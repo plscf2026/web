@@ -15,6 +15,9 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+    width: 100%;
+    touch-action: manipulation;
   }
 
   @media (min-width: 768px) {
@@ -54,6 +57,9 @@
     color: #0f172a;
     background-color: #f0f6fa;
     line-height: 1.5;
+    overflow-x: hidden;
+    width: 100%;
+    touch-action: manipulation;
   }
 
   h1, h2, h3, h4, h5, h6, .font-heading {
@@ -65,8 +71,15 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   }
 
-  input, select, textarea, button {
+  /* Prevent Mobile (iOS Safari & Android) from auto-zooming on focus & double-tap */
+  input, select, textarea {
+    font-size: 16px !important;
     font-family: inherit;
+    touch-action: manipulation;
+  }
+
+  button, a, [role="button"] {
+    touch-action: manipulation;
   }
 
   input[aria-invalid="true"],
