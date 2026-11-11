@@ -64,6 +64,26 @@
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
 }
 
+/* Animated Square QR Laser Scanning Beam */
+@keyframes qrLaserScan {
+  0% {
+    top: 6%;
+    opacity: 0.85;
+  }
+  50% {
+    top: 92%;
+    opacity: 1;
+  }
+  100% {
+    top: 6%;
+    opacity: 0.85;
+  }
+}
+
+.animate-qr-laser {
+  animation: qrLaserScan 2s ease-in-out infinite;
+}
+
 /* Global cubic-bezier slide-up animation */
 @keyframes slideUpEntrance {
   from {

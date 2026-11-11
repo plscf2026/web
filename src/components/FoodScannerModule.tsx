@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Utensils,
   Coffee,
@@ -25,7 +25,8 @@ import { EventStore, hasDepartmentPermission } from '../services/eventStore';
 import { findRegistrationByTokenOrId } from '../utils/tokenGenerator';
 import { validateMealCollection } from '../utils/eventRules';
 import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
-import { startResilientCameraStream, decodeQRCodeFromImageFile } from '../utils/qrDecoder';
+import { decodeQRCodeFromImageFile } from '../utils/qrDecoder';
+import { QrCameraScanner } from './common/QrCameraScanner';
 
 interface FoodScannerModuleProps {
   language: Language;
@@ -61,78 +62,9 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
   const [correctionReason, setCorrectionReason] = useState('');
   const [newCorrectionStatus, setNewCorrectionStatus] = useState<'COLLECTED' | 'CANCELLED'>('CANCELLED');
 
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const [isStartingCamera, setIsStartingCamera] = useState<boolean>(false);
-
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const lastScannedCodeRef = useRef<string>('');
-  const lastScannedTimeRef = useRef<number>(0);
-
   const refreshDistributions = () => {
     setDistributions(EventStore.getFoodDistributions());
   };
-
-  // Camera stream starter & real-time QR code decoding
-  useEffect(() => {
-    let stream: MediaStream | null = null;
-    let detectorInterval: any = null;
-
-    if (cameraActive) {
-      setCameraError(null);
-      setIsStartingCamera(true);
-
-      startResilientCameraStream(true).then((res) => {
-        setIsStartingCamera(false);
-        if (res.error || !res.stream) {
-          setCameraError(res.error || 'Failed to start camera.');
-          return;
-        }
-
-        stream = res.stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.setAttribute('playsinline', 'true');
-          videoRef.current.setAttribute('muted', 'true');
-          videoRef.current.play().catch(() => {});
-        }
-
-        // Real-time camera QR decoding using BarcodeDetector API
-        if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
-          try {
-            const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
-            detectorInterval = setInterval(async () => {
-              if (
-                videoRef.current &&
-                videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA
-              ) {
-                try {
-                  const barcodes = await detector.detect(videoRef.current);
-                  if (barcodes.length > 0) {
-                    const code = barcodes[0].rawValue?.trim();
-                    const now = Date.now();
-                    if (code && (code !== lastScannedCodeRef.current || now - lastScannedTimeRef.current > 3000)) {
-                      lastScannedCodeRef.current = code;
-                      lastScannedTimeRef.current = now;
-                      handleProcessScan(code);
-                    }
-                  }
-                } catch (e) {}
-              }
-            }, 300);
-          } catch (e) {
-            console.warn('BarcodeDetector initialization notice:', e);
-          }
-        }
-      });
-    }
-
-    return () => {
-      if (detectorInterval) clearInterval(detectorInterval);
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, [cameraActive]);
 
   const handleQRImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -364,45 +296,27 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
               </div>
             </div>
 
-            {/* Camera Viewport & Diagnostic Alerts */}
+            {/* Square QR Code Camera Viewfinder */}
             {cameraActive && (
-              <div className="space-y-2">
-                {cameraError ? (
-                  <div className="p-4 bg-amber-50 border border-amber-300 text-amber-900 rounded-2xl text-xs space-y-2">
-                    <div className="flex items-center gap-1.5 font-bold text-amber-950">
-                      <AlertTriangle className="w-4 h-4 text-amber-600" />
-                      <span>Camera Notice</span>
-                    </div>
-                    <p className="text-[11px] leading-relaxed">{cameraError}</p>
-                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-200 hover:bg-amber-300 text-amber-950 font-bold rounded-lg cursor-pointer transition-colors text-xs mt-1">
-                      <span>📁 Select Ticket / QR Photo File</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleQRImageUpload}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-                ) : (
-                  <div className="relative rounded-2xl overflow-hidden bg-slate-950 aspect-video border-2 border-dashed border-amber-400 flex items-center justify-center">
-                    {isStartingCamera ? (
-                      <div className="text-white text-xs flex items-center gap-2 font-mono">
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
-                        <span>Initializing video camera...</span>
-                      </div>
-                    ) : (
-                      <>
-                        <video ref={videoRef} className="w-full h-full object-cover" autoPlay playsInline muted />
-                        <div className="absolute inset-x-8 inset-y-6 border-2 border-amber-400 rounded-xl pointer-events-none animate-pulse" />
-                        <span className="absolute bottom-2 bg-slate-900/80 text-amber-300 px-3 py-1 rounded-full text-[10px] font-mono">
-                          Center QR code in viewfinder
-                        </span>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
+              <QrCameraScanner
+                onScan={handleProcessScan}
+                onClose={() => setCameraActive(false)}
+                onUploadImage={async (file) => {
+                  const decoded = await decodeQRCodeFromImageFile(file);
+                  if (decoded) {
+                    handleProcessScan(decoded);
+                  } else {
+                    playScanErrorSound();
+                    setFeedbackNotice({
+                      type: 'error',
+                      message: 'Could not decode QR code from the selected image. Please try another photo or enter the ID manually.',
+                    });
+                  }
+                }}
+                language={language}
+                themeColor="amber"
+                title={language === 'bn' ? 'খাবার বিতরণ কিউআর ক্যামেরা' : 'Food QR Camera Scanner'}
+              />
             )}
 
             {/* Manual ID Input Form */}
