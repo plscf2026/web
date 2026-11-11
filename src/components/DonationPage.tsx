@@ -155,30 +155,64 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
 
       const invoiceNumber = `INV-DON-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-      // 1. Authenticate with PayStation Gateway
-      const tokenRes = await PayStationService.grantToken();
-      const grantToken = tokenRes.token;
+      // Build PayStation callback URL — embeds invoice & amount for return verification
+      const callbackUrl = PayStationService.buildCallbackUrl({
+        type: 'donation',
+        invoiceNumber,
+        amount: effectiveAmount,
+      });
 
-      // 2. Create Hosted Order / Session
-      const createRes = await PayStationService.createPayment(
-        {
-          invoice_number: invoiceNumber,
-          currency: 'BDT',
-          payment_amount: effectiveAmount,
-          reference: `Donation: ${selectedCause.titleEn.slice(0, 30)}`,
-          cust_name: sanitizedDonor,
-          cust_phone: normalizedMobile,
-          cust_email: email.trim() || undefined,
-          callback_url: typeof window !== 'undefined' ? `${window.location.origin}/?donation=success` : 'https://plscf.org/?donation=success',
-        },
-        grantToken
-      );
+      // Store donor info in sessionStorage so we can complete the record after return
+      try {
+        sessionStorage.setItem('plscf_pending_donation', JSON.stringify({
+          invoiceNumber,
+          amount: effectiveAmount,
+          donorName: finalDonorName,
+          mobileNumber: normalizedMobile,
+          email: email.trim(),
+          purpose: causeTitle,
+          paymentMethod,
+        }));
+      } catch {}
+
+      // Create PayStation hosted checkout session
+      const createRes = await PayStationService.createPayment({
+        invoice_number: invoiceNumber,
+        currency: 'BDT',
+        payment_amount: effectiveAmount,
+        pay_with_charge: 0,
+        reference: `Donation: ${selectedCause.titleEn.slice(0, 30)}`,
+        cust_name: sanitizedDonor,
+        cust_phone: normalizedMobile,
+        cust_email: email.trim() || undefined,
+        cust_address: 'Faridpur',
+        callback_url: callbackUrl,
+        checkout_items: JSON.stringify({ type: 'donation', cause: selectedCause.id }),
+        opt_a: 'donation',
+        opt_b: selectedCause.id,
+      });
 
       if (!createRes.success) {
-        throw new Error(createRes.error || 'Failed to initiate payment gateway.');
+        throw new Error(createRes.error || 'Failed to initiate donation payment gateway.');
       }
 
-      // 3. Complete Donation Record
+      if (createRes.paymentUrl) {
+        // Real gateway: open hosted checkout, then verify on return
+        // For sandbox with simulation fallback (no real URL), complete immediately
+        const isSandboxSim = createRes.paymentUrl.includes('checkout/pay?invoice=');
+        if (!isSandboxSim) {
+          window.open(createRes.paymentUrl, '_blank', 'noopener,noreferrer');
+          setErrorMessage(
+            isBangla
+              ? 'নতুন ট্যাবে পেমেন্ট সম্পন্ন করুন। পেমেন্টের পর ফিরে এসে "যাচাই করুন" বাটন চাপুন।'
+              : 'Complete payment in the new tab. Return here and click "Verify Payment" after completing.'
+          );
+          setIsProcessing(false);
+          return;
+        }
+      }
+
+      // Sandbox simulation / fallback: complete the donation record immediately
       const paymentResult: PayStationPaymentResult = {
         invoiceNumber,
         trxId: createRes.trxId || `PST-${Date.now().toString(36).toUpperCase()}`,

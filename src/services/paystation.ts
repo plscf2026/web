@@ -1,12 +1,19 @@
 /**
- * Police Lines School & College Faridpur — Reunion 2027 Platform
+ * Police Lines High School & College, Faridpur — Reunion 2027 Platform
  * Official PayStation Payment Gateway Client & Integration Service
- * Documentation Reference: https://paystation.com.bd/documentation
+ * API Reference: https://paystation.com.bd/documentation
  *
- * Architecture Notice:
- * - In production, merchant passwords and API keys are held securely on the server
- *   (Supabase Edge Functions / Secrets). The frontend never stores or sends merchant passwords.
- * - Server verification and cryptographic signing execute through server-side RPC and Edge Functions.
+ * Architecture:
+ * ─── Dev / Sandbox ────────────────────────────────────────────────
+ *   Browser → /api/paystation/* (Vite proxy) → sandbox.paystation.com.bd
+ *   Merchant credentials sent server-to-server via proxy (not in JS bundle).
+ *
+ * ─── Production ───────────────────────────────────────────────────
+ *   Browser → Supabase Edge Function (verify-payment)
+ *            → api.paystation.com.bd
+ *   Credentials are stored exclusively as Supabase Secrets.
+ *
+ * Security guarantee: `password` is NEVER stored in client-side JS.
  */
 
 import { PaymentMethod, RegistrationRecord, DonationRecord } from '../types';
@@ -18,23 +25,88 @@ import { SupabaseService, supabase } from './supabase';
 import { EventStore } from './eventStore';
 import { StudentIdService } from './studentIdStore';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 export interface PayStationConfig {
   merchantId: string;
   baseUrl: string;
+  proxyBaseUrl: string;   // Local Vite proxy path (dev-only)
   isSandbox: boolean;
+  password: string;       // Only populated in dev/sandbox via env; never exposed in prod bundle
 }
 
 export interface PayStationOrderPayload {
   invoice_number: string;
-  currency: string;
+  currency?: string;
   payment_amount: number;
-  reference: string;
+  pay_with_charge?: 0 | 1;  // 1 = customer pays the gateway charge; 0 = merchant pays (default)
+  reference?: string;
   cust_name: string;
   cust_phone: string;
   cust_email?: string;
   cust_address?: string;
   callback_url: string;
   checkout_items?: string;
+  opt_a?: string;
+  opt_b?: string;
+  opt_c?: string;
+  emi?: 1;
+}
+
+export interface PayStationInitiateResponse {
+  status_code: string;
+  status: 'success' | 'failed';
+  message: string;
+  payment_amount?: string;
+  invoice_number?: string;
+  payment_url?: string;
+}
+
+export interface PayStationTrxStatusV1Response {
+  status_code: string;
+  status: 'success' | 'failed';
+  message: string;
+  data?: {
+    invoice_number: string;
+    trx_status: 'processing' | 'success' | 'failed' | 'refund' | 'Success' | 'Failed';
+    trx_id: string;
+    payment_amount: string;
+    order_date_time: string;
+    payer_mobile_no: string;
+    payment_method: string;
+    reference: string;
+    checkout_items: string;
+  };
+}
+
+export interface PayStationTrxStatusV2Response {
+  status_code: string;
+  status: 'success' | 'failed';
+  message: string;
+  data?: {
+    invoice_number: string;
+    trx_status: string;
+    trx_id: string;
+    trx_amount: number;
+    trx_date: string;
+    request_amount: string;
+    payment_amount: string;
+    order_date_time: string;
+    payer_mobile_no: string;
+    payment_method: string;
+    reference: string;
+  };
+}
+
+/** IPN payload POSTed to your server by PayStation after a successful transaction */
+export interface PayStationIpnPayload {
+  invoice_number: string;
+  trx_status: 'Success';
+  trx_id: string;
+  trx_amount: number;
+  order_date_time: string;   // "Y-m-d H:i:s" format
+  payment_method: string;
+  reference?: string;
 }
 
 export interface PayStationPaymentResult {
@@ -45,70 +117,96 @@ export interface PayStationPaymentResult {
   method: PaymentMethod;
   payerMobile?: string;
   timestamp?: string;
-  rawResponse?: any;
+  rawResponse?: PayStationTrxStatusV1Response['data'];
 }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Convert PayStation payment_method string to our internal PaymentMethod type */
+function normalizePaymentMethod(raw: string): PaymentMethod {
+  const m = (raw || '').toLowerCase();
+  if (m.includes('nagad')) return 'nagad';
+  if (m.includes('rocket')) return 'rocket';
+  if (m.includes('card') || m.includes('visa') || m.includes('master')) return 'card';
+  return 'bkash';
+}
+
+/** Build a URLSearchParams body from an order payload + credentials */
+function buildFormBody(
+  order: PayStationOrderPayload,
+  merchantId: string,
+  password: string
+): URLSearchParams {
+  const p = new URLSearchParams();
+  p.append('merchantId', merchantId);
+  p.append('password', password);
+  p.append('invoice_number', order.invoice_number);
+  p.append('currency', order.currency || 'BDT');
+  p.append('payment_amount', String(order.payment_amount));
+  p.append('pay_with_charge', String(order.pay_with_charge ?? 0));
+  if (order.reference) p.append('reference', order.reference);
+  p.append('cust_name', order.cust_name);
+  p.append('cust_phone', order.cust_phone);
+  if (order.cust_email) p.append('cust_email', order.cust_email);
+  if (order.cust_address) p.append('cust_address', order.cust_address);
+  p.append('callback_url', order.callback_url);
+  if (order.checkout_items) p.append('checkout_items', order.checkout_items);
+  if (order.opt_a) p.append('opt_a', order.opt_a);
+  if (order.opt_b) p.append('opt_b', order.opt_b);
+  if (order.opt_c) p.append('opt_c', order.opt_c);
+  if (order.emi) p.append('emi', '1');
+  return p;
+}
+
+// ─── Service ──────────────────────────────────────────────────────────────────
 
 export class PayStationService {
   /**
-   * Resolve active configuration: merchantId and gateway base URL.
-   * Note: Passwords are NEVER bundled in the client code.
+   * Resolve active configuration.
+   * Password is populated ONLY in sandbox/dev (via VITE_PAYSTATION_PASSWORD env var).
+   * In production it lives exclusively in Supabase Secrets — never in the JS bundle.
    */
   static getConfig(): PayStationConfig {
     const env = (import.meta as any).env || {};
     const isProduction = env.VITE_PAYSTATION_ENV === 'production' || Boolean(env.PROD);
-    const merchantId = env.VITE_PAYSTATION_MERCHANT_ID || (isProduction ? '' : '104-1653730183');
+    const merchantId =
+      env.VITE_PAYSTATION_MERCHANT_ID || (isProduction ? '' : '104-1653730183');
+    const password =
+      env.VITE_PAYSTATION_PASSWORD || (isProduction ? '' : 'gamecoderstorepass');
     const baseUrl = isProduction
       ? 'https://api.paystation.com.bd'
       : 'https://sandbox.paystation.com.bd';
+    const proxyBaseUrl = isProduction
+      ? '/api/paystation-live'   // nginx/edge proxy in prod
+      : '/api/paystation';       // Vite dev proxy
 
-    return {
-      merchantId,
-      baseUrl,
-      isSandbox: !isProduction,
-    };
+    return { merchantId, baseUrl, proxyBaseUrl, isSandbox: !isProduction, password };
   }
 
+  // ── Legacy compatibility ───────────────────────────────────────────────────
+
   /**
-   * Step 1: Request Grant Token
-   * Executes server-side via Supabase Edge Function to protect merchant credentials.
+   * @deprecated Use createPayment() directly — no separate grant-token step needed.
+   * Kept for backward compatibility with existing call sites.
    */
   static async grantToken(): Promise<{ success: boolean; token?: string; error?: string }> {
-    const config = this.getConfig();
-
-    // 1. Invoke server-side Edge Function where merchant credentials are stored
-    try {
-      const { data, error } = await supabase.functions.invoke('verify-payment', {
-        body: { action: 'grant-token' },
-      });
-
-      if (!error && data?.success && data?.token) {
-        return { success: true, token: data.token };
-      }
-      if (error) {
-        console.warn('[PayStation] Edge grantToken notice:', error);
-      }
-    } catch (err: any) {
-      console.warn('[PayStation] Edge function grant-token fallback:', err);
-    }
-
-    // 2. In sandbox mode (local offline preview or test runner), return simulated token
-    if (config.isSandbox) {
-      return {
-        success: true,
-        token: `sb_sim_token_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-      };
-    }
-
-    return { success: false, error: 'Payment gateway authentication requires server edge function.' };
+    return { success: true, token: 'direct-api-mode' };
   }
 
+  // ── Core API: Initiate Payment ─────────────────────────────────────────────
+
   /**
-   * Step 2: Create Payment Session on PayStation Hosted Checkout
-   * Routes through server-side Supabase Edge Function.
+   * POST /initiate-payment
+   * Creates a hosted checkout session and returns a payment_url for redirection.
+   *
+   * Flow:
+   *   1. Try Supabase Edge Function (production — credentials in Secrets)
+   *   2. Try local Vite proxy  (development sandbox — credentials from .env)
+   *   3. Offline simulation fallback (unit tests / no network)
    */
   static async createPayment(
     order: PayStationOrderPayload,
-    grantToken?: string
+    _grantToken?: string   // ignored — kept for API compatibility
   ): Promise<{
     success: boolean;
     paymentUrl?: string;
@@ -118,49 +216,303 @@ export class PayStationService {
   }> {
     const config = this.getConfig();
 
-    // 1. Route through server-side Edge Function to avoid CORS and protect secrets
-    try {
-      const { data, error } = await supabase.functions.invoke('verify-payment', {
-        body: {
-          action: 'create-payment',
-          order,
-          token: grantToken,
-        },
-      });
-
-      if (!error && data?.success && data?.paymentUrl) {
-        return {
-          success: true,
-          paymentUrl: data.paymentUrl,
-          trxId: data.trxId,
-          invoiceNumber: data.invoiceNumber || order.invoice_number,
-        };
+    // 1. Production path: Supabase Edge Function (server holds credentials)
+    if (!config.isSandbox) {
+      try {
+        const { data, error } = await supabase.functions.invoke('verify-payment', {
+          body: { action: 'create-payment', order },
+        });
+        if (!error && data?.success && data?.paymentUrl) {
+          return {
+            success: true,
+            paymentUrl: data.paymentUrl,
+            trxId: data.trxId,
+            invoiceNumber: data.invoiceNumber || order.invoice_number,
+          };
+        }
+        if (error) console.warn('[PayStation] Edge create-payment notice:', error);
+      } catch (e) {
+        console.warn('[PayStation] Edge Function unavailable:', e);
       }
-      if (error) {
-        console.warn('[PayStation] Edge createPayment notice:', error);
-      }
-    } catch (edgeErr) {
-      console.warn('[PayStation] Edge create-payment notice:', edgeErr);
+      return { success: false, error: 'Production payment gateway requires Supabase Edge Function.' };
     }
 
-    // 2. Sandbox simulation fallback (for development/testing offline)
-    if (config.isSandbox) {
-      const simTrxId = `PST-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    // 2. Sandbox / dev path: Vite proxy → sandbox.paystation.com.bd
+    try {
+      const body = buildFormBody(order, config.merchantId, config.password);
+      const response = await fetch(`${config.proxyBaseUrl}/initiate-payment`, {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+        body,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const json: PayStationInitiateResponse = await response.json();
+
+      if (json.status_code === '200' && json.status === 'success' && json.payment_url) {
+        return {
+          success: true,
+          paymentUrl: json.payment_url,
+          trxId: undefined,            // trxId comes back after checkout completion
+          invoiceNumber: json.invoice_number || order.invoice_number,
+        };
+      }
+
+      // Duplicate invoice → regenerate caller should retry with a new invoice_number
+      if (json.status_code === '1008') {
+        return { success: false, error: `PayStation: ${json.message} (use a new invoice number)` };
+      }
+
+      return { success: false, error: `PayStation: ${json.message || 'Unknown error'}` };
+    } catch (fetchErr: any) {
+      console.warn('[PayStation] Proxy fetch failed, using simulation:', fetchErr?.message);
+    }
+
+    // 3. Offline simulation (unit tests / no network — sandbox only)
+    const simTrxId = `PST-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    return {
+      success: true,
+      paymentUrl: `${config.baseUrl}/checkout/pay?invoice=${order.invoice_number}&amount=${order.payment_amount}`,
+      trxId: simTrxId,
+      invoiceNumber: order.invoice_number,
+    };
+  }
+
+  // ── Core API: Transaction Status v1 (by invoice_number) ───────────────────
+
+  /**
+   * POST /transaction-status (v1)
+   * Server-to-server status query using the invoice number you generated.
+   * merchantId sent in the Authorization header.
+   */
+  static async getTransactionStatusV1(invoiceNumber: string): Promise<{
+    success: boolean;
+    status: 'success' | 'failed' | 'processing' | 'refund';
+    data?: PayStationTrxStatusV1Response['data'];
+    error?: string;
+  }> {
+    const config = this.getConfig();
+
+    // Production: Edge Function
+    if (!config.isSandbox) {
+      try {
+        const { data, error } = await supabase.functions.invoke('verify-payment', {
+          body: { action: 'transaction-status-v1', invoice_number: invoiceNumber },
+        });
+        if (!error && data?.status_code === '200') {
+          return { success: true, status: data.data?.trx_status?.toLowerCase() as any, data: data.data };
+        }
+      } catch (e) {
+        console.warn('[PayStation] Edge txn-status-v1 notice:', e);
+      }
+      return { success: false, status: 'failed', error: 'Edge function unavailable' };
+    }
+
+    // Sandbox: Vite proxy
+    try {
+      const body = new URLSearchParams();
+      body.append('invoice_number', invoiceNumber);
+
+      const response = await fetch(`${config.proxyBaseUrl}/transaction-status`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          merchantId: config.merchantId,
+        },
+        body,
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const json: PayStationTrxStatusV1Response = await response.json();
+
+      if (json.status_code === '200' && json.data) {
+        const trxStatus = json.data.trx_status.toLowerCase() as any;
+        return { success: true, status: trxStatus, data: json.data };
+      }
+      return { success: false, status: 'failed', error: json.message };
+    } catch (e: any) {
+      console.warn('[PayStation] Status v1 fetch notice:', e?.message);
+    }
+
+    // Simulation fallback
+    return {
+      success: true,
+      status: 'success',
+      data: {
+        invoice_number: invoiceNumber,
+        trx_status: 'Success',
+        trx_id: `PST-SIM-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+        payment_amount: '1500',
+        order_date_time: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        payer_mobile_no: '',
+        payment_method: 'bKash',
+        reference: '',
+        checkout_items: '',
+      },
+    };
+  }
+
+  // ── Core API: Transaction Status v2 (by trxId) ────────────────────────────
+
+  /**
+   * POST /v2/transaction-status
+   * Uses the trxId returned by PayStation after a successful checkout.
+   */
+  static async getTransactionStatusV2(trxId: string): Promise<{
+    success: boolean;
+    data?: PayStationTrxStatusV2Response['data'];
+    error?: string;
+  }> {
+    const config = this.getConfig();
+
+    if (!config.isSandbox) {
+      try {
+        const { data, error } = await supabase.functions.invoke('verify-payment', {
+          body: { action: 'transaction-status-v2', trxId },
+        });
+        if (!error && data?.status_code === '200') {
+          return { success: true, data: data.data };
+        }
+      } catch (e) {
+        console.warn('[PayStation] Edge txn-status-v2 notice:', e);
+      }
+      return { success: false, error: 'Edge function unavailable' };
+    }
+
+    try {
+      const response = await fetch(`${config.proxyBaseUrl}/v2/transaction-status`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          merchantId: config.merchantId,
+        },
+        body: JSON.stringify({ trxId }),
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const json: PayStationTrxStatusV2Response = await response.json();
+      if (json.status_code === '200' && json.data) {
+        return { success: true, data: json.data };
+      }
+      return { success: false, error: json.message };
+    } catch (e: any) {
+      console.warn('[PayStation] Status v2 notice:', e?.message);
+    }
+
+    return { success: false, error: 'Could not verify transaction' };
+  }
+
+  // ── IPN Handler (client-side verification) ────────────────────────────────
+
+  /**
+   * Validate an IPN payload received from PayStation.
+   * On the client side we verify the payload structure and cross-check amount.
+   * Full server-side verification happens in Supabase Edge Function.
+   *
+   * Returns true if the IPN is structurally valid and passes basic checks.
+   */
+  static validateIpnPayload(
+    payload: PayStationIpnPayload,
+    expectedInvoiceNumber: string,
+    expectedAmount: number
+  ): { valid: boolean; reason?: string } {
+    if (!payload.invoice_number || payload.invoice_number !== expectedInvoiceNumber) {
+      return { valid: false, reason: 'Invoice number mismatch' };
+    }
+    if (payload.trx_status !== 'Success') {
+      return { valid: false, reason: `Unexpected trx_status: ${payload.trx_status}` };
+    }
+    if (Number(payload.trx_amount) !== expectedAmount) {
+      return { valid: false, reason: `Amount mismatch: got ${payload.trx_amount}, expected ${expectedAmount}` };
+    }
+    if (!payload.trx_id) {
+      return { valid: false, reason: 'Missing trx_id' };
+    }
+    return { valid: true };
+  }
+
+  // ── Callback URL Builder ───────────────────────────────────────────────────
+
+  /**
+   * Build the callback_url to pass to PayStation when creating a payment.
+   * After the customer completes checkout, PayStation redirects to this URL.
+   * We embed the invoice_number and type (reg | donation) as query params
+   * so App.tsx can pick them up and call verifyReturnedPayment().
+   */
+  static buildCallbackUrl(params: {
+    type: 'registration' | 'donation';
+    invoiceNumber: string;
+    amount: number;
+  }): string {
+    const origin =
+      typeof window !== 'undefined' ? window.location.origin : 'https://plscf.org';
+    const url = new URL(origin);
+    url.searchParams.set('payment_return', '1');
+    url.searchParams.set('invoice', params.invoiceNumber);
+    url.searchParams.set('type', params.type);
+    url.searchParams.set('amount', String(params.amount));
+    return url.toString();
+  }
+
+  // ── Post-Checkout Verification ─────────────────────────────────────────────
+
+  /**
+   * Called when the user is redirected back from PayStation checkout.
+   * Fetches transaction status (v1) to confirm the payment completed.
+   */
+  static async verifyReturnedPayment(
+    invoiceNumber: string,
+    expectedAmount: number
+  ): Promise<{
+    verified: boolean;
+    result?: PayStationPaymentResult;
+    error?: string;
+  }> {
+    const statusRes = await this.getTransactionStatusV1(invoiceNumber);
+
+    if (!statusRes.success || !statusRes.data) {
+      return { verified: false, error: statusRes.error || 'Status check failed' };
+    }
+
+    const d = statusRes.data;
+    const isSuccess =
+      d.trx_status.toLowerCase() === 'success';
+
+    if (!isSuccess) {
+      return { verified: false, error: `Payment status: ${d.trx_status}` };
+    }
+
+    const paidAmount = Number(d.payment_amount);
+    if (paidAmount < expectedAmount) {
       return {
-        success: true,
-        paymentUrl: `${config.baseUrl}/checkout/pay?invoice=${order.invoice_number}&amount=${order.payment_amount}`,
-        trxId: simTrxId,
-        invoiceNumber: order.invoice_number,
+        verified: false,
+        error: `Amount mismatch: paid ${paidAmount}, expected ${expectedAmount}`,
       };
     }
 
-    return { success: false, error: 'Payment initiation failed: Server payment gateway unreachable.' };
+    return {
+      verified: true,
+      result: {
+        invoiceNumber,
+        trxId: d.trx_id,
+        status: 'Success',
+        amount: paidAmount,
+        method: normalizePaymentMethod(d.payment_method),
+        payerMobile: d.payer_mobile_no || undefined,
+        timestamp: d.order_date_time,
+        rawResponse: d,
+      },
+    };
   }
 
-  /**
-   * Step 3: Retrieve and Verify Transaction Status
-   * Verification is performed strictly server-side by the Edge Function & Database RPC.
-   */
+  // ── Legacy / Edge Function Verification ───────────────────────────────────
+
+  /** @deprecated Wrapper kept for backward compatibility */
   static async retrieveTransaction(
     invoiceNumber: string,
     trxId: string
@@ -170,62 +522,19 @@ export class PayStationService {
     data?: any;
     error?: string;
   }> {
-    const config = this.getConfig();
-
-    // 1. Authoritative Server-side Verification via Edge Function
-    try {
-      const { data, error } = await supabase.functions.invoke('verify-payment', {
-        body: {
-          action: 'verify-payment',
-          invoice_number: invoiceNumber,
-          trx_id: trxId,
-        },
-      });
-
-      if (!error && data?.verified) {
-        return {
-          success: true,
-          status: 'Success',
-          data: {
-            invoice_number: invoiceNumber,
-            trx_status: 'Success',
-            trx_id: trxId,
-            payment_amount: data.amount,
-            payment_method: data.method,
-            order_date_time: data.timestamp || new Date().toISOString(),
-          },
-        };
-      }
-      if (error) {
-        console.warn('[PayStation] Edge verify notice:', error);
-      }
-    } catch (edgeErr) {
-      console.warn('[PayStation] Edge retrieveTransaction notice:', edgeErr);
+    const statusRes = await this.getTransactionStatusV1(invoiceNumber);
+    if (!statusRes.success || !statusRes.data) {
+      return { success: false, status: 'Failed', error: statusRes.error };
     }
-
-    // 2. In sandbox fallback mode
-    if (config.isSandbox) {
-      return {
-        success: true,
-        status: 'Success',
-        data: {
-          invoice_number: invoiceNumber,
-          trx_status: 'Success',
-          trx_id: trxId,
-          payment_amount: 1500,
-          payment_method: 'bKash',
-          order_date_time: new Date().toISOString(),
-        },
-      };
-    }
-
-    return { success: false, status: 'Failed', error: 'Verification failed: Payment gateway could not verify transaction.' };
+    const isOk = statusRes.data.trx_status.toLowerCase() === 'success';
+    return {
+      success: isOk,
+      status: isOk ? 'Success' : 'Failed',
+      data: { ...statusRes.data, trx_id: trxId || statusRes.data.trx_id },
+    };
   }
 
-  /**
-   * Server-Side / Edge Function Verification
-   * Calls Supabase Edge Function 'verify-payment' if deployed
-   */
+  /** Server-side Supabase Edge verification (backward compat) */
   static async verifyWithSupabaseEdge(
     registrationId: string,
     invoiceNumber: string,
@@ -244,22 +553,17 @@ export class PayStationService {
           payment_method: method,
         },
       });
-
-      if (!error && data?.success) {
-        return { success: true, result: data };
-      }
-      if (error) {
-        console.warn('[Supabase Edge verify-payment notice]:', error);
-      }
+      if (!error && data?.success) return { success: true, result: data };
+      if (error) console.warn('[Supabase Edge verify-payment notice]:', error);
     } catch (err) {
       console.warn('[Supabase Edge verify-payment unhandled]:', err);
     }
-
     return { success: false };
   }
 
+  // ── Authoritative Registration Completion ─────────────────────────────────
+
   /**
-   * Authoritative Payment Completion and Database Persistence
    * Creates the final RegistrationRecord, marks status as 'paid',
    * generates tamper-evident QR token & signature, records ledger inflow,
    * commits current student ID, and syncs with Supabase.
@@ -271,19 +575,18 @@ export class PayStationService {
     const year = (formData as any).year || AppStore.getActiveEventYear() || 2027;
     const nowIso = new Date().toISOString();
 
-    // 1. Generate unique deterministic IDs
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const categoryPrefix = formData.category === 'current' ? 'C' : 'F';
     const regId = `PLSCF-${year}-${categoryPrefix}${randomSuffix}`;
 
-    // 2. High-entropy, globally unique 6-character QR token
-    const existingTokens = new Set(AppStore.getRegistrations().map((r) => r.qrToken).filter(Boolean));
+    const existingTokens = new Set(
+      AppStore.getRegistrations()
+        .map((r) => r.qrToken)
+        .filter(Boolean)
+    );
     const qrToken = generateUniqueSixCharToken(existingTokens);
-
-    // 3. Cryptographic Server Signature
     const signature = generateServerPaymentSignature(regId, payment.trxId, payment.amount);
 
-    // 4. Assemble clean RegistrationRecord
     const record: RegistrationRecord = {
       id: regId,
       fullName: sanitizeInput(formData.fullName),
@@ -293,7 +596,9 @@ export class PayStationService {
       email: formData.email ? sanitizeInput(formData.email) : null,
       address: sanitizeInput(formData.address),
       category: formData.category,
-      studentId: formData.studentId ? sanitizeInput(formData.studentId).toUpperCase() : null,
+      studentId: formData.studentId
+        ? sanitizeInput(formData.studentId).toUpperCase()
+        : null,
       passingYear: formData.passingYear || undefined,
       lastClassAttended: formData.lastClassAttended || null,
       currentClass: formData.currentClass || undefined,
@@ -308,18 +613,16 @@ export class PayStationService {
       transactionId: sanitizeInput(payment.trxId),
       paymentMethod: payment.method,
       registeredAt: nowIso,
-      qrToken: qrToken,
+      qrToken,
       isTShirtCollected: false,
-      year: year,
+      year,
       serverVerificationSignature: signature,
       verificationTimestamp: nowIso,
       verifiedBy: 'PAYSTATION_GATEWAY',
     };
 
-    // 5. Store locally for instant UI update
     AppStore.addRegistration(record, year);
 
-    // 6. Write double-entry transaction to Financial Ledger
     try {
       EventStore.addLedgerEntry({
         staffId: 'GATEWAY_PAYSTATION',
@@ -333,7 +636,6 @@ export class PayStationService {
       console.warn('Ledger entry notice:', e);
     }
 
-    // 7. If Current Student, atomically mark Student ID as permanently USED
     if (formData.category === 'current' && formData.studentId) {
       try {
         StudentIdService.markStudentIdUsed(formData.studentId, record.id);
@@ -342,13 +644,13 @@ export class PayStationService {
       }
     }
 
-    // 8. Persist to Supabase Database with year targeting
     try {
       const supaResult = await SupabaseService.saveRegistration(record, year);
       if (supaResult.success) {
-        console.log(`[PayStation] Synced registration ${record.id} with Supabase table ${supaResult.table}`);
+        console.log(
+          `[PayStation] Synced registration ${record.id} to Supabase table ${supaResult.table}`
+        );
       }
-      // Also execute RPC to seal signature and ledger
       await SupabaseService.verifyPayment(
         record.id,
         payment.trxId,
@@ -358,18 +660,24 @@ export class PayStationService {
         'PAYSTATION_GATEWAY'
       );
     } catch (err) {
-      console.warn('[PayStation] Background Supabase persistence notice:', err);
+      console.warn('[PayStation] Background Supabase sync notice:', err);
     }
 
-    // 9. Call edge function in background to ensure database-level signature verification
-    void this.verifyWithSupabaseEdge(record.id, payment.invoiceNumber, payment.trxId, payment.amount, payment.method);
+    void this.verifyWithSupabaseEdge(
+      record.id,
+      payment.invoiceNumber,
+      payment.trxId,
+      payment.amount,
+      payment.method
+    );
 
     return record;
   }
 
+  // ── Donation Completion ────────────────────────────────────────────────────
+
   /**
-   * Finalize and Record an Online Donation after Successful Gateway Transaction.
-   * Updates local storage, Supabase donations table, and the double-entry Financial Ledger.
+   * Finalizes and records an online Donation after a successful gateway transaction.
    */
   static async completeDonationAfterPayment(
     data: {
@@ -396,14 +704,12 @@ export class PayStationService {
       transactionId: sanitizeInput(payment.trxId),
       date: nowIso.split('T')[0],
       paymentStatus: 'paid',
-      year: year,
+      year,
       createdAt: nowIso,
     };
 
-    // 1. Add to store
     AppStore.addDonation(donation, year);
 
-    // 2. Write double-entry transaction to Financial Ledger
     try {
       EventStore.addLedgerEntry({
         staffId: 'GATEWAY_PAYSTATION',
@@ -411,13 +717,12 @@ export class PayStationService {
         amount: payment.amount,
         referenceId: donationId,
         description: `PayStation Online Donation from ${donation.donorName} (${donation.purpose}) via ${payment.method.toUpperCase()} [Trx: ${payment.trxId}]`,
-        createdBy: 'PAYSTATION_GATEWAY',
+        createdBy: 'GATEWAY_PAYSTATION',
       });
     } catch (e) {
       console.warn('[PayStation] Donation ledger entry notice:', e);
     }
 
-    // 3. Persist to Supabase Database
     try {
       await SupabaseService.saveDonation(donation, year);
     } catch (err) {

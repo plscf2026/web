@@ -70,7 +70,7 @@ export default function App() {
     setFeeSettings(AppStore.getFeeSettings());
   }, [activeView]);
 
-  // Deep-link routing: auto-handle QR scans & verification URLs (?id=... or ?verify=... or ?token=...)
+  // Deep-link routing: auto-handle QR scans, verification URLs, and PayStation payment returns
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -79,6 +79,33 @@ export default function App() {
       const tokenParam = params.get('token');
       const query = tokenParam || idParam;
 
+      // ── PayStation payment return callback ───────────────────────────────
+      // PayStation redirects to callback_url after checkout (success or failure).
+      // We handle both registration and donation return flows here.
+      if (params.get('payment_return') === '1') {
+        const invoiceNumber = params.get('invoice') || '';
+        const payType = params.get('type') as 'registration' | 'donation' | null;
+        const amount = Number(params.get('amount') || 0);
+
+        // Clean the URL immediately to prevent re-triggering on refresh
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, '', cleanUrl);
+
+        if (invoiceNumber && amount > 0) {
+          if (payType === 'donation') {
+            setActiveView('donate');
+            // The DonationPage's useEffect will detect the pending verification
+            // via sessionStorage written before redirect
+          } else {
+            // Registration return — open payment modal in 'waiting' state so
+            // the user can click "I completed payment" to trigger status check
+            setActiveView('register');
+          }
+        }
+        return;
+      }
+
+      // ── Standard deep-link handling ──────────────────────────────────────
       if (query) {
         const local = findRegistrationByTokenOrId(AppStore.getRegistrations(), query);
         if (local) {
