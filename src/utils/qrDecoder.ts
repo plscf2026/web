@@ -109,60 +109,67 @@ export function startLiveQRScanner(
     }
   }
 
+  let isProcessing = false;
+
   const scanFrame = async () => {
-    if (!isScanning || !video) return;
+    if (!isScanning || !video || isProcessing) return;
+    isProcessing = true;
 
-    // Check if video is loaded and playing with valid dimensions
-    if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-      let detectedCode: string | null = null;
+    try {
+      // Check if video is loaded and playing with valid dimensions
+      if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+        let detectedCode: string | null = null;
 
-      // 1. Try native BarcodeDetector first if available
-      if (nativeDetector) {
-        try {
-          const barcodes = await nativeDetector.detect(video);
-          if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
-            detectedCode = barcodes[0].rawValue.trim();
-          }
-        } catch (_) {
-          // Native detector error or unhandled frame -> fallback to jsQR
-        }
-      }
-
-      // 2. jsQR canvas fallback (Universal across iOS Safari, Firefox, and Android)
-      if (!detectedCode && typeof document !== 'undefined') {
-        try {
-          if (!canvas) {
-            canvas = document.createElement('canvas');
-          }
-          // Downscale to 600px max dimension for ultra-fast 60fps frame rate without CPU lag
-          const targetWidth = Math.min(video.videoWidth, 600);
-          const scale = targetWidth / video.videoWidth;
-          const targetHeight = Math.floor(video.videoHeight * scale);
-
-          if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
-            canvas.width = targetWidth;
-            canvas.height = targetHeight;
-            ctx = canvas.getContext('2d', { willReadFrequently: true });
-          }
-
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
-            const imgData = ctx.getImageData(0, 0, targetWidth, targetHeight);
-            const qr = jsQR(imgData.data, imgData.width, imgData.height, {
-              inversionAttempts: 'attemptBoth',
-            });
-            if (qr && qr.data && qr.data.trim()) {
-              detectedCode = qr.data.trim();
+        // 1. Try native BarcodeDetector first if available
+        if (nativeDetector) {
+          try {
+            const barcodes = await nativeDetector.detect(video);
+            if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+              detectedCode = barcodes[0].rawValue.trim();
             }
+          } catch (_) {
+            // Native detector error or unhandled frame -> fallback to jsQR
           }
-        } catch (_) {
-          // Ignore transient frame read errors
+        }
+
+        // 2. jsQR canvas fallback (Universal across iOS Safari, Firefox, and Android)
+        if (!detectedCode && typeof document !== 'undefined') {
+          try {
+            if (!canvas) {
+              canvas = document.createElement('canvas');
+            }
+            // Downscale to 600px max dimension for ultra-fast 60fps frame rate without CPU lag
+            const targetWidth = Math.min(video.videoWidth, 600);
+            const scale = targetWidth / video.videoWidth;
+            const targetHeight = Math.floor(video.videoHeight * scale);
+
+            if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+              canvas.width = targetWidth;
+              canvas.height = targetHeight;
+              ctx = canvas.getContext('2d', { willReadFrequently: true });
+            }
+
+            if (ctx) {
+              ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
+              const imgData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+              const qr = jsQR(imgData.data, imgData.width, imgData.height, {
+                inversionAttempts: 'attemptBoth',
+              });
+              if (qr && qr.data && qr.data.trim()) {
+                detectedCode = qr.data.trim();
+              }
+            }
+          } catch (_) {
+            // Ignore transient frame read errors
+          }
+        }
+
+        if (detectedCode && isScanning) {
+          onDetected(detectedCode);
         }
       }
-
-      if (detectedCode && isScanning) {
-        onDetected(detectedCode);
-      }
+    } finally {
+      isProcessing = false;
     }
   };
 

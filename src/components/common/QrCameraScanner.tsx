@@ -23,11 +23,18 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
   const [preferRear, setPreferRear] = useState(true);
   const [isInitializing, setIsInitializing] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [lastScanned, setLastScanned] = useState<string | null>(null);
   const [isDetectedSuccess, setIsDetectedSuccess] = useState(false);
 
+  // Keep callback and scan state in stable refs so parent re-renders never tear down or restart the camera stream
+  const onScanRef = useRef(onScan);
+  useEffect(() => {
+    onScanRef.current = onScan;
+  }, [onScan]);
+
+  const lastScannedRef = useRef<string | null>(null);
   const lastScannedTimeRef = useRef<number>(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const themeBorderColor =
     themeColor === 'emerald'
@@ -50,6 +57,7 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
       ? 'via-sky-400 shadow-[0_0_12px_#38bdf8]'
       : 'via-amber-400 shadow-[0_0_12px_#fbbf24]';
 
+  // Master camera stream lifecycle: strictly depends on hardware facing mode (preferRear), NOT on scan results
   useEffect(() => {
     let stream: MediaStream | null = null;
     let stopScanner: (() => void) | null = null;
@@ -83,18 +91,37 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
             .play()
             .then(() => {
               if (videoRef.current && !isCancelled) {
-                // Initialize high-speed live scanner
+                // Initialize high-speed live scanner with frame lock
                 stopScanner = startLiveQRScanner(
                   videoRef.current,
                   (code) => {
                     const now = Date.now();
-                    // Throttle identical scans to prevent spamming
-                    if (code && (code !== lastScanned || now - lastScannedTimeRef.current > 2500)) {
-                      lastScannedTimeRef.current = now;
-                      setLastScanned(code);
-                      setIsDetectedSuccess(true);
-                      setTimeout(() => setIsDetectedSuccess(false), 800);
-                      onScan(code);
+                    const cleanCode = code ? code.trim() : '';
+                    if (!cleanCode) return;
+
+                    // Throttle identical scans to prevent rapid re-triggering (2.2s debounce)
+                    if (
+                      cleanCode === lastScannedRef.current &&
+                      now - lastScannedTimeRef.current < 2200
+                    ) {
+                      return;
+                    }
+
+                    lastScannedRef.current = cleanCode;
+                    lastScannedTimeRef.current = now;
+
+                    // Trigger non-intrusive green glow feedback without shifting layout
+                    setIsDetectedSuccess(true);
+                    if (successTimeoutRef.current) {
+                      clearTimeout(successTimeoutRef.current);
+                    }
+                    successTimeoutRef.current = setTimeout(() => {
+                      setIsDetectedSuccess(false);
+                    }, 650);
+
+                    // Execute latest onScan handler safely
+                    if (onScanRef.current) {
+                      onScanRef.current(cleanCode);
                     }
                   },
                   150
@@ -115,12 +142,13 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
 
     return () => {
       isCancelled = true;
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
       if (stopScanner) stopScanner();
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [preferRear, onScan, lastScanned]);
+  }, [preferRear]);
 
   const handleToggleFacing = () => {
     setPreferRear((prev) => !prev);
@@ -134,7 +162,7 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
   };
 
   return (
-    <div className="relative rounded-3xl overflow-hidden bg-slate-950 border-2 border-slate-800 shadow-2xl space-y-2">
+    <div className="relative rounded-3xl overflow-hidden bg-slate-950 border-2 border-slate-800 shadow-2xl space-y-2 select-none">
       {/* Top Floating Controls Bar */}
       <div className="absolute top-3 inset-x-3 z-20 flex items-center justify-between pointer-events-auto">
         <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700/80 text-[11px] font-bold text-white shadow-md">
@@ -165,8 +193,8 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
         </div>
       </div>
 
-      {/* Main Viewport Container */}
-      <div className="relative w-full aspect-square max-h-[380px] sm:max-h-[440px] flex items-center justify-center overflow-hidden">
+      {/* Main Viewport Container - hardware isolated to prevent DOM reflow jitter */}
+      <div className="relative w-full aspect-square max-h-[380px] sm:max-h-[440px] flex items-center justify-center overflow-hidden isolate select-none">
         {/* Loading Spinner */}
         {isInitializing && (
           <div className="z-10 flex flex-col items-center justify-center gap-3 text-white text-xs font-mono p-4 text-center">
@@ -210,10 +238,16 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
           </div>
         ) : (
           <>
-            {/* Live Camera Video Feed */}
+            {/* Live Camera Video Feed (Hardware-accelerated texture layer) */}
             <video
               ref={videoRef}
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+              style={{
+                transform: 'translateZ(0)',
+                WebkitTransform: 'translateZ(0)',
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
+              }}
               autoPlay
               playsInline
               muted
@@ -222,45 +256,46 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
             {/* Darkened Vignette Overlay */}
             <div className="absolute inset-0 bg-slate-950/45 pointer-events-none" />
 
-            {/* SQUARE QR CODE SCANNING SHAPE (Reticle Target Box) */}
+            {/* ROCK-SOLID RETICLE TARGET BOX (Zero layout shift on scan) */}
             <div
-              className={`relative z-10 w-60 h-60 sm:w-68 sm:h-68 rounded-3xl transition-all duration-300 pointer-events-none ${
+              className={`relative z-10 w-60 h-60 sm:w-68 sm:h-68 rounded-3xl pointer-events-none shadow-[0_0_0_9999px_rgba(15,23,42,0.55)] transition-colors duration-200 ${
                 isDetectedSuccess
-                  ? 'border-4 border-emerald-400 shadow-[0_0_30px_#10b981]'
-                  : 'shadow-[0_0_0_9999px_rgba(15,23,42,0.45)]'
+                  ? 'ring-4 ring-emerald-400/90 bg-emerald-500/10'
+                  : 'ring-1 ring-white/15 bg-transparent'
               }`}
+              style={{ boxSizing: 'border-box' }}
             >
               {/* Corner 1: Top-Left */}
               <div
-                className={`absolute -top-1 -left-1 w-9 h-9 border-t-4 border-l-4 rounded-tl-2xl ${
-                  isDetectedSuccess ? 'border-emerald-400' : themeBorderColor
+                className={`absolute -top-0.5 -left-0.5 w-9 h-9 border-t-4 border-l-4 rounded-tl-2xl transition-colors duration-200 ${
+                  isDetectedSuccess ? 'border-emerald-400 drop-shadow-[0_0_8px_#10b981]' : themeBorderColor
                 }`}
               />
               {/* Corner 2: Top-Right */}
               <div
-                className={`absolute -top-1 -right-1 w-9 h-9 border-t-4 border-r-4 rounded-tr-2xl ${
-                  isDetectedSuccess ? 'border-emerald-400' : themeBorderColor
+                className={`absolute -top-0.5 -right-0.5 w-9 h-9 border-t-4 border-r-4 rounded-tr-2xl transition-colors duration-200 ${
+                  isDetectedSuccess ? 'border-emerald-400 drop-shadow-[0_0_8px_#10b981]' : themeBorderColor
                 }`}
               />
               {/* Corner 3: Bottom-Left */}
               <div
-                className={`absolute -bottom-1 -left-1 w-9 h-9 border-b-4 border-l-4 rounded-bl-2xl ${
-                  isDetectedSuccess ? 'border-emerald-400' : themeBorderColor
+                className={`absolute -bottom-0.5 -left-0.5 w-9 h-9 border-b-4 border-l-4 rounded-bl-2xl transition-colors duration-200 ${
+                  isDetectedSuccess ? 'border-emerald-400 drop-shadow-[0_0_8px_#10b981]' : themeBorderColor
                 }`}
               />
               {/* Corner 4: Bottom-Right */}
               <div
-                className={`absolute -bottom-1 -right-1 w-9 h-9 border-b-4 border-r-4 rounded-br-2xl ${
-                  isDetectedSuccess ? 'border-emerald-400' : themeBorderColor
+                className={`absolute -bottom-0.5 -right-0.5 w-9 h-9 border-b-4 border-r-4 rounded-br-2xl transition-colors duration-200 ${
+                  isDetectedSuccess ? 'border-emerald-400 drop-shadow-[0_0_8px_#10b981]' : themeBorderColor
                 }`}
               />
 
-              {/* Animated Laser Scanning Line */}
-              {!isDetectedSuccess && (
-                <div
-                  className={`absolute inset-x-2 h-0.5 bg-gradient-to-r from-transparent ${themeLaserColor} to-transparent animate-qr-laser`}
-                />
-              )}
+              {/* Animated Laser Scanning Line (GPU-accelerated, suppressed during recognition) */}
+              <div
+                className={`absolute top-0 inset-x-3 h-0.5 bg-gradient-to-r from-transparent ${themeLaserColor} to-transparent animate-qr-laser transition-opacity duration-200 ${
+                  isDetectedSuccess ? 'opacity-0' : 'opacity-100'
+                }`}
+              />
 
               {/* Center Target Crosshair / Watermark */}
               <div className="absolute inset-0 flex items-center justify-center opacity-25">
@@ -271,7 +306,11 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
             {/* Bottom Target Alignment Pill */}
             <div className="absolute bottom-3 inset-x-0 z-20 flex justify-center pointer-events-none px-4">
               <span
-                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-bold tracking-wide backdrop-blur-md border shadow-lg ${themeBadgeColor}`}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-bold tracking-wide backdrop-blur-md border shadow-lg transition-colors duration-200 ${
+                  isDetectedSuccess
+                    ? 'bg-emerald-500/30 text-emerald-200 border-emerald-400/60 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
+                    : themeBadgeColor
+                }`}
               >
                 <QrCode className="w-3.5 h-3.5" />
                 <span>
@@ -291,4 +330,3 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
     </div>
   );
 };
-

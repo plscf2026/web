@@ -130,24 +130,50 @@
   line-height: 1.45rem !important;
 }
 
-/* Animated Square QR Laser Scanning Beam */
+/* Animated Square QR Laser Scanning Beam (GPU 3D Accelerated - Zero Layout Reflow) */
 @keyframes qrLaserScan {
   0% {
-    top: 6%;
+    transform: translate3d(0, 14px, 0);
     opacity: 0.85;
   }
   50% {
-    top: 92%;
+    transform: translate3d(0, 214px, 0);
     opacity: 1;
   }
   100% {
-    top: 6%;
+    transform: translate3d(0, 14px, 0);
     opacity: 0.85;
   }
 }
 
+@media (min-width: 640px) {
+  @keyframes qrLaserScanSm {
+    0% {
+      transform: translate3d(0, 16px, 0);
+      opacity: 0.85;
+    }
+    50% {
+      transform: translate3d(0, 244px, 0);
+      opacity: 1;
+    }
+    100% {
+      transform: translate3d(0, 16px, 0);
+      opacity: 0.85;
+    }
+  }
+}
+
 .animate-qr-laser {
-  animation: qrLaserScan 2s ease-in-out infinite;
+  animation: qrLaserScan 2.4s ease-in-out infinite;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+@media (min-width: 640px) {
+  .animate-qr-laser {
+    animation-name: qrLaserScanSm;
+  }
 }
 
 /* Global cubic-bezier slide-up animation */
