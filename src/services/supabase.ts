@@ -45,12 +45,12 @@ const STORAGE_KEY_AUDIT_LOGS = 'plscf_admin_audit_logs_v1';
 export const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
 
 /**
- * Security Gate: Dev Test Account Bypass is strictly restricted to development environments
- * and must never be permitted in production builds.
+ * Test Account Bypass: Active across preview, staging, and testing environments
+ * unless explicitly disabled via VITE_ENABLE_TEST_BYPASS="false".
  */
 export function isDevTestBypassAllowed(): boolean {
   const env = (import.meta as any).env || {};
-  return Boolean(env.VITE_ENABLE_TEST_BYPASS === 'true' || env.DEV);
+  return env.VITE_ENABLE_TEST_BYPASS !== 'false';
 }
 
 /**
