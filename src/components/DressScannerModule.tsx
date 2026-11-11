@@ -10,6 +10,7 @@ import {
   Shield,
   Edit3,
   QrCode,
+  X,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -45,6 +46,7 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
   );
   const [cameraActive, setCameraActive] = useState(false);
   const [feedbackNotice, setFeedbackNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isResultPopupOpen, setIsResultPopupOpen] = useState(false);
 
   // Correction modal for Super Admin
   const [selectedRecordForCorrection, setSelectedRecordForCorrection] = useState<DressDistributionRecord | null>(null);
@@ -89,6 +91,11 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
         messageEn: `Student ticket "${clean}" not found.`,
         messageBn: `"${clean}" নম্বরের কোনো টিকিট পাওয়া যায়নি।`,
       });
+      setFeedbackNotice({
+        type: 'error',
+        message: `Student ticket "${clean}" not found in database.`,
+      });
+      setIsResultPopupOpen(true);
       return;
     }
 
@@ -104,6 +111,7 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
     setScannedStudent(student);
     setValidationResult(result);
     setFeedbackNotice(null);
+    setIsResultPopupOpen(true);
   };
 
   // Confirm Received Handler
@@ -146,7 +154,12 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
       const updatedValidation = validateDressDistribution(scannedStudent, 'reunion_tshirt', currentDistributions);
       setValidationResult(updatedValidation);
 
-      setTimeout(() => setFeedbackNotice(null), 4000);
+      // Smooth auto-dismiss after success so staff can scan next student
+      setTimeout(() => {
+        setIsResultPopupOpen(false);
+        setScannedStudent(null);
+        setFeedbackNotice(null);
+      }, 1600);
     } else {
       setFeedbackNotice({
         type: 'error',
@@ -648,6 +661,212 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ── HIGH-VISIBILITY POPUP SCREEN FOR SCANNED OUTPUT ── */}
+      {isResultPopupOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-backdrop-in overflow-y-auto">
+          <div
+            className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-pop-in my-auto"
+            role="dialog"
+            aria-modal="true"
+          >
+            {/* Modal Header Bar */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-indigo-950 text-white">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-500/20 border border-indigo-400/30">
+                  <Shirt className="w-5 h-5 text-indigo-300" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black tracking-wide">
+                    {language === 'bn' ? 'পোশাক বিতরণ যাচাই ফলাফল' : 'Dress Kit Verification Result'}
+                  </h3>
+                  <span className="text-[10px] text-slate-300 font-mono">
+                    Official Reunion 2026/2027
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsResultPopupOpen(false);
+                  setScannedStudent(null);
+                  setFeedbackNotice(null);
+                }}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body Content */}
+            <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+              {/* Feedback Alert Notice */}
+              {feedbackNotice && (
+                <div
+                  className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2.5 ${
+                    feedbackNotice.type === 'success'
+                      ? 'bg-emerald-50 border border-emerald-300 text-emerald-900'
+                      : 'bg-rose-50 border border-rose-300 text-rose-900'
+                  }`}
+                >
+                  {feedbackNotice.type === 'success' ? (
+                    <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                  )}
+                  <span>{feedbackNotice.message}</span>
+                </div>
+              )}
+
+              {scannedStudent ? (
+                <>
+                  {/* Student Profile Card */}
+                  <div className="flex items-start gap-4 pb-5 border-b border-slate-100">
+                    <img
+                      src={
+                        scannedStudent.photoUrl ||
+                        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300'
+                      }
+                      alt={scannedStudent.fullName}
+                      className="w-20 h-24 object-cover rounded-2xl border-2 border-slate-200 shadow-xs bg-slate-100 shrink-0"
+                    />
+
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-900 text-white">
+                          {scannedStudent.category === 'former' ? 'Former Student' : 'Current Student'}
+                        </span>
+                        <span className="font-mono text-xs font-black text-indigo-600">
+                          {scannedStudent.id}
+                        </span>
+                      </div>
+
+                      <h4 className="text-lg font-black text-slate-900 truncate">
+                        {scannedStudent.fullName}
+                      </h4>
+
+                      <p className="text-xs text-slate-500 font-medium">
+                        Batch: <span className="font-bold text-slate-800">{scannedStudent.batchName}</span>
+                        {scannedStudent.passingYear && ` • Passing Year: ${scannedStudent.passingYear}`}
+                      </p>
+
+                      <div className="pt-1 flex items-center gap-2 text-xs">
+                        <span className="font-bold text-slate-500">TOKEN:</span>
+                        <span className="font-mono font-black tracking-widest text-amber-900 bg-amber-100/80 px-2.5 py-0.5 rounded border border-amber-300">
+                          {scannedStudent.qrToken}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Registered Clothing Item & Big Size Badge */}
+                  <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-indigo-700 tracking-wider block">
+                        Registered Clothing Item
+                      </span>
+                      <span className="text-sm font-black text-indigo-950 block">
+                        Official Reunion Commemorative T-Shirt
+                      </span>
+                    </div>
+
+                    <div className="text-center bg-white px-4 py-2 rounded-xl border border-indigo-300 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Size</span>
+                      <span className="text-2xl font-black text-indigo-700 font-mono">
+                        {scannedStudent.tShirtSize}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Eligibility & Payment Status */}
+                  <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
+                        Distribution Status
+                      </span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {validationResult?.status === 'ALREADY_RECEIVED' ? (
+                          <span className="text-xs font-black text-rose-600 flex items-center gap-1">
+                            <XCircle className="w-4 h-4" /> ALREADY RECEIVED
+                          </span>
+                        ) : validationResult?.status === 'ELIGIBLE' ? (
+                          <span className="text-xs font-black text-emerald-600 flex items-center gap-1">
+                            <CheckCircle className="w-4 h-4" /> NOT RECEIVED (ELIGIBLE)
+                          </span>
+                        ) : (
+                          <span className="text-xs font-black text-amber-700 flex items-center gap-1">
+                            <AlertTriangle className="w-4 h-4" /> {validationResult?.status}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Payment</span>
+                      <span
+                        className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                          scannedStudent.paymentStatus === 'paid'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-rose-100 text-rose-800'
+                        }`}
+                      >
+                        {scannedStudent.paymentStatus}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Primary Action Button */}
+                  {validationResult?.canReceive ? (
+                    <button
+                      type="button"
+                      onClick={handleConfirmReceived}
+                      className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-black text-sm tracking-wider uppercase transition-all shadow-lg shadow-indigo-600/25 cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle className="w-5 h-5" />
+                      <span>[ CONFIRM T-SHIRT (SIZE {scannedStudent.tShirtSize}) RECEIVED ]</span>
+                    </button>
+                  ) : validationResult?.status === 'ALREADY_RECEIVED' ? (
+                    <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-center font-bold text-xs space-y-1">
+                      <p>Student has already collected their T-shirt.</p>
+                      <p className="text-[11px] font-normal text-rose-700">
+                        Duplicate issuance is strictly blocked by RBAC rules.
+                      </p>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                /* Ticket Not Found State */
+                <div className="p-6 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto">
+                    <XCircle className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-base font-bold text-slate-900">
+                    {language === 'bn' ? 'কোনো টিকিট পাওয়া যায়নি' : 'Ticket Not Found'}
+                  </h4>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    {validationResult?.messageEn ||
+                      'Please verify the QR code image or check the registration ID number.'}
+                  </p>
+                </div>
+              )}
+
+              {/* Close / Scan Next Student Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsResultPopupOpen(false);
+                  setScannedStudent(null);
+                  setFeedbackNotice(null);
+                }}
+                className="w-full py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                {language === 'bn' ? 'পরবর্তী টিকিট স্ক্যান করুন' : 'Scan Next Student / Close'}
+              </button>
+            </div>
           </div>
         </div>
       )}

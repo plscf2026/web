@@ -12,6 +12,7 @@ import {
   Edit3,
   Shield,
   QrCode,
+  X,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -46,6 +47,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
     EventStore.getGateEvents()
   );
   const [actionNotice, setActionNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isResultPopupOpen, setIsResultPopupOpen] = useState(false);
 
   // Correction Modal State for Super Admin
   const [selectedEventForCorrection, setSelectedEventForCorrection] = useState<GateEventRecord | null>(null);
@@ -87,6 +89,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
         type: 'error',
         message: `Student ticket "${clean}" not found in database.`,
       });
+      setIsResultPopupOpen(true);
       return;
     }
 
@@ -95,6 +98,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
     setScannedStudent(student);
     setIsInside(inside);
     setActionNotice(null);
+    setIsResultPopupOpen(true);
   };
 
   // Perform Entry or Exit
@@ -143,7 +147,13 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
         type: 'success',
         message: `SUCCESS: ${scannedStudent.fullName} marked as ${eventType} at ${new Date().toLocaleTimeString()}.`,
       });
-      setTimeout(() => setActionNotice(null), 4000);
+
+      // Auto-dismiss after 1600ms on success so staff can scan next
+      setTimeout(() => {
+        setIsResultPopupOpen(false);
+        setScannedStudent(null);
+        setActionNotice(null);
+      }, 1600);
     } else {
       setActionNotice({
         type: 'error',
@@ -634,6 +644,196 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ── HIGH-VISIBILITY POPUP SCREEN FOR SCANNED OUTPUT ── */}
+      {isResultPopupOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-backdrop-in overflow-y-auto">
+          <div
+            className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-pop-in my-auto"
+            role="dialog"
+            aria-modal="true"
+          >
+            {/* Modal Header Bar */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-sky-950 text-white">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-sky-500/20 border border-sky-400/30">
+                  <ShieldCheck className="w-5 h-5 text-sky-300" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black tracking-wide">
+                    {_language === 'bn' ? 'গেট নিরাপত্তা যাচাই ফলাফল' : 'Gate Access Security Result'}
+                  </h3>
+                  <span className="text-[10px] text-slate-300 font-mono">
+                    Official Reunion 2026/2027 Security Gate
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsResultPopupOpen(false);
+                  setScannedStudent(null);
+                  setActionNotice(null);
+                }}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body Content */}
+            <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+              {/* Feedback Alert Notice */}
+              {actionNotice && (
+                <div
+                  className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2.5 ${
+                    actionNotice.type === 'success'
+                      ? 'bg-emerald-50 border border-emerald-300 text-emerald-900'
+                      : 'bg-rose-50 border border-rose-300 text-rose-900'
+                  }`}
+                >
+                  {actionNotice.type === 'success' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                  )}
+                  <span>{actionNotice.message}</span>
+                </div>
+              )}
+
+              {scannedStudent ? (
+                <>
+                  {/* Student Profile Card */}
+                  <div className="flex items-start gap-4 pb-5 border-b border-slate-100">
+                    <img
+                      src={
+                        scannedStudent.photoUrl ||
+                        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300'
+                      }
+                      alt={scannedStudent.fullName}
+                      className="w-20 h-24 object-cover rounded-2xl border-2 border-slate-200 shadow-xs bg-slate-100 shrink-0"
+                    />
+
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-900 text-white">
+                          {scannedStudent.category === 'former' ? 'Former Student' : 'Current Student'}
+                        </span>
+                        <span className="font-mono text-xs font-black text-sky-700">
+                          {scannedStudent.id}
+                        </span>
+                      </div>
+
+                      <h4 className="text-lg font-black text-slate-900 truncate">
+                        {scannedStudent.fullName}
+                      </h4>
+
+                      <p className="text-xs text-slate-500 font-medium">
+                        Batch: <span className="font-bold text-slate-800">{scannedStudent.batchName}</span>
+                        {scannedStudent.passingYear && ` • Passing Year: ${scannedStudent.passingYear}`}
+                      </p>
+
+                      <div className="pt-1 flex items-center gap-2 text-xs">
+                        <span className="font-bold text-slate-500">TOKEN:</span>
+                        <span className="font-mono font-black tracking-widest text-amber-900 bg-amber-100/80 px-2.5 py-0.5 rounded border border-amber-300">
+                          {scannedStudent.qrToken}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gate State & Location Callout Box */}
+                  <div className="p-4 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-sky-700 tracking-wider block">
+                        Current Campus Location
+                      </span>
+                      <span className="text-base font-black text-slate-900 block flex items-center gap-1.5 mt-0.5">
+                        {isInside ? (
+                          <>
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>INSIDE VENUE CAMPUS</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
+                            <span>OUTSIDE / NOT CHECKED IN</span>
+                          </>
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Ticket</span>
+                      <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800">
+                        {scannedStudent.paymentStatus}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Gate Dual Actions: Record Entry / Record Exit */}
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleGateAction('ENTRY')}
+                      disabled={isInside}
+                      className={`py-3.5 px-4 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
+                        isInside
+                          ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/25 cursor-pointer active:scale-[0.98]'
+                      }`}
+                    >
+                      <UserCheck className="w-4 h-4" />
+                      <span>{isInside ? 'Already Inside' : 'Record Entry'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleGateAction('EXIT')}
+                      disabled={!isInside}
+                      className={`py-3.5 px-4 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
+                        !isInside
+                          ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
+                          : 'bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-900/25 cursor-pointer active:scale-[0.98]'
+                      }`}
+                    >
+                      <UserX className="w-4 h-4" />
+                      <span>{!isInside ? 'Already Outside' : 'Record Exit'}</span>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* Ticket Not Found State */
+                <div className="p-6 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto">
+                    <XCircle className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-base font-bold text-slate-900">
+                    {_language === 'bn' ? 'কোনো টিকিট পাওয়া যায়নি' : 'Ticket Not Found'}
+                  </h4>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Please verify the QR code image or check the registration ID number.
+                  </p>
+                </div>
+              )}
+
+              {/* Close / Scan Next Student Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsResultPopupOpen(false);
+                  setScannedStudent(null);
+                  setActionNotice(null);
+                }}
+                className="w-full py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                {_language === 'bn' ? 'পরবর্তী টিকিট স্ক্যান করুন' : 'Scan Next Student / Close'}
+              </button>
+            </div>
           </div>
         </div>
       )}
