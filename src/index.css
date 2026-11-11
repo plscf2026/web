@@ -8,6 +8,27 @@
 }
 
 @layer base {
+  html {
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  @media (min-width: 768px) {
+    html {
+      font-size: 16.5px;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    html {
+      font-size: 17px;
+    }
+  }
+
   ::selection {
     background-color: #0284c7;
     color: #ffffff;
@@ -32,14 +53,20 @@
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     color: #0f172a;
     background-color: #f0f6fa;
+    line-height: 1.5;
   }
 
   h1, h2, h3, h4, h5, h6, .font-heading {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    letter-spacing: -0.015em;
   }
 
   code, kbd, samp, pre, .font-mono {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+
+  input, select, textarea, button {
+    font-family: inherit;
   }
 
   input[aria-invalid="true"],
@@ -62,6 +89,32 @@
 .font-satoshi,
 .font-sans {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+}
+
+/* =========================================================================
+   OPTICAL ACCESSIBILITY & READABILITY: ELEVATE MICRO-TEXT SCALES
+   Prevents hardcoded 9px, 10px, 11px and 12px text from appearing illegible
+   on high-DPI mobile phone screens and wide desktop displays.
+   ========================================================================= */
+.text-\[9px\] {
+  font-size: 0.72rem !important; /* ~11.5px */
+  line-height: 1rem !important;
+}
+.text-\[10px\] {
+  font-size: 0.78rem !important; /* ~12.5px */
+  line-height: 1.15rem !important;
+}
+.text-\[11px\] {
+  font-size: 0.84rem !important; /* ~13.5px */
+  line-height: 1.25rem !important;
+}
+.text-xs {
+  font-size: 0.875rem !important; /* 14px */
+  line-height: 1.3rem !important;
+}
+.text-sm {
+  font-size: 0.95rem !important; /* ~15.2px */
+  line-height: 1.45rem !important;
 }
 
 /* Animated Square QR Laser Scanning Beam */
