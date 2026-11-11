@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import {
   ShieldCheck,
   Users,
@@ -63,8 +63,20 @@ import { AuditHistoryTab } from './admin/AuditHistoryTab';
 import { StudentIdManagementTab } from './admin/StudentIdManagementTab';
 import { StudentIdService } from '../services/studentIdStore';
 import { EventStore } from '../services/eventStore';
-import { AdminRmsContainer } from './admin/rms/AdminRmsContainer';
-import { IdCardManagementPortal } from './admin/idcard/IdCardManagementPortal';
+// Heavy administrative portals loaded lazily to preserve bundle performance
+const AdminRmsContainer = lazy(() =>
+  import('./admin/rms/AdminRmsContainer').then((m) => ({ default: m.AdminRmsContainer }))
+);
+const IdCardManagementPortal = lazy(() =>
+  import('./admin/idcard/IdCardManagementPortal').then((m) => ({ default: m.IdCardManagementPortal }))
+);
+
+const AdminTabFallback = () => (
+  <div className="bg-white rounded-2xl p-12 border border-slate-200 text-center flex flex-col items-center justify-center my-6" role="status">
+    <div className="w-10 h-10 rounded-full border-4 border-emerald-100 border-t-emerald-600 animate-spin mb-3 shadow-xs" />
+    <p className="text-sm font-medium text-slate-500">Loading module...</p>
+  </div>
+);
 import { formatCsvRow } from '../utils/security';
 
 interface AdminDashboardProps {
@@ -951,20 +963,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* TAB: REUNION MANAGEMENT SYSTEM (RMS - 12 INTEGRATED MODULES) */}
       {activeTab === 'reunionManagement' && (
-        <AdminRmsContainer
-          language={language}
-          registrations={registrations}
-          adminSession={adminSession}
-        />
+        <Suspense fallback={<AdminTabFallback />}>
+          <AdminRmsContainer
+            language={language}
+            registrations={registrations}
+            adminSession={adminSession}
+          />
+        </Suspense>
       )}
 
       {/* TAB: STUDENT ID CARD MANAGEMENT SYSTEM */}
       {activeTab === 'idCardManagement' && (
-        <IdCardManagementPortal
-          currentUserEmail={adminSession?.email || 'admin@gmail.com'}
-          currentUserRole={adminSession?.role || 'super_admin'}
-          isSuperAdmin={adminSession?.role === 'super_admin' || !adminSession}
-        />
+        <Suspense fallback={<AdminTabFallback />}>
+          <IdCardManagementPortal
+            currentUserEmail={adminSession?.email || 'admin@gmail.com'}
+            currentUserRole={adminSession?.role || 'super_admin'}
+            isSuperAdmin={adminSession?.role === 'super_admin' || !adminSession}
+          />
+        </Suspense>
       )}
 
       {/* TAB: MASTER EVENT OVERVIEW (PART 9) */}

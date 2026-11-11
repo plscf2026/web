@@ -22,20 +22,20 @@ const MAX_COLLISION_RETRIES = 20;
 export function generateSixCharToken(): string {
   const bytes = new Uint8Array(TOKEN_LENGTH);
 
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    crypto.getRandomValues(bytes);
+  // Standard Web Crypto API (Browser & Node.js 19+ cross-platform)
+  const cryptoObj =
+    typeof globalThis !== 'undefined' && typeof globalThis.crypto?.getRandomValues === 'function'
+      ? globalThis.crypto
+      : typeof window !== 'undefined' && typeof window.crypto?.getRandomValues === 'function'
+      ? window.crypto
+      : null;
+
+  if (cryptoObj) {
+    cryptoObj.getRandomValues(bytes);
   } else {
-    // Node.js fallback if crypto global not set
-    try {
-      const nodeCrypto = require('crypto');
-      const randomBuf = nodeCrypto.randomBytes(TOKEN_LENGTH);
-      for (let i = 0; i < TOKEN_LENGTH; i++) {
-        bytes[i] = randomBuf[i];
-      }
-    } catch {
-      for (let i = 0; i < TOKEN_LENGTH; i++) {
-        bytes[i] = Math.floor(Math.random() * 256);
-      }
+    // Pure mathematical PRNG fallback for constrained offline test harnesses
+    for (let i = 0; i < TOKEN_LENGTH; i++) {
+      bytes[i] = Math.floor(Math.random() * 256);
     }
   }
 
