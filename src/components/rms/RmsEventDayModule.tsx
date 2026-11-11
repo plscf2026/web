@@ -105,7 +105,7 @@ export const RmsEventDayModule: React.FC<Props> = ({ currentUser, canManage }) =
             </div>
           </div>
           <p className="text-sm text-slate-400 mt-1">
-            Real-time live telemetry, stage readiness telemetry, and incident dispatch for Sylhet Police Lines High School & College Reunion 2027.
+            Real-time live telemetry, stage readiness telemetry, and incident dispatch for Police Lines High School & College, Faridpur Reunion 2027.
           </p>
         </div>
 

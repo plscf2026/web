@@ -124,7 +124,7 @@ export const RmsManagementPortal: React.FC<Props> = ({ onBackToPublic }) => {
                 <div className="flex items-center gap-2">
                   <Building className="w-4 h-4 text-emerald-400" />
                   <span className="font-black text-sm tracking-tight text-white">
-                    Sylhet Police Lines High School & College
+                    Police Lines High School & College, Faridpur
                   </span>
                   <span className="px-2 py-0.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-black rounded uppercase">
                     RMS 2027 ERP
@@ -302,7 +302,7 @@ export const RmsManagementPortal: React.FC<Props> = ({ onBackToPublic }) => {
       <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p>
-            © 2027 Sylhet Police Lines High School & College Reunion Organizing Committee. All rights reserved.
+            © 2027 Police Lines High School & College, Faridpur Reunion Organizing Committee. All rights reserved.
           </p>
           <div className="flex items-center gap-4 text-xs">
             <span className="font-semibold text-slate-700">Convener: Monowar Shikder</span>

@@ -59,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="font-semibold text-[11px] sm:text-xs truncate">
               {language === 'bn'
                 ? 'সিলেট পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজ পুনর্মিলনী ২০২৭ • ২৮-২৯ জানুয়ারি ২০২৭'
-                : 'Sylhet Police Lines High School & College Reunion 2027 • Jan 28-29, 2027'}
+                : 'Police Lines High School & College, Faridpur Reunion 2027 • Jan 28-29, 2027'}
             </span>
           </div>
 

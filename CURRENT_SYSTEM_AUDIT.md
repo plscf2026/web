@@ -1,10 +1,10 @@
 # Current System Audit Report
-## Sylhet Police Lines High School & College Reunion Platform
+## Police Lines High School & College, Faridpur Reunion Platform
 
 ---
 
 ## 1. Executive Audit Overview
-This audit examines the existing web platform for Sylhet Police Lines High School & College, Faridpur (Est. 1962). The application is an active, production-grade event registration and ticketing system built using a modern React/TypeScript stack backed by Supabase PostgreSQL and PayStation Bangladesh.
+This audit examines the existing web platform for Police Lines High School & College, Faridpur, Faridpur (Est. 1962). The application is an active, production-grade event registration and ticketing system built using a modern React/TypeScript stack backed by Supabase PostgreSQL and PayStation Bangladesh.
 
 ---
 

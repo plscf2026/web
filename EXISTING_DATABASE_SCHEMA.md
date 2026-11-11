@@ -1,5 +1,5 @@
 # Existing Database Schema & Entity Structure
-## Sylhet Police Lines High School & College Reunion Platform
+## Police Lines High School & College, Faridpur Reunion Platform
 
 ---
 

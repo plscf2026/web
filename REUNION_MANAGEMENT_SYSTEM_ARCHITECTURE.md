@@ -1,10 +1,10 @@
 # Reunion Management System (RMS) Architecture & Systems Design
-## Sylhet Police Lines High School & College Reunion 2027
+## Police Lines High School & College, Faridpur Reunion 2027
 
 ---
 
 ## 1. Executive Summary & Event Context
-- **Institution**: Sylhet Police Lines High School & College (Est. 1962, Faridpur, Bangladesh).
+- **Institution**: Police Lines High School & College, Faridpur (Est. 1962, Faridpur, Bangladesh).
 - **Core Event**: Grand Reunion 2027.
 - **Main Event Date**: Friday, January 29, 2027.
 - **Venue**:

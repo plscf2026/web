@@ -1,5 +1,5 @@
 /**
- * Sylhet Police Lines High School & College Reunion 2027
+ * Police Lines High School & College, Faridpur Reunion 2027
  * Browser-Based XSS Execution & DOM Integration Security Test Suite
  *
  * Verifies that malicious payloads do not execute within an active DOM runtime.

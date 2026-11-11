@@ -1,5 +1,5 @@
 # Automated XSS Security Test Execution Report
-## Sylhet Police Lines High School & College Reunion 2027
+## Police Lines High School & College, Faridpur Reunion 2027
 **Target Application:** Reunion ERP & Digital Ticketing Portal  
 **Test Suite:** `src/utils/xssSecurity.test.ts` & Complete Test Suite (`src/utils/*.test.ts`)  
 **Test Framework:** Node.js native test runner (`node:test`, `node:assert/strict`) via `tsx`  

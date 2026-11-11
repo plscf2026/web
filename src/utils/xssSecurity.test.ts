@@ -1,5 +1,5 @@
 /**
- * Sylhet Police Lines High School & College Reunion 2027
+ * Police Lines High School & College, Faridpur Reunion 2027
  * Comprehensive Automated XSS & Injection Security Test Suite
  *
  * Covers OWASP Top 10 A03:2021 - Injection & CWE-79 / CWE-1236 / CWE-116

@@ -1,5 +1,5 @@
 # Browser-Based XSS Execution & Verification Test Report
-## Sylhet Police Lines High School & College Reunion 2027
+## Police Lines High School & College, Faridpur Reunion 2027
 **Target Application:** Reunion ERP & Digital Ticketing Portal  
 **Test Suite:** [`src/utils/browserXssIntegration.test.ts`](file:///Users/sagarkumarsaha/Desktop/1%20plsc2027/plscf65/src/utils/browserXssIntegration.test.ts)  
 **Execution Runtime:** Node.js v22.12.0 + JSDOM v27 (Configured with `runScripts: "dangerously"`)  

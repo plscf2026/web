@@ -1,5 +1,5 @@
 # XSS Protection Architecture & Implementation Guide
-## Sylhet Police Lines High School & College Reunion 2027
+## Police Lines High School & College, Faridpur Reunion 2027
 **Target Platform:** Reunion Management System (RMS) & Digital Ticketing Platform  
 **Architecture:** React 19 + TypeScript + Vite + Supabase + PayStation  
 **Author:** Senior Application Security Engineer  
@@ -8,7 +8,7 @@
 
 ## 1. Architectural Defense-in-Depth Strategy
 
-Cross-Site Scripting (XSS) defense in the Sylhet Police Lines Reunion 2027 platform is implemented using a **four-layer defense-in-depth model**:
+Cross-Site Scripting (XSS) defense in the Police Lines, Faridpur Reunion 2027 platform is implemented using a **four-layer defense-in-depth model**:
 
 ```
 +-------------------------------------------------------------------------+

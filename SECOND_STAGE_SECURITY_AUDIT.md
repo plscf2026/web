@@ -1,5 +1,5 @@
 # Second-Stage Production-Level XSS & Browser Security Audit
-## Sylhet Police Lines High School & College Reunion 2027
+## Police Lines High School & College, Faridpur Reunion 2027
 **Target Application:** Reunion Management System (RMS) & Digital Ticketing Portal  
 **Audit Phase:** Second-Stage Independent Verification & Regression Analysis  
 **Auditor:** Senior Application Security Engineer & Systems Architect  

@@ -22,7 +22,7 @@ export const AdminRmsSettings: React.FC<Props> = ({ language }) => {
   const [feeSettings, setFeeSettings] = useState<FeeSettings>(() => AppStore.getFeeSettings());
 
   // Form State
-  const [eventName] = useState('Sylhet Police Lines High School & College Reunion 2027');
+  const [eventName] = useState('Police Lines High School & College, Faridpur Reunion 2027');
   const [eventDate, setEventDate] = useState(feeSettings.eventTargetDate || '2027-01-29T09:00:00');
   const [registrationOpen, setRegistrationOpen] = useState(feeSettings.registrationOpen);
   const [formerStudentFee, setFormerStudentFee] = useState<number>(feeSettings.formerStudentFee || 1000);

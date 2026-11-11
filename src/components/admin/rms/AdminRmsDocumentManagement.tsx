@@ -75,7 +75,7 @@ export const AdminRmsDocumentManagement: React.FC<Props> = ({ language }) => {
 
   const handleDownload = (doc: RmsDocument) => {
     // Generate simulated downloadable file
-    const content = `Sylhet Police Lines High School & College Reunion 2027\nDocument Title: ${doc.title}\nCategory: ${doc.category}\nCommittee: ${doc.committeeName}\nUploaded By: ${doc.uploadedByName}\nUpload Date: ${doc.uploadedAt}\nAccess Level: ${doc.accessPermission}\n\nOfficial document content archived for Reunion 2027 administration.`;
+    const content = `Police Lines High School & College, Faridpur Reunion 2027\nDocument Title: ${doc.title}\nCategory: ${doc.category}\nCommittee: ${doc.committeeName}\nUploaded By: ${doc.uploadedByName}\nUpload Date: ${doc.uploadedAt}\nAccess Level: ${doc.accessPermission}\n\nOfficial document content archived for Reunion 2027 administration.`;
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -451,7 +451,7 @@ export const AdminRmsDocumentManagement: React.FC<Props> = ({ language }) => {
               <FileCode className="w-12 h-12 text-blue-600 mx-auto" />
               <div className="font-mono text-xs font-bold text-slate-900">{previewDoc.fileName}</div>
               <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-                Official encrypted document verified for Sylhet Police Lines High School & College Reunion 2027.
+                Official encrypted document verified for Police Lines High School & College, Faridpur Reunion 2027.
               </p>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white rounded-full text-[10px] font-bold text-slate-700 border border-slate-200">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />

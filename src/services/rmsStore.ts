@@ -1,5 +1,5 @@
 /**
- * Sylhet Police Lines High School & College Reunion 2027
+ * Police Lines High School & College, Faridpur Reunion 2027
  * Reunion Management System (RMS) - Central Enterprise ERP Service Store
  */
 
@@ -731,7 +731,7 @@ export const INITIAL_MEETINGS: RmsMeeting[] = [
 export const INITIAL_ANNOUNCEMENTS: RmsAnnouncement[] = [
   {
     id: 'ANN-01',
-    titleEn: 'Official Notice: Sylhet Police Lines High School & College Reunion 2027 Confirmed',
+    titleEn: 'Official Notice: Police Lines High School & College, Faridpur Reunion 2027 Confirmed',
     titleBn: 'অফিসিয়াল বিজ্ঞপ্তি: সিলেট পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজ পুনর্মিলনী ২০২৭ চূড়ান্ত',
     contentEn: 'The Central Steering Committee has confirmed the Grand Reunion 2027 dates for January 28-29, 2027 at the School Campus and Police Lines Large Field.',
     contentBn: 'কেন্দ্রীয় ব্যবস্থাপনা কমিটির সর্বসম্মত সিদ্ধান্তে আগামী ২৮-২৯ জানুয়ারি ২০২৭ তারিখে স্কুল ক্যাম্পাস ও পুলিশ লাইন্স মাঠে পুনর্মিলনী ২০২৭ উদযাপিত হবে।',
@@ -850,7 +850,7 @@ export const INITIAL_AUDIT_LOGS: RmsAuditLog[] = [
     action: 'INITIALIZE_RMS_PLATFORM',
     entityType: 'SYSTEM',
     entityId: 'RMS-2027',
-    details: 'Reunion Management ERP initialized for Sylhet Police Lines High School & College Reunion 2027.',
+    details: 'Reunion Management ERP initialized for Police Lines High School & College, Faridpur Reunion 2027.',
     timestamp: '2026-10-01T00:00:00Z',
   },
   {

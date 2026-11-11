@@ -2,7 +2,7 @@
 
 ## Scope and evidence
 
-Read-only source audit of the existing Reunion Registration Website for Sylhet Police Lines High School & College, Faridpur. These reports describe repository evidence, not the live deployment. No database connection, secret environment value, personal record, payment, email, migration, or deployment was accessed or changed.
+Read-only source audit of the existing Reunion Registration Website for Police Lines High School & College, Faridpur, Faridpur. These reports describe repository evidence, not the live deployment. No database connection, secret environment value, personal record, payment, email, migration, or deployment was accessed or changed.
 
 ## Purpose and current behavior
 

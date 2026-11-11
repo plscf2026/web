@@ -1,5 +1,5 @@
 # Content Security Policy (CSP) & Header Hardening Specification
-## Sylhet Police Lines High School & College Reunion 2027
+## Police Lines High School & College, Faridpur Reunion 2027
 **Target Application:** Reunion ERP & Digital Ticketing Portal  
 **Target Environments:** Production, Staging, Local Development  
 **Standard:** W3C Content Security Policy Level 3  

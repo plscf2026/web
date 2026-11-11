@@ -60,7 +60,7 @@ export const RmsExecutiveOverview: React.FC<RmsExecutiveOverviewProps> = ({
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-950 border border-sky-800 text-[11px] font-bold text-sky-400">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Sylhet Police Lines High School & College Reunion 2027</span>
+              <span>Police Lines High School & College, Faridpur Reunion 2027</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight font-clash">
               {language === 'bn' ? 'কেন্দ্রীয় পরিচালনা পরিষদ ড্যাশবোর্ড' : 'Central Steering Committee Command Center'}

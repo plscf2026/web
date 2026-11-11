@@ -1,7 +1,7 @@
 export const translations = {
   en: {
     // Top banner & Header
-    institutionName: 'Sylhet Police Lines High School & College',
+    institutionName: 'Police Lines High School & College, Faridpur',
     institutionSubtitle: 'Established in 1962 • Faridpur, Bangladesh',
     reunionTitle: 'Grand Reunion 2027',
     reunionDates: 'January 28 - 29, 2027',
@@ -24,7 +24,7 @@ export const translations = {
     // Hero & Home
     heroHeading: 'Relive the Memories, Celebrate the Heritage',
     heroSubheading:
-      'Join thousands of alumni and students as we mark the historic Grand Reunion 2027 of Sylhet Police Lines High School & College.',
+      'Join thousands of alumni and students as we mark the historic Grand Reunion 2027 of Police Lines High School & College, Faridpur.',
     btnRegisterNow: 'Register for Reunion',
     btnMakeDonation: 'Contribute / Donate',
     btnDownloadTicket: 'Download Ticket',

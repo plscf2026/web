@@ -1,5 +1,5 @@
 # Committee Management Guide
-## Sylhet Police Lines High School & College Reunion 2027
+## Police Lines High School & College, Faridpur Reunion 2027
 
 ---
 

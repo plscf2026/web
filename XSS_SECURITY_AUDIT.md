@@ -1,5 +1,5 @@
 # Comprehensive XSS Security Audit Report
-## Sylhet Police Lines High School & College Reunion 2027
+## Police Lines High School & College, Faridpur Reunion 2027
 **Target Application:** Reunion ERP & Digital Ticketing Portal  
 **Audit Scope:** Full Source Code Audit (React, TypeScript, Vite, Supabase, PayStation Gateway, RMS Modules)  
 **Lead Auditor:** Senior Application Security Engineer & Systems Architect  
@@ -10,7 +10,7 @@
 
 ## 1. Executive Summary
 
-A comprehensive source code security assessment of the **Sylhet Police Lines High School & College Reunion 2027** platform was conducted to identify Cross-Site Scripting (XSS), script injection, and client-side code execution vulnerabilities.
+A comprehensive source code security assessment of the **Police Lines High School & College, Faridpur Reunion 2027** platform was conducted to identify Cross-Site Scripting (XSS), script injection, and client-side code execution vulnerabilities.
 
 While React’s default JSX text interpolation inherently escapes strings in standard HTML text nodes (mitigating direct reflected HTML injection in text labels), the audit uncovered **critical architectural gaps** where user-controlled or database-controlled input flowed into dangerous DOM sinks, dynamic attribute bindings, spreadsheet exports, and missing browser-enforced security policies:
 

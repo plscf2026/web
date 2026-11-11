@@ -1,5 +1,5 @@
 # Deployment & Production Setup Guide
-## Sylhet Police Lines High School & College Reunion 2027
+## Police Lines High School & College, Faridpur Reunion 2027
 
 ---
 
@@ -25,7 +25,7 @@ VITE_PAYSTATION_MERCHANT_ID=your_merchant_id
 VITE_PAYSTATION_PASSWORD=your_merchant_password
 
 # Application Settings
-VITE_APP_NAME="Sylhet Police Lines High School & College Reunion 2027"
+VITE_APP_NAME="Police Lines High School & College, Faridpur Reunion 2027"
 VITE_ADMIN_PIN="admin@123"
 ```
 
@@ -74,7 +74,7 @@ Ensure Single-Page Application (SPA) routing is configured via `vercel.json`:
 ---
 
 ## 5. Post-Deployment Verification Checklist
-1. Access the homepage at production domain and verify "Sylhet Police Lines High School & College Reunion 2027" branding and countdown to Jan 29, 2027.
+1. Access the homepage at production domain and verify "Police Lines High School & College, Faridpur Reunion 2027" branding and countdown to Jan 29, 2027.
 2. Complete a test student registration with photo capture and PayStation sandbox checkout.
 3. Access the **RMS Portal** (`/portal` or header button) and log in as `Convener Monowar Shikder` using test PIN `admin@123`.
 4. Submit a test budget request and approve it to verify balance propagation.

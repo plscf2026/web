@@ -1,5 +1,5 @@
 # Application Security & Functional Regression Report
-## Sylhet Police Lines High School & College Reunion 2027
+## Police Lines High School & College, Faridpur Reunion 2027
 **Target Application:** Reunion ERP & Digital Ticketing Portal  
 **Document Purpose:** Verification of Application Integrity, Functional Features, and Access Controls  
 **Regression Status:** **100% OPERATIONAL (Zero Regressions Identified)**  

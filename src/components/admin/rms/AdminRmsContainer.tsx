@@ -109,7 +109,7 @@ export const AdminRmsContainer: React.FC<Props> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-blue-900 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                Sylhet Police Lines High School & College Reunion 2027
+                Police Lines High School & College, Faridpur Reunion 2027
               </span>
               <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                 <ShieldCheck className="w-3 h-3" />
