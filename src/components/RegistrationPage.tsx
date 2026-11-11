@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   User,
   Upload,
@@ -58,29 +58,81 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 }) => {
   const t = translations[language];
 
-  // Form State
-  const [fullName, setFullName] = useState('');
-  const [photoUrl, setPhotoUrl] = useState('');
-  const [mobileNumber, setMobileNumber] = useState('');
-  const [email, setEmail] = useState(''); // OPTIONAL
-  const [address, setAddress] = useState('');
-  const [category, setCategory] = useState<StudentCategory>('former');
+  // Helper to retrieve saved registration form draft
+  const getDraft = () => {
+    try {
+      const raw = localStorage.getItem('plscf_registration_draft');
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return null;
+  };
+  const draft = React.useMemo(() => getDraft(), []);
+
+  // Form State — initialized from saved draft if available
+  const [fullName, setFullName] = useState(() => draft?.fullName || '');
+  const [photoUrl, setPhotoUrl] = useState(() => draft?.photoUrl || '');
+  const [mobileNumber, setMobileNumber] = useState(() => draft?.mobileNumber || '');
+  const [email, setEmail] = useState(() => draft?.email || ''); // OPTIONAL
+  const [address, setAddress] = useState(() => draft?.address || '');
+  const [category, setCategory] = useState<StudentCategory>(() => draft?.category || 'former');
 
   // Academic Information
-  const [passingYear, setPassingYear] = useState('2015'); // Mandatory for former
-  const [lastClassAttended, setLastClassAttended] = useState('SSC'); // Optional for former
-  const [currentClass, setCurrentClass] = useState('Class 10'); // For current students
-  const [studentId, setStudentId] = useState(''); // Mandatory for current students
+  const [passingYear, setPassingYear] = useState(() => draft?.passingYear || '2015'); // Mandatory for former
+  const [lastClassAttended, setLastClassAttended] = useState(() => draft?.lastClassAttended || 'SSC'); // Optional for former
+  const [currentClass, setCurrentClass] = useState(() => draft?.currentClass || 'Class 10'); // For current students
+  const [studentId, setStudentId] = useState(() => draft?.studentId || ''); // Mandatory for current students
   const [idVerificationResult, setIdVerificationResult] = useState<StudentIdVerificationResult | null>(null);
   const [isVerifyingId, setIsVerifyingId] = useState(false);
-  const [batchName, setBatchName] = useState('');
-  const [groupOrSection, setGroupOrSection] = useState('Section A'); // For current students
-  const [rollNumber, setRollNumber] = useState('');
+  const [batchName, setBatchName] = useState(() => draft?.batchName || '');
+  const [groupOrSection, setGroupOrSection] = useState(() => draft?.groupOrSection || 'Section A'); // For current students
+  const [rollNumber, setRollNumber] = useState(() => draft?.rollNumber || '');
 
   // T-shirt & Donation
-  const [tShirtSize, setTShirtSize] = useState<TShirtSize>('L');
-  const [donationInput, setDonationInput] = useState<number | ''>('');
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [tShirtSize, setTShirtSize] = useState<TShirtSize>(() => draft?.tShirtSize || 'L');
+  const [donationInput, setDonationInput] = useState<number | ''>(() => (typeof draft?.donationInput === 'number' ? draft.donationInput : ''));
+  const [termsAccepted, setTermsAccepted] = useState(() => Boolean(draft?.termsAccepted));
+
+  // Auto-save form draft to localStorage on any field update
+  useEffect(() => {
+    try {
+      const currentDraft = {
+        fullName,
+        photoUrl,
+        mobileNumber,
+        email,
+        address,
+        category,
+        passingYear,
+        lastClassAttended,
+        currentClass,
+        studentId,
+        batchName,
+        groupOrSection,
+        rollNumber,
+        tShirtSize,
+        donationInput,
+        termsAccepted,
+      };
+      localStorage.setItem('plscf_registration_draft', JSON.stringify(currentDraft));
+    } catch {}
+  }, [
+    fullName,
+    photoUrl,
+    mobileNumber,
+    email,
+    address,
+    category,
+    passingYear,
+    lastClassAttended,
+    currentClass,
+    studentId,
+    batchName,
+    groupOrSection,
+    rollNumber,
+    tShirtSize,
+    donationInput,
+    termsAccepted,
+  ]);
 
   // Photo live camera & compression state (Requirement 4)
   const [photoSizeKb, setPhotoSizeKb] = useState<number | null>(null);

@@ -12,6 +12,9 @@ import {
   QrCode,
   Clock,
   Wifi,
+  Info,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Language, PaymentMethod, RegistrationRecord } from '../types';
 import { RegistrationFormData } from '../utils/rules';
@@ -27,6 +30,8 @@ interface PaymentModalProps {
   totalPayable: number;
   studentName: string;
   registrationData?: RegistrationFormData | null;
+  initialStep?: ModalStep;
+  initialErrorMessage?: string;
 }
 
 type ModalStep =
@@ -59,6 +64,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   totalPayable,
   studentName,
   registrationData,
+  initialStep,
+  initialErrorMessage,
 }) => {
   if (!isOpen) return null;
 
@@ -66,12 +73,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const config = PayStationService.getConfig();
 
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('bkash');
-  const [step, setStep] = useState<ModalStep>('select');
+  const [step, setStep] = useState<ModalStep>(() => initialStep || 'select');
   const [processingStep, setProcessingStep] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState(() => initialErrorMessage || '');
   const [completedTicket, setCompletedTicket] = useState<RegistrationRecord | null>(null);
   const [transactionSummary, setTransactionSummary] = useState<PayStationPaymentResult | null>(null);
   const [pollCount, setPollCount] = useState(0);
+  const [copiedField, setCopiedField] = useState('');
 
   // Persist invoice & amount across renders so the polling closure uses fresh values
   const invoiceRef = useRef(`PLSCF26-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`);
@@ -183,11 +191,22 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         isBangla ? 'পেমেন্ট পেজে নিয়ে যাওয়া হচ্ছে...' : 'Opening PayStation checkout...'
       );
 
-      // Open hosted checkout in a new tab
-      window.open(createRes.paymentUrl, '_blank', 'noopener,noreferrer');
+      // Persist full pending registration session before redirecting
+      PayStationService.savePendingSession({
+        type: 'registration',
+        invoiceNumber: invoiceRef.current,
+        amount: totalPayable,
+        formData: registrationData,
+        fees: {
+          registrationFee,
+          donationAmount,
+          totalPayable,
+        },
+        createdAt: new Date().toISOString(),
+      });
 
-      // Switch to waiting mode — the polling effect will verify completion
-      setStep('waiting');
+      // Redirect in the current window to ensure mobile Safari history & "GO BACK" redirects work seamlessly
+      window.location.href = createRes.paymentUrl;
     } catch (err: any) {
       console.error('[PayStation] Checkout error:', err);
       setErrorMessage(err.message || 'Payment initiation failed.');
@@ -570,6 +589,83 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   : 'Complete payment on the PayStation checkout page. Upay, Visa & Mastercard also supported.'}
               </p>
             </div>
+
+            {/* Sandbox Testing Guide Card — Explains "The input wallet is not eligible" */}
+            {config.isSandbox && (
+              <div className="p-3.5 rounded-2xl bg-amber-50/90 border border-amber-300 text-xs space-y-2">
+                <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                  <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>
+                    {isBangla ? 'স্যান্ডবক্স টেস্ট মোড — পরীক্ষার নির্দেশিকা' : 'Sandbox Test Wallet Guide'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  {isBangla ? (
+                    <>
+                      <strong>সতর্কতা:</strong> বিকাশ/নগদে আপনার <strong>ব্যক্তিগত মোবাইল নম্বর দিবেন না</strong> (দিলে <em>&quot;The input wallet is not eligible&quot;</em> দেখায়)। নিচের টেস্ট অ্যাকাউন্ট ব্যবহার করুন:
+                    </>
+                  ) : (
+                    <>
+                      <strong>Notice:</strong> Do <strong>NOT</strong> enter your real phone number (it triggers <em>&quot;The input wallet is not eligible&quot;</em>). Use official sandbox test credentials:
+                    </>
+                  )}
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5 font-mono text-[11px]">
+                  {/* bKash Test Wallet */}
+                  <div className="bg-white p-2.5 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs">
+                    <div>
+                      <span className="text-[9px] uppercase font-bold text-pink-600 tracking-wider block font-sans">
+                        bKash Test Wallet
+                      </span>
+                      <span className="font-bold text-slate-900 text-xs">01770618575</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText('01770618575');
+                        setCopiedField('bkash');
+                        setTimeout(() => setCopiedField(''), 2000);
+                      }}
+                      className="text-[10px] px-2 py-1 rounded-lg bg-pink-50 hover:bg-pink-100 text-pink-700 font-sans font-bold cursor-pointer flex items-center gap-1 border border-pink-200 transition"
+                    >
+                      {copiedField === 'bkash' ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-600" />
+                          <span>{isBangla ? 'কপি হয়েছে' : 'Copied'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3 text-pink-600" />
+                          <span>{isBangla ? 'কপি' : 'Copy'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* OTP & PIN */}
+                  <div className="bg-white p-2.5 rounded-xl border border-amber-200 space-y-1 shadow-2xs text-[11px]">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-slate-500 font-sans font-semibold">Test OTP:</span>
+                      <span className="font-bold text-slate-900 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                        123456
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-slate-500 font-sans font-semibold">Test PIN:</span>
+                      <span className="font-bold text-slate-900 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                        12121
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-amber-700 font-sans flex items-center justify-between pt-0.5">
+                  <span>{isBangla ? 'বিকল্প টেস্ট নম্বর:' : 'Alt test numbers:'} 01770618576, 01929918378</span>
+                  <span className="font-bold text-amber-900">Sandbox Mode</span>
+                </div>
+              </div>
+            )}
 
             {/* Error */}
             {errorMessage && (

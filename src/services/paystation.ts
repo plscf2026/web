@@ -120,6 +120,51 @@ export interface PayStationPaymentResult {
   rawResponse?: PayStationTrxStatusV1Response['data'];
 }
 
+export interface PayStationSandboxTestWallet {
+  provider: string;
+  numbers: string[];
+  otp: string;
+  pin: string;
+  instructionsEn: string;
+  instructionsBn: string;
+}
+
+export const PAYSTATION_SANDBOX_TEST_WALLETS: PayStationSandboxTestWallet[] = [
+  {
+    provider: 'bKash',
+    numbers: ['01770618575', '01770618576', '01929918378', '01877722345', '01619777282'],
+    otp: '123456',
+    pin: '12121',
+    instructionsEn: 'In bKash Sandbox, personal numbers show "The input wallet is not eligible". You must use test wallet 01770618575, OTP 123456, and PIN 12121.',
+    instructionsBn: 'বিকাশ স্যান্ডবক্সে ব্যক্তিগত নম্বর দিলে "The input wallet is not eligible" দেখাবে। টেস্ট নম্বর 01770618575, ওটিপি 123456 এবং পিন 12121 দিন।',
+  },
+  {
+    provider: 'Nagad',
+    numbers: ['01619777282', '01619777283'],
+    otp: '123456',
+    pin: '12121',
+    instructionsEn: 'Use test number 01619777282, OTP 123456, and PIN 12121 for Nagad sandbox.',
+    instructionsBn: 'নগদ স্যান্ডবক্সে টেস্ট নম্বর 01619777282, ওটিপি 123456 এবং পিন 12121 দিন।',
+  },
+];
+
+export interface PendingPaymentSession {
+  type: 'registration' | 'donation';
+  invoiceNumber: string;
+  amount: number;
+  formData?: RegistrationFormData;
+  fees?: { registrationFee: number; donationAmount: number; totalPayable: number };
+  donationData?: {
+    donorName: string;
+    mobileNumber: string;
+    email?: string;
+    amount: number;
+    purpose: string;
+    paymentMethod: PaymentMethod;
+  };
+  createdAt: string;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Convert PayStation payment_method string to our internal PaymentMethod type */
@@ -434,6 +479,36 @@ export class PayStationService {
       return { valid: false, reason: 'Missing trx_id' };
     }
     return { valid: true };
+  }
+
+  // ── Pending Session Persistence (Prevents Lost Form Data on Redirect/Go-Back) ──
+
+  static savePendingSession(session: PendingPaymentSession): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('plscf_pending_payment_session', JSON.stringify(session));
+    } catch (e) {
+      console.warn('Failed to save pending payment session:', e);
+    }
+  }
+
+  static getPendingSession(): PendingPaymentSession | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem('plscf_pending_payment_session');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  static clearPendingSession(): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.removeItem('plscf_pending_payment_session');
+    } catch (e) {
+      console.warn(e);
+    }
   }
 
   // ── Callback URL Builder ───────────────────────────────────────────────────
