@@ -25,8 +25,12 @@ import {
   ShieldAlert,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Landmark,
   CreditCard,
+  Layers,
+  Menu,
+  X,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -164,6 +168,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'notices'
     | 'reports'
   >('reunionManagement');
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
   // Delete Booking Confirmation State (pop-up with mandatory reason)
   const [bookingToDelete, setBookingToDelete] = useState<RegistrationRecord | null>(null);
@@ -675,7 +680,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // VIEW 2: AUTHENTICATED CENTRAL COMMAND DASHBOARD
   // ==========================================
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Top Admin Header with Supabase Connection Telemetry - Solid Navy Blue */}
       <div className="bg-[#172554] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-blue-900 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
@@ -722,53 +727,227 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
-      {/* Admin Navigation Tabs */}
-      <div className="bg-white rounded-2xl p-2 border border-slate-200 shadow-xs flex items-center gap-1 overflow-x-auto">
-        {[
-          {
-            id: 'reunionManagement',
-            label: language === 'bn' ? '🏛️ পুনর্মিলনী ইআরপি (RMS)' : '🏛️ Reunion Management (RMS)',
-            icon: Landmark,
-            highlight: true,
-          },
-          {
-            id: 'idCardManagement',
-            label: language === 'bn' ? '🪪 আইডি কার্ড পোর্টাল' : '🪪 Student ID Cards',
-            icon: CreditCard,
-            highlight: true,
-          },
-          { id: 'masterOverview', label: language === 'bn' ? 'মাস্টার ইভেন্ট ড্যাশবোর্ড' : 'Master Overview', icon: Sparkles },
-          { id: 'budgetManagement', label: language === 'bn' ? 'বাজেট ও ব্যয়' : 'Budget & Expenses', icon: DollarSign },
-          { id: 'dailyAnalytics', label: language === 'bn' ? 'দৈনিক অ্যানালিটিক্স' : 'Daily Analytics', icon: BarChart3 },
-          { id: 'staffManagement', label: language === 'bn' ? 'স্টাফ ও রোলস' : 'Staff & Roles', icon: Users },
-          { id: 'auditHistory', label: language === 'bn' ? 'অডিট হিস্ট্রি' : 'Audit Trail', icon: ShieldAlert },
-          { id: 'allBookings', label: language === 'bn' ? 'সকল বুকিং (সুপাবেস)' : 'All Bookings (Supabase)', icon: Database },
-          { id: 'studentIds', label: language === 'bn' ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা' : 'Student ID Management', icon: ShieldCheck },
-          { id: 'feeSettings', label: t.tabFeeSettings, icon: Settings },
-          { id: 'tickets', label: t.tabTickets, icon: QrCode },
-          { id: 'notices', label: t.tabNoticesAdmin, icon: FileText },
-          { id: 'reports', label: t.tabReports, icon: Download },
-        ].map((tab) => {
-          const isActive = activeTab === tab.id;
-          const Icon = tab.icon;
-          return (
+      {/* Admin Navigation & Content Layout */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        {/* ======================================================== */}
+        {/* 1. LEFT SIDEBAR NAVIGATION (Desktop: lg+)                */}
+        {/* ======================================================== */}
+        <aside className="hidden lg:block w-64 xl:w-72 shrink-0 bg-white rounded-3xl p-3.5 border border-slate-200 shadow-xs sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto">
+          {/* Sidebar Title */}
+          <div className="px-3 py-2 flex items-center justify-between border-b border-slate-100 mb-2">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-[#172554]" />
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                {language === 'bn' ? 'অ্যাডমিন মডিউল (১৩টি)' : 'ADMIN MODULES (13)'}
+              </span>
+            </div>
+            <span className="text-[10px] font-mono font-bold bg-[#172554]/10 text-[#172554] px-1.5 py-0.5 rounded">
+              CONTROL
+            </span>
+          </div>
+
+          {/* Navigation Items List */}
+          <nav className="space-y-1">
+            {[
+              {
+                id: 'reunionManagement',
+                label: language === 'bn' ? '🏛️ পুনর্মিলনী ইআরপি (RMS)' : '🏛️ Reunion Management (RMS)',
+                icon: Landmark,
+                highlight: true,
+                badge: 'ERP 2027',
+              },
+              {
+                id: 'idCardManagement',
+                label: language === 'bn' ? '🪪 আইডি কার্ড পোর্টাল' : '🪪 Student ID Cards',
+                icon: CreditCard,
+                highlight: true,
+                badge: 'ID Suite',
+              },
+              { id: 'masterOverview', label: language === 'bn' ? 'মাস্টার ইভেন্ট ড্যাশবোর্ড' : 'Master Overview', icon: Sparkles },
+              { id: 'budgetManagement', label: language === 'bn' ? 'বাজেট ও ব্যয়' : 'Budget & Expenses', icon: DollarSign },
+              { id: 'dailyAnalytics', label: language === 'bn' ? 'দৈনিক অ্যানালিটিক্স' : 'Daily Analytics', icon: BarChart3 },
+              { id: 'staffManagement', label: language === 'bn' ? 'স্টাফ ও রোলস' : 'Staff & Roles', icon: Users },
+              { id: 'auditHistory', label: language === 'bn' ? 'অডিট হিস্ট্রি' : 'Audit Trail', icon: ShieldAlert },
+              { id: 'allBookings', label: language === 'bn' ? 'সকল বুকিং (সুপাবেস)' : 'All Bookings (Supabase)', icon: Database },
+              { id: 'studentIds', label: language === 'bn' ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা' : 'Student ID Management', icon: ShieldCheck },
+              { id: 'feeSettings', label: t.tabFeeSettings, icon: Settings },
+              { id: 'tickets', label: t.tabTickets, icon: QrCode },
+              { id: 'notices', label: t.tabNoticesAdmin, icon: FileText },
+              { id: 'reports', label: t.tabReports, icon: Download },
+            ].map((tab) => {
+              const isActive = activeTab === tab.id;
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-[#172554] text-white shadow-md'
+                      : tab.highlight
+                      ? 'text-[#172554] bg-[#172554]/5 hover:bg-[#172554]/10 font-black'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#C5A45D]' : tab.highlight ? 'text-[#172554]' : 'text-slate-400'}`} />
+                    <span className="truncate">{tab.label}</span>
+                  </div>
+                  {isActive ? (
+                    <ChevronRight className="w-3.5 h-3.5 text-[#C5A45D] shrink-0" />
+                  ) : tab.badge ? (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                      {tab.badge}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        {/* ======================================================== */}
+        {/* 2. MOBILE DRAWER NAVIGATION (Mobile: < lg)              */}
+        {/* ======================================================== */}
+        {isMobileDrawerOpen && (
+          <div className="lg:hidden fixed inset-0 z-50 flex">
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
+              onClick={() => setIsMobileDrawerOpen(false)}
+            />
+
+            {/* Drawer Content */}
+            <div className="relative w-72 max-w-[85vw] bg-white h-full shadow-2xl p-4 flex flex-col z-10 overflow-y-auto">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-[#172554]" />
+                  <span className="text-xs font-black text-slate-900">
+                    {language === 'bn' ? 'অ্যাডমিন মডিউলসমূহ' : 'Admin Modules (13)'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileDrawerOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <nav className="space-y-1 flex-1">
+                {[
+                  {
+                    id: 'reunionManagement',
+                    label: language === 'bn' ? '🏛️ পুনর্মিলনী ইআরপি (RMS)' : '🏛️ Reunion Management (RMS)',
+                    icon: Landmark,
+                    highlight: true,
+                  },
+                  {
+                    id: 'idCardManagement',
+                    label: language === 'bn' ? '🪪 আইডি কার্ড পোর্টাল' : '🪪 Student ID Cards',
+                    icon: CreditCard,
+                    highlight: true,
+                  },
+                  { id: 'masterOverview', label: language === 'bn' ? 'মাস্টার ইভেন্ট ড্যাশবোর্ড' : 'Master Overview', icon: Sparkles },
+                  { id: 'budgetManagement', label: language === 'bn' ? 'বাজেট ও ব্যয়' : 'Budget & Expenses', icon: DollarSign },
+                  { id: 'dailyAnalytics', label: language === 'bn' ? 'দৈনিক অ্যানালিটিক্স' : 'Daily Analytics', icon: BarChart3 },
+                  { id: 'staffManagement', label: language === 'bn' ? 'স্টাফ ও রোলস' : 'Staff & Roles', icon: Users },
+                  { id: 'auditHistory', label: language === 'bn' ? 'অডিট হিস্ট্রি' : 'Audit Trail', icon: ShieldAlert },
+                  { id: 'allBookings', label: language === 'bn' ? 'সকল বুকিং (সুপাবেস)' : 'All Bookings (Supabase)', icon: Database },
+                  { id: 'studentIds', label: language === 'bn' ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা' : 'Student ID Management', icon: ShieldCheck },
+                  { id: 'feeSettings', label: t.tabFeeSettings, icon: Settings },
+                  { id: 'tickets', label: t.tabTickets, icon: QrCode },
+                  { id: 'notices', label: t.tabNoticesAdmin, icon: FileText },
+                  { id: 'reports', label: t.tabReports, icon: Download },
+                ].map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveTab(tab.id as any);
+                        setIsMobileDrawerOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-[#172554] text-white shadow-md'
+                          : tab.highlight
+                          ? 'text-[#172554] bg-[#172554]/5 hover:bg-[#172554]/10 font-black'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 truncate">
+                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#C5A45D]' : 'text-slate-400'}`} />
+                        <span className="truncate">{tab.label}</span>
+                      </div>
+                      {isActive && <ChevronRight className="w-3.5 h-3.5 text-[#C5A45D] shrink-0" />}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* 3. MAIN CONTENT VIEWPORT (Right side of Sidebar)         */}
+        {/* ======================================================== */}
+        <main className="flex-1 min-w-0 w-full space-y-6">
+          {/* Mobile Current Module Quick-Selector Bar (< lg) */}
+          <div className="lg:hidden bg-white border border-slate-200 rounded-2xl p-3 shadow-xs flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-[#172554] text-[#C5A45D] flex items-center justify-center shrink-0">
+                <Layers className="w-4 h-4" />
+              </div>
+              <div className="truncate">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                  {language === 'bn' ? 'বর্তমান সেকশন' : 'Current Section'}
+                </span>
+                <span className="text-xs font-black text-slate-900 truncate block">
+                  {activeTab === 'reunionManagement'
+                    ? (language === 'bn' ? '🏛️ পুনর্মিলনী ইআরপি (RMS)' : '🏛️ Reunion Management (RMS)')
+                    : activeTab === 'idCardManagement'
+                    ? (language === 'bn' ? '🪪 আইডি কার্ড পোর্টাল' : '🪪 Student ID Cards')
+                    : activeTab === 'masterOverview'
+                    ? (language === 'bn' ? 'মাস্টার ইভেন্ট ড্যাশবোর্ড' : 'Master Overview')
+                    : activeTab === 'budgetManagement'
+                    ? (language === 'bn' ? 'বাজেট ও ব্যয়' : 'Budget & Expenses')
+                    : activeTab === 'dailyAnalytics'
+                    ? (language === 'bn' ? 'দৈনিক অ্যানালিটিক্স' : 'Daily Analytics')
+                    : activeTab === 'staffManagement'
+                    ? (language === 'bn' ? 'স্টাফ ও রোলস' : 'Staff & Roles')
+                    : activeTab === 'auditHistory'
+                    ? (language === 'bn' ? 'অডিট হিস্ট্রি' : 'Audit Trail')
+                    : activeTab === 'allBookings'
+                    ? (language === 'bn' ? 'সকল বুকিং (সুপাবেস)' : 'All Bookings (Supabase)')
+                    : activeTab === 'studentIds'
+                    ? (language === 'bn' ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা' : 'Student ID Management')
+                    : activeTab === 'feeSettings'
+                    ? t.tabFeeSettings
+                    : activeTab === 'tickets'
+                    ? t.tabTickets
+                    : activeTab === 'notices'
+                    ? t.tabNoticesAdmin
+                    : activeTab === 'reports'
+                    ? t.tabReports
+                    : activeTab}
+                </span>
+              </div>
+            </div>
+
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                isActive
-                  ? 'bg-[#172554] text-white shadow-sm'
-                  : tab.highlight
-                  ? 'text-[#172554] bg-[#172554]/10 hover:bg-[#172554]/20 font-black'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
+              type="button"
+              onClick={() => setIsMobileDrawerOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold shrink-0 transition-colors cursor-pointer"
             >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{tab.label}</span>
+              <Menu className="w-4 h-4" />
+              <span>{language === 'bn' ? 'সকল মেনু' : 'All Modules'}</span>
             </button>
-          );
-        })}
-      </div>
+          </div>
 
       {/* TAB: REUNION MANAGEMENT SYSTEM (RMS - 12 INTEGRATED MODULES) */}
       {activeTab === 'reunionManagement' && (
@@ -1914,6 +2093,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
       )}
+
+        </main>
+      </div>
 
       {/* MODAL: ADD EXPENSE */}
       {showAddExpenseModal && (
