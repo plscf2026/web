@@ -1,0 +1,145 @@
+@import "tailwindcss";
+
+@layer base {
+  ::selection {
+    background-color: #0284c7;
+    color: #ffffff;
+  }
+
+  /* Custom scrollbar: 8px width, #0284c7 thumb, #f0f6fa track */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #f0f6fa;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #0284c7;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #0369a1;
+  }
+
+  body {
+    font-family: 'Satoshi', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Bengali", sans-serif;
+    color: #0f172a;
+    background-color: #f0f6fa;
+  }
+
+  h1, h2, h3, h4, .font-heading {
+    font-family: 'Clash Display', 'Satoshi', sans-serif;
+  }
+
+  input[aria-invalid="true"],
+  select[aria-invalid="true"],
+  [data-validation-field][aria-invalid="true"] {
+    animation: validation-error-pulse 1.1s ease-in-out infinite;
+  }
+
+  @keyframes validation-error-pulse {
+    50% {
+      border-color: #e11d48;
+      background-color: #fff1f2;
+      box-shadow: 0 0 0 3px rgb(225 29 72 / 18%);
+    }
+  }
+}
+
+/* Raw Form Swiss Brutalist Utility Classes */
+.font-clash {
+  font-family: 'Clash Display', sans-serif;
+}
+
+.font-satoshi {
+  font-family: 'Satoshi', sans-serif;
+}
+
+/* Global cubic-bezier slide-up animation */
+@keyframes slideUpEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUpEntrance 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Organic pulsing gradient blobs */
+@keyframes blobPulse {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+    opacity: 0.65;
+  }
+  50% {
+    transform: translate(30px, -20px) scale(1.08);
+    opacity: 0.9;
+  }
+}
+
+.animate-blob-pulse {
+  animation: blobPulse 12s ease-in-out infinite;
+}
+
+/* Interactive Brutalist CTA Button with directional left-to-right fill */
+.btn-brutalist {
+  position: relative;
+  overflow: hidden;
+  background-color: #0f172a;
+  color: #f0f6fa;
+  transition: color 0.3s ease-out, border-color 0.3s ease-out;
+  border-radius: 0px !important;
+  z-index: 1;
+}
+
+.btn-brutalist::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #ffffff;
+  transform: translateX(-100%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: -1;
+}
+
+.btn-brutalist:hover::before {
+  transform: translateX(0);
+}
+
+.btn-brutalist:hover {
+  color: #0284c7;
+}
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .print-ticket-container {
+    box-shadow: none !important;
+    border: 2px solid #0f172a !important;
+    page-break-inside: avoid !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 190mm !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+}

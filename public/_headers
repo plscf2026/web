@@ -1,0 +1,8 @@
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://api.fontshare.com; font-src 'self' https://api.fontshare.com https://cdn.fontshare.com data:; img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co https://hnthoszbkhvygoowtvau.supabase.co; connect-src 'self' https://*.supabase.co https://hnthoszbkhvygoowtvau.supabase.co wss://*.supabase.co wss://hnthoszbkhvygoowtvau.supabase.co https://api.paystation.com.bd https://sandbox.paystation.com.bd; frame-src 'self' https://api.paystation.com.bd https://sandbox.paystation.com.bd; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self' https://api.paystation.com.bd https://sandbox.paystation.com.bd;
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(self), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
