@@ -1596,7 +1596,16 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
               Reset credentials for <strong className="text-white">{showResetPasswordModal.fullName}</strong> ({showResetPasswordModal.username})
             </p>
             <div>
-              <label className="block text-slate-300 font-semibold mb-1 text-xs">New Secure Password</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-slate-300 font-semibold text-xs">New Secure Password</label>
+                <button
+                  type="button"
+                  onClick={() => setNewStaffPassword('admin@123')}
+                  className="text-[10px] text-amber-400 hover:text-amber-300 font-mono font-semibold"
+                >
+                  🧪 Fill: admin@123
+                </button>
+              </div>
               <input
                 type="password"
                 placeholder="Enter new password (e.g. staff@123)"

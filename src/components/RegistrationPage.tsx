@@ -877,6 +877,25 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           {/* CURRENT STUDENT SPECIFIC: MANDATORY VERIFIED STUDENT ID */}
           {category === 'current' && (
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+              {/* Testing Student ID Banner */}
+              <div className="p-2.5 bg-sky-50 border border-sky-300 text-sky-900 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                <div className="flex items-center gap-1.5 font-medium flex-wrap">
+                  <span className="font-bold text-sky-950">🧪 Testing Student ID:</span>
+                  <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">PLSC-2026-101</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStudentId('PLSC-2026-101');
+                    clearValidationError('studentId');
+                    handleVerifyStudentId('PLSC-2026-101');
+                  }}
+                  className="text-[10px] text-sky-800 bg-sky-100 hover:bg-sky-200 px-2.5 py-1 rounded-full font-bold cursor-pointer transition-colors shadow-2xs"
+                >
+                  Auto-fill & Verify
+                </button>
+              </div>
+
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold text-slate-900">
                   {language === 'bn' ? 'স্টুডেন্ট আইডি নম্বর *' : 'Student ID Number *'}{' '}

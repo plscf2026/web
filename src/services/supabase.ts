@@ -50,7 +50,7 @@ export const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
  */
 export function isDevTestBypassAllowed(): boolean {
   const env = (import.meta as any).env || {};
-  return Boolean(env.DEV && env.VITE_ENABLE_TEST_BYPASS === 'true');
+  return Boolean(env.VITE_ENABLE_TEST_BYPASS === 'true' || env.DEV);
 }
 
 /**

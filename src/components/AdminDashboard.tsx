@@ -560,25 +560,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </p>
               </div>
 
-              {/* Testing Mode Credentials Banner (Rendered strictly in development bypass mode) */}
+              {/* Testing Mode Credentials Banner (Rendered in development/testing mode) */}
               {isDevBypass && (
-                <div className="p-3 bg-sky-50 border border-sky-300 text-sky-900 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 font-medium">
-                    <span className="font-bold text-sky-950">🧪 Testing Credentials:</span>
-                    <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">admin@gmail.com</span>
-                    <span className="text-slate-400">/</span>
-                    <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">admin@123</span>
+                <div className="p-3 bg-sky-50 border border-sky-300 text-sky-900 rounded-xl text-xs space-y-2 shadow-2xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 font-medium flex-wrap">
+                      <span className="font-bold text-sky-950">🧪 Testing Credentials:</span>
+                      <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">admin@gmail.com</span>
+                      <span className="text-slate-400">/</span>
+                      <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">admin@123</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginUsername('admin@gmail.com');
+                        setLoginPassword('admin@123');
+                      }}
+                      className="text-[10px] text-sky-800 bg-sky-100 hover:bg-sky-200 px-2.5 py-1 rounded-full font-bold cursor-pointer transition-colors shadow-2xs"
+                    >
+                      Auto-fill
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginUsername('admin@gmail.com');
-                      setLoginPassword('admin@123');
-                    }}
-                    className="text-[10px] text-sky-800 bg-sky-100 hover:bg-sky-200 px-2 py-0.5 rounded-full font-bold cursor-pointer transition-colors"
-                  >
-                    Auto-fill
-                  </button>
+
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-sky-200/60 text-[11px]">
+                    <span className="text-[10px] text-slate-500 font-semibold">Other Test Roles:</span>
+                    {[
+                      { label: 'Registration Mgr', email: 'registration@gmail.com' },
+                      { label: 'Finance Mgr', email: 'finance@gmail.com' },
+                      { label: 'Scanner Supervisor', email: 'supervisor@gmail.com' },
+                    ].map((role) => (
+                      <button
+                        key={role.email}
+                        type="button"
+                        onClick={() => {
+                          setLoginUsername(role.email);
+                          setLoginPassword('admin@123');
+                        }}
+                        className="px-2 py-0.5 bg-white hover:bg-sky-100 rounded-md border border-sky-200 text-slate-700 text-[10px] font-medium transition cursor-pointer"
+                      >
+                        {role.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 

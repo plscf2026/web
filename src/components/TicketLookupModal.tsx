@@ -65,6 +65,26 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
           <p className="text-xs text-slate-600">{t.lookupSubtitle}</p>
         </div>
 
+        {/* Testing Credentials Banner (For quick attendee lookup testing) */}
+        <div className="p-3 bg-sky-50 border border-sky-300 text-sky-900 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+          <div className="flex items-center gap-1.5 font-medium flex-wrap">
+            <span className="font-bold text-sky-950">🧪 Testing Credentials:</span>
+            <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">PLSCF-2026-F1001</span>
+            <span className="text-slate-400">/</span>
+            <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">01712345678</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setRegistrationId('PLSCF-2026-F1001');
+              setMobileNumber('01712345678');
+            }}
+            className="text-[10px] text-sky-800 bg-sky-100 hover:bg-sky-200 px-2.5 py-1 rounded-full font-bold cursor-pointer transition-colors shadow-2xs"
+          >
+            Auto-fill
+          </button>
+        </div>
+
         <form onSubmit={handleSearch} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="ticket-registration-id">
