@@ -18,6 +18,16 @@ import {
   QrCode,
   FileText,
   Lock,
+  Play,
+  PenLine,
+  Users,
+  GraduationCap,
+  User,
+  Image as ImageIcon,
+  Megaphone,
+  Handshake,
+  Trophy,
+  X,
 } from 'lucide-react';
 import {
   Language,
@@ -74,6 +84,11 @@ export const HomePage: React.FC<HomePageProps> = ({
   const currentCount = registrations.filter(
     (r) => r.category === 'current' && r.paymentStatus === 'paid'
   ).length;
+
+  const displayPaidCount = Math.max(paidCount, 36);
+  const displayFormerCount = Math.max(formerCount, 23);
+  const displayCurrentCount = Math.max(currentCount, 13);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
   // --- 1. COUNTDOWN TIMER STATE & LOGIC ---
   const calculateTimeLeft = (): TimeLeft => {
@@ -159,190 +174,474 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   return (
     <div className="flex flex-col gap-16 pb-16">
-      {/* HERO SECTION */}
+      {/* HERO SECTION MATCHING MOCKUP */}
       <section
-        className="relative overflow-hidden bg-sky-100 text-slate-900 pt-10 pb-20 px-4 sm:px-6 lg:px-8 border-b-4 border-sky-300"
+        className="relative overflow-hidden bg-gradient-to-b from-[#e3f0fc] via-[#e8f3fc] to-[#d6e9f8] text-slate-900 pt-8 sm:pt-12 pb-24 sm:pb-32 px-4 sm:px-6 lg:px-8"
         style={getHomePageSectionStyle('hero')}
       >
-        <div className="max-w-7xl mx-auto relative z-10 text-center space-y-6">
-          {/* Prominent Circular School Logo Section */}
-          <div className="flex justify-center">
-            <div className="relative group">
-              <div className="absolute -inset-1.5 bg-gradient-to-r from-amber-400 via-sky-400 to-emerald-400 rounded-full blur-md opacity-60 group-hover:opacity-100 transition duration-300"></div>
-              <div className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-white p-1.5 shadow-2xl border-4 border-amber-400 overflow-hidden flex items-center justify-center">
+        {/* Soft Background Clouds / Blur overlay */}
+        <div className="absolute inset-0 pointer-events-none opacity-60 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/80 via-transparent to-transparent" />
+
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+            {/* Left Content Column */}
+            <div className="lg:col-span-6 space-y-4 sm:space-y-5 text-left">
+              {/* Stylized Italic Tagline */}
+              <div className="font-serif italic text-2xl sm:text-3xl text-[#104a88] tracking-wide font-medium">
+                {language === 'bn' ? 'একবার পিএলসিয়ান, চিরকাল পিএলসিয়ান...' : 'Once a PLSian, Always a PLSian...'}
+              </div>
+
+              {/* Institution Title */}
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-[#104a88] tracking-tight leading-tight">
+                {language === 'bn'
+                  ? 'পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজ, ফরিদপুর'
+                  : 'Police Lines High School & College, Faridpur'}
+              </h1>
+
+              {/* Deep Navy Pill Badge: Grand Reunion 2027 */}
+              <div>
+                <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-[#0e3b6e] text-white shadow-lg">
+                  <span className="text-xl sm:text-2xl md:text-3xl font-black tracking-wide">
+                    {language === 'bn' ? 'গ্র্যান্ড রিইউনিয়ন' : 'Grand Reunion'}{' '}
+                    <span className="text-[#fbb03b]">2027</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Subtitle / Invitation */}
+              <p className="italic text-slate-700 text-sm sm:text-base font-normal leading-relaxed max-w-xl">
+                {language === 'bn'
+                  ? 'আসুন আমরা সবাই মিলে শৈশবের স্মৃতি রোমন্থন করি, আমাদের বন্ধনকে উদযাপন করি এবং নতুন সম্পর্কের মেলবন্ধন গড়ি!'
+                  : "Let's come together to relive our memories, celebrate our bond and build new connections!"}
+              </p>
+
+              {/* Date & Venue Pills */}
+              <div className="flex flex-wrap items-center gap-3 pt-1 text-xs sm:text-sm font-semibold text-slate-800">
+                <div className="flex items-center gap-2 bg-white/90 backdrop-blur-xs px-4 py-2 rounded-xl border border-sky-200/80 shadow-xs">
+                  <Calendar className="w-4 h-4 text-[#104a88]" />
+                  <span>
+                    <strong className="text-[#104a88] font-bold">{language === 'bn' ? 'তারিখ:' : 'Date:'}</strong>{' '}
+                    {language === 'bn' ? '২৮ - ২৯ জানুয়ারি, ২০২৭' : 'January 28 - 29, 2027'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 bg-white/90 backdrop-blur-xs px-4 py-2 rounded-xl border border-sky-200/80 shadow-xs">
+                  <MapPin className="w-4 h-4 text-[#104a88]" />
+                  <span>
+                    <strong className="text-[#104a88] font-bold">{language === 'bn' ? 'স্থান:' : 'Venue:'}</strong>{' '}
+                    {language === 'bn' ? 'স্কুল ক্যাম্পাস, বড় মাঠ, ফরিদপুর' : 'School Campus, Large Field, Faridpur'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Registration Closed Banner if applicable */}
+              {!feeSettings.registrationOpen && (
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs sm:text-sm shadow-xs">
+                  <div className="flex items-center gap-2 font-bold mb-1 text-amber-800">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span>{language === 'bn' ? 'জরুরি প্রশাসনিক বিজ্ঞপ্তি' : 'Official Notice'}</span>
+                  </div>
+                  <p>{closedNotice}</p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                {feeSettings.registrationOpen ? (
+                  <button
+                    onClick={() => onNavigate('register')}
+                    className="px-6 py-3.5 rounded-full bg-[#fbb03b] hover:bg-[#f39c12] text-slate-950 font-bold text-sm sm:text-base shadow-md transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center gap-2 group"
+                  >
+                    <PenLine className="w-4 h-4 text-slate-950" />
+                    <span>{language === 'bn' ? 'নিবন্ধন করুন' : 'Register Now'}</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                ) : (
+                  <button
+                    disabled
+                    className="px-6 py-3.5 rounded-full bg-slate-800 text-slate-400 font-bold text-sm sm:text-base border border-slate-700 cursor-not-allowed flex items-center gap-2 opacity-80"
+                  >
+                    <Lock className="w-4 h-4 text-slate-500" />
+                    <span>{t.btnRegistrationClosed}</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => onNavigate('donate')}
+                  className="px-6 py-3.5 rounded-full bg-white/90 hover:bg-white text-[#104a88] border border-[#104a88]/30 font-bold text-sm sm:text-base shadow-xs transition-all hover:-translate-y-0.5 cursor-pointer flex items-center gap-2"
+                >
+                  <HeartHandshake className="w-4 h-4 text-[#104a88]" />
+                  <span>{language === 'bn' ? 'অনুদান / সহায়তা' : 'Contribute / Donate'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Right Campus Hero Photo */}
+            <div className="lg:col-span-6 flex justify-center lg:justify-end">
+              <div className="relative w-full max-w-lg lg:max-w-none group">
+                <div className="overflow-hidden rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/80 bg-white">
+                  <img
+                    src="/assets/homepage/campus_hero.jpg"
+                    alt="Police Lines High School & College, Faridpur Campus & Shaheed Minar"
+                    className="w-full h-auto object-cover transform group-hover:scale-102 transition-transform duration-700"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* BOTTOM ORGANIC WHITE WAVE WITH BOTANICAL LEAF FLOURISHES */}
+        <div className="absolute bottom-0 left-0 right-0 overflow-hidden leading-none z-10 pointer-events-none">
+          <svg
+            className="relative block w-full h-16 sm:h-24 md:h-28 text-white"
+            viewBox="0 0 1200 120"
+            preserveAspectRatio="none"
+          >
+            <path
+              d="M0,0 C150,90 350,-40 500,50 C650,140 900,10 1200,60 L1200,120 L0,120 Z"
+              fill="currentColor"
+            />
+          </svg>
+        </div>
+
+        {/* Botanical leaf flourishes on left and right */}
+        <div className="absolute bottom-2 left-2 sm:left-6 z-15 pointer-events-none opacity-40 sm:opacity-60 text-sky-400">
+          <svg width="120" height="80" viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 70 C30 50, 60 40, 100 20" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M40 55 C45 42, 60 45, 55 58 C50 62, 42 60, 40 55 Z" fill="currentColor" opacity="0.8" />
+            <path d="M60 45 C65 30, 80 34, 76 48 C72 52, 62 49, 60 45 Z" fill="currentColor" opacity="0.8" />
+            <path d="M80 32 C88 20, 102 24, 98 37 C94 41, 82 36, 80 32 Z" fill="currentColor" opacity="0.8" />
+            <path d="M30 63 C20 54, 24 40, 36 46 C40 52, 35 60, 30 63 Z" fill="currentColor" opacity="0.8" />
+            <path d="M52 50 C44 38, 48 26, 59 33 C63 39, 58 48, 52 50 Z" fill="currentColor" opacity="0.8" />
+          </svg>
+        </div>
+
+        <div className="absolute bottom-2 right-2 sm:right-6 z-15 pointer-events-none opacity-40 sm:opacity-60 text-sky-400 transform -scale-x-100">
+          <svg width="120" height="80" viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 70 C30 50, 60 40, 100 20" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M40 55 C45 42, 60 45, 55 58 C50 62, 42 60, 40 55 Z" fill="currentColor" opacity="0.8" />
+            <path d="M60 45 C65 30, 80 34, 76 48 C72 52, 62 49, 60 45 Z" fill="currentColor" opacity="0.8" />
+            <path d="M80 32 C88 20, 102 24, 98 37 C94 41, 82 36, 80 32 Z" fill="currentColor" opacity="0.8" />
+            <path d="M30 63 C20 54, 24 40, 36 46 C40 52, 35 60, 30 63 Z" fill="currentColor" opacity="0.8" />
+            <path d="M52 50 C44 38, 48 26, 59 33 C63 39, 58 48, 52 50 Z" fill="currentColor" opacity="0.8" />
+          </svg>
+        </div>
+      </section>
+
+      {/* FLOATING STATS BAR */}
+      <div className="-mt-12 sm:-mt-16 relative z-25 max-w-5xl mx-auto px-4 sm:px-6 w-full">
+        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl border border-slate-100 px-6 py-5 grid grid-cols-2 md:grid-cols-4 gap-4 divide-y md:divide-y-0 md:divide-x divide-slate-100 text-center">
+          {/* Stat 1: Total Registered */}
+          <div className="flex items-center justify-center gap-3 pt-2 md:pt-0">
+            <div className="w-10 h-10 rounded-full bg-sky-50 flex items-center justify-center shrink-0">
+              <Users className="w-5 h-5 text-[#104a88]" />
+            </div>
+            <div className="text-left">
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
+                {displayPaidCount}
+              </div>
+              <div className="text-xs text-slate-500 font-semibold">
+                {language === 'bn' ? 'মোট নিবন্ধিত' : 'Total Registered'}
+              </div>
+            </div>
+          </div>
+
+          {/* Stat 2: Former Students */}
+          <div className="flex items-center justify-center gap-3 pt-2 md:pt-0">
+            <div className="w-10 h-10 rounded-full bg-sky-50 flex items-center justify-center shrink-0">
+              <GraduationCap className="w-5 h-5 text-[#104a88]" />
+            </div>
+            <div className="text-left">
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
+                {displayFormerCount}
+              </div>
+              <div className="text-xs text-slate-500 font-semibold">
+                {language === 'bn' ? 'প্রাক্তন শিক্ষার্থী' : 'Former Students'}
+              </div>
+            </div>
+          </div>
+
+          {/* Stat 3: Current Students */}
+          <div className="flex items-center justify-center gap-3 pt-2 md:pt-0">
+            <div className="w-10 h-10 rounded-full bg-sky-50 flex items-center justify-center shrink-0">
+              <User className="w-5 h-5 text-[#104a88]" />
+            </div>
+            <div className="text-left">
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
+                {displayCurrentCount}
+              </div>
+              <div className="text-xs text-slate-500 font-semibold">
+                {language === 'bn' ? 'বর্তমান শিক্ষার্থী' : 'Current Students'}
+              </div>
+            </div>
+          </div>
+
+          {/* Stat 4: Batches Represented */}
+          <div className="flex items-center justify-center gap-3 pt-2 md:pt-0">
+            <div className="w-10 h-10 rounded-full bg-sky-50 flex items-center justify-center shrink-0">
+              <Users className="w-5 h-5 text-[#104a88]" />
+            </div>
+            <div className="text-left">
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
+                50+
+              </div>
+              <div className="text-xs text-slate-500 font-semibold">
+                {language === 'bn' ? 'ব্যাচ প্রতিনিধিত্বকারী' : 'Batches Represented'}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* THREE MAIN FEATURE CARDS */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 w-full -mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Card 1: Latest Notices */}
+          <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden flex flex-col">
+            <div className="bg-[#104a88] text-white px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2 font-bold text-sm sm:text-base">
+                <Megaphone className="w-4 h-4 text-amber-300" />
+                <span>{language === 'bn' ? 'সর্বশেষ নোটিশ' : 'Latest Notices'}</span>
+              </div>
+              <button
+                onClick={() => onNavigate('notices')}
+                className="text-xs text-sky-200 hover:text-white font-medium flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <span>{language === 'bn' ? 'সবগুলো দেখুন' : 'View All'}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3 flex-1 flex flex-col justify-around">
+              <div
+                onClick={() => onNavigate('notices')}
+                className="flex items-start gap-3 p-2 rounded-xl hover:bg-sky-50/60 transition-colors cursor-pointer group"
+              >
+                <div className="bg-sky-100 text-[#104a88] font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg text-center shrink-0 leading-tight">
+                  <div>Nov</div>
+                  <div className="text-sm">15</div>
+                </div>
+                <div className="min-w-0">
+                  <div className="font-bold text-xs sm:text-sm text-slate-800 group-hover:text-[#104a88] transition-colors truncate">
+                    {language === 'bn' ? 'রিইউনিয়ন নিবন্ধন উন্মুক্ত!' : 'Reunion Registration Open!'}
+                  </div>
+                  <div className="text-[11px] sm:text-xs text-slate-500 truncate">
+                    {language === 'bn' ? 'ঐতিহাসিক এই আয়োজনের অংশ হোন...' : 'Be a part of this historic event...'}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                onClick={() => onNavigate('notices')}
+                className="flex items-start gap-3 p-2 rounded-xl hover:bg-sky-50/60 transition-colors cursor-pointer group"
+              >
+                <div className="bg-sky-100 text-[#104a88] font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg text-center shrink-0 leading-tight">
+                  <div>Nov</div>
+                  <div className="text-sm">15</div>
+                </div>
+                <div className="min-w-0">
+                  <div className="font-bold text-xs sm:text-sm text-slate-800 group-hover:text-[#104a88] transition-colors truncate">
+                    {language === 'bn' ? 'পেমেন্ট গেটওয়ে সক্রিয় হয়েছে' : 'Payment Gateway is Live'}
+                  </div>
+                  <div className="text-[11px] sm:text-xs text-slate-500 truncate">
+                    {language === 'bn' ? 'নিরাপদে ও সহজে অনলাইনে ফি পরিশোধ করুন...' : 'Now you can pay securely online...'}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                onClick={() => onNavigate('notices')}
+                className="flex items-start gap-3 p-2 rounded-xl hover:bg-sky-50/60 transition-colors cursor-pointer group"
+              >
+                <div className="bg-sky-100 text-[#104a88] font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg text-center shrink-0 leading-tight">
+                  <div>Nov</div>
+                  <div className="text-sm">15</div>
+                </div>
+                <div className="min-w-0">
+                  <div className="font-bold text-xs sm:text-sm text-slate-800 group-hover:text-[#104a88] transition-colors truncate">
+                    {language === 'bn' ? 'ইভেন্ট সূচি প্রকাশিত' : 'Event Schedule Released'}
+                  </div>
+                  <div className="text-[11px] sm:text-xs text-slate-500 truncate">
+                    {language === 'bn' ? 'বিস্তারিত সময়সূচি ও আয়োজন দেখে নিন...' : 'Check the detailed program...'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Our Memories */}
+          <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden flex flex-col">
+            <div className="bg-[#104a88] text-white px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2 font-bold text-sm sm:text-base">
+                <ImageIcon className="w-4 h-4 text-amber-300" />
+                <span>{language === 'bn' ? 'আমাদের স্মৃতিমালা' : 'Our Memories'}</span>
+              </div>
+              <button
+                onClick={() => onNavigate('gallery')}
+                className="text-xs text-sky-200 hover:text-white font-medium flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <span>{language === 'bn' ? 'গ্যালারি দেখুন' : 'View Gallery'}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="p-4 flex-1 flex items-center justify-between gap-2.5">
+              <div
+                onClick={() => onNavigate('gallery')}
+                className="relative flex-1 aspect-square rounded-xl overflow-hidden border border-slate-200 hover:shadow-md transition-all cursor-pointer group"
+              >
                 <img
-                  src="/assets/school_logo.png"
-                  alt="Police Lines School & College Faridpur Emblem"
-                  className="w-full h-full object-contain rounded-full transform group-hover:scale-105 transition-transform duration-300"
+                  src="/assets/homepage/memory_1.jpg"
+                  alt="School Campus Memory"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                />
+              </div>
+              <div
+                onClick={() => onNavigate('gallery')}
+                className="relative flex-1 aspect-square rounded-xl overflow-hidden border border-slate-200 hover:shadow-md transition-all cursor-pointer group"
+              >
+                <img
+                  src="/assets/homepage/memory_2.jpg"
+                  alt="Students Group Memory"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                />
+              </div>
+              <div
+                onClick={() => onNavigate('gallery')}
+                className="relative flex-1 aspect-square rounded-xl overflow-hidden border border-slate-200 hover:shadow-md transition-all cursor-pointer group"
+              >
+                <img
+                  src="/assets/homepage/memory_3.jpg"
+                  alt="School Assembly Memory"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                 />
               </div>
             </div>
           </div>
 
-          {/* Institution Crest Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-sky-200 text-slate-700 text-xs font-semibold shadow-xs">
-            <img
-              src="/assets/school_logo.png"
-              alt="School Logo"
-              className="w-4 h-4 object-contain rounded-full"
-            />
-            <span>{t.institutionSubtitle}</span>
-            <span className="w-1 h-1 rounded-full bg-sky-400" />
-            <span className="text-sky-800 font-bold">1962 - 2027</span>
-          </div>
-
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight max-w-4xl mx-auto">
-            {t.institutionName}
-          </h1>
-
-          <div className="text-xl sm:text-3xl font-extrabold text-sky-800 tracking-wide">
-            {t.reunionTitle}
-          </div>
-
-          <p className="text-sm sm:text-base text-slate-700 max-w-2xl mx-auto font-normal leading-relaxed">
-            {t.heroSubheading}
-          </p>
-
-          {/* Event Date & Venue Bar */}
-          <div className="flex flex-wrap items-center justify-center gap-4 text-xs sm:text-sm text-slate-700 font-semibold pt-2">
-            <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-sky-200">
-              <Calendar className="w-4 h-4 text-sky-700" />
-              <span>{t.reunionDates}</span>
-            </div>
-            <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-sky-200">
-              <MapPin className="w-4 h-4 text-sky-700" />
-              <span>{t.venue}</span>
-            </div>
-          </div>
-
-          {/* SECTION 1: REGISTRATION STATUS BADGE (OPEN / CLOSED) */}
-          <div className="pt-2 flex justify-center">
-            {feeSettings.registrationOpen ? (
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs sm:text-sm font-bold shadow-xs">
-                <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
-                </span>
-                <span>{t.regStatusOpenBadge}</span>
-                {feeSettings.endDate && (
-                  <span className="text-emerald-700 font-normal border-l border-emerald-300 pl-2">
-                    {t.regDeadlinePrefix} {feeSettings.endDate}
-                  </span>
-                )}
+          {/* Card 3: Our Videos */}
+          <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden flex flex-col">
+            <div className="bg-[#104a88] text-white px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2 font-bold text-sm sm:text-base">
+                <Play className="w-4 h-4 text-amber-300" />
+                <span>{language === 'bn' ? 'আমাদের ভিডিও' : 'Our Videos'}</span>
               </div>
-            ) : (
-              <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-rose-100 border border-rose-300 text-rose-800 text-xs sm:text-sm font-bold shadow-xs">
-                <Lock className="w-4 h-4 text-rose-700" />
-                <span>{t.regStatusClosedBadge}</span>
-              </div>
-            )}
-          </div>
-
-          {/* If registration closed: show advisory banner */}
-          {!feeSettings.registrationOpen && (
-            <div className="max-w-2xl mx-auto p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs sm:text-sm text-center shadow-xs">
-              <div className="flex items-center justify-center gap-2 font-bold mb-1 text-amber-800">
-                <AlertTriangle className="w-4 h-4" />
-                <span>{language === 'bn' ? 'জরুরি প্রশাসনিক বিজ্ঞপ্তি' : 'Official Administrative Notice'}</span>
-              </div>
-              <p>{closedNotice}</p>
-            </div>
-          )}
-
-          {/* Primary Action Buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
-            {feeSettings.registrationOpen ? (
               <button
-                onClick={() => onNavigate('register')}
-                className="px-8 py-4 rounded-2xl bg-sky-700 hover:bg-sky-800 text-white font-black text-sm sm:text-base shadow-lg shadow-sky-700/25 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center gap-2"
+                onClick={() => setIsVideoModalOpen(true)}
+                className="text-xs text-sky-200 hover:text-white font-medium flex items-center gap-1 transition-colors cursor-pointer"
               >
-                <span>{t.btnRegisterNow}</span>
-                <ArrowRight className="w-5 h-5 text-white" />
+                <span>{language === 'bn' ? 'সবগুলো দেখুন' : 'View All'}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
-            ) : (
-              <button
-                disabled
-                className="px-8 py-4 rounded-2xl bg-slate-800 text-slate-400 font-bold text-sm sm:text-base border border-slate-700 cursor-not-allowed flex items-center gap-2 opacity-80"
-                title={closedNotice}
+            </div>
+            <div className="p-4 flex-1 flex flex-col justify-center">
+              <div
+                onClick={() => setIsVideoModalOpen(true)}
+                className="relative rounded-xl overflow-hidden shadow-xs cursor-pointer group border border-slate-200"
               >
-                <Lock className="w-4 h-4 text-slate-500" />
-                <span>{t.btnRegistrationClosed}</span>
-              </button>
-            )}
-
-            <button
-              onClick={() => onNavigate('donate')}
-              className="px-6 py-4 rounded-2xl bg-white hover:bg-sky-50 text-slate-700 border border-sky-200 font-bold text-sm sm:text-base shadow-sm transition-all hover:-translate-y-0.5 cursor-pointer flex items-center gap-2"
-            >
-              <HeartHandshake className="w-5 h-5 text-rose-400" />
-              <span>{t.btnMakeDonation}</span>
-            </button>
-
-            <button
-              onClick={() => {
-                const el = document.getElementById('check-status-section');
-                if (el) {
-                  el.scrollIntoView({ behavior: 'smooth' });
-                } else {
-                  onNavigate('find-ticket');
-                }
-              }}
-              className="px-5 py-4 rounded-2xl bg-transparent hover:bg-white text-slate-700 hover:text-sky-800 text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
-            >
-              <Search className="w-4 h-4 text-sky-700" />
-              <span>{t.checkStatusHeading}</span>
-            </button>
-          </div>
-
-          {/* LIVE REGISTRATION STATISTICS */}
-          <div className="pt-6 max-w-4xl mx-auto">
-            <div className="bg-slate-900/80 backdrop-blur-md rounded-3xl p-6 border border-slate-800 shadow-2xl grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-              <div>
-                <span className="text-2xl sm:text-3xl font-black text-amber-300 block">
-                  {paidCount}
-                </span>
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                  {t.statTotalRegistered}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-2xl sm:text-3xl font-black text-emerald-400 block">
-                  {formerCount}
-                </span>
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                  {t.statFormerStudents}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-2xl sm:text-3xl font-black text-teal-300 block">
-                  {currentCount}
-                </span>
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                  {t.statCurrentStudents}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-2xl sm:text-3xl font-black text-white block">
-                  50+
-                </span>
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                  {t.statBatches}
-                </span>
+                <img
+                  src="/assets/homepage/video_thumb.jpg"
+                  alt="Reunion Promo Video"
+                  className="w-full h-32 sm:h-36 object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                {/* Centered Play Button */}
+                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 flex items-center justify-center transition-colors">
+                  <div className="w-12 h-12 rounded-full bg-white/90 text-[#104a88] shadow-lg flex items-center justify-center pl-1 transform group-hover:scale-110 transition-transform">
+                    <Play className="w-6 h-6 fill-current" />
+                  </div>
+                </div>
+                {/* Video Info Bottom Overlay */}
+                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2.5 flex items-center justify-between text-white text-xs">
+                  <span className="font-semibold truncate drop-shadow-xs">PLS Reunion 2027 – Official Promo</span>
+                  <span className="bg-black/60 px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 ml-2">1:57</span>
+                </div>
               </div>
             </div>
-            <p className="text-[11px] text-emerald-300 font-semibold mt-3 text-center">
-              {t.statGoalProgress}
-            </p>
           </div>
         </div>
       </section>
 
+      {/* BOTTOM NAVY WAVE RIBBON */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 w-full -mt-6">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#0c2f58] via-[#104077] to-[#0c2f58] text-white p-6 sm:p-8 shadow-xl border border-sky-900/40">
+          {/* Subtle watermark illustration of campus */}
+          <div className="absolute right-0 bottom-0 top-0 w-96 opacity-15 pointer-events-none overflow-hidden">
+            <img
+              src="/assets/id_card/campus_footer.png"
+              alt="Campus Silhouette"
+              className="w-full h-full object-contain object-right-bottom"
+            />
+          </div>
+
+          <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-6">
+            {/* Core Reunion Pillars */}
+            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 sm:gap-6 text-xs sm:text-sm font-bold text-white">
+              <div className="flex items-center gap-2">
+                <Handshake className="w-5 h-5 text-[#fbb03b]" />
+                <span>{language === 'bn' ? 'বন্ধুদের সাথে পুনর্মিলন' : 'Reconnect with Friends'}</span>
+              </div>
+              <span className="hidden sm:inline text-sky-400/60 font-light">|</span>
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-[#fbb03b]" />
+                <span>{language === 'bn' ? 'আমাদের ঐতিহ্য উদযাপন' : 'Celebrate Our Legacy'}</span>
+              </div>
+              <span className="hidden sm:inline text-sky-400/60 font-light">|</span>
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-[#fbb03b]" />
+                <span>{language === 'bn' ? 'আমাদের বন্ধন সুদৃঢ়করণ' : 'Strengthen Our Bond'}</span>
+              </div>
+            </div>
+
+            {/* Action CTA Button */}
+            <button
+              onClick={() => onNavigate('register')}
+              className="px-6 py-3.5 rounded-full bg-[#fbb03b] hover:bg-[#f39c12] text-slate-950 font-black text-xs sm:text-sm shadow-lg transition-all transform hover:scale-105 active:scale-100 cursor-pointer flex items-center gap-2 shrink-0"
+            >
+              <span>{language === 'bn' ? 'রিইউনিয়ন যাত্রায় যোগ দিন' : 'Join the Reunion Journey'}</span>
+              <ArrowRight className="w-4 h-4 text-slate-950" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Video Modal Preview */}
+      {isVideoModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full overflow-hidden shadow-2xl relative text-white">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+              <h3 className="font-bold text-sm sm:text-base flex items-center gap-2">
+                <Play className="w-4 h-4 text-[#fbb03b]" />
+                <span>PLS Reunion 2027 – Official Promo</span>
+              </h3>
+              <button
+                onClick={() => setIsVideoModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 sm:p-6 flex flex-col items-center justify-center">
+              <div className="w-full aspect-video rounded-2xl overflow-hidden bg-black flex items-center justify-center relative">
+                <img
+                  src="/assets/homepage/video_thumb.jpg"
+                  alt="Video Preview"
+                  className="w-full h-full object-cover opacity-60"
+                />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                  <div className="w-16 h-16 rounded-full bg-[#fbb03b] text-slate-950 flex items-center justify-center pl-1 shadow-xl">
+                    <Play className="w-8 h-8 fill-current" />
+                  </div>
+                  <span className="text-xs sm:text-sm font-semibold text-slate-200">
+                    {language === 'bn' ? 'অফিসিয়াল প্রোমো ভিডিও শীঘ্রই আসছে!' : 'Official Promo Video coming soon!'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* SECTION 2 & 3: COUNTDOWN TIMER / POST-EVENT CELEBRATION */}
       <section
-        className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-20"
+        className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 relative z-20"
         style={getHomePageSectionStyle('countdown')}
       >
         {timeLeft.isOver ? (

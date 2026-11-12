@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import {
+  Home,
+  UserPlus,
   QrCode,
   Globe,
   Menu,
@@ -36,9 +38,16 @@ export const Header: React.FC<HeaderProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const navItems = [
-    { id: 'home', label: t.navHome, icon: null },
-    { id: 'register', label: t.navRegister, icon: null, highlight: true },
+  interface NavItem {
+    id: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    highlight?: boolean;
+  }
+
+  const navItems: NavItem[] = [
+    { id: 'home', label: t.navHome, icon: Home },
+    { id: 'register', label: t.navRegister, icon: UserPlus, highlight: true },
     { id: 'donate', label: t.navDonate, icon: HeartHandshake },
     { id: 'find-ticket', label: t.navFindTicket, icon: Search },
     { id: 'notices', label: t.navNotices, icon: Bell },
@@ -49,15 +58,15 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
       {/* Top emergency announcement & quick portals bar */}
-      <div className="bg-sky-900 text-sky-50 text-xs py-1.5 px-3 sm:px-4 border-b border-sky-800">
+      <div className="bg-sky-950 text-sky-50 text-xs py-1.5 px-3 sm:px-4 border-b border-sky-900">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-1.5">
           <div className="flex items-center gap-2 max-w-full overflow-hidden">
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-600 text-white uppercase shrink-0">
-              {language === 'bn' ? 'অফিসিয়াল' : 'Official'}
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white uppercase shrink-0 tracking-wide">
+              {language === 'bn' ? 'অফিসিয়াল' : 'OFFICIAL'}
             </span>
             <span className="font-semibold text-[11px] sm:text-xs truncate">
               {language === 'bn'
-                ? 'সিলেট পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজ পুনর্মিলনী ২০২৭ • ২৮-২৯ জানুয়ারি ২০২৭'
+                ? 'পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজ, ফরিদপুর পুনর্মিলনী ২০২৭ • ২৮-২৯ জানুয়ারি ২০২৭'
                 : 'Police Lines High School & College, Faridpur Reunion 2027 • Jan 28-29, 2027'}
             </span>
           </div>
@@ -120,45 +129,33 @@ export const Header: React.FC<HeaderProps> = ({
               />
             </div>
 
-            <div className="min-w-0">
-              <h1 className="text-xs sm:text-lg font-bold text-slate-900 tracking-tight leading-tight group-hover:text-sky-700 transition-colors">
+            <div className="min-w-0 pr-3 border-r border-slate-200">
+              <h1 className="text-xs sm:text-base font-extrabold text-slate-900 tracking-tight leading-tight group-hover:text-sky-700 transition-colors">
                 {t.institutionName}
               </h1>
-              <p className="text-[10px] sm:text-xs text-slate-600 font-medium flex items-center gap-1.5">
+              <p className="text-[10px] sm:text-xs text-slate-500 font-semibold italic flex items-center gap-1.5 mt-0.5">
                 <span>{language === 'bn' ? 'স্থাপিত ১৯৬২ • ফরিদপুর' : 'Est. 1962 • Faridpur'}</span>
-                <span className="w-1 h-1 rounded-full bg-slate-300" />
-                <span className="text-sky-700 font-bold">{t.reunionTitle}</span>
               </p>
             </div>
           </div>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1.5 xl:gap-2">
             {navItems.map((item) => {
               const isActive = activeView === item.id;
-              if (item.highlight) {
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleNav(item.id)}
-                    className="ml-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-sky-700 hover:bg-sky-800 text-white shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer active:scale-95"
-                  >
-                    {item.label}
-                  </button>
-                );
-              }
+              const IconComponent = item.icon;
 
               return (
                 <button
                   key={item.id}
                   onClick={() => handleNav(item.id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
                     isActive
-                      ? 'text-sky-800 bg-sky-50 font-semibold'
-                      : 'text-slate-700 hover:text-sky-700 hover:bg-slate-50'
+                      ? 'bg-[#104a88] text-white shadow-xs'
+                      : 'text-slate-800 hover:text-sky-900 hover:bg-slate-100'
                   }`}
                 >
-                  {item.icon && <item.icon className="w-4 h-4 opacity-75" />}
+                  {IconComponent && <IconComponent className="w-3.5 h-3.5" />}
                   <span>{item.label}</span>
                 </button>
               );
