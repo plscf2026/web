@@ -12,6 +12,7 @@ import {
   IdCardSystemSettings,
   DEFAULT_ID_CARD_SETTINGS,
 } from '../types/idcard';
+import { RegistrationRecord } from '../types';
 import { AppStore } from './store';
 import { safeRandomUUID } from '../utils/security';
 
@@ -199,6 +200,66 @@ export class IdCardStore {
   // 3. STUDENT REGISTRATION INTEGRATION & ID CARD RECORDS
   // Only paid and eligible registrations are processed.
   // ==========================================================================
+  static getOrBuildCardForRegistration(reg: RegistrationRecord): StudentIdCardRecord {
+    const list = this.getIdCards();
+    const existing = list.find((c) => c.registrationId === reg.id || c.idNumber === reg.id);
+    if (existing) return existing;
+
+    let batchYear = '';
+    let isFlagged = false;
+    let reviewReason = '';
+
+    if (reg.category === 'former') {
+      batchYear = reg.passingYear?.trim() || '';
+      if (!batchYear) {
+        isFlagged = true;
+        reviewReason = 'Missing graduation/passing year for alumni record';
+      }
+    } else {
+      batchYear = '2026';
+      if (reg.currentClass) {
+        batchYear = `Class_${reg.currentClass.replace(/\s+/g, '_')}`;
+      }
+    }
+
+    if (!reg.photoUrl) {
+      isFlagged = true;
+      reviewReason = reviewReason
+        ? `${reviewReason}; Missing student photograph`
+        : 'Missing student photograph';
+    }
+
+    const verificationUrl = `https://plscf2026.reunion.org/verify-student-id?id=${encodeURIComponent(
+      reg.id
+    )}&token=${encodeURIComponent(reg.qrToken)}`;
+
+    const newCard: StudentIdCardRecord = {
+      id: `IDC-${reg.id}`,
+      registrationId: reg.id,
+      eventYear: reg.year || 2026,
+      studentName: reg.fullName,
+      studentNameBn: reg.fullNameBn,
+      batchYear: batchYear || '2026',
+      batchName: reg.batchName,
+      idNumber: reg.id,
+      contactNumber: reg.mobileNumber,
+      photoUrl: reg.photoUrl,
+      hasPhoto: Boolean(reg.photoUrl),
+      qrToken: reg.qrToken,
+      verificationUrl,
+      cardStatus: isFlagged ? 'FLAGGED_REVIEW' : 'ELIGIBLE',
+      reviewReason: isFlagged ? reviewReason : undefined,
+      pdfStoragePath: `STUDENT_ID_CARDS/Batch_${batchYear || 'REVIEW'}/Individual_Cards/Student_${reg.id.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+      cardDimensions: '54x86mm',
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.saveIdCards([newCard, ...list]);
+    return newCard;
+  }
+
   static syncWithRegistrations(): StudentIdCardRecord[] {
     const registrations = AppStore.getRegistrations();
     const paidRegistrations = registrations.filter((r) => r.paymentStatus === 'paid');

@@ -15,6 +15,8 @@ import {
 import { RegistrationRecord, Language } from '../types';
 import { translations } from '../i18n/translations';
 import { formatSafeQrPayload } from '../utils/tokenGenerator';
+import { StudentIdCardBadge } from './idcard/StudentIdCardBadge';
+import { IdCardStore } from '../services/idCardStore';
 
 interface TicketViewProps {
   registration: RegistrationRecord;
@@ -99,6 +101,32 @@ export const TicketView: React.FC<TicketViewProps> = ({
         >
           {language === 'bn' ? 'হোমে ফিরুন' : 'Back to Home'}
         </button>
+      </div>
+
+      {/* Official Student ID Card Section */}
+      <div className="no-print mb-8 bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 rounded-3xl p-6 text-white shadow-xl border border-sky-800/40">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+          <div className="text-center lg:text-left space-y-2 max-w-md">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 text-xs font-bold border border-sky-400/30">
+              <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
+              <span>{language === 'bn' ? 'অফিসিয়াল স্টুডেন্ট আইডি কার্ড' : 'Official Student ID Card'}</span>
+            </span>
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              {language === 'bn' ? 'আপনার আইডি কার্ড ডাউনলোড করুন' : 'Download Your Student ID Card'}
+            </h2>
+            <p className="text-xs text-sky-200/80 leading-relaxed">
+              {language === 'bn'
+                ? 'ইভেন্টে প্রবেশের জন্য অফিসিয়াল আইডি কার্ডের প্রিন্ট-রেডি PDF অথবা মোবাইল গ্যালারির জন্য উচ্চমানের ছবি (Photo) ডাউনলোড করুন।'
+                : 'Download your official print-ready ID card PDF or high-resolution photo image for your mobile gallery.'}
+            </p>
+          </div>
+          <div className="flex-shrink-0">
+            <StudentIdCardBadge
+              student={IdCardStore.getOrBuildCardForRegistration(registration)}
+              language={language}
+            />
+          </div>
+        </div>
       </div>
 
       {/* OFFICIAL DIGITAL ENTRY TICKET / BADGE CARD (A4/Print Friendly) */}

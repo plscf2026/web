@@ -324,6 +324,335 @@ export async function generateIndividualIdCardPdf(
 }
 
 /**
+ * Helper to safely load an image from URL or data URI for HTML5 Canvas
+ */
+function loadCanvasImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || typeof Image === 'undefined') {
+      resolve(null);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+function drawCanvasRoundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+): void {
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x, y, w, h, r);
+  } else {
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y + w, x, y, r);
+    ctx.closePath();
+  }
+}
+
+/**
+ * Generate a standalone individual Student ID Card as a high-resolution Photo (PNG/Image)
+ * Dimensions: 1080 × 1720 px (CR80 standard ratio at high DPI)
+ */
+export async function generateIndividualIdCardImage(
+  student: StudentIdCardRecord
+): Promise<{ blob: Blob; dataUrl: string }> {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return {
+      blob: new Blob(['mock-idcard-image'], { type: 'image/png' }),
+      dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    };
+  }
+
+  const scale = 20; // 20 px per mm -> 1080 x 1720 px
+  const width = Math.round(ID_CARD_DIMENSIONS.widthMm * scale); // 1080
+  const height = Math.round(ID_CARD_DIMENSIONS.heightMm * scale); // 1720
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Canvas 2D rendering context not available');
+  }
+
+  // 1. Base Card Background
+  ctx.fillStyle = '#F3F7FA';
+  ctx.fillRect(0, 0, width, height);
+
+  // 2. Upper Deep Navy Card Banner (0 to 38.5 mm -> 770 px)
+  const navyGrad = ctx.createLinearGradient(0, 0, 0, 38.5 * scale);
+  navyGrad.addColorStop(0, '#041025');
+  navyGrad.addColorStop(0.52, '#092446');
+  navyGrad.addColorStop(1, '#123F66');
+  ctx.fillStyle = navyGrad;
+  ctx.fillRect(0, 0, width, 38.5 * scale);
+
+  // Top-Right Deep Cyan Corner Accent
+  ctx.fillStyle = '#104D77';
+  ctx.beginPath();
+  ctx.moveTo(38.0 * scale, 0);
+  ctx.lineTo(width, 0);
+  ctx.lineTo(width, 12.0 * scale);
+  ctx.closePath();
+  ctx.fill();
+
+  // Metallic Gold Contour Divider Line under Upper Navy
+  const goldGrad = ctx.createLinearGradient(0, 0, width, 0);
+  goldGrad.addColorStop(0, '#AE7108');
+  goldGrad.addColorStop(0.25, '#F5BE35');
+  goldGrad.addColorStop(0.5, '#FFE590');
+  goldGrad.addColorStop(0.75, '#F4BD36');
+  goldGrad.addColorStop(1, '#B4780B');
+  ctx.fillStyle = goldGrad;
+  ctx.fillRect(0, 38.5 * scale, width, 0.7 * scale);
+
+  // 3. Header Text & Institution Branding
+  // Gold rule above title
+  ctx.fillStyle = '#F1CA7E';
+  ctx.fillRect(3.5 * scale, 3.1 * scale, 3.0 * scale, 0.35 * scale);
+
+  // "STUDENT IDENTITY CARD"
+  ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
+  ctx.fillStyle = '#8ED9F5';
+  ctx.fillText('STUDENT IDENTITY CARD', 3.5 * scale, 6.0 * scale);
+
+  // "Police Lines"
+  ctx.font = 'bold 50px serif, system-ui, -apple-system';
+  ctx.fillStyle = '#FFFCF5';
+  ctx.fillText('Police Lines', 3.3 * scale, 10.4 * scale);
+
+  // "School & College"
+  ctx.font = 'bold 40px serif, system-ui, -apple-system';
+  ctx.fillText('School & College', 3.3 * scale, 14.2 * scale);
+
+  // "FARIDPUR"
+  ctx.font = 'bold 21px system-ui, -apple-system, sans-serif';
+  ctx.fillStyle = '#F4CB7C';
+  ctx.fillText('FARIDPUR', 3.5 * scale, 17.2 * scale);
+
+  // School Crest Logo
+  try {
+    const crestImg = await loadCanvasImage(SCHOOL_CREST_PNG);
+    if (crestImg) {
+      ctx.drawImage(crestImg, 36.2 * scale, 4.8 * scale, 15.0 * scale, 7.75 * scale);
+    }
+  } catch (err) {
+    console.warn('[IdCard] School crest canvas draw notice:', err);
+  }
+
+  // 4. Student Photo Frame & Image
+  // Outer Gold Frame
+  ctx.strokeStyle = '#F3D490';
+  ctx.lineWidth = 0.4 * scale;
+  drawCanvasRoundRect(ctx, 3.5 * scale, 19.5 * scale, 16.5 * scale, 19.0 * scale, 1.5 * scale);
+  ctx.stroke();
+
+  // Photo Inset Background
+  ctx.fillStyle = '#E4EDF2';
+  drawCanvasRoundRect(ctx, 3.9 * scale, 19.9 * scale, 15.7 * scale, 18.2 * scale, 1.2 * scale);
+  ctx.fill();
+
+  // Draw Student Photo if available, otherwise silhouette
+  let photoDrawn = false;
+  if (student.photoUrl) {
+    try {
+      const photoImg = await loadCanvasImage(student.photoUrl);
+      if (photoImg) {
+        ctx.save();
+        drawCanvasRoundRect(ctx, 4.0 * scale, 20.0 * scale, 15.5 * scale, 18.0 * scale, 1.0 * scale);
+        ctx.clip();
+        ctx.drawImage(photoImg, 4.0 * scale, 20.0 * scale, 15.5 * scale, 18.0 * scale);
+        ctx.restore();
+        photoDrawn = true;
+      }
+    } catch {
+      photoDrawn = false;
+    }
+  }
+
+  if (!photoDrawn) {
+    // Vector silhouette avatar
+    ctx.fillStyle = '#9EB9CC';
+    ctx.beginPath();
+    ctx.arc((3.9 + 7.8) * scale, (19.9 + 6.0) * scale, 2.8 * scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo((3.9 + 2.5) * scale, (19.9 + 15.0) * scale);
+    ctx.lineTo((3.9 + 7.8) * scale, (19.9 + 9.5) * scale);
+    ctx.lineTo((3.9 + 13.1) * scale, (19.9 + 15.0) * scale);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 5. Student Name & Role Badge Beside Photo
+  ctx.fillStyle = '#EBC474';
+  ctx.fillRect(21.9 * scale, 25.5 * scale, 4.2 * scale, 0.3 * scale);
+
+  ctx.fillStyle = '#FFFCF5';
+  const name = student.studentName.trim();
+  const fontSize = name.length > 22 ? 26 : name.length > 16 ? 30 : 36;
+  ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
+  ctx.fillText(name, 21.9 * scale, 30.5 * scale);
+
+  // Category Tag ("ALUMNI MEMBER" or "CURRENT STUDENT")
+  const isCurrent = student.batchName.toLowerCase().includes('class');
+  const categoryLabel = isCurrent ? 'CURRENT STUDENT' : 'ALUMNI MEMBER';
+  ctx.fillStyle = 'rgba(8, 47, 73, 0.8)';
+  drawCanvasRoundRect(ctx, 21.9 * scale, 32.0 * scale, 17.5 * scale, 3.4 * scale, 0.8 * scale);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.fillStyle = '#8ED9F5';
+  ctx.font = 'bold 18px system-ui, -apple-system, sans-serif';
+  ctx.fillText(categoryLabel, 22.8 * scale, 34.3 * scale);
+
+  // 6. Middle Information Block (Batch, ID Number, Contact)
+  ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
+
+  // Field 1: Batch
+  ctx.fillStyle = '#10203A';
+  ctx.fillText('Batch:', 3.6 * scale, 44.5 * scale);
+  ctx.fillStyle = '#1E3A8A';
+  ctx.fillText(student.batchYear || student.batchName, 12.0 * scale, 44.5 * scale);
+
+  ctx.strokeStyle = '#9EB8CB';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(3.6 * scale, 46.2 * scale);
+  ctx.lineTo(29.5 * scale, 46.2 * scale);
+  ctx.stroke();
+
+  // Field 2: ID Number
+  ctx.fillStyle = '#10203A';
+  ctx.fillText('ID Number:', 3.6 * scale, 50.5 * scale);
+  ctx.fillStyle = '#1E3A8A';
+  ctx.fillText(student.idNumber, 16.0 * scale, 50.5 * scale);
+
+  ctx.beginPath();
+  ctx.moveTo(3.6 * scale, 52.2 * scale);
+  ctx.lineTo(29.5 * scale, 52.2 * scale);
+  ctx.stroke();
+
+  // Field 3: Contact Number
+  ctx.fillStyle = '#10203A';
+  ctx.fillText('Contact:', 3.6 * scale, 56.5 * scale);
+  ctx.fillStyle = '#1E3A8A';
+  ctx.fillText(student.contactNumber, 14.0 * scale, 56.5 * scale);
+
+  ctx.beginPath();
+  ctx.moveTo(3.6 * scale, 58.2 * scale);
+  ctx.lineTo(29.5 * scale, 58.2 * scale);
+  ctx.stroke();
+
+  // Field 4: 6-Character QR Token
+  if (student.qrToken) {
+    ctx.fillStyle = '#B45309';
+    ctx.font = 'bold 21px monospace';
+    ctx.fillText(`TOKEN: ${student.qrToken}`, 3.6 * scale, 62.0 * scale);
+  }
+
+  // 7. QR Code Box
+  ctx.strokeStyle = '#D9B15E';
+  ctx.lineWidth = 0.4 * scale;
+  drawCanvasRoundRect(ctx, 30.9 * scale, 41.5 * scale, 19.8 * scale, 19.8 * scale, 1.2 * scale);
+  ctx.stroke();
+
+  // White Inset
+  ctx.fillStyle = '#FFFFFF';
+  drawCanvasRoundRect(ctx, 31.3 * scale, 41.9 * scale, 19.0 * scale, 19.0 * scale, 0.9 * scale);
+  ctx.fill();
+
+  // Corner Accents in #76A4BE
+  ctx.strokeStyle = '#76A4BE';
+  ctx.lineWidth = 2;
+  // Top-Left
+  ctx.beginPath();
+  ctx.moveTo(32.3 * scale, 44.0 * scale);
+  ctx.lineTo(32.3 * scale, 43.2 * scale);
+  ctx.lineTo(33.1 * scale, 43.2 * scale);
+  // Top-Right
+  ctx.moveTo(48.5 * scale, 43.2 * scale);
+  ctx.lineTo(49.3 * scale, 43.2 * scale);
+  ctx.lineTo(49.3 * scale, 44.0 * scale);
+  // Bottom-Left
+  ctx.moveTo(32.3 * scale, 59.6 * scale);
+  ctx.lineTo(32.3 * scale, 60.4 * scale);
+  ctx.lineTo(33.1 * scale, 60.4 * scale);
+  // Bottom-Right
+  ctx.moveTo(48.5 * scale, 60.4 * scale);
+  ctx.lineTo(49.3 * scale, 60.4 * scale);
+  ctx.lineTo(49.3 * scale, 59.6 * scale);
+  ctx.stroke();
+
+  // Scannable QR Code
+  try {
+    const qrDataUrl = await generateStudentQrCodeDataUrl(student.verificationUrl);
+    const qrImg = await loadCanvasImage(qrDataUrl);
+    if (qrImg) {
+      ctx.drawImage(qrImg, 32.3 * scale, 42.9 * scale, 17.0 * scale, 17.0 * scale);
+    }
+  } catch (err) {
+    console.warn('[IdCard] QR code canvas draw notice:', err);
+  }
+
+  // 8. Campus Signature Footer Artwork
+  try {
+    const footerImg = await loadCanvasImage(CAMPUS_FOOTER_PNG);
+    if (footerImg) {
+      ctx.drawImage(footerImg, 0, 64.2 * scale, 54.0 * scale, 21.8 * scale);
+    }
+  } catch (err) {
+    console.warn('[IdCard] Campus footer canvas draw notice:', err);
+  }
+
+  // Gold line above footer
+  ctx.fillStyle = '#F5BE35';
+  ctx.fillRect(0, 64.2 * scale, width, 0.4 * scale);
+
+  // Bottom-right Navy Corner Overlay
+  ctx.fillStyle = '#061931';
+  ctx.beginPath();
+  ctx.moveTo(45.0 * scale, 86.0 * scale);
+  ctx.lineTo(54.0 * scale, 81.5 * scale);
+  ctx.lineTo(54.0 * scale, 86.0 * scale);
+  ctx.closePath();
+  ctx.fill();
+
+  // Fine Gold Line in Corner
+  ctx.strokeStyle = '#F5BE35';
+  ctx.lineWidth = 0.25 * scale;
+  ctx.beginPath();
+  ctx.moveTo(44.4 * scale, 86.0 * scale);
+  ctx.lineTo(54.0 * scale, 81.2 * scale);
+  ctx.stroke();
+
+  // Convert canvas to Blob
+  const blob = await new Promise<Blob>((resolve) => {
+    canvas.toBlob((b) => {
+      resolve(b || new Blob([], { type: 'image/png' }));
+    }, 'image/png');
+  });
+
+  const dataUrl = canvas.toDataURL('image/png');
+
+  return { blob, dataUrl };
+}
+
+/**
  * Generate a Batch-wise Combined Print-Ready PDF
  * Gang-run printing layout: 9 cards per A4 sheet (3 columns × 3 rows)
  * Page size: 210 × 297 mm with cutting marks and batch title

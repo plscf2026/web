@@ -1,0 +1,315 @@
+import React, { useState } from 'react';
+import {
+  FileText,
+  Image as ImageIcon,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+} from 'lucide-react';
+import { StudentIdCardRecord } from '../../types/idcard';
+import { Language } from '../../types';
+import {
+  generateIndividualIdCardPdf,
+  generateIndividualIdCardImage,
+} from '../../utils/idCardGenerator';
+import {
+  SCHOOL_CREST_PNG,
+  CAMPUS_FOOTER_PNG,
+} from '../../utils/idCardTemplateAssets';
+
+export interface StudentIdCardBadgeProps {
+  student: StudentIdCardRecord;
+  language?: Language;
+  showActions?: boolean;
+  className?: string;
+}
+
+export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
+  student,
+  language = 'en',
+  showActions = true,
+  className = '',
+}) => {
+  const isBangla = language === 'bn';
+  const [downloadingType, setDownloadingType] = useState<'pdf' | 'image' | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+
+  const isCurrentStudent = student.batchName.toLowerCase().includes('class');
+
+  const safeFilename = `Student_ID_${student.idNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+
+  const handleDownloadPdf = async () => {
+    try {
+      setDownloadingType('pdf');
+      setErrorMessage('');
+      const { pdfBlob } = await generateIndividualIdCardPdf(student);
+
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${safeFilename}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setSuccessMessage(isBangla ? 'PDF আইডি কার্ড ডাউনলোড সফল হয়েছে!' : 'ID Card PDF downloaded successfully!');
+      setTimeout(() => setSuccessMessage(''), 3500);
+    } catch (err: any) {
+      console.error('[StudentIdCardBadge] PDF download failed:', err);
+      setErrorMessage(isBangla ? 'PDF ডাউনলোড ব্যর্থ হয়েছে।' : 'Failed to download PDF ID card.');
+      setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setDownloadingType(null);
+    }
+  };
+
+  const handleDownloadPhoto = async () => {
+    try {
+      setDownloadingType('image');
+      setErrorMessage('');
+      const { blob } = await generateIndividualIdCardImage(student);
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${safeFilename}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setSuccessMessage(isBangla ? 'ছবি ডাউনলোড সফল হয়েছে!' : 'ID Card photo downloaded successfully!');
+      setTimeout(() => setSuccessMessage(''), 3500);
+    } catch (err: any) {
+      console.error('[StudentIdCardBadge] Photo download failed:', err);
+      setErrorMessage(isBangla ? 'ছবি ডাউনলোড ব্যর্থ হয়েছে।' : 'Failed to download photo ID card.');
+      setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setDownloadingType(null);
+    }
+  };
+
+  return (
+    <div className={`flex flex-col items-center ${className}`}>
+      {/* Physical CR80 Card Dimensions: 54 × 86 mm (Aspect Ratio: 1 : 1.5926) */}
+      <div
+        id={`student-id-card-${student.idNumber}`}
+        className="relative w-[280px] h-[446px] rounded-2xl overflow-hidden shadow-2xl border-2 border-amber-400/50 select-none bg-[#FDFCF8]"
+        style={{
+          background: 'linear-gradient(135deg, #FDFCF8 0%, #F3F7FA 60%, #E1F0F8 100%)',
+        }}
+      >
+        {/* 1. Upper Deep Navy Card Banner */}
+        <div
+          className="absolute top-0 left-0 right-0 h-[200px]"
+          style={{
+            background: 'linear-gradient(180deg, #041025 0%, #092446 52%, #123F66 100%)',
+          }}
+        >
+          {/* Top-Right Deep Cyan Accent */}
+          <div
+            className="absolute top-0 right-0 w-[80px] h-[65px] bg-[#104D77]"
+            style={{ clipPath: 'polygon(100% 0, 0 0, 100% 100%)' }}
+          />
+
+          {/* School Crest Logo */}
+          <img
+            src={SCHOOL_CREST_PNG}
+            alt="School Crest"
+            className="absolute top-2.5 right-2 w-[76px] h-[39px] object-contain drop-shadow"
+          />
+
+          {/* Header Titles */}
+          <div className="absolute top-2.5 left-3 text-left">
+            <div className="w-4 h-[2px] bg-[#F1CA7E] mb-1" />
+            <p className="text-[9px] font-bold tracking-wider text-[#8ED9F5] uppercase">
+              STUDENT IDENTITY CARD
+            </p>
+            <h4 className="text-[17px] font-extrabold text-[#FFFCF5] leading-none mt-0.5">
+              Police Lines
+            </h4>
+            <p className="text-[14px] font-bold text-[#FFFCF5] leading-tight">
+              School &amp; College
+            </p>
+            <p className="text-[8px] font-bold tracking-widest text-[#F4CB7C] mt-0.5">
+              FARIDPUR
+            </p>
+          </div>
+
+          {/* Photo Frame & Avatar */}
+          <div className="absolute top-[102px] left-3 w-[84px] h-[96px] rounded-lg p-[2px] bg-gradient-to-br from-[#AE7108] via-[#FFE590] to-[#B4780B] shadow-md">
+            <div className="w-full h-full rounded-[6px] overflow-hidden bg-[#E4EDF2] flex items-center justify-center">
+              {student.photoUrl ? (
+                <img
+                  src={student.photoUrl}
+                  alt={student.studentName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-200 text-slate-500">
+                  <div className="w-8 h-8 rounded-full bg-slate-400 mb-1" />
+                  <div className="w-12 h-6 rounded-t-full bg-slate-400" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Beside Photo: Student Name & Category Badge */}
+          <div className="absolute top-[132px] left-[105px] right-2 text-left">
+            <div className="w-5 h-[2px] bg-[#EBC474] mb-1" />
+            <h3 className="text-[14px] font-bold text-[#FFFCF5] leading-tight line-clamp-2">
+              {student.studentName}
+            </h3>
+            <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[8px] font-semibold tracking-wider text-[#8ED9F5] bg-sky-950/70 border border-sky-400/40">
+              {isCurrentStudent ? 'CURRENT STUDENT' : 'ALUMNI MEMBER'}
+            </span>
+          </div>
+        </div>
+
+        {/* Gold Metallic Divider Line under navy header */}
+        <div
+          className="absolute top-[200px] left-0 right-0 h-[3px]"
+          style={{
+            background: 'linear-gradient(90deg, #AE7108 0%, #F5BE35 25%, #FFE590 50%, #F4BD36 74%, #B4780B 100%)',
+          }}
+        />
+
+        {/* 2. Middle Student Details & QR Code */}
+        <div className="absolute top-[210px] left-3 right-3 flex justify-between items-start">
+          {/* Left Column: Data fields */}
+          <div className="flex-1 pr-2 space-y-2 text-left">
+            {/* Batch */}
+            <div className="border-b border-slate-300 pb-0.5">
+              <span className="text-[9px] font-bold text-[#10203A] mr-1">Batch:</span>
+              <span className="text-[10px] font-extrabold text-[#1E3A8A]">
+                {student.batchYear || student.batchName}
+              </span>
+            </div>
+
+            {/* ID Number */}
+            <div className="border-b border-slate-300 pb-0.5">
+              <span className="text-[9px] font-bold text-[#10203A] mr-1">ID No:</span>
+              <span className="text-[9px] font-extrabold text-[#1E3A8A]">
+                {student.idNumber}
+              </span>
+            </div>
+
+            {/* Contact */}
+            <div className="border-b border-slate-300 pb-0.5">
+              <span className="text-[9px] font-bold text-[#10203A] mr-1">Contact:</span>
+              <span className="text-[9px] font-bold text-[#1E3A8A]">
+                {student.contactNumber}
+              </span>
+            </div>
+
+            {/* 6-Character QR Token */}
+            <div className="pb-0.5 flex items-center justify-between">
+              <span className="text-[9px] font-bold text-[#10203A]">Token:</span>
+              <span className="text-[10px] font-mono font-black tracking-widest text-[#B45309] bg-amber-50 px-1.5 py-0.2 rounded border border-amber-300">
+                {student.qrToken}
+              </span>
+            </div>
+          </div>
+
+          {/* Right Column: QR Code Box */}
+          <div className="w-[96px] h-[96px] rounded-lg p-[2px] bg-gradient-to-br from-[#AE7108] via-[#FFE590] to-[#B4780B] shadow-md flex-shrink-0">
+            <div className="w-full h-full bg-white rounded-[6px] p-1 flex flex-col items-center justify-center relative">
+              {/* Decorative corner ticks */}
+              <div className="absolute top-1 left-1 w-2 h-2 border-t-2 border-l-2 border-[#76A4BE]" />
+              <div className="absolute top-1 right-1 w-2 h-2 border-t-2 border-r-2 border-[#76A4BE]" />
+              <div className="absolute bottom-1 left-1 w-2 h-2 border-b-2 border-l-2 border-[#76A4BE]" />
+              <div className="absolute bottom-1 right-1 w-2 h-2 border-b-2 border-r-2 border-[#76A4BE]" />
+
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
+                  student.verificationUrl
+                )}`}
+                alt="Verification QR"
+                className="w-[78px] h-[78px] object-contain"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Campus Signature Footer Artwork */}
+        <div className="absolute bottom-0 left-0 right-0 h-[112px]">
+          <div
+            className="w-full h-[2px]"
+            style={{
+              background: 'linear-gradient(90deg, #AE7108 0%, #F5BE35 25%, #FFE590 50%, #B4780B 100%)',
+            }}
+          />
+          <img
+            src={CAMPUS_FOOTER_PNG}
+            alt="Campus Signature"
+            className="w-full h-[110px] object-cover"
+          />
+
+          {/* Bottom-right navy corner triangle */}
+          <div
+            className="absolute bottom-0 right-0 w-[50px] h-[25px] bg-[#061931]"
+            style={{ clipPath: 'polygon(100% 0, 0 100%, 100% 100%)' }}
+          />
+          <div
+            className="absolute bottom-0 right-0 w-[52px] h-[26px] pointer-events-none"
+            style={{
+              borderBottom: '2px solid #F5BE35',
+              clipPath: 'polygon(100% 0, 0 100%, 100% 100%)',
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Success / Error Feedback */}
+      {successMessage && (
+        <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 shadow-2xs">
+          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+          <span>{successMessage}</span>
+        </div>
+      )}
+      {errorMessage && (
+        <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-rose-600 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200">
+          <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {/* Download Action Buttons */}
+      {showActions && (
+        <div className="mt-4 grid grid-cols-2 gap-2.5 w-full max-w-[280px]">
+          {/* Download PDF Button */}
+          <button
+            type="button"
+            onClick={handleDownloadPdf}
+            disabled={downloadingType !== null}
+            className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60 active:scale-95"
+          >
+            {downloadingType === 'pdf' ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+            ) : (
+              <FileText className="w-3.5 h-3.5 text-amber-400" />
+            )}
+            <span>{isBangla ? 'PDF ডাউনলোড' : 'Download PDF'}</span>
+          </button>
+
+          {/* Download Photo Button */}
+          <button
+            type="button"
+            onClick={handleDownloadPhoto}
+            disabled={downloadingType !== null}
+            className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60 active:scale-95"
+          >
+            {downloadingType === 'image' ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-200" />
+            ) : (
+              <ImageIcon className="w-3.5 h-3.5 text-sky-300" />
+            )}
+            <span>{isBangla ? 'ছবি ডাউনলোড' : 'Download Photo'}</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};

@@ -19,6 +19,8 @@ import {
 import { Language, PaymentMethod, RegistrationRecord } from '../types';
 import { RegistrationFormData } from '../utils/rules';
 import { PayStationService, PayStationPaymentResult } from '../services/paystation';
+import { StudentIdCardBadge } from './idcard/StudentIdCardBadge';
+import { IdCardStore } from '../services/idCardStore';
 
 export interface PaymentModalProps {
   isOpen: boolean;
@@ -257,11 +259,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs">
+    <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-slate-950/85 backdrop-blur-xs p-3 sm:p-6 flex items-start sm:items-center justify-center min-h-[100dvh] min-h-screen">
       <section
         aria-labelledby="paystation-modal-title"
         aria-modal="true"
-        className="relative w-full max-w-lg rounded-3xl border border-slate-700 bg-white p-6 sm:p-7 shadow-2xl overflow-hidden"
+        className="relative w-full max-w-lg rounded-3xl border border-slate-700 bg-white p-5 sm:p-7 shadow-2xl my-auto max-h-[92dvh] max-h-[92vh] flex flex-col overflow-hidden"
         role="dialog"
       >
         {/* Background ambient */}
@@ -271,7 +273,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         {step !== 'processing' && step !== 'verifying' && (
           <button
             aria-label={isBangla ? 'বন্ধ করুন' : 'Close'}
-            className="absolute right-4 top-4 rounded-full p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="absolute right-3.5 top-3.5 z-20 rounded-full p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
             onClick={onClose}
             type="button"
           >
@@ -279,69 +281,83 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           </button>
         )}
 
-        {/* ── SUCCESS ── */}
-        {step === 'success' && completedTicket && transactionSummary ? (
-          <div className="space-y-5 py-2">
-            <div className="text-center space-y-2">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                <CheckCircle2 className="w-9 h-9" />
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                {isBangla ? 'পেমেন্ট সফলভাবে সম্পন্ন!' : 'Payment Verified & Confirmed!'}
-              </h2>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                {isBangla
-                  ? 'আপনার নিবন্ধন ও ডিজিটাল টিকিট প্রস্তুত। প্রবেশ গেটে QR কোড দেখান।'
-                  : 'Your registration is confirmed. Present the QR code at the entry gate.'}
-              </p>
-            </div>
-
-            {/* Receipt */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2.5">
-              <div className="flex justify-between items-center text-slate-600">
-                <span>{isBangla ? 'ট্রানজেকশন আইডি' : 'Transaction ID'}:</span>
-                <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
-                  {transactionSummary.trxId}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-slate-600">
-                <span>{isBangla ? 'ইনভয়েস নম্বর' : 'Invoice Number'}:</span>
-                <span className="font-mono text-slate-700">{transactionSummary.invoiceNumber}</span>
-              </div>
-              <div className="flex justify-between items-center text-slate-600">
-                <span>{isBangla ? 'নিবন্ধন আইডি' : 'Registration ID'}:</span>
-                <span className="font-mono font-bold text-slate-900">{completedTicket.id}</span>
-              </div>
-              <div className="flex justify-between items-center text-slate-600">
-                <span>{isBangla ? 'পেমেন্ট পদ্ধতি' : 'Payment Method'}:</span>
-                <span className="font-bold text-slate-800 uppercase">
-                  {transactionSummary.rawResponse?.payment_method || transactionSummary.method} (PayStation)
-                </span>
-              </div>
-              {transactionSummary.payerMobile && (
-                <div className="flex justify-between items-center text-slate-600">
-                  <span>{isBangla ? 'পেয়ারের মোবাইল' : 'Payer Mobile'}:</span>
-                  <span className="font-mono text-slate-700">{transactionSummary.payerMobile}</span>
+        {/* Inner Scrollable Body — enables smooth scrolling and avoids cutoff on mobile */}
+        <div className="overflow-y-auto overscroll-contain pr-1 -mr-1 flex-1 space-y-4 touch-pan-y">
+          {/* ── SUCCESS ── */}
+          {step === 'success' && completedTicket && transactionSummary ? (
+            <div className="space-y-4 py-1">
+              <div className="text-center space-y-1.5">
+                <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                  <CheckCircle2 className="w-8 h-8" />
                 </div>
-              )}
-              <div className="flex justify-between items-center border-t border-slate-200 pt-2 text-sm font-black text-slate-900">
-                <span>{isBangla ? 'পরিশোধিত পরিমাণ' : 'Total Paid'}:</span>
-                <span className="text-emerald-700">৳ {transactionSummary.amount.toLocaleString()} BDT</span>
+                <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                  {isBangla ? 'পেমেন্ট সফলভাবে সম্পন্ন!' : 'Payment Verified & Confirmed!'}
+                </h2>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  {isBangla
+                    ? 'আপনার অফিসিয়াল স্টুডেন্ট আইডি কার্ড প্রস্তুত। নিচে থেকে PDF অথবা ছবি ডাউনলোড করুন।'
+                    : 'Your official Student ID Card is ready. Download the printable PDF or Photo image below.'}
+                </p>
               </div>
-            </div>
 
-            <button
-              onClick={() => {
-                if (onSuccess && completedTicket) onSuccess(completedTicket);
-                else onClose();
-              }}
-              className="w-full py-4 rounded-2xl bg-[#0F172A] hover:bg-[#1E293B] text-white font-bold text-sm shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2 group"
-            >
-              <QrCode className="w-5 h-5 text-sky-400 group-hover:scale-110 transition-transform" />
-              <span>{isBangla ? 'ডিজিটাল টিকিট দেখুন' : 'View Digital Ticket Pass'}</span>
-              <ArrowRight className="w-4 h-4 ml-1" />
-            </button>
-          </div>
+              {/* Official Student ID Card Badge with Live Preview and Download Actions */}
+              <div className="py-2 flex flex-col items-center justify-center bg-slate-50/80 p-3 sm:p-4 rounded-3xl border border-slate-200">
+                <h3 className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>{isBangla ? 'অফিসিয়াল স্টুডেন্ট আইডি কার্ড' : 'Official Student ID Card'}</span>
+                </h3>
+                <StudentIdCardBadge
+                  student={IdCardStore.getOrBuildCardForRegistration(completedTicket)}
+                  language={language}
+                />
+              </div>
+
+              {/* Receipt */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2.5">
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>{isBangla ? 'ট্রানজেকশন আইডি' : 'Transaction ID'}:</span>
+                  <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
+                    {transactionSummary.trxId}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>{isBangla ? 'ইনভয়েস নম্বর' : 'Invoice Number'}:</span>
+                  <span className="font-mono text-slate-700">{transactionSummary.invoiceNumber}</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>{isBangla ? 'নিবন্ধন আইডি' : 'Registration ID'}:</span>
+                  <span className="font-mono font-bold text-slate-900">{completedTicket.id}</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>{isBangla ? 'পেমেন্ট পদ্ধতি' : 'Payment Method'}:</span>
+                  <span className="font-bold text-slate-800 uppercase">
+                    {transactionSummary.rawResponse?.payment_method || transactionSummary.method} (PayStation)
+                  </span>
+                </div>
+                {transactionSummary.payerMobile && (
+                  <div className="flex justify-between items-center text-slate-600">
+                    <span>{isBangla ? 'পেয়ারের মোবাইল' : 'Payer Mobile'}:</span>
+                    <span className="font-mono text-slate-700">{transactionSummary.payerMobile}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center border-t border-slate-200 pt-2 text-sm font-black text-slate-900">
+                  <span>{isBangla ? 'পরিশোধিত পরিমাণ' : 'Total Paid'}:</span>
+                  <span className="text-emerald-700">৳ {transactionSummary.amount.toLocaleString()} BDT</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  if (onSuccess && completedTicket) onSuccess(completedTicket);
+                  else onClose();
+                }}
+                className="w-full py-3.5 rounded-2xl bg-[#0F172A] hover:bg-[#1E293B] text-white font-bold text-sm shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2 group"
+              >
+                <QrCode className="w-5 h-5 text-sky-400 group-hover:scale-110 transition-transform" />
+                <span>{isBangla ? 'ডিজিটাল টিকিট পাস দেখুন' : 'View Digital Ticket Pass'}</span>
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </button>
+            </div>
 
         /* ── PROCESSING / VERIFYING ── */
         ) : step === 'processing' || step === 'verifying' ? (
@@ -689,6 +705,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
           </div>
         )}
+        </div>
       </section>
     </div>
   );
