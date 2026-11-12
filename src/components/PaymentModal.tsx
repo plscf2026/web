@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Lock,
   ArrowRight,
+  ArrowLeft,
   RefreshCw,
   QrCode,
   Clock,
@@ -294,7 +295,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           <button
             aria-label={isBangla ? 'বন্ধ করুন' : 'Close'}
             className="absolute right-3.5 top-3.5 z-20 rounded-full p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-            onClick={onClose}
+            onClick={step === 'success' && completedTicket && onSuccess ? () => onSuccess(completedTicket) : onClose}
             type="button"
           >
             <X className="h-5 w-5" />
@@ -490,20 +491,33 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <h2 className="font-black text-slate-900 text-lg">
                 {isBangla ? 'পেমেন্ট সম্পন্ন হয়নি' : 'Payment Not Completed'}
               </h2>
-              <p className="text-xs text-rose-700 max-w-xs mx-auto">{errorMessage}</p>
+              <p className="text-xs text-rose-700 max-w-xs mx-auto leading-relaxed">{errorMessage}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setStep('select');
-                setErrorMessage('');
-                setPollCount(0);
-                invoiceRef.current = `PLSCF26-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-              }}
-              className="w-full py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-700 text-white font-bold text-sm cursor-pointer transition shadow"
-            >
-              {isBangla ? 'আবার চেষ্টা করুন' : 'Try Again'}
-            </button>
+
+            <div className="space-y-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('select');
+                  setErrorMessage('');
+                  setPollCount(0);
+                  invoiceRef.current = `PLSCF26-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+                }}
+                className="w-full py-3.5 rounded-2xl bg-[#0F172A] hover:bg-[#1E293B] text-white font-bold text-sm cursor-pointer transition shadow flex items-center justify-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>{isBangla ? 'আবার চেষ্টা করুন' : 'Try Again'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-3.5 rounded-2xl border-2 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 text-slate-800 font-bold text-sm cursor-pointer transition flex items-center justify-center gap-2 shadow-xs"
+              >
+                <ArrowLeft className="w-4 h-4 text-slate-600" />
+                <span>{isBangla ? 'রেজিস্ট্রেশন ফর্মে ফিরে যান (GO BACK)' : 'Go Back to Registration (GO BACK)'}</span>
+              </button>
+            </div>
           </div>
 
         /* ── SELECT / DEFAULT ── */
@@ -725,6 +739,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     : `Pay ৳${totalPayable.toLocaleString()} via PayStation`}
                 </span>
                 <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+              </button>
+
+              {/* Secondary: Go Back to Registration Form */}
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-3 rounded-2xl border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
+                <span>{isBangla ? 'রেজিস্ট্রেশন ফর্মে ফিরে যান (GO BACK)' : 'Go Back to Registration (GO BACK)'}</span>
               </button>
             </div>
 

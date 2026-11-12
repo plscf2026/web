@@ -69,6 +69,15 @@ export default function App() {
   const [paymentModalStep, setPaymentModalStep] = useState<ModalStep>('select');
   const [paymentModalInvoice, setPaymentModalInvoice] = useState<string>('');
   const [pendingRegistrationData, setPendingRegistrationData] = useState<RegistrationFormData | null>(null);
+  const [preservedRegistrationData, setPreservedRegistrationData] = useState<RegistrationFormData | null>(() => {
+    try {
+      const raw = localStorage.getItem('plscf_registration_draft');
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    const session = PayStationService.getPendingSession();
+    return session?.formData || null;
+  });
+  const [registrationFormKey, setRegistrationFormKey] = useState(0);
   const [paymentModalError, setPaymentModalError] = useState<string>('');
   const [pendingFees, setPendingFees] = useState<{
     registrationFee: number;
@@ -116,6 +125,7 @@ export default function App() {
         if (pendingSession && pendingSession.type === 'registration' && pendingSession.formData) {
           setActiveView('register');
           setPendingRegistrationData(pendingSession.formData);
+          setPreservedRegistrationData(pendingSession.formData);
           if (pendingSession.fees) {
             setPendingFees(pendingSession.fees);
           }
@@ -125,21 +135,21 @@ export default function App() {
 
           // If gateway reported failure/cancel or user pressed "GO BACK" after an error
           if (statusParam.includes('fail') || statusParam.includes('cancel')) {
-            setPaymentModalStep('select');
+            setPaymentModalStep('failed');
             const rawMsg = (params.get('message') || params.get('error') || params.get('reason') || '').toLowerCase();
             const isInsufficientBalance = rawMsg.includes('balance') || statusParam.includes('balance');
 
             if (isInsufficientBalance) {
               setPaymentModalError(
                 language === 'bn'
-                  ? 'পেমেন্ট ব্যর্থ: বিকাশ স্যান্ডবক্স টেস্ট নম্বরে ব্যালেন্স অপ্রতুল ("Insufficient balance")। অনুগ্রহ করে পর্যাপ্ত ব্যালেন্সযুক্ত সক্রিয় টেস্ট ওয়ালেট 01929918378 বা 01770618576 ব্যবহার করুন (OTP: 123456, PIN: 12121)।'
-                  : 'Payment Failed: The test bKash wallet has insufficient sandbox mock balance. Please use active test wallet 01929918378 or 01770618576 (OTP: 123456, PIN: 12121).'
+                  ? 'পেমেন্ট ব্যর্থ: বিকাশ স্যান্ডবক্স টেস্ট নম্বরে ব্যালেন্স অপ্রতুল ("Insufficient balance")। অনুগ্রহ করে পর্যাপ্ত ব্যালেন্সযুক্ত সক্রিয় টেস্ট ওয়ালেট 01929918378 বা 01770618576 ব্যবহার করুন (OTP: 123456, PIN: 12121)। আপনার পূরণকৃত সব তথ্য সংরক্ষিত রয়েছে।'
+                  : 'Payment Failed: The test bKash wallet has insufficient sandbox mock balance. Please use active test wallet 01929918378 or 01770618576 (OTP: 123456, PIN: 12121). All your entered data is preserved.'
               );
             } else {
               setPaymentModalError(
                 language === 'bn'
-                  ? 'পেমেন্ট সম্পন্ন হয়নি বা বাতিল করা হয়েছে। বিকাশ স্যান্ডবক্সে সক্রিয় টেস্ট ওয়ালেট 01929918378 বা 01770618576 (OTP: 123456, PIN: 12121) ব্যবহার করে আবার চেষ্টা করুন।'
-                  : 'Payment was not completed or failed. In Sandbox, please use active test wallet 01929918378 or 01770618576 (OTP: 123456, PIN: 12121) and try again.'
+                  ? 'পেমেন্ট সম্পন্ন হয়নি বা বাতিল করা হয়েছে। আপনার পূরণকৃত সব তথ্য সংরক্ষিত রয়েছে। আপনি তথ্য যাচাই করতে পারেন বা পুনরায় চেষ্টা করতে পারেন।'
+                  : 'Payment was not completed or was cancelled. All your entered registration details have been preserved. You can review your details or try again.'
               );
             }
           } else {
@@ -185,6 +195,7 @@ export default function App() {
     fees: { registrationFee: number; donationAmount: number; totalPayable: number }
   ) => {
     setPendingRegistrationData(formData);
+    setPreservedRegistrationData(formData);
     setPendingFees(fees);
     setPaymentModalStep('select');
     setPaymentModalInvoice('');
@@ -198,17 +209,34 @@ export default function App() {
     setIsPaymentModalOpen(true);
   };
 
-  // Handle closing payment modal without completing transaction
+  // Handle closing payment modal without completing transaction / clicking GO BACK
   const handleCancelPaymentModal = () => {
     if (pendingRegistrationData?.category === 'current' && pendingRegistrationData.studentId) {
       StudentIdService.releaseReservation(pendingRegistrationData.studentId);
     }
+    // Keep preserved registration data intact so the registration form does NOT lose any user input
+    if (pendingRegistrationData) {
+      setPreservedRegistrationData(pendingRegistrationData);
+    }
     setIsPaymentModalOpen(false);
-    setPendingRegistrationData(null);
     setPaymentModalError('');
     setPaymentModalInvoice('');
     setPaymentModalStep('select');
+    setActiveView('register');
+  };
+
+  // Start fresh registration (clears saved form data to register a new student)
+  const handleStartNewRegistration = () => {
+    try {
+      localStorage.removeItem('plscf_registration_draft');
+    } catch {}
+    setPendingRegistrationData(null);
+    setPreservedRegistrationData(null);
     PayStationService.clearPendingSession();
+    setRegistrationFormKey((prev) => prev + 1);
+    setActiveTicket(null);
+    setActiveView('register');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   if (activeView === 'portal') {
@@ -233,6 +261,10 @@ export default function App() {
           onLanguageChange={handleLanguageChange}
           activeView={activeView}
           onNavigate={(view) => {
+            if (view === 'register' && activeView === 'ticket') {
+              handleStartNewRegistration();
+              return;
+            }
             setActiveView(view);
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
@@ -273,8 +305,10 @@ export default function App() {
 
           {activeView === 'register' && (
             <RegistrationPage
+              key={`registration-form-${registrationFormKey}`}
               language={language}
               feeSettings={feeSettings}
+              initialData={preservedRegistrationData}
               onInitiatePayment={handleInitiatePayment}
               onNavigate={(view) => {
                 setActiveView(view);
@@ -291,10 +325,7 @@ export default function App() {
                 setActiveView('ticket');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              onNavigateRegister={() => {
-                setActiveView('register');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
+              onNavigateRegister={handleStartNewRegistration}
             />
           )}
 
@@ -306,6 +337,7 @@ export default function App() {
                 setActiveView('home');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
+              onRegisterAnother={handleStartNewRegistration}
             />
           )}
 
@@ -353,6 +385,7 @@ export default function App() {
             onSuccess={(ticket) => {
               setIsPaymentModalOpen(false);
               setPendingRegistrationData(null);
+              setPreservedRegistrationData(null);
               setPaymentModalError('');
               setPaymentModalInvoice('');
               setPaymentModalStep('select');
@@ -360,6 +393,8 @@ export default function App() {
               try {
                 localStorage.removeItem('plscf_registration_draft');
               } catch {}
+              // Refresh registration form so it is fresh and clean to add new data
+              setRegistrationFormKey((prev) => prev + 1);
               setActiveTicket(ticket);
               setActiveView('ticket');
               window.scrollTo({ top: 0, behavior: 'smooth' });

@@ -34,12 +34,14 @@ import {
 import { StudentIdService } from '../services/studentIdStore';
 import { readValidatedImage } from '../utils/fileValidation';
 import { AppStore } from '../services/store';
+import { PayStationService } from '../services/paystation';
 import { StudentIdCardRecord } from '../types/idcard';
 import { SynchronizedCameraCardModal } from './idcard/SynchronizedCameraCardModal';
 
 interface RegistrationPageProps {
   language: Language;
   feeSettings: FeeSettings;
+  initialData?: RegistrationFormData | null;
   onInitiatePayment: (formData: RegistrationFormData, fees: { registrationFee: number; donationAmount: number; totalPayable: number }) => void;
   onNavigate: (view: string) => void;
 }
@@ -54,20 +56,27 @@ const SAMPLE_AVATARS = [
 export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   language,
   feeSettings,
+  initialData,
   onInitiatePayment,
   onNavigate: _onNavigate,
 }) => {
   const t = translations[language];
 
   // Helper to retrieve saved registration form draft
+  // Preserves data across failures, cancellations, and external gateway redirects
   const getDraft = () => {
+    if (initialData) return initialData;
     try {
       const raw = localStorage.getItem('plscf_registration_draft');
       if (raw) return JSON.parse(raw);
     } catch {}
+    try {
+      const session = PayStationService.getPendingSession();
+      if (session?.formData) return session.formData;
+    } catch {}
     return null;
   };
-  const draft = React.useMemo(() => getDraft(), []);
+  const draft = React.useMemo(() => getDraft(), [initialData]);
 
   // Form State — initialized from saved draft if available
   const [fullName, setFullName] = useState(() => draft?.fullName || '');
@@ -134,6 +143,29 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     donationInput,
     termsAccepted,
   ]);
+
+  // Synchronize form fields whenever initialData is provided or updated (e.g. after failed payment or return)
+  useEffect(() => {
+    if (!initialData) return;
+    if (initialData.fullName !== undefined) setFullName(initialData.fullName || '');
+    if (initialData.photoUrl !== undefined) setPhotoUrl(initialData.photoUrl || '');
+    if (initialData.mobileNumber !== undefined) setMobileNumber(initialData.mobileNumber || '');
+    if (initialData.email !== undefined) setEmail(initialData.email || '');
+    if (initialData.address !== undefined) setAddress(initialData.address || '');
+    if (initialData.category !== undefined) setCategory(initialData.category || 'former');
+    if (initialData.passingYear !== undefined) setPassingYear(initialData.passingYear || '2015');
+    if (initialData.lastClassAttended !== undefined) setLastClassAttended(initialData.lastClassAttended || 'SSC');
+    if (initialData.currentClass !== undefined) setCurrentClass(initialData.currentClass || 'Class 10');
+    if (initialData.studentId !== undefined) setStudentId(initialData.studentId || '');
+    if (initialData.batchName !== undefined) setBatchName(initialData.batchName || '');
+    if (initialData.groupOrSection !== undefined) setGroupOrSection(initialData.groupOrSection || 'Section A');
+    if (initialData.rollNumber !== undefined) setRollNumber(initialData.rollNumber || '');
+    if (initialData.tShirtSize !== undefined) setTShirtSize((initialData.tShirtSize as TShirtSize) || 'L');
+    if (typeof initialData.donationAmount === 'number') {
+      setDonationInput(initialData.donationAmount > 0 ? initialData.donationAmount : '');
+    }
+    if (initialData.termsAccepted !== undefined) setTermsAccepted(Boolean(initialData.termsAccepted));
+  }, [initialData]);
 
   // Photo live camera, adjustment & compression state (Requirement 4)
   const [photoSizeKb, setPhotoSizeKb] = useState<number | null>(null);

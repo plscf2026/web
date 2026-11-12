@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Sparkles,
   X,
+  UserPlus,
 } from 'lucide-react';
 import { RegistrationRecord, Language } from '../types';
 import { translations } from '../i18n/translations';
@@ -21,12 +22,14 @@ interface TicketViewProps {
   registration: RegistrationRecord;
   language: Language;
   onNavigateHome: () => void;
+  onRegisterAnother?: () => void;
 }
 
 export const TicketView: React.FC<TicketViewProps> = ({
   registration,
   language,
   onNavigateHome,
+  onRegisterAnother,
 }) => {
   const t = translations[language];
   const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -78,6 +81,16 @@ export const TicketView: React.FC<TicketViewProps> = ({
 
       {/* Action Buttons (Hidden on Print) */}
       <div className="no-print flex flex-wrap items-center justify-center gap-3 mb-8">
+        {onRegisterAnother && (
+          <button
+            onClick={onRegisterAnother}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold shadow-md transition-all cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>{language === 'bn' ? 'নতুন শিক্ষার্থী নিবন্ধন করুন' : 'Register Another Student'}</span>
+          </button>
+        )}
+
         <button
           onClick={handlePrint}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold shadow-md transition-all cursor-pointer"
