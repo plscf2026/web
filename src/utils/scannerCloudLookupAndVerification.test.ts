@@ -130,3 +130,81 @@ test('3. AppStore.findRegistrationAsync checks local memory and caches cloud-ret
     AppStore.saveRegistrations(cleaned);
   }
 });
+
+test('4. Manual Registration ID + QR Token dual-verification validates matching and detects mismatch', async () => {
+  const attendee: RegistrationRecord = {
+    id: 'PLSCF-2027-F8472',
+    fullName: 'aaaaaaaaaa',
+    photoUrl: 'https://example.com/photo.jpg',
+    mobileNumber: '01700000000',
+    address: 'Faridpur',
+    category: 'former',
+    batchName: 'SSC 2016',
+    passingYear: '2016',
+    tShirtSize: 'Oversize 50',
+    registrationFee: 1500,
+    donationAmount: 0,
+    totalPaid: 1500,
+    paymentStatus: 'paid',
+    transactionId: 'DKD70PW483',
+    paymentMethod: 'bkash',
+    registeredAt: new Date().toISOString(),
+    qrToken: 'FJJG4G',
+    isTShirtCollected: false,
+    year: 2027,
+  };
+
+  const existing = AppStore.getRegistrations();
+  AppStore.saveRegistrations([attendee, ...existing.filter((r) => r.id !== attendee.id)]);
+
+  try {
+    // 1. Correct Registration ID and correct QR Token
+    const found = AppStore.findRegistration(attendee.id);
+    assert.ok(found);
+    const tokenMatches = (found?.qrToken || '').toUpperCase() === 'FJJG4G';
+    assert.equal(tokenMatches, true, 'Token FJJG4G should match attendee PLSCF-2027-F8472');
+
+    // 2. Mismatched QR Token detection
+    const wrongTokenMatches = (found?.qrToken || '').toUpperCase() === 'WRONG1';
+    assert.equal(wrongTokenMatches, false, 'Invalid token should fail verification');
+  } finally {
+    const cleaned = AppStore.getRegistrations().filter((r) => r.id !== attendee.id);
+    AppStore.saveRegistrations(cleaned);
+  }
+});
+
+test('5. Scanner Desk interfaces have Upload QR Image completely removed while preserving Open Camera and Manual Entry', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+
+  const scannerFiles = [
+    'src/components/MultiStationDesk.tsx',
+    'src/components/FoodScannerModule.tsx',
+    'src/components/DressScannerModule.tsx',
+    'src/components/GateScannerModule.tsx',
+    'src/components/common/QrCameraScanner.tsx',
+  ];
+
+  for (const relPath of scannerFiles) {
+    const fullPath = path.resolve(relPath);
+    const content = fs.readFileSync(fullPath, 'utf8');
+
+    // Verify "Upload QR Image" button is gone
+    assert.ok(!content.includes('Upload QR Image'), `File ${relPath} should not contain "Upload QR Image"`);
+    assert.ok(!content.includes('decodeQRCodeFromImageFile'), `File ${relPath} should not use decodeQRCodeFromImageFile`);
+
+    if (relPath !== 'src/components/common/QrCameraScanner.tsx') {
+      // Verify Option 1 (Open Camera) is preserved
+      assert.ok(content.includes('Open Camera') || content.includes('Stop Camera'), `File ${relPath} must preserve Open Camera`);
+      // Verify Option 2 (Registration ID + QR Token) is preserved
+      assert.ok(content.includes('QR Token') || content.includes('tokenInput'), `File ${relPath} must preserve QR Token manual verification`);
+    }
+  }
+
+  // Verify other unrelated image upload files remain intact
+  const registrationPage = fs.readFileSync(path.resolve('src/components/RegistrationPage.tsx'), 'utf8');
+  assert.ok(registrationPage.includes('accept="image/jpeg,image/png,image/webp"'), 'Student photo upload in RegistrationPage must remain untouched');
+
+  const staffFinance = fs.readFileSync(path.resolve('src/components/StaffFinanceModule.tsx'), 'utf8');
+  assert.ok(staffFinance.includes('Receipt / Voucher Image'), 'Voucher image in StaffFinanceModule must remain untouched');
+});

@@ -458,14 +458,15 @@ export const SupabaseService = {
    * Checks registrations_2027, registrations_2026, and generic registrations tables.
    */
   async lookupRegistrationByIdOrToken(
-    identifier: string
+    identifier: string,
+    tokenParam?: string
   ): Promise<RegistrationRecord | null> {
     if (!identifier || !identifier.trim()) return null;
     const clean = identifier.trim();
     const parsed = parseScannedInput(clean);
 
-    const safeId = parsed.id?.replace(/[,%()]/g, '').trim();
-    const safeToken = parsed.token?.replace(/[,%()]/g, '').trim();
+    const safeId = (parsed.id || clean).replace(/[,%()]/g, '').trim();
+    const safeToken = (tokenParam?.trim() || parsed.token)?.replace(/[,%()]/g, '').trim();
     const safeRaw = parsed.raw?.replace(/[,%()]/g, '').trim();
 
     const tablesToTry = ['registrations_2027', 'registrations_2026', 'registrations'];

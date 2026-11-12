@@ -1527,7 +1527,7 @@ export class AppStore {
    * 2. If not found, queries Supabase PostgreSQL tables (registrations_2027, registrations_2026).
    * 3. Caches newly discovered record into local store for offline use.
    */
-  static async findRegistrationAsync(input: string): Promise<RegistrationRecord | undefined> {
+  static async findRegistrationAsync(input: string, tokenInput?: string): Promise<RegistrationRecord | undefined> {
     if (!input || !input.trim()) return undefined;
     const clean = input.trim();
 
@@ -1537,7 +1537,7 @@ export class AppStore {
 
     // 2. Cloud lookup in Supabase
     try {
-      const cloudRecord = await SupabaseService.lookupRegistrationByIdOrToken(clean);
+      const cloudRecord = await SupabaseService.lookupRegistrationByIdOrToken(clean, tokenInput);
       if (cloudRecord) {
         // Cache to local storage
         const current = this.getRegistrations();

@@ -15,6 +15,7 @@ import {
   MapPin,
   X,
   XCircle,
+  KeyRound,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -28,7 +29,6 @@ import { AppStore } from '../services/store';
 import { EventStore } from '../services/eventStore';
 import { findRegistrationByTokenOrId, parseScannedInput } from '../utils/tokenGenerator';
 import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
-import { decodeQRCodeFromImageFile } from '../utils/qrDecoder';
 import { QrCameraScanner } from './common/QrCameraScanner';
 
 export type DeskStationId =
@@ -53,6 +53,7 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
 }) => {
   const [activeStation, setActiveStation] = useState<DeskStationId>('MASTER_DESK');
   const [scanInput, setScanInput] = useState('');
+  const [tokenInput, setTokenInput] = useState('');
   const [scannedStudent, setScannedStudent] = useState<RegistrationRecord | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [actionNotice, setActionNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -73,35 +74,19 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
     setDressDistributions(EventStore.getDressDistributions());
   };
 
-  // Decode QR from uploaded image file
-  const handleQRImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const decoded = await decodeQRCodeFromImageFile(file);
-    if (decoded) {
-      handleProcessScan(decoded);
-    } else {
-      playScanErrorSound();
-      setActionNotice({
-        type: 'error',
-        message: 'Could not decode QR code from the selected image. Please try another photo or enter the ID manually.',
-      });
-    }
-  };
-
-  // Process QR / Token lookup
-  const handleProcessScan = async (codeToSearch: string) => {
+  // Process QR Camera scan or manual Registration ID + QR Token lookup
+  const handleProcessScan = async (codeToSearch: string, tokenParam?: string) => {
     if (!codeToSearch.trim()) return;
     refreshAllState();
 
     const clean = codeToSearch.trim();
     const parsed = parseScannedInput(clean);
-    const displayTicket = parsed.id || parsed.token || clean;
+    const displayTicket = parsed.id || clean;
+    const expectedToken = tokenParam?.trim().toUpperCase() || parsed.token;
 
     let student = findRegistrationByTokenOrId(AppStore.getRegistrations(), clean);
     if (!student) {
-      student = await AppStore.findRegistrationAsync(clean);
+      student = await AppStore.findRegistrationAsync(clean, expectedToken);
     }
 
     if (!student) {
@@ -113,6 +98,21 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
       });
       setIsResultPopupOpen(true);
       return;
+    }
+
+    // When QR Token is provided (manual verification or QR payload), verify token matches Registration ID
+    if (expectedToken) {
+      const studentToken = (student.qrToken || (student as any).qr_token || '').toUpperCase();
+      if (studentToken && studentToken !== expectedToken) {
+        playScanErrorSound();
+        setScannedStudent(null);
+        setActionNotice({
+          type: 'error',
+          message: `Verification Failed: QR Token "${expectedToken}" does not match Registration ID "${student.id}".`,
+        });
+        setIsResultPopupOpen(true);
+        return;
+      }
     }
 
     playScanSuccessSound();
@@ -319,20 +319,11 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
               </h3>
 
               <div className="flex items-center gap-2">
-                <label className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer transition-colors border border-slate-200">
-                  <span>📁 Upload QR Image</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleQRImageUpload}
-                    className="hidden"
-                  />
-                </label>
-
+                {/* OPTION 1: OPEN CAMERA */}
                 <button
                   type="button"
                   onClick={() => setCameraActive(!cameraActive)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${cameraActive
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${cameraActive
                       ? 'bg-rose-100 text-rose-700 border border-rose-300'
                       : 'bg-slate-900 text-white hover:bg-slate-800'
                     }`}
@@ -343,61 +334,82 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
               </div>
             </div>
 
-            {/* Square QR Code Camera Viewfinder */}
+            {/* OPTION 1: Square QR Code Camera Viewfinder */}
             {cameraActive && (
               <QrCameraScanner
                 onScan={handleProcessScan}
                 onClose={() => setCameraActive(false)}
-                onUploadImage={async (file) => {
-                  const decoded = await decodeQRCodeFromImageFile(file);
-                  if (decoded) {
-                    handleProcessScan(decoded);
-                  } else {
-                    playScanErrorSound();
-                    setActionNotice({
-                      type: 'error',
-                      message: 'Could not decode QR code from the selected image. Please try another photo or enter the ID manually.',
-                    });
-                  }
-                }}
                 language={language}
                 themeColor="sky"
                 title={language === 'bn' ? 'মাল্টি-স্টেশন কিউআর ক্যামেরা' : 'Multi-Station QR Camera Scanner'}
               />
             )}
 
-            {/* Manual ID Input Form */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleProcessScan(scanInput);
-              }}
-              className="space-y-3"
-            >
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">
-                  Registration ID / QR Token
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={scanInput}
-                    onChange={(e) => setScanInput(e.target.value)}
-                    placeholder="e.g. PLSCF-2026-F1001"
-                    className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-300 text-sm font-mono uppercase tracking-wider focus:border-slate-900 focus:outline-hidden"
-                  />
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-                </div>
+            {/* OPTION 2: REGISTRATION ID + QR TOKEN (Server-Verified Manual Entry) */}
+            <div className="pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-sky-600" />
+                  <span>Manual Verification (ID + Token)</span>
+                </span>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  Enter both credentials
+                </span>
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-2"
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleProcessScan(scanInput, tokenInput);
+                }}
+                className="space-y-3"
               >
-                <Search className="w-3.5 h-3.5" />
-                <span>Lookup & Verify Station Access</span>
-              </button>
-            </form>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Registration ID *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={scanInput}
+                        onChange={(e) => setScanInput(e.target.value)}
+                        placeholder="e.g. PLSCF-2027-F8472"
+                        required
+                        className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-300 text-xs font-mono uppercase tracking-wider focus:border-slate-900 focus:outline-hidden"
+                      />
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-3" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      QR Token *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={tokenInput}
+                        onChange={(e) => setTokenInput(e.target.value)}
+                        placeholder="e.g. FJJG4G"
+                        maxLength={10}
+                        required
+                        className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-300 text-xs font-mono uppercase tracking-wider focus:border-slate-900 focus:outline-hidden"
+                      />
+                      <KeyRound className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-3" />
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-2"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Verify Registration ID + QR Token</span>
+                </button>
+              </form>
+            </div>
 
             {/* Quick Demo Attendee Pills */}
             <div className="pt-2 border-t border-slate-100">
@@ -406,18 +418,19 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  { id: 'PLSCF-2026-F1001', label: 'Tanvir (Alumni)' },
-                  { id: 'PLSCF-2026-F1002', label: 'Dr. Nusrat (Alumni)' },
-                  { id: 'PLSCF-2026-F1003', label: 'Asad (Alumni)' },
-                  { id: 'PLSCF-2026-C2001', label: 'Samiul (Student)' },
-                  { id: 'PLSCF-2026-C2002', label: 'Ayesha (Student)' },
+                  { id: 'PLSCF-2026-F1001', token: 'A7K9M2', label: 'Tanvir (Alumni)' },
+                  { id: 'PLSCF-2026-F1002', token: 'R8W3N5', label: 'Dr. Nusrat (Alumni)' },
+                  { id: 'PLSCF-2026-F1003', token: 'M4T9P2', label: 'Asad (Alumni)' },
+                  { id: 'PLSCF-2026-C2001', token: 'C3P7X9', label: 'Samiul (Student)' },
+                  { id: 'PLSCF-2026-C2002', token: 'D8L2N6', label: 'Ayesha (Student)' },
                 ].map((demo) => (
                   <button
                     key={demo.id}
                     type="button"
                     onClick={() => {
                       setScanInput(demo.id);
-                      handleProcessScan(demo.id);
+                      setTokenInput(demo.token);
+                      handleProcessScan(demo.id, demo.token);
                     }}
                     className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-sky-100 hover:text-sky-900 text-slate-700 transition-colors border border-slate-200 cursor-pointer"
                   >

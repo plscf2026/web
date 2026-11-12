@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, RefreshCw, X, AlertTriangle, QrCode, Upload } from 'lucide-react';
+import { Camera, RefreshCw, X, AlertTriangle, QrCode } from 'lucide-react';
 import { startResilientCameraStream, startLiveQRScanner } from '../../utils/qrDecoder';
 
 interface QrCameraScannerProps {
   onScan: (code: string) => void;
   onClose: () => void;
-  onUploadImage?: (file: File) => void;
   language?: 'en' | 'bn';
   title?: string;
   themeColor?: 'amber' | 'emerald' | 'sky';
@@ -14,7 +13,6 @@ interface QrCameraScannerProps {
 export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
   onScan,
   onClose,
-  onUploadImage,
   language = 'en',
   title,
   themeColor = 'amber',
@@ -33,7 +31,6 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
 
   const lastScannedRef = useRef<string | null>(null);
   const lastScannedTimeRef = useRef<number>(0);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const themeBorderColor =
@@ -154,13 +151,6 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
     setPreferRear((prev) => !prev);
   };
 
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && onUploadImage) {
-      onUploadImage(file);
-    }
-  };
-
   return (
     <div className="relative rounded-3xl overflow-hidden bg-slate-950 border-2 border-slate-800 shadow-2xl space-y-2 select-none">
       {/* Top Floating Controls Bar */}
@@ -216,25 +206,13 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
             </h4>
             <p className="text-xs text-slate-400 leading-relaxed">{cameraError}</p>
 
-            {onUploadImage && (
-              <div className="pt-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileInputChange}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs cursor-pointer shadow-md transition-colors"
-                >
-                  <Upload className="w-4 h-4" />
-                  <span>{language === 'bn' ? 'কিউআর ছবি ফাইল নির্বাচন করুন' : 'Upload QR Image File'}</span>
-                </button>
-              </div>
-            )}
+            <div className="pt-2">
+              <span className="text-xs text-amber-300 font-medium">
+                {language === 'bn'
+                  ? 'নিচে রেজিস্ট্রেশন আইডি এবং কিউআর টোকেন দিয়ে ম্যানুয়াল যাচাই করুন।'
+                  : 'Please use the manual Registration ID & QR Token verification below.'}
+              </span>
+            </div>
           </div>
         ) : (
           <>

@@ -31,7 +31,7 @@ export async function startResilientCameraStream(
       window.location.hostname !== '127.0.0.1';
     return {
       error: isInsecure
-        ? 'Camera access is blocked by browsers on insecure HTTP. Please use HTTPS or upload a QR image below.'
+        ? 'Camera access is blocked by browsers on insecure HTTP. Please use HTTPS or verify using Registration ID & QR Token manually below.'
         : 'Camera API (getUserMedia) is not supported in this browser.',
       errorType: isInsecure ? 'INSECURE_CONTEXT' : 'UNSUPPORTED',
     };
@@ -183,100 +183,4 @@ export function startLiveQRScanner(
   };
 }
 
-/**
- * Universal QR code decoder for uploaded image files (File or Blob).
- * Employs native BarcodeDetector and multi-scale + binarized jsQR canvas passes
- * to reliably decode photos taken on mobile cameras (even if skewed, low contrast, or high res).
- */
-export async function decodeQRCodeFromImageFile(file: File | Blob): Promise<string | null> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
 
-    reader.onload = async () => {
-      const dataUrl = reader.result as string;
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-
-      img.onload = async () => {
-        // 1. Try native BarcodeDetector API if available
-        if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
-          try {
-            const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
-            const barcodes = await detector.detect(img);
-            if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
-              const code = barcodes[0].rawValue.trim();
-              if (code) return resolve(code);
-            }
-          } catch (_) {
-            // Fall through to jsQR
-          }
-        }
-
-        // 2. Pure JavaScript multi-scale canvas scanning with jsQR
-        try {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-          if (!ctx) return resolve(null);
-
-          const maxDim = Math.max(img.width, img.height);
-          // Try original size, 1200px, 800px, 500px scales for optimal detection
-          const scalesToTry = [1];
-          if (maxDim > 1200) scalesToTry.push(1200 / maxDim);
-          if (maxDim > 800) scalesToTry.push(800 / maxDim);
-          if (maxDim > 500) scalesToTry.push(500 / maxDim);
-
-          for (const scale of scalesToTry) {
-            const w = Math.round(img.width * scale);
-            const h = Math.round(img.height * scale);
-            canvas.width = w;
-            canvas.height = h;
-            ctx.drawImage(img, 0, 0, w, h);
-
-            const imageData = ctx.getImageData(0, 0, w, h);
-            const qr = jsQR(imageData.data, imageData.width, imageData.height, {
-              inversionAttempts: 'attemptBoth',
-            });
-
-            if (qr && qr.data && qr.data.trim()) {
-              return resolve(qr.data.trim());
-            }
-          }
-
-          // 3. High-contrast binarization pass for washed-out or low-contrast paper/ticket photos
-          const w = Math.min(img.width, 800);
-          const h = Math.round(img.height * (w / img.width));
-          canvas.width = w;
-          canvas.height = h;
-          ctx.drawImage(img, 0, 0, w, h);
-
-          const imgData = ctx.getImageData(0, 0, w, h);
-          const data = imgData.data;
-          for (let i = 0; i < data.length; i += 4) {
-            // Perceived luminance calculation
-            const brightness = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8;
-            const val = brightness > 128 ? 255 : 0;
-            data[i] = val;
-            data[i + 1] = val;
-            data[i + 2] = val;
-          }
-
-          const binarizedQr = jsQR(data, w, h, { inversionAttempts: 'attemptBoth' });
-          if (binarizedQr && binarizedQr.data && binarizedQr.data.trim()) {
-            return resolve(binarizedQr.data.trim());
-          }
-        } catch (err) {
-          console.warn('Canvas jsQR image decode notice:', err);
-        }
-
-        // Return null if all passes fail
-        resolve(null);
-      };
-
-      img.onerror = () => resolve(null);
-      img.src = dataUrl;
-    };
-
-    reader.onerror = () => resolve(null);
-    reader.readAsDataURL(file);
-  });
-}
