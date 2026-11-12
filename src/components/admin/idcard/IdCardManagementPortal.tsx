@@ -45,15 +45,12 @@ import {
   IdCardSystemSettings,
 } from '../../../types/idcard';
 import { IdCardStore } from '../../../services/idCardStore';
-import {
-  generateIndividualIdCardPdf,
-  generateBatchCombinedA4Pdf,
-  generateBatchZipArchive,
-  generateAllBatchesBulkZip,
-} from '../../../utils/idCardGenerator';
-import { IdCardPreviewModal } from './IdCardPreviewModal';
 import { GlobalPagination } from '../../common/GlobalPagination';
 import { paginate } from '../../../utils/pagination';
+
+const IdCardPreviewModal = React.lazy(() =>
+  import('./IdCardPreviewModal').then((m) => ({ default: m.IdCardPreviewModal }))
+);
 
 interface IdCardManagementPortalProps {
   currentUserEmail?: string;
@@ -80,11 +77,11 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
     | 'settings'
   >('dashboard');
 
-  // Core Data States
-  const [cards, setCards] = useState<StudentIdCardRecord[]>([]);
-  const [batches, setBatches] = useState<BatchIdCardCollection[]>([]);
-  const [staffList, setStaffList] = useState<IdCardStaffAccount[]>([]);
-  const [downloadLogs, setDownloadLogs] = useState<IdCardDownloadLog[]>([]);
+  // Core Data States (fast cached initialization)
+  const [cards, setCards] = useState<StudentIdCardRecord[]>(() => IdCardStore.getIdCards());
+  const [batches, setBatches] = useState<BatchIdCardCollection[]>(() => IdCardStore.getBatchCollections());
+  const [staffList, setStaffList] = useState<IdCardStaffAccount[]>(() => IdCardStore.getStaffAccounts());
+  const [downloadLogs, setDownloadLogs] = useState<IdCardDownloadLog[]>(() => IdCardStore.getDownloadLogs());
   const [settings, setSettings] = useState<IdCardSystemSettings>(() =>
     IdCardStore.getSettings()
   );
@@ -162,7 +159,11 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
   };
 
   useEffect(() => {
-    refreshData();
+    // Non-blocking initialization: lets the mobile browser complete initial render/paint first
+    const timer = setTimeout(() => {
+      refreshData();
+    }, 20);
+    return () => clearTimeout(timer);
   }, []);
 
   // System Metrics
@@ -217,6 +218,7 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
   // ==========================================================================
   const handleDownloadSinglePdf = async (student: StudentIdCardRecord) => {
     try {
+      const { generateIndividualIdCardPdf } = await import('../../../utils/idCardGenerator');
       const { pdfBlob } = await generateIndividualIdCardPdf(student);
       const url = URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
@@ -272,6 +274,7 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
         currentTask: `Formatting Batch ${batchYear} cards into A4 print sheets...`,
       });
 
+      const { generateBatchCombinedA4Pdf } = await import('../../../utils/idCardGenerator');
       const { pdfBlob, totalPages } = await generateBatchCombinedA4Pdf(
         batchCards,
         batchYear
@@ -334,6 +337,7 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
         currentTask: `Generating individual PDFs for Batch ${batchYear}...`,
       });
 
+      const { generateBatchZipArchive } = await import('../../../utils/idCardGenerator');
       const zipBlob = await generateBatchZipArchive(
         batchYear,
         batchCards,
@@ -416,6 +420,7 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
         archiveFilename: 'Police_Lines_All_Student_ID_Cards.zip',
       });
 
+      const { generateAllBatchesBulkZip } = await import('../../../utils/idCardGenerator');
       const zipBlob = await generateAllBatchesBulkZip(
         grouped,
         (processedBatches, totalBatches, percent) => {
@@ -487,6 +492,7 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
 
     try {
       setIsProcessingBulk(true);
+      const { generateIndividualIdCardPdf } = await import('../../../utils/idCardGenerator');
       for (let i = 0; i < selectedList.length; i++) {
         const student = selectedList[i];
         setBulkProgress({
@@ -1550,13 +1556,15 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
 
       {/* ID Card Preview Modal */}
       {previewStudent && (
-        <IdCardPreviewModal
-          student={previewStudent}
-          currentUserName={currentUserEmail}
-          currentUserRole={currentUserRole}
-          onClose={() => setPreviewStudent(null)}
-          onCardGenerated={refreshData}
-        />
+        <React.Suspense fallback={null}>
+          <IdCardPreviewModal
+            student={previewStudent}
+            currentUserName={currentUserEmail}
+            currentUserRole={currentUserRole}
+            onClose={() => setPreviewStudent(null)}
+            onCardGenerated={refreshData}
+          />
+        </React.Suspense>
       )}
 
       {/* Create Staff Modal */}

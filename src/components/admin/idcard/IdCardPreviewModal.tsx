@@ -7,15 +7,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download, Printer, CheckCircle2, AlertTriangle, ShieldCheck, Loader2 } from 'lucide-react';
 import { StudentIdCardRecord } from '../../../types/idcard';
-import {
-  generateIndividualIdCardPdf,
-  generateStudentQrCodeDataUrl,
-} from '../../../utils/idCardGenerator';
+import { generateStudentQrCodeDataUrl } from '../../../utils/studentQrCode';
 import { IdCardStore } from '../../../services/idCardStore';
-import {
-  SCHOOL_CREST_PNG,
-  CAMPUS_FOOTER_PNG,
-} from '../../../utils/idCardTemplateAssets';
 
 interface IdCardPreviewModalProps {
   student: StudentIdCardRecord;
@@ -70,6 +63,7 @@ export const IdCardPreviewModal: React.FC<IdCardPreviewModalProps> = ({
   const handleDownloadPdf = async () => {
     try {
       setIsDownloading(true);
+      const { generateIndividualIdCardPdf } = await import('../../../utils/idCardGenerator');
       const { pdfBlob } = await generateIndividualIdCardPdf(student);
 
       // Trigger browser download
@@ -156,7 +150,7 @@ export const IdCardPreviewModal: React.FC<IdCardPreviewModalProps> = ({
 
               {/* School Crest Logo */}
               <img
-                src={SCHOOL_CREST_PNG}
+                src="/assets/id_card/school_crest.png"
                 alt="School Crest"
                 className="absolute top-2.5 right-2 w-[76px] h-[39px] object-contain drop-shadow"
               />
@@ -289,7 +283,7 @@ export const IdCardPreviewModal: React.FC<IdCardPreviewModalProps> = ({
                 }}
               />
               <img
-                src={CAMPUS_FOOTER_PNG}
+                src="/assets/id_card/campus_footer.png"
                 alt="Campus Signature"
                 className="w-full h-[110px] object-cover"
               />

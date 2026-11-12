@@ -1021,13 +1021,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* TAB: STUDENT ID CARD MANAGEMENT SYSTEM */}
       {activeTab === 'idCardManagement' && (
-        <Suspense fallback={<AdminTabFallback />}>
-          <IdCardManagementPortal
-            currentUserEmail={adminSession?.email || 'admin@gmail.com'}
-            currentUserRole={adminSession?.role || 'super_admin'}
-            isSuperAdmin={adminSession?.role === 'super_admin' || !adminSession}
-          />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={<AdminTabFallback />}>
+            <IdCardManagementPortal
+              currentUserEmail={adminSession?.email || 'admin@gmail.com'}
+              currentUserRole={adminSession?.role || 'super_admin'}
+              isSuperAdmin={adminSession?.role === 'super_admin' || !adminSession}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       {/* TAB: MASTER EVENT OVERVIEW (PART 9) */}

@@ -418,6 +418,7 @@ test('Scenario 3: Scanner on DIFFERENT device scans student QR code -> successfu
       passingYear: '2015',
       batchName: 'SSC 2015',
       tShirtSize: 'L',
+      donationAmount: 0,
       photoUrl: 'https://example.com/farhan.jpg',
       termsAccepted: true,
     };

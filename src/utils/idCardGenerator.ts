@@ -16,30 +16,14 @@
 
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
-import QRCode from 'qrcode';
 import { StudentIdCardRecord } from '../types/idcard';
 import {
   SCHOOL_CREST_PNG,
   CAMPUS_FOOTER_PNG,
   ID_CARD_DIMENSIONS,
 } from './idCardTemplateAssets';
-
-/**
- * Generate a scannable, secure QR code data URI
- */
-export async function generateStudentQrCodeDataUrl(
-  verificationUrl: string
-): Promise<string> {
-  return QRCode.toDataURL(verificationUrl, {
-    margin: 0,
-    errorCorrectionLevel: 'M',
-    width: 400,
-    color: {
-      dark: '#10203A',
-      light: '#FFFFFF',
-    },
-  });
-}
+import { generateStudentQrCodeDataUrl } from './studentQrCode';
+export { generateStudentQrCodeDataUrl };
 
 /**
  * Draw an individual ID Card on a jsPDF document at the given offset (default: 0, 0)

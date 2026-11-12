@@ -9,15 +9,7 @@ import {
 } from 'lucide-react';
 import { StudentIdCardRecord } from '../../types/idcard';
 import { Language } from '../../types';
-import {
-  generateIndividualIdCardPdf,
-  generateIndividualIdCardImage,
-  generateStudentQrCodeDataUrl,
-} from '../../utils/idCardGenerator';
-import {
-  SCHOOL_CREST_PNG,
-  CAMPUS_FOOTER_PNG,
-} from '../../utils/idCardTemplateAssets';
+import { generateStudentQrCodeDataUrl } from '../../utils/studentQrCode';
 
 export interface StudentIdCardBadgeProps {
   student: StudentIdCardRecord;
@@ -79,6 +71,7 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
       setErrorMessage('');
 
       // Generate high-resolution PNG image
+      const { generateIndividualIdCardImage } = await import('../../utils/idCardGenerator');
       const { dataUrl } = await generateIndividualIdCardImage(student);
 
       // Create an invisible iframe for dedicated printing
@@ -183,6 +176,7 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
     try {
       setDownloadingType('pdf');
       setErrorMessage('');
+      const { generateIndividualIdCardPdf } = await import('../../utils/idCardGenerator');
       const { pdfBlob } = await generateIndividualIdCardPdf(student);
 
       const url = URL.createObjectURL(pdfBlob);
@@ -209,6 +203,7 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
     try {
       setDownloadingType('image');
       setErrorMessage('');
+      const { generateIndividualIdCardImage } = await import('../../utils/idCardGenerator');
       const { blob } = await generateIndividualIdCardImage(student);
 
       const url = URL.createObjectURL(blob);
@@ -256,7 +251,7 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
 
           {/* School Crest Logo */}
           <img
-            src={SCHOOL_CREST_PNG}
+            src="/assets/id_card/school_crest.png"
             alt="School Crest"
             className="absolute top-2.5 right-2 w-[76px] h-[39px] object-contain drop-shadow"
           />
@@ -388,7 +383,7 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
             }}
           />
           <img
-            src={CAMPUS_FOOTER_PNG}
+            src="/assets/id_card/campus_footer.png"
             alt="Campus Signature"
             className="w-full h-[110px] object-cover"
           />
