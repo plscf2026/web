@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   DollarSign,
   Wallet,
@@ -20,6 +20,8 @@ import {
   calculateStaffFinancialSummary,
 } from '../../utils/eventRules';
 import { sanitizeUrl, formatCsvRow } from '../../utils/security';
+import { GlobalPagination } from '../common/GlobalPagination';
+import { paginate } from '../../utils/pagination';
 
 interface BudgetManagementTabProps {
   language?: Language;
@@ -67,6 +69,21 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
   const [feedbackNotice, setFeedbackNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [expenseSearch, setExpenseSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+
+  // Global Pagination States (Default 10, options 10, 20, 30, 40)
+  const [staffPage, setStaffPage] = useState(1);
+  const [staffPageSize, setStaffPageSize] = useState(10);
+
+  const [expensePage, setExpensePage] = useState(1);
+  const [expensePageSize, setExpensePageSize] = useState(10);
+
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const [ledgerPageSize, setLedgerPageSize] = useState(10);
+
+  // Reset expense page to 1 whenever search or filter changes
+  useEffect(() => {
+    setExpensePage(1);
+  }, [expenseSearch, statusFilter]);
 
   const refreshAll = () => {
     setCentralBudget(EventStore.getCentralBudget());
@@ -440,7 +457,7 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {staffList.map((stf) => {
+              {paginate(staffList, staffPage, staffPageSize).map((stf) => {
                 const sSummary = calculateStaffFinancialSummary(
                   stf.id,
                   stf.fullName,
@@ -492,6 +509,15 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* Staff Allocations Global Pagination */}
+        <GlobalPagination
+          currentPage={staffPage}
+          totalRecords={staffList.length}
+          pageSize={staffPageSize}
+          onPageChange={setStaffPage}
+          onPageSizeChange={setStaffPageSize}
+        />
       </div>
 
       {/* SECTION C: STAFF EXPENSES APPROVAL & REVIEW WORKFLOW (Requirement 8I) */}
@@ -546,7 +572,7 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredExpenses.map((exp) => (
+                {paginate(filteredExpenses, expensePage, expensePageSize).map((exp) => (
                   <tr key={exp.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 whitespace-nowrap">
                       {exp.expenseDate}
@@ -629,6 +655,15 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
             </table>
           </div>
         )}
+
+        {/* Expenses Global Pagination */}
+        <GlobalPagination
+          currentPage={expensePage}
+          totalRecords={filteredExpenses.length}
+          pageSize={expensePageSize}
+          onPageChange={setExpensePage}
+          onPageSizeChange={setExpensePageSize}
+        />
       </div>
 
       {/* SECTION D: AUTHORITATIVE FINANCIAL LEDGER (Double-Entry Record) */}
@@ -657,7 +692,7 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
-              {ledger.slice(0, 15).map((l) => (
+              {paginate(ledger, ledgerPage, ledgerPageSize).map((l) => (
                 <tr key={l.id} className="hover:bg-slate-50 transition-colors">
                   <td className="py-2 px-3 text-slate-500">{l.id}</td>
                   <td className="py-2 px-3 font-bold text-slate-900">{l.staffId}</td>
@@ -687,6 +722,15 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* Financial Ledger Global Pagination */}
+        <GlobalPagination
+          currentPage={ledgerPage}
+          totalRecords={ledger.length}
+          pageSize={ledgerPageSize}
+          onPageChange={setLedgerPage}
+          onPageSizeChange={setLedgerPageSize}
+        />
       </div>
 
       {/* MODAL 1: MODIFY CENTRAL BUDGET */}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Users,
   CreditCard,
@@ -14,6 +14,8 @@ import {
   getDhakaDateString,
 } from '../../utils/eventRules';
 import { formatCsvRow } from '../../utils/security';
+import { GlobalPagination } from '../common/GlobalPagination';
+import { paginate } from '../../utils/pagination';
 
 interface DailyAnalyticsTabProps {
   language?: Language;
@@ -31,6 +33,15 @@ export const DailyAnalyticsTab: React.FC<DailyAnalyticsTabProps> = ({
   const [endDate, setEndDate] = useState<string>('');
   const [graduationYearFilter, setGraduationYearFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
+
+  // Global Pagination State (Default 10, supports 10, 20, 30, 40)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 on filter/search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [targetDate, startDate, endDate, graduationYearFilter, searchTerm]);
 
   // Calculations for current selected date in Asia/Dhaka Timezone
   const regAnalytics = aggregateRegistrationAnalytics(registrations, targetDate);
@@ -482,7 +493,7 @@ export const DailyAnalyticsTab: React.FC<DailyAnalyticsTabProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredRegistrations.slice(0, 20).map((r) => (
+              {paginate(filteredRegistrations, currentPage, pageSize).map((r) => (
                 <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                   <td className="py-2 px-3 font-mono font-bold text-slate-900">{r.id}</td>
                   <td className="py-2 px-3 font-semibold text-slate-800">{r.fullName}</td>
@@ -512,6 +523,15 @@ export const DailyAnalyticsTab: React.FC<DailyAnalyticsTabProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* Global Pagination */}
+        <GlobalPagination
+          currentPage={currentPage}
+          totalRecords={filteredRegistrations.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
     </div>
   );

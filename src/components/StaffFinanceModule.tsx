@@ -11,6 +11,8 @@ import { EventStore } from '../services/eventStore';
 import { calculateStaffFinancialSummary } from '../utils/eventRules';
 import { readValidatedImage } from '../utils/fileValidation';
 import { sanitizeUrl } from '../utils/security';
+import { GlobalPagination } from './common/GlobalPagination';
+import { paginate } from '../utils/pagination';
 
 interface StaffFinanceModuleProps {
   language: Language;
@@ -24,6 +26,10 @@ export const StaffFinanceModule: React.FC<StaffFinanceModuleProps> = ({
   const [allocations, setAllocations] = useState(() => EventStore.getStaffAllocations());
   const [expenses, setExpenses] = useState(() => EventStore.getStaffExpenses());
   const [ledger, setLedger] = useState(() => EventStore.getFinancialLedger());
+
+  // Global Pagination State (Default 10, options 10, 20, 30, 40)
+  const [expensePage, setExpensePage] = useState(1);
+  const [expensePageSize, setExpensePageSize] = useState(10);
 
   // Add Expense Form State
   const [showAddForm, setShowAddForm] = useState(false);
@@ -399,7 +405,7 @@ export const StaffFinanceModule: React.FC<StaffFinanceModuleProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {staffExpensesList.map((exp) => (
+                {paginate(staffExpensesList, expensePage, expensePageSize).map((exp) => (
                   <tr key={exp.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 whitespace-nowrap">
                       {exp.expenseDate} {exp.expenseTime}
@@ -445,6 +451,15 @@ export const StaffFinanceModule: React.FC<StaffFinanceModuleProps> = ({
             </table>
           </div>
         )}
+
+        {/* Global Pagination */}
+        <GlobalPagination
+          currentPage={expensePage}
+          totalRecords={staffExpensesList.length}
+          pageSize={expensePageSize}
+          onPageChange={setExpensePage}
+          onPageSizeChange={setExpensePageSize}
+        />
       </div>
     </div>
   );

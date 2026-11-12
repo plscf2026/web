@@ -52,6 +52,8 @@ import {
   generateAllBatchesBulkZip,
 } from '../../../utils/idCardGenerator';
 import { IdCardPreviewModal } from './IdCardPreviewModal';
+import { GlobalPagination } from '../../common/GlobalPagination';
+import { paginate } from '../../../utils/pagination';
 
 interface IdCardManagementPortalProps {
   currentUserEmail?: string;
@@ -91,6 +93,24 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBatchFilter, setSelectedBatchFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+
+  // Global Pagination States (Default 10, options 10, 20, 30, 40)
+  const [studentPage, setStudentPage] = useState(1);
+  const [studentPageSize, setStudentPageSize] = useState(10);
+
+  const [batchPage, setBatchPage] = useState(1);
+  const [batchPageSize, setBatchPageSize] = useState(10);
+
+  const [staffPage, setStaffPage] = useState(1);
+  const [staffPageSize, setStaffPageSize] = useState(10);
+
+  const [downloadLogPage, setDownloadLogPage] = useState(1);
+  const [downloadLogPageSize, setDownloadLogPageSize] = useState(10);
+
+  // Reset student page to 1 on search or filter change
+  useEffect(() => {
+    setStudentPage(1);
+  }, [searchQuery, selectedBatchFilter, statusFilter]);
 
   // Modals & Preview States
   const [previewStudent, setPreviewStudent] = useState<StudentIdCardRecord | null>(null);
@@ -762,7 +782,7 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-medium">
-                  {batches.map((batch) => {
+                  {paginate(batches, batchPage, batchPageSize).map((batch) => {
                     const isAllGenerated =
                       batch.totalGeneratedCards === batch.totalEligibleStudents &&
                       batch.totalEligibleStudents > 0;
@@ -827,6 +847,16 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
                 </tbody>
               </table>
             </div>
+
+            {/* Batches Global Pagination */}
+            <GlobalPagination
+              variant="dark"
+              currentPage={batchPage}
+              totalRecords={batches.length}
+              pageSize={batchPageSize}
+              onPageChange={setBatchPage}
+              onPageSizeChange={setBatchPageSize}
+            />
           </div>
         </div>
       )}
@@ -923,7 +953,7 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  filteredStudents.map((student) => (
+                  paginate(filteredStudents, studentPage, studentPageSize).map((student) => (
                     <tr key={student.id} className="hover:bg-slate-800/40 transition">
                       <td className="py-3 px-3">
                         <input
@@ -1005,6 +1035,16 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Students Global Pagination */}
+          <GlobalPagination
+            variant="dark"
+            currentPage={studentPage}
+            totalRecords={filteredStudents.length}
+            pageSize={studentPageSize}
+            onPageChange={setStudentPage}
+            onPageSizeChange={setStudentPageSize}
+          />
         </div>
       )}
 
@@ -1286,7 +1326,7 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-medium">
-                  {staffList.map((staff) => (
+                  {paginate(staffList, staffPage, staffPageSize).map((staff) => (
                     <tr key={staff.id} className="hover:bg-slate-800/40 transition">
                       <td className="py-3.5 px-4 font-bold text-white">{staff.fullName}</td>
                       <td className="py-3.5 px-4 text-slate-300">
@@ -1363,6 +1403,16 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
                 </tbody>
               </table>
             </div>
+
+            {/* Staff Global Pagination */}
+            <GlobalPagination
+              variant="dark"
+              currentPage={staffPage}
+              totalRecords={staffList.length}
+              pageSize={staffPageSize}
+              onPageChange={setStaffPage}
+              onPageSizeChange={setStaffPageSize}
+            />
           </div>
         </div>
       )}
@@ -1398,7 +1448,7 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
                       </td>
                     </tr>
                   ) : (
-                    downloadLogs.map((log) => (
+                    paginate(downloadLogs, downloadLogPage, downloadLogPageSize).map((log) => (
                       <tr key={log.id} className="hover:bg-slate-800/40 transition">
                         <td className="py-3 px-4 font-mono text-slate-400">
                           {new Date(log.timestamp).toLocaleString()}
@@ -1420,6 +1470,16 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
                 </tbody>
               </table>
             </div>
+
+            {/* Download Logs Global Pagination */}
+            <GlobalPagination
+              variant="dark"
+              currentPage={downloadLogPage}
+              totalRecords={downloadLogs.length}
+              pageSize={downloadLogPageSize}
+              onPageChange={setDownloadLogPage}
+              onPageSizeChange={setDownloadLogPageSize}
+            />
           </div>
         </div>
       )}

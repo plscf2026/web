@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   CheckSquare,
   Plus,
@@ -20,6 +20,8 @@ import {
 import { RmsStore } from '../../services/rmsStore';
 import { RmsTask, TaskStatus, TaskPriority, CommitteeId } from '../../types/rms';
 import { Language } from '../../types';
+import { GlobalPagination } from '../common/GlobalPagination';
+import { paginate } from '../../utils/pagination';
 
 interface RmsTaskBoardModuleProps {
   language?: Language;
@@ -38,6 +40,15 @@ export const RmsTaskBoardModule: React.FC<RmsTaskBoardModuleProps> = ({
   const [committeeFilter, setCommitteeFilter] = useState<string>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Global Pagination State for Table View (Default 10, options 10, 20, 30, 40)
+  const [tablePage, setTablePage] = useState(1);
+  const [tablePageSize, setTablePageSize] = useState(10);
+
+  // Reset to page 1 on filter/search change
+  useEffect(() => {
+    setTablePage(1);
+  }, [committeeFilter, priorityFilter, searchQuery]);
 
   // Selected task for detail modal
   const [selectedTask, setSelectedTask] = useState<RmsTask | null>(null);
@@ -348,7 +359,7 @@ export const RmsTaskBoardModule: React.FC<RmsTaskBoardModuleProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredTasks.map((t) => (
+                {paginate(filteredTasks, tablePage, tablePageSize).map((t) => (
                   <tr
                     key={t.id}
                     onClick={() => setSelectedTask(t)}
@@ -384,6 +395,16 @@ export const RmsTaskBoardModule: React.FC<RmsTaskBoardModuleProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Tasks Table Global Pagination */}
+          <GlobalPagination
+            currentPage={tablePage}
+            totalRecords={filteredTasks.length}
+            pageSize={tablePageSize}
+            onPageChange={setTablePage}
+            onPageSizeChange={setTablePageSize}
+            language={language}
+          />
         </div>
       )}
 

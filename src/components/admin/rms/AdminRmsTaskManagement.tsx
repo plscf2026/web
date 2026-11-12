@@ -21,6 +21,8 @@ import {
 import { RmsTask, TaskStatus, TaskPriority } from '../../../types/rms';
 import { Language } from '../../../types';
 import { RmsStore } from '../../../services/rmsStore';
+import { GlobalPagination } from '../../common/GlobalPagination';
+import { paginate } from '../../../utils/pagination';
 
 interface Props {
   language: Language;
@@ -33,6 +35,15 @@ export const AdminRmsTaskManagement: React.FC<Props> = ({ language }) => {
   const [committeeFilter, setCommitteeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+
+  // Global Pagination State for List View (Default 10, options 10, 20, 30, 40)
+  const [listPage, setListPage] = useState(1);
+  const [listPageSize, setListPageSize] = useState(10);
+
+  // Reset to page 1 on filter/search change
+  React.useEffect(() => {
+    setListPage(1);
+  }, [searchQuery, committeeFilter, statusFilter, priorityFilter]);
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -463,7 +474,7 @@ export const AdminRmsTaskManagement: React.FC<Props> = ({ language }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredTasks.map((task) => {
+                {paginate(filteredTasks, listPage, listPageSize).map((task) => {
                   const overdue = isOverdue(task);
                   return (
                     <tr key={task.id} className="hover:bg-slate-50/80 transition">
@@ -525,6 +536,16 @@ export const AdminRmsTaskManagement: React.FC<Props> = ({ language }) => {
               </tbody>
             </table>
           </div>
+
+          {/* List View Global Pagination */}
+          <GlobalPagination
+            currentPage={listPage}
+            totalRecords={filteredTasks.length}
+            pageSize={listPageSize}
+            onPageChange={setListPage}
+            onPageSizeChange={setListPageSize}
+            language={language}
+          />
         </div>
       )}
 

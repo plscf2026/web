@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { StaffAccount, EventStaffRole, DepartmentType, StaffPermissionAction } from '../../types';
 import { EventStore, getDefaultDepartment, getDefaultPermissions } from '../../services/eventStore';
+import { GlobalPagination } from '../common/GlobalPagination';
+import { paginate } from '../../utils/pagination';
 
 interface StaffManagementTabProps {
   currentAdminEmail?: string;
@@ -24,6 +26,15 @@ export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentA
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+
+  // Global Pagination State (Default 10, supports 10, 20, 30, 40)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 on filter/search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, roleFilter, statusFilter]);
 
   // Modal States
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -321,7 +332,7 @@ export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentA
                   </td>
                 </tr>
               ) : (
-                filteredStaff.map((staff) => (
+                paginate(filteredStaff, currentPage, pageSize).map((staff) => (
                   <tr key={staff.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3 px-4">
                       <div className="font-semibold text-slate-900">{staff.fullName}</div>
@@ -387,6 +398,15 @@ export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentA
             </tbody>
           </table>
         </div>
+
+        {/* Staff Global Pagination */}
+        <GlobalPagination
+          currentPage={currentPage}
+          totalRecords={filteredStaff.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       {/* Modal: Create Staff Account */}

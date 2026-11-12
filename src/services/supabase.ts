@@ -257,7 +257,7 @@ export const SupabaseService = {
   }> {
     const year = options.year ?? 2027;
     const page = Math.max(1, options.page ?? 1);
-    const pageSize = Math.min(100, Math.max(10, options.pageSize ?? 25));
+    const pageSize = Math.min(100, Math.max(10, options.pageSize ?? 10));
     const offset = (page - 1) * pageSize;
     const yearTableName = getRegistrationsTableName(year);
 

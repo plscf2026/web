@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { RegistrationRecord, Language } from '../../../types';
 import { formatCsvRow } from '../../../utils/security';
+import { GlobalPagination } from '../../common/GlobalPagination';
+import { paginate } from '../../../utils/pagination';
 
 interface BatchInfo {
   batchId: string;
@@ -32,11 +34,21 @@ interface Props {
 }
 
 export const AdminRmsBatchManagement: React.FC<Props> = ({
+  language = 'en',
   registrations,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'former' | 'current'>('all');
   const [selectedBatchDetails, setSelectedBatchDetails] = useState<string | null>(null);
+
+  // Global Pagination State (Default 10, options 10, 20, 30, 40)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 on search or filter change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory]);
 
   // Batch representative assignments saved in local state or localStorage
   const [batchMetadata, setBatchMetadata] = useState<Record<string, BatchInfo>>(() => {
@@ -263,7 +275,7 @@ export const AdminRmsBatchManagement: React.FC<Props> = ({
                   </td>
                 </tr>
               ) : (
-                filteredBatches.map((b) => {
+                paginate(filteredBatches, currentPage, pageSize).map((b) => {
                   const rep = batchMetadata[b.batchName];
 
                   return (
@@ -355,6 +367,16 @@ export const AdminRmsBatchManagement: React.FC<Props> = ({
             </tbody>
           </table>
         </div>
+
+        {/* Global Pagination */}
+        <GlobalPagination
+          currentPage={currentPage}
+          totalRecords={filteredBatches.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          language={language}
+        />
       </div>
 
       {/* Inspect Batch Attendees Drawer Modal */}

@@ -14,11 +14,22 @@ import {
 import { AdminAuditHistoryItem } from '../../types';
 import { EventStore } from '../../services/eventStore';
 import { formatCsvRow } from '../../utils/security';
+import { GlobalPagination } from '../common/GlobalPagination';
+import { paginate } from '../../utils/pagination';
 
 export const AuditHistoryTab: React.FC = () => {
   const [history, setHistory] = useState<AdminAuditHistoryItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [entityFilter, setEntityFilter] = useState<string>('ALL');
+
+  // Global Pagination State (Default 10, options 10, 20, 30, 40)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 on search or filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, entityFilter]);
 
   const loadHistory = () => {
     const records = EventStore.getAuditHistory();
@@ -192,7 +203,7 @@ export const AuditHistoryTab: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredHistory.map((item) => {
+                paginate(filteredHistory, currentPage, pageSize).map((item) => {
                   const dhakaTime = new Date(item.timestamp).toLocaleString('en-US', {
                     timeZone: 'Asia/Dhaka',
                     dateStyle: 'medium',
@@ -263,6 +274,15 @@ export const AuditHistoryTab: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Global Pagination */}
+        <GlobalPagination
+          currentPage={currentPage}
+          totalRecords={filteredHistory.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
     </div>
   );

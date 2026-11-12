@@ -26,6 +26,8 @@ import { validateDressDistribution } from '../utils/eventRules';
 import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
 import { decodeQRCodeFromImageFile } from '../utils/qrDecoder';
 import { QrCameraScanner } from './common/QrCameraScanner';
+import { GlobalPagination } from './common/GlobalPagination';
+import { paginate } from '../utils/pagination';
 
 interface DressScannerModuleProps {
   language: Language;
@@ -45,6 +47,10 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
     EventStore.getDressDistributions()
   );
   const [cameraActive, setCameraActive] = useState(false);
+
+  // Global Pagination State (Default 10, options 10, 20, 30, 40)
+  const [logPage, setLogPage] = useState(1);
+  const [logPageSize, setLogPageSize] = useState(10);
   const [feedbackNotice, setFeedbackNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isResultPopupOpen, setIsResultPopupOpen] = useState(false);
 
@@ -529,7 +535,7 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {distributions.slice(0, 15).map((record) => (
+                {paginate(distributions, logPage, logPageSize).map((record) => (
                   <tr key={record.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-2.5 px-3 font-mono font-bold text-slate-900">
                       {record.registrationId}
@@ -577,6 +583,16 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
             </table>
           </div>
         )}
+
+        {/* Global Pagination */}
+        <GlobalPagination
+          currentPage={logPage}
+          totalRecords={distributions.length}
+          pageSize={logPageSize}
+          onPageChange={setLogPage}
+          onPageSizeChange={setLogPageSize}
+          language={language}
+        />
       </div>
 
       {/* Super Admin Size Correction Modal with Mandatory Reason */}

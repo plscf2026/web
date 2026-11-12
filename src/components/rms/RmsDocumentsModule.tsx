@@ -14,6 +14,8 @@ import {
 import { RmsDocument, RmsUser } from '../../types/rms';
 import { RmsStore } from '../../services/rmsStore';
 import { sanitizeUrl } from '../../utils/security';
+import { GlobalPagination } from '../common/GlobalPagination';
+import { paginate } from '../../utils/pagination';
 
 interface Props {
   currentUser: RmsUser;
@@ -29,6 +31,15 @@ export const RmsDocumentsModule: React.FC<Props> = ({ currentUser, canUpload }) 
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedAccess, setSelectedAccess] = useState<string>('ALL');
   const [previewDoc, setPreviewDoc] = useState<RmsDocument | null>(null);
+
+  // Global Pagination State (Default 10, options 10, 20, 30, 40)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 on search or filter change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCommitteeId, selectedCategory, selectedAccess]);
 
   // Upload modal state
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -193,7 +204,7 @@ export const RmsDocumentsModule: React.FC<Props> = ({ currentUser, canUpload }) 
                   </td>
                 </tr>
               ) : (
-                filteredDocs.map((doc) => (
+                paginate(filteredDocs, currentPage, pageSize).map((doc) => (
                   <tr key={doc.id} className="hover:bg-slate-50/80 transition">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -272,6 +283,15 @@ export const RmsDocumentsModule: React.FC<Props> = ({ currentUser, canUpload }) 
             </tbody>
           </table>
         </div>
+
+        {/* Global Pagination */}
+        <GlobalPagination
+          currentPage={currentPage}
+          totalRecords={filteredDocs.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       {/* Document Detail Preview Modal */}

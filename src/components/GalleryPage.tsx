@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Image as ImageIcon,
   Video as VideoIcon,
@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { Language } from '../types';
 import { translations } from '../i18n/translations';
+import { GlobalPagination } from './common/GlobalPagination';
+import { paginate, DEFAULT_PAGE_SIZE } from '../utils/pagination';
 
 interface GalleryPageProps {
   language: Language;
@@ -123,6 +125,12 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language }) => {
   const [activeTab, setActiveTab] = useState<'photos' | 'videos'>('photos');
   const [activeAlbum, setActiveAlbum] = useState<string>('all');
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, activeAlbum]);
 
   const filteredItems = MEDIA_ITEMS.filter((item) => {
     const matchType = activeTab === 'photos' ? item.type === 'photo' : item.type === 'video';
@@ -208,7 +216,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language }) => {
 
       {/* Media Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {filteredItems.map((item) => (
+        {paginate(filteredItems, page, pageSize).map((item) => (
           <div
             key={item.id}
             onClick={() => setSelectedItem(item)}
@@ -245,6 +253,15 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language }) => {
           </div>
         ))}
       </div>
+
+      <GlobalPagination
+        currentPage={page}
+        pageSize={pageSize}
+        totalRecords={filteredItems.length}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        language={language}
+      />
 
       {/* Lightbox / Video Modal */}
       {selectedItem && (

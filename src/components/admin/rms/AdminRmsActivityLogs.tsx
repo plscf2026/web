@@ -12,6 +12,8 @@ import { RmsAuditLog } from '../../../types/rms';
 import { Language } from '../../../types';
 import { RmsStore } from '../../../services/rmsStore';
 import { formatCsvRow } from '../../../utils/security';
+import { GlobalPagination } from '../../common/GlobalPagination';
+import { paginate } from '../../../utils/pagination';
 
 interface Props {
   language: Language;
@@ -21,6 +23,15 @@ export const AdminRmsActivityLogs: React.FC<Props> = ({ language }) => {
   const [logs, setLogs] = useState<RmsAuditLog[]>(() => RmsStore.getAuditLogs());
   const [searchQuery, setSearchQuery] = useState('');
   const [entityFilter, setEntityFilter] = useState<string>('all');
+
+  // Global Pagination State (Default 10, options 10, 20, 30, 40)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 on search or filter change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, entityFilter]);
 
   const reloadLogs = () => {
     setLogs(RmsStore.getAuditLogs());
@@ -164,7 +175,7 @@ export const AdminRmsActivityLogs: React.FC<Props> = ({ language }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredLogs.map((log) => (
+              {paginate(filteredLogs, currentPage, pageSize).map((log) => (
                 <tr key={log.id} className="hover:bg-slate-50/80 transition">
                   <td className="px-4 py-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
@@ -215,6 +226,16 @@ export const AdminRmsActivityLogs: React.FC<Props> = ({ language }) => {
             </tbody>
           </table>
         </div>
+
+        {/* Global Pagination */}
+        <GlobalPagination
+          currentPage={currentPage}
+          totalRecords={filteredLogs.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          language={language}
+        />
       </div>
     </div>
   );

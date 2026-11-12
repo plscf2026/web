@@ -63,6 +63,8 @@ import { AuditHistoryTab } from './admin/AuditHistoryTab';
 import { StudentIdManagementTab } from './admin/StudentIdManagementTab';
 import { StudentIdService } from '../services/studentIdStore';
 import { EventStore } from '../services/eventStore';
+import { GlobalPagination } from './common/GlobalPagination';
+import { paginate } from '../utils/pagination';
 // Heavy administrative portals loaded lazily to preserve bundle performance
 const AdminRmsContainer = lazy(() =>
   import('./admin/rms/AdminRmsContainer').then((m) => ({ default: m.AdminRmsContainer }))
@@ -214,6 +216,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'former' | 'current'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'pending' | 'refunded'>('all');
+
+  // Global Pagination States (Default 10 per page, dynamic 10/20/30/40 selector)
+  const [regPage, setRegPage] = useState(1);
+  const [regPageSize, setRegPageSize] = useState(10);
+
+  const [payPage, setPayPage] = useState(1);
+  const [payPageSize, setPayPageSize] = useState(10);
+
+  const [donationsPage, setDonationsPage] = useState(1);
+  const [donationsPageSize, setDonationsPageSize] = useState(10);
+
+  const [tshirtPage, setTshirtPage] = useState(1);
+  const [tshirtPageSize, setTshirtPageSize] = useState(10);
+
+  const [ticketsPage, setTicketsPage] = useState(1);
+  const [ticketsPageSize, setTicketsPageSize] = useState(10);
+
+  const [staffPage, setStaffPage] = useState(1);
+  const [staffPageSize, setStaffPageSize] = useState(10);
+
+  const [expensesPage, setExpensesPage] = useState(1);
+  const [expensesPageSize, setExpensesPageSize] = useState(10);
+
+  const [noticesPage, setNoticesPage] = useState(1);
+  const [noticesPageSize, setNoticesPageSize] = useState(10);
+
+  // Automatically reset registrations to page 1 whenever search, filters, or year change
+  useEffect(() => {
+    setRegPage(1);
+  }, [searchTerm, categoryFilter, statusFilter, selectedYear]);
 
   // Modals
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
@@ -1193,7 +1225,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  filteredRegistrations.map((reg) => (
+                  paginate(filteredRegistrations, regPage, regPageSize).map((reg) => (
                     <tr key={reg.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-3">
@@ -1307,6 +1339,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Registrations Global Pagination */}
+          <GlobalPagination
+            currentPage={regPage}
+            totalRecords={filteredRegistrations.length}
+            pageSize={regPageSize}
+            onPageChange={setRegPage}
+            onPageSizeChange={setRegPageSize}
+            language={language}
+          />
         </div>
       )}
 
@@ -1762,7 +1804,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {registrations.map((r) => (
+                {paginate(registrations, payPage, payPageSize).map((r) => (
                   <tr key={r.id} className="hover:bg-slate-50">
                     <td className="py-2.5 px-3 font-mono font-bold text-slate-800">
                       {r.transactionId}
@@ -1785,6 +1827,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Payments Global Pagination */}
+          <GlobalPagination
+            currentPage={payPage}
+            totalRecords={registrations.length}
+            pageSize={payPageSize}
+            onPageChange={setPayPage}
+            onPageSizeChange={setPayPageSize}
+            language={language}
+          />
         </div>
       )}
 
@@ -1820,7 +1872,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {donations.map((d) => (
+                {paginate(donations, donationsPage, donationsPageSize).map((d) => (
                   <tr key={d.id} className="hover:bg-slate-50">
                     <td className="py-2.5 px-3">
                       <span className="font-bold text-slate-900 block">{d.donorName}</span>
@@ -1836,6 +1888,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Donations Global Pagination */}
+          <GlobalPagination
+            currentPage={donationsPage}
+            totalRecords={donations.length}
+            pageSize={donationsPageSize}
+            onPageChange={setDonationsPage}
+            onPageSizeChange={setDonationsPageSize}
+            language={language}
+          />
         </div>
       )}
 
@@ -1870,7 +1932,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {registrations.map((reg) => (
+                {paginate(registrations, tshirtPage, tshirtPageSize).map((reg) => (
                   <tr key={reg.id} className="hover:bg-slate-50">
                     <td className="py-2.5 px-3 font-medium text-slate-900">{reg.fullName}</td>
                     <td className="py-2.5 px-3 font-mono text-slate-500">{reg.id}</td>
@@ -1892,6 +1954,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* T-Shirt Global Pagination */}
+          <GlobalPagination
+            currentPage={tshirtPage}
+            totalRecords={registrations.length}
+            pageSize={tshirtPageSize}
+            onPageChange={setTshirtPage}
+            onPageSizeChange={setTshirtPageSize}
+            language={language}
+          />
         </div>
       )}
 
@@ -1906,7 +1978,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {registrations.map((reg) => (
+            {paginate(registrations, ticketsPage, ticketsPageSize).map((reg) => (
               <div key={reg.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs font-bold text-slate-800">{reg.id}</span>
@@ -1935,6 +2007,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             ))}
           </div>
+
+          {/* Tickets Global Pagination */}
+          <GlobalPagination
+            currentPage={ticketsPage}
+            totalRecords={registrations.length}
+            pageSize={ticketsPageSize}
+            onPageChange={setTicketsPage}
+            onPageSizeChange={setTicketsPageSize}
+            language={language}
+          />
         </div>
       )}
 
@@ -1959,7 +2041,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {INITIAL_STAFF_USERS.map((st) => (
+                {paginate(INITIAL_STAFF_USERS, staffPage, staffPageSize).map((st) => (
                   <tr key={st.id} className="hover:bg-slate-50">
                     <td className="py-2.5 px-3 font-mono font-bold text-slate-800">{st.username}</td>
                     <td className="py-2.5 px-3 font-medium text-slate-900">{st.fullName}</td>
@@ -1970,6 +2052,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Staff Global Pagination */}
+          <GlobalPagination
+            currentPage={staffPage}
+            totalRecords={INITIAL_STAFF_USERS.length}
+            pageSize={staffPageSize}
+            onPageChange={setStaffPage}
+            onPageSizeChange={setStaffPageSize}
+            language={language}
+          />
         </div>
       )}
 
@@ -2005,7 +2097,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {expenses.map((exp) => (
+                {paginate(expenses, expensesPage, expensesPageSize).map((exp) => (
                   <tr key={exp.id} className="hover:bg-slate-50">
                     <td className="py-2.5 px-3 font-mono font-bold text-slate-800">{exp.receiptRef}</td>
                     <td className="py-2.5 px-3 font-semibold text-slate-700">{exp.category}</td>
@@ -2018,6 +2110,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Finances Global Pagination */}
+          <GlobalPagination
+            currentPage={expensesPage}
+            totalRecords={expenses.length}
+            pageSize={expensesPageSize}
+            onPageChange={setExpensesPage}
+            onPageSizeChange={setExpensesPageSize}
+            language={language}
+          />
         </div>
       )}
 
@@ -2049,7 +2151,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <div className="space-y-3">
-            {notices.map((n) => (
+            {paginate(notices, noticesPage, noticesPageSize).map((n) => (
               <div key={n.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
@@ -2084,6 +2186,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             ))}
           </div>
+
+          {/* Notices Global Pagination */}
+          <GlobalPagination
+            currentPage={noticesPage}
+            totalRecords={notices.length}
+            pageSize={noticesPageSize}
+            onPageChange={setNoticesPage}
+            onPageSizeChange={setNoticesPageSize}
+            language={language}
+          />
         </div>
       )}
 

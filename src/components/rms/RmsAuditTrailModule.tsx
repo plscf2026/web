@@ -9,12 +9,23 @@ import {
 import { RmsAuditLog } from '../../types/rms';
 import { RmsStore } from '../../services/rmsStore';
 import { formatCsvRow } from '../../utils/security';
+import { GlobalPagination } from '../common/GlobalPagination';
+import { paginate } from '../../utils/pagination';
 
 export const RmsAuditTrailModule: React.FC = () => {
   const [logs] = useState<RmsAuditLog[]>(() => RmsStore.getAuditLogs());
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEntity, setSelectedEntity] = useState<string>('ALL');
   const [selectedAction, setSelectedAction] = useState<string>('ALL');
+
+  // Global Pagination State (Default 10, options 10, 20, 30, 40)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 on search or filter change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedEntity, selectedAction]);
 
   const filteredLogs = logs.filter((log) => {
     const matchesSearch =
@@ -147,7 +158,7 @@ export const RmsAuditTrailModule: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log) => (
+                paginate(filteredLogs, currentPage, pageSize).map((log) => (
                   <tr key={log.id} className="hover:bg-slate-50/80 transition">
                     <td className="px-6 py-4 text-slate-500 whitespace-nowrap">
                       <div className="flex items-center gap-1.5 text-slate-700">
@@ -199,6 +210,15 @@ export const RmsAuditTrailModule: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Global Pagination */}
+        <GlobalPagination
+          currentPage={currentPage}
+          totalRecords={filteredLogs.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
     </div>
   );

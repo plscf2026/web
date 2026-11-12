@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bell, Search, Download, Pin, Calendar, FileText } from 'lucide-react';
 import { Language } from '../types';
 import { translations } from '../i18n/translations';
 import { AppStore } from '../services/store';
+import { GlobalPagination } from './common/GlobalPagination';
+import { paginate, DEFAULT_PAGE_SIZE } from '../utils/pagination';
 
 interface NoticeBoardPageProps {
   language: Language;
@@ -14,6 +16,12 @@ export const NoticeBoardPage: React.FC<NoticeBoardPageProps> = ({ language }) =>
 
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeCategory, searchTerm]);
 
   const filteredNotices = notices.filter((n) => {
     const matchCat = activeCategory === 'all' || n.category === activeCategory;
@@ -100,7 +108,7 @@ export const NoticeBoardPage: React.FC<NoticeBoardPageProps> = ({ language }) =>
             No notices match your filter.
           </div>
         ) : (
-          filteredNotices.map((notice) => (
+          paginate(filteredNotices, page, pageSize).map((notice) => (
             <div
               key={notice.id}
               className={`bg-white rounded-2xl p-6 border shadow-xs transition-shadow hover:shadow-md space-y-4 ${
@@ -162,6 +170,15 @@ export const NoticeBoardPage: React.FC<NoticeBoardPageProps> = ({ language }) =>
           ))
         )}
       </div>
+
+      <GlobalPagination
+        currentPage={page}
+        pageSize={pageSize}
+        totalRecords={filteredNotices.length}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        language={language}
+      />
     </div>
   );
 };

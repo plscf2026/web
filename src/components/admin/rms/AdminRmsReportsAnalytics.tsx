@@ -15,6 +15,8 @@ import { RegistrationRecord, Language } from '../../../types';
 import { WeeklyProgressReport } from '../../../types/rms';
 import { RmsStore } from '../../../services/rmsStore';
 import { formatCsvRow } from '../../../utils/security';
+import { GlobalPagination } from '../../common/GlobalPagination';
+import { paginate, DEFAULT_PAGE_SIZE } from '../../../utils/pagination';
 
 interface Props {
   language: Language;
@@ -29,6 +31,14 @@ export const AdminRmsReportsAnalytics: React.FC<Props> = ({
   const [weeklyReports, setWeeklyReports] = useState<WeeklyProgressReport[]>(() => RmsStore.getWeeklyReports());
   const [selectedWeeklyReport, setSelectedWeeklyReport] = useState<WeeklyProgressReport | null>(null);
   const [reviewComments, setReviewComments] = useState('');
+
+  // Pagination states
+  const [batchPage, setBatchPage] = useState(1);
+  const [batchPageSize, setBatchPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [commPage, setCommPage] = useState(1);
+  const [commPageSize, setCommPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [weeklyPage, setWeeklyPage] = useState(1);
+  const [weeklyPageSize, setWeeklyPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const committees = RmsStore.getCommittees();
   const tasks = RmsStore.getTasks();
@@ -248,9 +258,9 @@ export const AdminRmsReportsAnalytics: React.FC<Props> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {batchStats.map((b, idx) => (
+                {paginate(batchStats, batchPage, batchPageSize).map((b, idx) => (
                   <tr key={b.batchName} className="hover:bg-slate-50/80 transition">
-                    <td className="px-4 py-3 font-mono font-bold text-slate-400">#{idx + 1}</td>
+                    <td className="px-4 py-3 font-mono font-bold text-slate-400">#{(batchPage - 1) * batchPageSize + idx + 1}</td>
                     <td className="px-4 py-3 font-bold text-slate-900">{b.batchName}</td>
                     <td className="px-4 py-3">
                       <span
@@ -272,6 +282,15 @@ export const AdminRmsReportsAnalytics: React.FC<Props> = ({
               </tbody>
             </table>
           </div>
+
+          <GlobalPagination
+            currentPage={batchPage}
+            pageSize={batchPageSize}
+            totalRecords={batchStats.length}
+            onPageChange={setBatchPage}
+            onPageSizeChange={setBatchPageSize}
+            language={language}
+          />
         </div>
       )}
 
@@ -297,7 +316,7 @@ export const AdminRmsReportsAnalytics: React.FC<Props> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {committeeStats.map((cs) => (
+                {paginate(committeeStats, commPage, commPageSize).map((cs) => (
                   <tr key={cs.committee.id} className="hover:bg-slate-50/80 transition">
                     <td className="px-4 py-3 font-bold text-slate-900">{cs.committee.nameEn}</td>
                     <td className="px-4 py-3 text-slate-600">{cs.committee.directorName}</td>
@@ -327,6 +346,15 @@ export const AdminRmsReportsAnalytics: React.FC<Props> = ({
               </tbody>
             </table>
           </div>
+
+          <GlobalPagination
+            currentPage={commPage}
+            pageSize={commPageSize}
+            totalRecords={committeeStats.length}
+            onPageChange={setCommPage}
+            onPageSizeChange={setCommPageSize}
+            language={language}
+          />
         </div>
       )}
 
@@ -334,7 +362,7 @@ export const AdminRmsReportsAnalytics: React.FC<Props> = ({
       {activeReportTab === 'weekly' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {weeklyReports.map((report) => (
+            {paginate(weeklyReports, weeklyPage, weeklyPageSize).map((report) => (
               <div key={report.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
                 <div className="flex items-start justify-between">
                   <div>
@@ -389,6 +417,15 @@ export const AdminRmsReportsAnalytics: React.FC<Props> = ({
               </div>
             ))}
           </div>
+
+          <GlobalPagination
+            currentPage={weeklyPage}
+            pageSize={weeklyPageSize}
+            totalRecords={weeklyReports.length}
+            onPageChange={setWeeklyPage}
+            onPageSizeChange={setWeeklyPageSize}
+            language={language}
+          />
         </div>
       )}
 

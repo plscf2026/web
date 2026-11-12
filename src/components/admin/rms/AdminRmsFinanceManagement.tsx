@@ -20,6 +20,8 @@ import { RmsExpense, BudgetRequest, RmsSponsor, BudgetStatus } from '../../../ty
 import { RmsStore } from '../../../services/rmsStore';
 import { AppStore } from '../../../services/store';
 import { formatCsvRow } from '../../../utils/security';
+import { GlobalPagination } from '../../common/GlobalPagination';
+import { paginate } from '../../../utils/pagination';
 
 interface Props {
   language: Language;
@@ -39,6 +41,15 @@ export const AdminRmsFinanceManagement: React.FC<Props> = ({ language, registrat
   // Filters
   const [expenseSearch, setExpenseSearch] = useState('');
   const [expenseCommFilter, setExpenseCommFilter] = useState('all');
+
+  // Global Pagination State (Default 10, options 10, 20, 30, 40)
+  const [expensePage, setExpensePage] = useState(1);
+  const [expensePageSize, setExpensePageSize] = useState(10);
+
+  // Reset to page 1 on search or filter change
+  React.useEffect(() => {
+    setExpensePage(1);
+  }, [expenseSearch, expenseCommFilter]);
 
   // Modals
   const [isRecordExpenseModalOpen, setIsRecordExpenseModalOpen] = useState(false);
@@ -458,7 +469,7 @@ export const AdminRmsFinanceManagement: React.FC<Props> = ({ language, registrat
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredExpenses.map((exp) => (
+                  {paginate(filteredExpenses, expensePage, expensePageSize).map((exp) => (
                     <tr key={exp.id} className="hover:bg-slate-50/80 transition">
                       <td className="px-4 py-3 font-mono font-bold text-slate-900">{exp.voucherNumber}</td>
                       <td className="px-4 py-3">
@@ -511,6 +522,16 @@ export const AdminRmsFinanceManagement: React.FC<Props> = ({ language, registrat
                 </tbody>
               </table>
             </div>
+
+            {/* Expenses Global Pagination */}
+            <GlobalPagination
+              currentPage={expensePage}
+              totalRecords={filteredExpenses.length}
+              pageSize={expensePageSize}
+              onPageChange={setExpensePage}
+              onPageSizeChange={setExpensePageSize}
+              language={language}
+            />
           </div>
         </div>
       )}

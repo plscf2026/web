@@ -12,6 +12,8 @@ import {
 import { RegistrationRecord, Language } from '../../../types';
 import { RmsStore } from '../../../services/rmsStore';
 import { formatCsvRow } from '../../../utils/security';
+import { GlobalPagination } from '../../common/GlobalPagination';
+import { paginate } from '../../../utils/pagination';
 
 interface Props {
   language: Language;
@@ -19,12 +21,22 @@ interface Props {
 }
 
 export const AdminRmsMemberManagement: React.FC<Props> = ({
+  language = 'en',
   registrations,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'former' | 'current'>('all');
   const [selectedCommitteeFilter, setSelectedCommitteeFilter] = useState<string>('all');
   const [selectedMember, setSelectedMember] = useState<RegistrationRecord | null>(null);
+
+  // Global Pagination State (Default 10, options 10, 20, 30, 40)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 on search or filter change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, selectedCommitteeFilter]);
 
   // Committee assignment modal
   const [assigningMember, setAssigningMember] = useState<RegistrationRecord | null>(null);
@@ -207,7 +219,7 @@ export const AdminRmsMemberManagement: React.FC<Props> = ({
                   </td>
                 </tr>
               ) : (
-                filteredMembers.map((member) => {
+                paginate(filteredMembers, currentPage, pageSize).map((member) => {
                   const assignments =
                     memberCommitteeMap[member.mobileNumber] ||
                     memberCommitteeMap[member.fullName] ||
@@ -309,6 +321,16 @@ export const AdminRmsMemberManagement: React.FC<Props> = ({
             </tbody>
           </table>
         </div>
+
+        {/* Global Pagination */}
+        <GlobalPagination
+          currentPage={currentPage}
+          totalRecords={filteredMembers.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          language={language}
+        />
       </div>
 
       {/* Inspect Member Details Modal */}

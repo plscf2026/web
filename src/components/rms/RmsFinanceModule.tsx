@@ -10,6 +10,8 @@ import { RmsStore } from '../../services/rmsStore';
 import { BudgetRequest, RmsExpense, CommitteeId } from '../../types/rms';
 import { Language } from '../../types';
 import { formatCsvRow } from '../../utils/security';
+import { GlobalPagination } from '../common/GlobalPagination';
+import { paginate } from '../../utils/pagination';
 
 interface RmsFinanceModuleProps {
   language?: Language;
@@ -27,6 +29,13 @@ export const RmsFinanceModule: React.FC<RmsFinanceModuleProps> = ({
   const [incomeList] = useState(() => RmsStore.getIncomeTransactions());
   const committees = RmsStore.getCommittees();
   const currentUser = RmsStore.getCurrentUser();
+
+  // Global Pagination States (Default 10, options 10, 20, 30, 40)
+  const [expensePage, setExpensePage] = useState(1);
+  const [expensePageSize, setExpensePageSize] = useState(10);
+
+  const [incomePage, setIncomePage] = useState(1);
+  const [incomePageSize, setIncomePageSize] = useState(10);
 
   // Modals
   const [showBudgetModal, setShowBudgetModal] = useState(false);
@@ -350,7 +359,7 @@ export const RmsFinanceModule: React.FC<RmsFinanceModuleProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {expenses.map((exp) => (
+                {paginate(expenses, expensePage, expensePageSize).map((exp) => (
                   <tr key={exp.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3 px-4 font-mono font-bold text-sky-700">{exp.voucherNumber}</td>
                     <td className="py-3 px-4 font-bold text-slate-900">{exp.expenseTitle}</td>
@@ -386,6 +395,16 @@ export const RmsFinanceModule: React.FC<RmsFinanceModuleProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Expenses Global Pagination */}
+          <GlobalPagination
+            currentPage={expensePage}
+            totalRecords={expenses.length}
+            pageSize={expensePageSize}
+            onPageChange={setExpensePage}
+            onPageSizeChange={setExpensePageSize}
+            language={language}
+          />
         </div>
       )}
 
@@ -406,7 +425,7 @@ export const RmsFinanceModule: React.FC<RmsFinanceModuleProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {incomeList.map((inc) => (
+                {paginate(incomeList, incomePage, incomePageSize).map((inc) => (
                   <tr key={inc.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3 px-4 font-mono font-bold text-slate-700">{inc.referenceId}</td>
                     <td className="py-3 px-4 font-bold text-slate-900">{inc.sourceTitle}</td>
@@ -424,6 +443,16 @@ export const RmsFinanceModule: React.FC<RmsFinanceModuleProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Income Global Pagination */}
+          <GlobalPagination
+            currentPage={incomePage}
+            totalRecords={incomeList.length}
+            pageSize={incomePageSize}
+            onPageChange={setIncomePage}
+            onPageSizeChange={setIncomePageSize}
+            language={language}
+          />
         </div>
       )}
 

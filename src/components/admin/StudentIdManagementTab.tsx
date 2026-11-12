@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   ShieldCheck,
   Search,
@@ -18,6 +18,8 @@ import {
 import { Language, CurrentStudentIdRecord, StudentIdStatus } from '../../types';
 import { StudentIdService } from '../../services/studentIdStore';
 import { formatCsvRow } from '../../utils/security';
+import { GlobalPagination } from '../common/GlobalPagination';
+import { paginate } from '../../utils/pagination';
 
 interface StudentIdManagementTabProps {
   language: Language;
@@ -34,6 +36,15 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
   const [selectedClass, setSelectedClass] = useState('ALL');
   const [selectedYear, setSelectedYear] = useState('ALL');
   const [selectedUsage, setSelectedUsage] = useState('ALL');
+
+  // Global Pagination State (Default 10, options 10, 20, 30, 40)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedClass, selectedYear, selectedUsage]);
 
   // Modal States
   const [showAddModal, setShowAddModal] = useState(false);
@@ -479,7 +490,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredList.map((item) => (
+                paginate(filteredList, currentPage, pageSize).map((item) => (
                   <tr key={item.studentId} className="hover:bg-slate-50/70 transition-colors">
                     {/* Student ID */}
                     <td className="py-3 px-4 font-mono font-bold text-slate-900">
@@ -605,16 +616,15 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
           </table>
         </div>
 
-        <div className="p-3 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500 flex items-center justify-between">
-          <span>
-            {language === 'bn'
-              ? `মোট ${filteredList.length}টি রেকর্ড প্রদর্শিত হচ্ছে`
-              : `Showing ${filteredList.length} of ${studentIds.length} student ID records`}
-          </span>
-          <span className="text-[#172554] font-medium">
-            POLICE LINES SCHOOL & COLLEGE, FARIDPUR
-          </span>
-        </div>
+        {/* Global Pagination */}
+        <GlobalPagination
+          currentPage={currentPage}
+          totalRecords={filteredList.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          language={language}
+        />
       </div>
 
       {/* MODAL: ADD SINGLE STUDENT ID */}

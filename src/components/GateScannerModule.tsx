@@ -27,6 +27,8 @@ import { validateGateAction } from '../utils/eventRules';
 import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
 import { decodeQRCodeFromImageFile } from '../utils/qrDecoder';
 import { QrCameraScanner } from './common/QrCameraScanner';
+import { GlobalPagination } from './common/GlobalPagination';
+import { paginate } from '../utils/pagination';
 
 interface GateScannerModuleProps {
   language: Language;
@@ -46,6 +48,10 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
   const [gateEvents, setGateEvents] = useState<GateEventRecord[]>(() =>
     EventStore.getGateEvents()
   );
+
+  // Global Pagination State (Default 10, options 10, 20, 30, 40)
+  const [logPage, setLogPage] = useState(1);
+  const [logPageSize, setLogPageSize] = useState(10);
   const [actionNotice, setActionNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isResultPopupOpen, setIsResultPopupOpen] = useState(false);
 
@@ -518,7 +524,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {gateEvents.slice(0, 15).map((evt) => (
+                {paginate(gateEvents, logPage, logPageSize).map((evt) => (
                   <tr key={evt.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-2.5 px-3 font-mono font-bold text-slate-900">
                       {evt.registrationId}
@@ -573,6 +579,15 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
             </table>
           </div>
         )}
+
+        {/* Global Pagination */}
+        <GlobalPagination
+          currentPage={logPage}
+          totalRecords={gateEvents.length}
+          pageSize={logPageSize}
+          onPageChange={setLogPage}
+          onPageSizeChange={setLogPageSize}
+        />
       </div>
 
       {/* Super Admin Correction Modal with Mandatory Audit Reason */}
