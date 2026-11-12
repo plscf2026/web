@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Download,
   Layers,
+  Eye,
 } from 'lucide-react';
 import {
   StaffExpense,
@@ -19,9 +20,10 @@ import {
   calculateCentralBudgetOverview,
   calculateStaffFinancialSummary,
 } from '../../utils/eventRules';
-import { sanitizeUrl, formatCsvRow } from '../../utils/security';
+import { formatCsvRow } from '../../utils/security';
 import { GlobalPagination } from '../common/GlobalPagination';
 import { paginate } from '../../utils/pagination';
+import { VoucherModal } from '../common/VoucherModal';
 
 interface BudgetManagementTabProps {
   language?: Language;
@@ -65,6 +67,7 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
   const [selectedExpenseForReview, setSelectedExpenseForReview] = useState<StaffExpense | null>(null);
   const [reviewAction, setReviewAction] = useState<'APPROVE' | 'REJECT' | 'VOID'>('APPROVE');
   const [reviewReason, setReviewReason] = useState('');
+  const [viewingVoucherExpense, setViewingVoucherExpense] = useState<StaffExpense | null>(null);
 
   const [feedbackNotice, setFeedbackNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [expenseSearch, setExpenseSearch] = useState('');
@@ -585,16 +588,16 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
                     </td>
                     <td className="py-2.5 px-3 text-center">
                       {exp.receiptUrl ? (
-                        <a
-                          href={sanitizeUrl(exp.receiptUrl)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-indigo-600 hover:underline font-bold"
+                        <button
+                          type="button"
+                          onClick={() => setViewingVoucherExpense(exp)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition border border-indigo-200 cursor-pointer shadow-2xs"
                         >
-                          View Voucher
-                        </a>
+                          <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>View Voucher</span>
+                        </button>
                       ) : (
-                        <span className="text-slate-400">—</span>
+                        <span className="text-slate-400 font-mono text-[11px]">—</span>
                       )}
                     </td>
                     <td className="py-2.5 px-3 text-center">
@@ -952,6 +955,13 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* VIEW VOUCHER POPUP MODAL */}
+      <VoucherModal
+        isOpen={Boolean(viewingVoucherExpense)}
+        onClose={() => setViewingVoucherExpense(null)}
+        expense={viewingVoucherExpense}
+      />
     </div>
   );
 };
