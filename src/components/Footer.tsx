@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  GraduationCap,
   MapPin,
   Phone,
   Mail,
@@ -30,8 +29,12 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
           {/* Col 1: Institution Details */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-md">
-                <GraduationCap className="w-6 h-6 text-amber-300" />
+              <div className="w-12 h-12 rounded-full overflow-hidden bg-white p-0.5 shadow-md shrink-0 border-2 border-amber-400 flex items-center justify-center">
+                <img
+                  src="/assets/school_logo.png"
+                  alt="Police Lines School & College Emblem"
+                  className="w-full h-full object-contain rounded-full"
+                />
               </div>
               <div>
                 <h3 className="font-bold text-white text-base leading-tight">

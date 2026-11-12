@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  GraduationCap,
   QrCode,
   Globe,
   Menu,
@@ -113,13 +112,12 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => handleNav('home')}
             className="flex items-center gap-2.5 sm:gap-3.5 cursor-pointer select-none group min-w-0"
           >
-            <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-xl bg-sky-700 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform duration-200 border-2 border-sky-300 shrink-0">
-              <div className="text-center">
-                <GraduationCap className="w-5 h-5 sm:w-7 sm:h-7 mx-auto text-amber-300" />
-                <span className="text-[8px] sm:text-[9px] font-extrabold tracking-tighter block text-white/90">
-                  EST 1962
-                </span>
-              </div>
+            <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-full overflow-hidden bg-white p-0.5 shadow-md group-hover:scale-105 transition-transform duration-200 border-2 border-amber-400 shrink-0 flex items-center justify-center">
+              <img
+                src="/assets/school_logo.png"
+                alt="Police Lines School & College Faridpur Crest"
+                className="w-full h-full object-contain rounded-full"
+              />
             </div>
 
             <div className="min-w-0">

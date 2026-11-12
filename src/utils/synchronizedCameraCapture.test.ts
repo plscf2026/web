@@ -106,3 +106,4 @@ test('Synchronized Camera 4: Confirmed Crop preserves photo size <= 200 KB', asy
   assert.ok(sampleDataUrl.startsWith('data:image/jpeg;base64,'));
   assert.ok(typeof compressImageTo200KB === 'function');
 });
+

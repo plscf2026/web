@@ -545,8 +545,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
           {/* Header Banner - Solid Institutional Navy Blue */}
           <div className="bg-[#172554] p-6 sm:p-8 text-white text-center space-y-2 border-b border-blue-900">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/10 border border-white/20 text-[#C5A45D] shadow-md mb-1">
-              <ShieldCheck className="w-8 h-8" />
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white p-1 border-2 border-[#C5A45D] shadow-md mb-1 overflow-hidden">
+              <img
+                src="/assets/school_logo.png"
+                alt="Police Lines School & College Faridpur Emblem"
+                className="w-full h-full object-contain rounded-full"
+              />
             </div>
             <h1 className="text-xl sm:text-2xl font-black tracking-tight">
               {language === 'bn'
@@ -695,8 +699,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Top Admin Header with Supabase Connection Telemetry - Solid Navy Blue */}
       <div className="bg-[#172554] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-blue-900 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 mb-1.5">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-full overflow-hidden bg-white p-0.5 border-2 border-[#C5A45D] shadow-md shrink-0 hidden sm:flex items-center justify-center">
+            <img
+              src="/assets/school_logo.png"
+              alt="Police Lines School & College Faridpur Emblem"
+              className="w-full h-full object-contain rounded-full"
+            />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-1.5">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-900 border border-blue-700 text-[11px] font-bold text-[#C5A45D]">
               <ShieldCheck className="w-3.5 h-3.5 text-[#C5A45D]" />
               <span>{adminSession.fullName}</span>
@@ -717,6 +729,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{t.adminHeading}</h1>
           <p className="text-xs text-slate-300 mt-1">{t.adminSubtitle}</p>
         </div>
+      </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
           <button

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  GraduationCap,
   History,
   Target,
   MapPin,
@@ -97,8 +96,17 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
       {/* Institutional Overview & History */}
       <section className="space-y-6">
         <div className="text-center max-w-3xl mx-auto space-y-3">
+          <div className="flex justify-center mb-2">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white p-1 shadow-lg border-2 border-amber-400 overflow-hidden flex items-center justify-center">
+              <img
+                src="/assets/school_logo.png"
+                alt="Police Lines School & College Faridpur Crest"
+                className="w-full h-full object-contain rounded-full"
+              />
+            </div>
+          </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#172554]/10 text-[#172554] text-xs font-bold border border-[#172554]/20">
-            <GraduationCap className="w-4 h-4 text-[#172554]" />
+            <img src="/assets/school_logo.png" alt="School Logo" className="w-4 h-4 object-contain rounded-full" />
             <span>{t.institutionSubtitle}</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">

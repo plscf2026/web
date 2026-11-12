@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import {
-  GraduationCap,
   Calendar,
   MapPin,
   ArrowRight,
@@ -166,9 +165,27 @@ export const HomePage: React.FC<HomePageProps> = ({
         style={getHomePageSectionStyle('hero')}
       >
         <div className="max-w-7xl mx-auto relative z-10 text-center space-y-6">
+          {/* Prominent Circular School Logo Section */}
+          <div className="flex justify-center">
+            <div className="relative group">
+              <div className="absolute -inset-1.5 bg-gradient-to-r from-amber-400 via-sky-400 to-emerald-400 rounded-full blur-md opacity-60 group-hover:opacity-100 transition duration-300"></div>
+              <div className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-white p-1.5 shadow-2xl border-4 border-amber-400 overflow-hidden flex items-center justify-center">
+                <img
+                  src="/assets/school_logo.png"
+                  alt="Police Lines School & College Faridpur Emblem"
+                  className="w-full h-full object-contain rounded-full transform group-hover:scale-105 transition-transform duration-300"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Institution Crest Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-sky-200 text-slate-700 text-xs font-semibold shadow-xs">
-            <GraduationCap className="w-4 h-4 text-sky-700" />
+            <img
+              src="/assets/school_logo.png"
+              alt="School Logo"
+              className="w-4 h-4 object-contain rounded-full"
+            />
             <span>{t.institutionSubtitle}</span>
             <span className="w-1 h-1 rounded-full bg-sky-400" />
             <span className="text-sky-800 font-bold">1962 - 2027</span>

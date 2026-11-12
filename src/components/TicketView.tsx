@@ -8,7 +8,6 @@ import {
   MapPin,
   Shirt,
   ShieldCheck,
-  GraduationCap,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -138,8 +137,12 @@ export const TicketView: React.FC<TicketViewProps> = ({
         <div className="p-6 sm:p-8 border-b border-slate-200 bg-[#F3F4F6]">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-[#172554] flex items-center justify-center text-white shadow-md border-2 border-[#C5A45D] shrink-0">
-                <GraduationCap className="w-8 h-8 text-[#C5A45D]" />
+              <div className="w-16 h-16 rounded-full overflow-hidden bg-white p-1 flex items-center justify-center shadow-md border-2 border-[#C5A45D] shrink-0">
+                <img
+                  src="/assets/school_logo.png"
+                  alt="Police Lines School & College Faridpur Emblem"
+                  className="w-full h-full object-contain rounded-full"
+                />
               </div>
               <div>
                 <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight">
