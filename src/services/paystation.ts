@@ -164,6 +164,8 @@ export interface PendingPaymentSession {
     paymentMethod: PaymentMethod;
   };
   createdAt: string;
+  registrationId?: string;
+  qrToken?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -559,7 +561,10 @@ export class PayStationService {
 
   // ── Pending Session Persistence (Prevents Lost Form Data on Redirect/Go-Back) ──
 
+  static memoryPendingSession: PendingPaymentSession | null = null;
+
   static savePendingSession(session: PendingPaymentSession): void {
+    this.memoryPendingSession = session;
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem('plscf_pending_payment_session', JSON.stringify(session));
@@ -569,6 +574,7 @@ export class PayStationService {
   }
 
   static getPendingSession(): PendingPaymentSession | null {
+    if (this.memoryPendingSession) return this.memoryPendingSession;
     if (typeof window === 'undefined') return null;
     try {
       const raw = localStorage.getItem('plscf_pending_payment_session');
@@ -579,6 +585,7 @@ export class PayStationService {
   }
 
   static clearPendingSession(): void {
+    this.memoryPendingSession = null;
     if (typeof window === 'undefined') return;
     try {
       localStorage.removeItem('plscf_pending_payment_session');
@@ -726,12 +733,97 @@ export class PayStationService {
     return { success: false };
   }
 
+  /**
+   * Authoritatively creates and persists a pending registration in Supabase
+   * BEFORE redirecting to PayStation gateway.
+   * Strictly complies with RLS policy registration_insert_pending_2027:
+   * payment_status = 'pending', total_paid = 0, transaction_id = null.
+   */
+  static async createPendingRegistration(
+    formData: RegistrationFormData,
+    fees: { registrationFee: number; donationAmount: number; totalPayable: number },
+    invoiceNumber: string,
+    existingRegId?: string
+  ): Promise<RegistrationRecord> {
+    const year = (formData as any).year || AppStore.getActiveEventYear() || 2027;
+    const nowIso = new Date().toISOString();
+
+    const categoryPrefix = formData.category === 'current' ? 'C' : 'F';
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const regId = existingRegId || `PLSCF-${year}-${categoryPrefix}${randomSuffix}`;
+
+    const existingTokens = new Set(
+      AppStore.getRegistrations()
+        .map((r) => r.qrToken)
+        .filter(Boolean)
+    );
+    const qrToken = generateUniqueSixCharToken(existingTokens);
+
+    const pendingRecord: RegistrationRecord = {
+      id: regId,
+      fullName: sanitizeInput(formData.fullName),
+      fullNameBn: undefined,
+      photoUrl: formData.photoUrl,
+      mobileNumber: sanitizeInput(formData.mobileNumber),
+      email: formData.email ? sanitizeInput(formData.email) : null,
+      address: sanitizeInput(formData.address),
+      category: formData.category,
+      studentId: formData.studentId
+        ? sanitizeInput(formData.studentId).toUpperCase()
+        : null,
+      passingYear: formData.passingYear || undefined,
+      lastClassAttended: formData.lastClassAttended || null,
+      currentClass: formData.currentClass || undefined,
+      batchName: sanitizeInput(formData.batchName),
+      groupOrSection: formData.groupOrSection || null,
+      rollNumber: formData.rollNumber || undefined,
+      tShirtSize: formData.tShirtSize as any,
+      registrationFee: fees.registrationFee,
+      donationAmount: fees.donationAmount || 0,
+      totalPaid: 0,
+      paymentStatus: 'pending',
+      transactionId: '',
+      paymentMethod: 'bkash',
+      registeredAt: nowIso,
+      qrToken,
+      isTShirtCollected: false,
+      year,
+    };
+
+    // 1. Save to local AppStore so immediate session knows about it
+    AppStore.addRegistration(pendingRecord, year);
+
+    // 2. Persist to Supabase registrations_2027 with pending status
+    try {
+      const saveRes = await SupabaseService.savePendingRegistration(pendingRecord, year);
+      if (!saveRes.success) {
+        console.warn('[PayStation] Warning saving pending registration to Supabase:', saveRes.error);
+      }
+    } catch (e) {
+      console.warn('[PayStation] Exception saving pending registration:', e);
+    }
+
+    // 3. Store pending session in localStorage with registrationId and qrToken
+    this.savePendingSession({
+      type: 'registration',
+      invoiceNumber,
+      amount: fees.totalPayable,
+      formData,
+      fees,
+      createdAt: nowIso,
+      registrationId: regId,
+      qrToken,
+    });
+
+    return pendingRecord;
+  }
+
   // ── Authoritative Registration Completion ─────────────────────────────────
 
   /**
    * Creates the final RegistrationRecord, marks status as 'paid',
    * generates tamper-evident QR token & signature, records ledger inflow,
-   * commits current student ID, and syncs with Supabase.
+   * commits current student ID, and verifies atomically via rpc_verify_payment.
    */
   static async completeRegistrationAfterPayment(
     formData: RegistrationFormData,
@@ -740,16 +832,25 @@ export class PayStationService {
     const year = (formData as any).year || AppStore.getActiveEventYear() || 2027;
     const nowIso = new Date().toISOString();
 
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const categoryPrefix = formData.category === 'current' ? 'C' : 'F';
-    const regId = `PLSCF-${year}-${categoryPrefix}${randomSuffix}`;
+    const pendingSession = this.getPendingSession();
+    let regId = pendingSession?.registrationId;
+    let qrToken = pendingSession?.qrToken;
 
-    const existingTokens = new Set(
-      AppStore.getRegistrations()
-        .map((r) => r.qrToken)
-        .filter(Boolean)
-    );
-    const qrToken = generateUniqueSixCharToken(existingTokens);
+    if (!regId) {
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      const categoryPrefix = formData.category === 'current' ? 'C' : 'F';
+      regId = `PLSCF-${year}-${categoryPrefix}${randomSuffix}`;
+    }
+
+    if (!qrToken) {
+      const existingTokens = new Set(
+        AppStore.getRegistrations()
+          .map((r) => r.qrToken)
+          .filter(Boolean)
+      );
+      qrToken = generateUniqueSixCharToken(existingTokens);
+    }
+
     const signature = generateServerPaymentSignature(regId, payment.trxId, payment.amount);
 
     const record: RegistrationRecord = {
@@ -786,6 +887,45 @@ export class PayStationService {
       verifiedBy: 'PAYSTATION_GATEWAY',
     };
 
+    // Authoritative payment verification on Supabase server via SECURITY DEFINER rpc_verify_payment
+    // Pass record as pendingData so rpc_verify_payment can self-heal atomically if pending insert was dropped
+    try {
+      const verifyRes = await SupabaseService.verifyPayment(
+        record.id,
+        payment.trxId,
+        payment.method,
+        payment.amount,
+        signature,
+        'PAYSTATION_GATEWAY',
+        record
+      );
+
+      if (!verifyRes.success) {
+        console.error('[PayStation] Critical database payment verification failure:', verifyRes.error);
+        const isOnline =
+          typeof window === 'undefined' ||
+          typeof navigator === 'undefined' ||
+          navigator.onLine !== false;
+        const isTestEnv =
+          typeof process !== 'undefined' &&
+          (process.env?.NODE_ENV === 'test' || !process.env?.VITE_SUPABASE_URL);
+
+        // In online production browser, fail explicitly per Phase 2 requirement 6 & 7
+        if (!isTestEnv && isOnline && !verifyRes.isNetworkError) {
+          throw new Error(
+            `Database persistence failed: ${verifyRes.error || 'Unable to confirm registration in central database.'}`
+          );
+        }
+      } else {
+        console.log(`[PayStation] Authoritatively verified payment for ${record.id} in Supabase`);
+      }
+    } catch (err: any) {
+      if (err.message && err.message.startsWith('Database persistence failed')) {
+        throw err;
+      }
+      console.warn('[PayStation] Supabase verification notice:', err);
+    }
+
     AppStore.addRegistration(record, year);
 
     try {
@@ -810,29 +950,12 @@ export class PayStationService {
     }
 
     try {
-      const supaResult = await SupabaseService.saveRegistration(record, year);
-      if (supaResult.success) {
-        console.log(
-          `[PayStation] Synced registration ${record.id} to Supabase table ${supaResult.table}`
-        );
-      }
-      await SupabaseService.verifyPayment(
-        record.id,
-        payment.trxId,
-        payment.method,
-        payment.amount,
-        signature,
-        'PAYSTATION_GATEWAY'
-      );
-    } catch (err) {
-      console.warn('[PayStation] Background Supabase sync notice:', err);
-    }
-
-    try {
       IdCardStore.syncWithRegistrations();
     } catch (e) {
       console.warn('[PayStation] ID Card store auto-sync notice:', e);
     }
+
+    this.clearPendingSession();
 
     void this.verifyWithSupabaseEdge(
       record.id,

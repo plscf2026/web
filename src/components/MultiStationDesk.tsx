@@ -27,7 +27,7 @@ import {
 } from '../types';
 import { AppStore } from '../services/store';
 import { EventStore } from '../services/eventStore';
-import { findRegistrationByTokenOrId, parseScannedInput } from '../utils/tokenGenerator';
+import { parseScannedInput } from '../utils/tokenGenerator';
 import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
 import { QrCameraScanner } from './common/QrCameraScanner';
 
@@ -84,36 +84,37 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
     const displayTicket = parsed.id || clean;
     const expectedToken = tokenParam?.trim().toUpperCase() || parsed.token;
 
-    let student = findRegistrationByTokenOrId(AppStore.getRegistrations(), clean);
-    if (!student) {
-      student = await AppStore.findRegistrationAsync(clean, expectedToken);
-    }
+    const verifyRes = await AppStore.verifyStudentTicketAsync(clean, expectedToken, staffUser?.id || 'MULTI_STATION_STAFF');
 
-    if (!student) {
+    if (!verifyRes.verified || !verifyRes.student) {
       playScanErrorSound();
       setScannedStudent(null);
-      setActionNotice({
-        type: 'error',
-        message: `Student ticket "${displayTicket}" not found in database.`,
-      });
+      if (verifyRes.errorType === 'NETWORK_ERROR') {
+        setActionNotice({
+          type: 'error',
+          message: 'Network Connection Error: Unable to reach verification server. Please check your internet connection.',
+        });
+      } else if (verifyRes.errorType === 'UNPAID') {
+        setActionNotice({
+          type: 'error',
+          message: verifyRes.error || `Payment Pending: Student registration is not paid. Station actions not permitted.`,
+        });
+      } else if (verifyRes.errorType === 'TOKEN_MISMATCH') {
+        setActionNotice({
+          type: 'error',
+          message: verifyRes.error || `Security Warning: Cryptographic QR token mismatch. Pass is invalid.`,
+        });
+      } else {
+        setActionNotice({
+          type: 'error',
+          message: verifyRes.error || `Student ticket "${displayTicket}" not found in database.`,
+        });
+      }
       setIsResultPopupOpen(true);
       return;
     }
 
-    // When QR Token is provided (manual verification or QR payload), verify token matches Registration ID
-    if (expectedToken) {
-      const studentToken = (student.qrToken || (student as any).qr_token || '').toUpperCase();
-      if (studentToken && studentToken !== expectedToken) {
-        playScanErrorSound();
-        setScannedStudent(null);
-        setActionNotice({
-          type: 'error',
-          message: `Verification Failed: QR Token "${expectedToken}" does not match Registration ID "${student.id}".`,
-        });
-        setIsResultPopupOpen(true);
-        return;
-      }
-    }
+    const student = verifyRes.student;
 
     playScanSuccessSound();
     setScannedStudent(student);

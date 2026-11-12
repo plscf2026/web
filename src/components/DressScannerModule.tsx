@@ -23,7 +23,7 @@ import {
 } from '../types';
 import { AppStore } from '../services/store';
 import { EventStore, hasDepartmentPermission } from '../services/eventStore';
-import { findRegistrationByTokenOrId, parseScannedInput } from '../utils/tokenGenerator';
+import { parseScannedInput } from '../utils/tokenGenerator';
 import { validateDressDistribution } from '../utils/eventRules';
 import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
 import { QrCameraScanner } from './common/QrCameraScanner';
@@ -76,48 +76,61 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
     const displayTicket = parsed.id || clean;
     const expectedToken = tokenParam?.trim().toUpperCase() || parsed.token;
 
-    let student = findRegistrationByTokenOrId(AppStore.getRegistrations(), clean);
-    if (!student) {
-      student = await AppStore.findRegistrationAsync(clean, expectedToken);
-    }
+    const verifyRes = await AppStore.verifyStudentTicketAsync(clean, expectedToken, staffUser?.id || 'DRESS_STAFF');
 
-    if (!student) {
+    if (!verifyRes.verified || !verifyRes.student) {
       playScanErrorSound();
       setScannedStudent(null);
-      setValidationResult({
-        canReceive: false,
-        status: 'INVALID_TICKET',
-        messageEn: `Student ticket "${displayTicket}" not found.`,
-        messageBn: `"${displayTicket}" নম্বরের কোনো টিকিট পাওয়া যায়নি।`,
-      });
-      setFeedbackNotice({
-        type: 'error',
-        message: `Student ticket "${displayTicket}" not found in database.`,
-      });
+      if (verifyRes.errorType === 'NETWORK_ERROR') {
+        setValidationResult({
+          canReceive: false,
+          status: 'NETWORK_ERROR' as any,
+          messageEn: 'Network Connection Error: Unable to reach verification server. Please check your internet connection.',
+          messageBn: 'নেটওয়ার্ক সংযোগ ত্রুটি: সার্ভারের সাথে যোগাযোগ করা যায়নি। ইন্টারনেট সংযোগ পরীক্ষা করুন।',
+        });
+        setFeedbackNotice({
+          type: 'error',
+          message: 'Network Connection Error: Unable to reach verification server. Please check your internet connection.',
+        });
+      } else if (verifyRes.errorType === 'UNPAID') {
+        setValidationResult({
+          canReceive: false,
+          status: 'INVALID_TICKET',
+          messageEn: verifyRes.error || `Payment Pending: Student registration is not paid. Dress distribution denied.`,
+          messageBn: 'পেমেন্ট মুলতুবি: নিবন্ধন ফি পরিশোধ করা হয়নি। ড্রেস প্রদান করা যাবে না।',
+        });
+        setFeedbackNotice({
+          type: 'error',
+          message: verifyRes.error || `Payment Pending: Student registration is not paid. Dress distribution denied.`,
+        });
+      } else if (verifyRes.errorType === 'TOKEN_MISMATCH') {
+        setValidationResult({
+          canReceive: false,
+          status: 'INVALID_TICKET',
+          messageEn: verifyRes.error || `QR Token "${expectedToken}" does not match Registration ID "${clean}".`,
+          messageBn: `কিউআর টোকেন "${expectedToken}" রেজিস্ট্রেশনের সাথে মেলেনি।`,
+        });
+        setFeedbackNotice({
+          type: 'error',
+          message: verifyRes.error || `Security Warning: Cryptographic QR token mismatch. Pass is invalid.`,
+        });
+      } else {
+        setValidationResult({
+          canReceive: false,
+          status: 'INVALID_TICKET',
+          messageEn: `Student ticket "${displayTicket}" not found.`,
+          messageBn: `"${displayTicket}" নম্বরের কোনো টিকিট পাওয়া যায়নি।`,
+        });
+        setFeedbackNotice({
+          type: 'error',
+          message: verifyRes.error || `Student ticket "${displayTicket}" not found in database.`,
+        });
+      }
       setIsResultPopupOpen(true);
       return;
     }
 
-    // When QR Token is provided (manual verification or QR payload), verify token matches Registration ID
-    if (expectedToken) {
-      const studentToken = (student.qrToken || (student as any).qr_token || '').toUpperCase();
-      if (studentToken && studentToken !== expectedToken) {
-        playScanErrorSound();
-        setScannedStudent(null);
-        setValidationResult({
-          canReceive: false,
-          status: 'INVALID_TICKET',
-          messageEn: `QR Token "${expectedToken}" does not match Registration ID "${student.id}".`,
-          messageBn: `কিউআর টোকেন "${expectedToken}" রেজিস্ট্রেশন আইডি "${student.id}"-এর সাথে মেলেনি।`,
-        });
-        setFeedbackNotice({
-          type: 'error',
-          message: `Verification Failed: QR Token "${expectedToken}" does not match Registration ID "${student.id}".`,
-        });
-        setIsResultPopupOpen(true);
-        return;
-      }
-    }
+    const student = verifyRes.student;
 
     const currentDistributions = EventStore.getDressDistributions();
     const result = validateDressDistribution(student, 'reunion_tshirt', currentDistributions);

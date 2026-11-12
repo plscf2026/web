@@ -109,7 +109,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       setCompletedTicket(ticket);
       setStep('success');
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Ticket generation failed.');
+      console.error('[PaymentModal] Finalization failure:', err);
+      setErrorMessage(
+        isBangla
+          ? `ডাটাবেজ নিশ্চিতকরণ ব্যর্থ হয়েছে: ${err?.message || 'অনুগ্রহ করে সহায়তা দলের সাথে যোগাযোগ করুন।'}`
+          : `Database confirmation failed: ${err?.message || 'Please contact support or retry.'}`
+      );
       setStep('failed');
     }
   };
@@ -198,6 +203,17 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setProcessingStep(isBangla ? 'PayStation পেমেন্ট সেশন তৈরি হচ্ছে...' : 'Creating PayStation payment session...');
 
     try {
+      // 1. Authoritatively create pending registration in Supabase (payment_status='pending', total_paid=0)
+      const pendingRecord = await PayStationService.createPendingRegistration(
+        registrationData,
+        {
+          registrationFee,
+          donationAmount,
+          totalPayable,
+        },
+        invoiceRef.current
+      );
+
       const callbackUrl = PayStationService.buildCallbackUrl({
         type: 'registration',
         invoiceNumber: invoiceRef.current,
@@ -222,9 +238,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           category: registrationData.category,
           batch: registrationData.batchName,
           tshirt: registrationData.tShirtSize,
+          regId: pendingRecord.id,
         }),
         opt_a: registrationData.category,
         opt_b: registrationData.batchName || '',
+        opt_c: pendingRecord.id,
       });
 
       if (!createRes.success || !createRes.paymentUrl) {

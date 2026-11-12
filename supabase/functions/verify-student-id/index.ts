@@ -17,6 +17,40 @@ function jsonResponse(
   });
 }
 
+function parseUrlOrToken(raw: string): { id?: string; token?: string } {
+  if (!raw) return {};
+  const trimmed = raw.trim();
+  if (trimmed.includes('?') || trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      const u = new URL(trimmed.startsWith('http') ? trimmed : `https://plscf.org/${trimmed.startsWith('/') ? '' : '/'}${trimmed}`);
+      const id =
+        u.searchParams.get('id') ||
+        u.searchParams.get('ID') ||
+        u.searchParams.get('student_id') ||
+        u.searchParams.get('registration_id');
+      const token =
+        u.searchParams.get('token') ||
+        u.searchParams.get('TOKEN') ||
+        u.searchParams.get('qr_token');
+
+      // Check path segment for PLSCF-XXXX-XXXX
+      let pathId: string | undefined;
+      for (const seg of u.pathname.split('/').filter(Boolean)) {
+        if (/^PLSCF-\d{4}-[A-Z0-9]+$/i.test(seg)) {
+          pathId = seg.toUpperCase();
+          break;
+        }
+      }
+
+      return {
+        id: (id || pathId)?.trim().toUpperCase(),
+        token: token?.trim().toUpperCase(),
+      };
+    } catch {}
+  }
+  return {};
+}
+
 serve(async (req) => {
   const origin = req.headers.get('origin');
   const headers: Record<string, string> = {
@@ -51,11 +85,15 @@ serve(async (req) => {
     let studentId = '';
     let qrToken = '';
     let year = 2027;
+    let staffId = '';
+    let staffRole = '';
 
     if (req.method === 'GET') {
       const url = new URL(req.url);
       studentId = url.searchParams.get('id')?.trim() || '';
       qrToken = url.searchParams.get('token')?.trim() || '';
+      staffId = url.searchParams.get('staff_id')?.trim() || '';
+      staffRole = url.searchParams.get('staff_role')?.trim() || '';
       const parsedYear = Number(url.searchParams.get('year') || '2027');
       if (Number.isInteger(parsedYear) && parsedYear >= 2020 && parsedYear <= 2100) {
         year = parsedYear;
@@ -64,15 +102,31 @@ serve(async (req) => {
       const body = await req.json();
       studentId = typeof body.id === 'string' ? body.id.trim() : '';
       qrToken = typeof body.token === 'string' ? body.token.trim() : '';
+      staffId = typeof body.staff_id === 'string' ? body.staff_id.trim() : '';
+      staffRole = typeof body.staff_role === 'string' ? body.staff_role.trim() : '';
       const parsedYear = Number(body.year || '2027');
       if (Number.isInteger(parsedYear) && parsedYear >= 2020 && parsedYear <= 2100) {
         year = parsedYear;
       }
     }
 
-    if (!studentId || !/^[A-Za-z0-9-]{3,60}$/.test(studentId)) {
+    // Auto-parse if full URL was passed in studentId
+    const parsedFromUrl = parseUrlOrToken(studentId);
+    if (parsedFromUrl.id) studentId = parsedFromUrl.id;
+    if (!qrToken && parsedFromUrl.token) qrToken = parsedFromUrl.token;
+
+    // Normalization
+    studentId = studentId.toUpperCase().trim();
+    qrToken = qrToken.toUpperCase().trim();
+
+    if (!studentId && !qrToken) {
       return jsonResponse(
-        { success: false, verified: false, error: 'Invalid or missing student registration ID.' },
+        {
+          success: false,
+          verified: false,
+          status: 'INVALID_INPUT',
+          error: 'Registration ID or QR token is required for verification.',
+        },
         400,
         headers
       );
@@ -82,42 +136,64 @@ serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // 1. Query consolidated registrations_2027 table
+    // 1. Authoritative lookup in registrations_2027
     const targetTable = 'registrations_2027';
-    const { data: registration, error } = await supabase
+    let query = supabase
       .from(targetTable)
-      .select('id, full_name, full_name_bn, photo_url, category, passing_year, current_class, batch_name, payment_status, qr_token, year')
-      .eq('id', studentId)
-      .maybeSingle();
+      .select('id, full_name, full_name_bn, photo_url, category, passing_year, current_class, batch_name, payment_status, qr_token, year');
+
+    if (studentId && qrToken) {
+      query = query.eq('id', studentId);
+    } else if (studentId) {
+      query = query.or(`id.ilike.${studentId},qr_token.ilike.${studentId}`);
+    } else {
+      query = query.eq('qr_token', qrToken);
+    }
+
+    const { data: registration, error } = await query.limit(1).maybeSingle();
 
     if (error || !registration) {
       return jsonResponse(
-        { success: false, verified: false, error: 'Student ID not found or registration record does not exist.' },
+        {
+          success: false,
+          verified: false,
+          status: 'NOT_FOUND',
+          error: `Student ticket "${studentId || qrToken}" not found in database.`,
+        },
         404,
         headers
       );
     }
 
-    // 2. Validate payment status
+    // 2. Enforce payment status validation
     if (registration.payment_status !== 'paid') {
       return jsonResponse(
         {
           success: false,
           verified: false,
-          error: 'Student registration is not yet confirmed (pending payment).',
+          status: 'UNPAID',
+          error: `Payment Pending: Registration "${registration.id}" is in "${registration.payment_status}" status.`,
         },
         403,
         headers
       );
     }
 
-    // 3. If QR token is provided, verify matching
-    if (qrToken && registration.qr_token && qrToken !== registration.qr_token) {
-      return jsonResponse(
-        { success: false, verified: false, error: 'Cryptographic QR token mismatch. Pass is invalid.' },
-        403,
-        headers
-      );
+    // 3. Cryptographic token matching (case-insensitive)
+    if (qrToken && registration.qr_token) {
+      const regToken = String(registration.qr_token).trim().toUpperCase();
+      if (regToken !== qrToken && registration.id.toUpperCase() !== studentId) {
+        return jsonResponse(
+          {
+            success: false,
+            verified: false,
+            status: 'TOKEN_MISMATCH',
+            error: `Cryptographic QR token mismatch for registration "${registration.id}".`,
+          },
+          403,
+          headers
+        );
+      }
     }
 
     // 4. Sanitize photo URL (accepts base64 or HTTPS only)
@@ -133,18 +209,19 @@ serve(async (req) => {
     const { data: idCardRecord } = await supabase
       .from('student_id_cards')
       .select('card_status, generated_at')
-      .eq('registration_id', studentId)
+      .eq('registration_id', registration.id)
       .maybeSingle();
 
     if (idCardRecord?.card_status) {
       cardStatus = idCardRecord.card_status;
     }
 
-    // Return safe, sanitized verification badge (excluding personal phone/email/financial records)
+    // Return safe, sanitized verification payload with zero PII
     return jsonResponse(
       {
         success: true,
         verified: true,
+        status: 'ELIGIBLE',
         institution: 'Police Lines School & College, Faridpur',
         event: `Grand Reunion ${registration.year || year}`,
         student: {
@@ -156,6 +233,8 @@ serve(async (req) => {
           passingYear: registration.passing_year || null,
           currentClass: registration.current_class || null,
           photoUrl: safePhotoUrl,
+          paymentStatus: registration.payment_status,
+          qrToken: registration.qr_token,
           cardStatus: cardStatus,
           verifiedAt: new Date().toISOString(),
         },
@@ -168,4 +247,3 @@ serve(async (req) => {
     return jsonResponse({ error: 'Internal verification error.' }, 500, headers);
   }
 });
-

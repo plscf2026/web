@@ -27,6 +27,32 @@ export const SUPABASE_ANON_KEY =
   (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
   'sb_publishable_yEnHiM0NTIxuKNQnNHQu3Q_IRJ7zfur';
 
+/**
+ * Robust network error detection across Node, Vite, browsers, and mobile devices.
+ */
+export function isNetworkException(err: any): boolean {
+  if (!err) return false;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+  const msg = String(err.message || err.error_description || err.error || err).toLowerCase();
+  const name = String(err.name || '').toLowerCase();
+  const code = String(err.code || '').toLowerCase();
+  return (
+    name === 'aborterror' ||
+    name === 'networkerror' ||
+    code === 'enotfound' ||
+    code === 'econnrefused' ||
+    code === 'etimedout' ||
+    code === 'enetunreach' ||
+    msg.includes('failed to fetch') ||
+    msg.includes('fetch failed') ||
+    msg.includes('network') ||
+    msg.includes('timeout') ||
+    msg.includes('offline') ||
+    msg.includes('connection refused') ||
+    Boolean(err.isNetworkError)
+  );
+}
+
 // SECURITY VERIFICATION: Verify that no service_role key is ever bundled into client
 if (typeof window !== 'undefined') {
   if (SUPABASE_ANON_KEY.includes('service_role')) {
@@ -155,15 +181,26 @@ function fromRegistrationDbRow(row: any): RegistrationRecord {
 
 export const SupabaseService = {
   /**
-   * Save a registration to Supabase backend.
-   * Targets consolidated table 'registrations_2027', with fallback to 'registrations'.
+   * Save a pending registration to Supabase backend in compliance with
+   * RLS policy 'registration_insert_pending_2027' (payment_status='pending', total_paid=0).
    */
-  async saveRegistration(
+  async savePendingRegistration(
     reg: RegistrationRecord,
     year: number = 2027
   ): Promise<{ success: boolean; table: string; error?: string }> {
     const yearTableName = getRegistrationsTableName(year);
-    const row = toRegistrationDbRow(reg, year);
+    const row = toRegistrationDbRow(reg, year) as any;
+
+    // Enforce strict pending invariants for RLS compliance
+    row.payment_status = 'pending';
+    row.total_paid = 0;
+    row.transaction_id = null;
+    row.payment_method = null;
+    row.server_verification_signature = null;
+    row.verification_timestamp = null;
+    row.verified_by = null;
+    row.is_checked_in = false;
+    row.is_tshirt_collected = false;
 
     try {
       // 1. Try consolidated table: registrations_2027
@@ -175,7 +212,7 @@ export const SupabaseService = {
         return { success: true, table: yearTableName };
       }
 
-      console.warn(`Supabase upsert into ${yearTableName} returned error:`, yearTableError.message);
+      console.warn(`Supabase pending insert into ${yearTableName} returned error:`, yearTableError.message);
 
       // 2. Try generic 'registrations' table fallback
       const { error: genericTableError } = await supabase
@@ -192,8 +229,52 @@ export const SupabaseService = {
         error: yearTableError.message || genericTableError.message,
       };
     } catch (err: any) {
-      console.error('Supabase saveRegistration exception:', err);
+      console.error('Supabase savePendingRegistration exception:', err);
       return { success: false, table: yearTableName, error: err.message };
+    }
+  },
+
+  /**
+   * Save a registration to Supabase backend.
+   * If status is 'pending', inserts directly in compliance with RLS.
+   * If status is 'paid', uses authoritative rpc_verify_payment to record payment server-side.
+   */
+  async saveRegistration(
+    reg: RegistrationRecord,
+    year: number = 2027
+  ): Promise<{ success: boolean; table: string; error?: string }> {
+    if (reg.paymentStatus === 'pending') {
+      return this.savePendingRegistration(reg, year);
+    }
+
+    // For paid records, finalize authoritatively via rpc_verify_payment
+    const sig =
+      reg.serverVerificationSignature ||
+      `SIG_VERIFIED_${Date.now().toString(36).toUpperCase()}`;
+
+    const res = await this.verifyPayment(
+      reg.id,
+      reg.transactionId || `TRX-MANUAL-${Date.now()}`,
+      reg.paymentMethod || 'manual',
+      reg.totalPaid || reg.registrationFee || 1500,
+      sig,
+      reg.verifiedBy || 'SYSTEM_CONFIRM',
+      reg
+    );
+
+    if (res.success) {
+      return { success: true, table: getRegistrationsTableName(year) };
+    }
+
+    // Fallback: Attempt standard upsert
+    const yearTableName = getRegistrationsTableName(year);
+    const row = toRegistrationDbRow(reg, year);
+    try {
+      const { error } = await supabase.from(yearTableName).upsert(row, { onConflict: 'id' });
+      if (!error) return { success: true, table: yearTableName };
+      return { success: false, table: yearTableName, error: error.message || res.error };
+    } catch (e: any) {
+      return { success: false, table: yearTableName, error: e.message || res.error };
     }
   },
 
@@ -339,24 +420,33 @@ export const SupabaseService = {
     paymentMethod: string,
     amount: number,
     signature: string,
-    verifiedBy: string = 'PAYSTATION_GATEWAY'
-  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    verifiedBy: string = 'PAYSTATION_GATEWAY',
+    pendingData?: RegistrationRecord
+  ): Promise<{ success: boolean; data?: any; error?: string; isNetworkError?: boolean }> {
     try {
-      const { data, error } = await supabase.rpc('rpc_verify_payment', {
+      const payload: any = {
         p_reg_id: registrationId,
         p_trx_id: trxId,
         p_method: paymentMethod,
         p_amount: amount,
         p_signature: signature,
         p_verified_by: verifiedBy,
-      });
+      };
+      if (pendingData) {
+        payload.p_pending_data = toRegistrationDbRow(pendingData, pendingData.year || 2027);
+      }
+      const { data, error } = await supabase.rpc('rpc_verify_payment', payload);
 
       if (!error && (data as any)?.success) {
         return { success: true, data };
       }
-      return { success: false, error: error?.message || (data as any)?.error || 'Verification failed.' };
+      return {
+        success: false,
+        error: error?.message || (data as any)?.error || 'Verification failed.',
+      };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Error executing payment RPC.' };
+      const isNet = isNetworkException(err);
+      return { success: false, error: err.message || 'Error executing payment RPC.', isNetworkError: isNet };
     }
   },
 
@@ -462,46 +552,267 @@ export const SupabaseService = {
   },
 
   /**
-   * Authoritative cloud ticket lookup by Token, ID, URL, or scanned QR payload.
-   * Checks consolidated registrations_2027 and generic registrations table.
+   * Authoritative cross-device student ticket verification.
+   * Calls secure rpc_verify_student_qr (SECURITY DEFINER) to bypass RLS barriers securely
+   * without exposing private PII (phone numbers, email, payment amounts).
+   * Differentiates network errors, payment pending, token mismatches, and not found.
    */
-  async lookupRegistrationByIdOrToken(
+  async verifyStudentTicket(
     identifier: string,
-    tokenParam?: string
-  ): Promise<RegistrationRecord | null> {
-    if (!identifier || !identifier.trim()) return null;
+    tokenParam?: string,
+    staffId: string = 'SCANNER_DESK'
+  ): Promise<{
+    success: boolean;
+    verified: boolean;
+    student?: RegistrationRecord;
+    errorType?: 'NOT_FOUND' | 'UNPAID' | 'TOKEN_MISMATCH' | 'NETWORK_ERROR' | 'INVALID_INPUT';
+    error?: string;
+  }> {
+    if (!identifier || !identifier.trim()) {
+      return {
+        success: false,
+        verified: false,
+        errorType: 'INVALID_INPUT',
+        error: 'Registration ID or QR token is required for verification.',
+      };
+    }
+
     const clean = identifier.trim();
     const parsed = parseScannedInput(clean);
-
     const safeId = (parsed.id || clean).replace(/[,%()]/g, '').trim();
     const safeToken = (tokenParam?.trim() || parsed.token)?.replace(/[,%()]/g, '').trim();
-    const safeRaw = parsed.raw?.replace(/[,%()]/g, '').trim();
 
+    // 1. Authoritative lookup via SECURITY DEFINER rpc_verify_student_qr
+    try {
+      const { data, error } = await supabase.rpc('rpc_verify_student_qr', {
+        p_identifier: safeId,
+        p_token: safeToken || null,
+        p_staff_id: staffId,
+      });
+
+      if (!error && data) {
+        const res = data as any;
+        if (res.success && res.student) {
+          const s = res.student;
+          const regRecord: RegistrationRecord = {
+            id: s.id,
+            fullName: s.fullName,
+            fullNameBn: s.fullNameBn || undefined,
+            photoUrl: s.photoUrl || undefined,
+            category: s.category || 'former',
+            batchName: s.batchName || 'General',
+            passingYear: s.passingYear || undefined,
+            currentClass: s.currentClass || undefined,
+            paymentStatus: s.paymentStatus || 'paid',
+            qrToken: s.qrToken,
+            year: s.year || 2027,
+            registeredAt: s.verifiedAt || new Date().toISOString(),
+            registrationFee: 0,
+            donationAmount: 0,
+            totalPaid: 0,
+            transactionId: '',
+            paymentMethod: 'bkash',
+            isTShirtCollected: false,
+            // STRICT PRIVACY: Zero PII returned to scanner clients
+            mobileNumber: '',
+            email: null,
+            address: '',
+            tShirtSize: 'L',
+          };
+          return { success: true, verified: true, student: regRecord };
+        }
+
+        if (res.status === 'UNPAID') {
+          return {
+            success: false,
+            verified: false,
+            errorType: 'UNPAID',
+            error: res.error || `Payment Pending: Registration "${safeId}" is unpaid.`,
+          };
+        }
+        if (res.status === 'TOKEN_MISMATCH') {
+          return {
+            success: false,
+            verified: false,
+            errorType: 'TOKEN_MISMATCH',
+            error: res.error || `Cryptographic QR token mismatch for registration "${safeId}".`,
+          };
+        }
+        if (res.status === 'NOT_FOUND') {
+          return {
+            success: false,
+            verified: false,
+            errorType: 'NOT_FOUND',
+            error: res.error || `Student ticket "${safeId || clean}" not found in database.`,
+          };
+        }
+      }
+
+      if (error && isNetworkException(error)) {
+        return {
+          success: false,
+          verified: false,
+          errorType: 'NETWORK_ERROR',
+          error: 'Network Connection Error: Unable to reach verification server. Please check your internet connection.',
+        };
+      }
+    } catch (err: any) {
+      if (isNetworkException(err)) {
+        return {
+          success: false,
+          verified: false,
+          errorType: 'NETWORK_ERROR',
+          error: 'Network Connection Error: Unable to reach verification server. Please check your internet connection.',
+        };
+      }
+      console.warn('[Supabase] rpc_verify_student_qr notice:', err);
+    }
+
+    // 2. Edge Function Fallback: verify-student-id
+    try {
+      const { data: edgeData, error: edgeError } = await supabase.functions.invoke('verify-student-id', {
+        body: { id: safeId, token: safeToken, staff_id: staffId },
+      });
+
+      if (!edgeError && edgeData) {
+        if (edgeData.success && edgeData.student) {
+          const s = edgeData.student;
+          const regRecord: RegistrationRecord = {
+            id: s.id,
+            fullName: s.fullName,
+            fullNameBn: s.fullNameBn || undefined,
+            photoUrl: s.photoUrl || undefined,
+            category: s.category || 'former',
+            batchName: s.batchName || 'General',
+            passingYear: s.passingYear || undefined,
+            currentClass: s.currentClass || undefined,
+            paymentStatus: s.paymentStatus || 'paid',
+            qrToken: s.qrToken,
+            year: 2027,
+            registeredAt: new Date().toISOString(),
+            registrationFee: 0,
+            donationAmount: 0,
+            totalPaid: 0,
+            transactionId: '',
+            paymentMethod: 'bkash',
+            isTShirtCollected: false,
+            mobileNumber: '',
+            email: null,
+            address: '',
+            tShirtSize: 'L',
+          };
+          return { success: true, verified: true, student: regRecord };
+        }
+        if (edgeData.status === 'UNPAID') {
+          return {
+            success: false,
+            verified: false,
+            errorType: 'UNPAID',
+            error: edgeData.error || `Payment Pending: Registration "${safeId}" is unpaid.`,
+          };
+        }
+        if (edgeData.status === 'TOKEN_MISMATCH') {
+          return {
+            success: false,
+            verified: false,
+            errorType: 'TOKEN_MISMATCH',
+            error: edgeData.error || `Cryptographic QR token mismatch for registration "${safeId}".`,
+          };
+        }
+        if (edgeData.status === 'NOT_FOUND') {
+          return {
+            success: false,
+            verified: false,
+            errorType: 'NOT_FOUND',
+            error: edgeData.error || `Student ticket "${safeId || clean}" not found in database.`,
+          };
+        }
+      }
+      if (edgeError && isNetworkException(edgeError)) {
+        return {
+          success: false,
+          verified: false,
+          errorType: 'NETWORK_ERROR',
+          error: 'Network Connection Error: Unable to reach verification server. Please check your internet connection.',
+        };
+      }
+    } catch (edgeErr: any) {
+      if (isNetworkException(edgeErr)) {
+        return {
+          success: false,
+          verified: false,
+          errorType: 'NETWORK_ERROR',
+          error: 'Network Connection Error: Unable to reach verification server. Please check your internet connection.',
+        };
+      }
+    }
+
+    // 3. Fallback table query for authenticated staff
     const tablesToTry = ['registrations_2027', 'registrations'];
-
     for (const table of tablesToTry) {
       try {
         let query = supabase.from(table).select('*');
-
         if (safeId && safeToken) {
           query = query.or(`id.ilike.%${safeId}%,qr_token.ilike.%${safeToken}%`);
         } else if (safeId) {
           query = query.or(`id.ilike.%${safeId}%,qr_token.ilike.%${safeId}%`);
         } else if (safeToken) {
           query = query.or(`qr_token.ilike.%${safeToken}%,id.ilike.%${safeToken}%`);
-        } else if (safeRaw) {
-          query = query.or(`id.ilike.%${safeRaw}%,qr_token.ilike.%${safeRaw}%`);
         }
 
         const { data, error } = await query.limit(1);
         if (!error && Array.isArray(data) && data.length > 0) {
-          return fromRegistrationDbRow(data[0]);
+          const row = fromRegistrationDbRow(data[0]);
+          if (row.paymentStatus !== 'paid') {
+            return {
+              success: false,
+              verified: false,
+              errorType: 'UNPAID',
+              error: `Payment Pending: Registration "${row.id}" is in "${row.paymentStatus}" status.`,
+            };
+          }
+          if (safeToken && row.qrToken && row.qrToken.toUpperCase() !== safeToken.toUpperCase()) {
+            return {
+              success: false,
+              verified: false,
+              errorType: 'TOKEN_MISMATCH',
+              error: `Cryptographic QR token mismatch for registration "${row.id}".`,
+            };
+          }
+          return { success: true, verified: true, student: row };
         }
-      } catch (err) {
-        console.warn(`[Supabase] Cloud lookup on ${table} error:`, err);
+      } catch (err: any) {
+        if (isNetworkException(err)) {
+          return {
+            success: false,
+            verified: false,
+            errorType: 'NETWORK_ERROR',
+            error: 'Network Connection Error: Unable to reach verification server. Please check your internet connection.',
+          };
+        }
       }
     }
 
+    return {
+      success: false,
+      verified: false,
+      errorType: 'NOT_FOUND',
+      error: `Student ticket "${safeId || clean}" not found in database.`,
+    };
+  },
+
+  /**
+   * Authoritative cloud ticket lookup by Token, ID, URL, or scanned QR payload.
+   * Checks consolidated registrations_2027 via secure verification.
+   */
+  async lookupRegistrationByIdOrToken(
+    identifier: string,
+    tokenParam?: string
+  ): Promise<RegistrationRecord | null> {
+    const res = await this.verifyStudentTicket(identifier, tokenParam);
+    if (res.verified && res.student) {
+      return res.student;
+    }
     return null;
   },
 
@@ -525,25 +836,47 @@ export const SupabaseService = {
     };
     error?: string;
   }> {
-    const { data, error } = await supabase.functions.invoke<{
-      success: boolean;
-      verified: boolean;
-      student?: any;
-      error?: string;
-    }>('verify-student-id', {
-      body: { id, token, year },
-    });
+    try {
+      const { data, error } = await supabase.functions.invoke<{
+        success: boolean;
+        verified: boolean;
+        student?: any;
+        error?: string;
+      }>('verify-student-id', {
+        body: { id, token, year },
+      });
 
-    if (error || !data?.verified || !data.student) {
+      if (!error && data?.verified && data.student) {
+        return {
+          verified: true,
+          student: data.student,
+        };
+      }
+    } catch (_) {}
+
+    // Fallback: Use direct RPC verification
+    const rpcRes = await this.verifyStudentTicket(id, token);
+    if (rpcRes.verified && rpcRes.student) {
       return {
-        verified: false,
-        error: data?.error || error?.message || 'Verification failed. Student ID or token is invalid.',
+        verified: true,
+        student: {
+          id: rpcRes.student.id,
+          fullName: rpcRes.student.fullName,
+          fullNameBn: rpcRes.student.fullNameBn || null,
+          category: rpcRes.student.category,
+          batchName: rpcRes.student.batchName,
+          passingYear: rpcRes.student.passingYear || null,
+          currentClass: rpcRes.student.currentClass || null,
+          photoUrl: rpcRes.student.photoUrl,
+          cardStatus: 'ELIGIBLE',
+          verifiedAt: new Date().toISOString(),
+        },
       };
     }
 
     return {
-      verified: true,
-      student: data.student,
+      verified: false,
+      error: rpcRes.error || 'Verification failed. Student ID or token is invalid.',
     };
   },
 

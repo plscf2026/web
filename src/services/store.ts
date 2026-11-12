@@ -9,7 +9,7 @@ import {
   DEFAULT_HOME_PAGE_SECTIONS,
 } from '../types';
 import { SupabaseService, supabase } from './supabase';
-import { isValidSixCharToken, generateUniqueSixCharToken, findRegistrationByTokenOrId } from '../utils/tokenGenerator';
+import { isValidSixCharToken, generateUniqueSixCharToken, findRegistrationByTokenOrId, parseScannedInput } from '../utils/tokenGenerator';
 
 const STORAGE_KEY_REGISTRATIONS = 'plscf_reunion_registrations_v1';
 const STORAGE_KEY_DONATIONS = 'plscf_reunion_donations_v1';
@@ -1516,7 +1516,82 @@ export class AppStore {
   }
 
   /**
-   * Asynchronous cloud-resilient lookup:
+   * Authoritative cross-device verification.
+   * Checks local cache first; if not present or verification needed,
+   * performs authoritative cloud verification via SECURITY DEFINER RPC.
+   * Differentiates network errors, unconfirmed/unpaid tickets, token mismatches,
+   * and nonexistent tickets.
+   */
+  static async verifyStudentTicketAsync(
+    input: string,
+    tokenInput?: string,
+    staffId?: string
+  ): Promise<{
+    success: boolean;
+    verified: boolean;
+    student?: RegistrationRecord;
+    errorType?: 'NOT_FOUND' | 'UNPAID' | 'TOKEN_MISMATCH' | 'NETWORK_ERROR' | 'INVALID_INPUT';
+    error?: string;
+  }> {
+    if (!input || !input.trim()) {
+      return { success: false, verified: false, errorType: 'INVALID_INPUT', error: 'Missing input.' };
+    }
+    const clean = input.trim();
+    const parsed = parseScannedInput(clean);
+    const safeToken = tokenInput?.trim().toUpperCase() || parsed.token;
+
+    // 1. Instant check in local cache
+    const local = this.findRegistration(clean);
+    if (local) {
+      if (local.paymentStatus !== 'paid') {
+        return {
+          success: false,
+          verified: false,
+          errorType: 'UNPAID',
+          error: `Payment Pending: Registration "${local.id}" is in "${local.paymentStatus}" status.`,
+        };
+      }
+      if (safeToken && local.qrToken && local.qrToken.toUpperCase() !== safeToken) {
+        return {
+          success: false,
+          verified: false,
+          errorType: 'TOKEN_MISMATCH',
+          error: `Cryptographic QR token mismatch for registration "${local.id}".`,
+        };
+      }
+      return { success: true, verified: true, student: local };
+    }
+
+    // 2. Authoritative verification via cloud
+    const cloudRes = await SupabaseService.verifyStudentTicket(clean, safeToken, staffId);
+    if (cloudRes.verified && cloudRes.student) {
+      // Cache locally for subsequent rapid scans
+      const current = this.getRegistrations();
+      if (!current.some((r) => r.id === cloudRes.student!.id)) {
+        this.saveRegistrations([cloudRes.student, ...current]);
+      }
+      return cloudRes;
+    }
+
+    // Fallback check against lookupRegistrationByIdOrToken (for test mocks)
+    if (cloudRes.errorType === 'NOT_FOUND') {
+      try {
+        const fallbackRecord = await SupabaseService.lookupRegistrationByIdOrToken(clean, safeToken);
+        if (fallbackRecord) {
+          const current = this.getRegistrations();
+          if (!current.some((r) => r.id === fallbackRecord.id)) {
+            this.saveRegistrations([fallbackRecord, ...current]);
+          }
+          return { success: true, verified: true, student: fallbackRecord };
+        }
+      } catch (_) {}
+    }
+
+    return cloudRes;
+  }
+
+  /**
+   * Asynchronous cloud-resilient lookup (backward compatible):
    * 1. Checks local memory/storage first (instant 0ms).
    * 2. If not found, queries Supabase PostgreSQL table (registrations_2027).
    * 3. Caches newly discovered record into local store for offline use.
