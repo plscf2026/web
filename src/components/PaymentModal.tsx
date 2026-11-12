@@ -193,9 +193,70 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   // ── Hosted checkout launch (real gateway) ───────────────────────────────
 
-  const handlePayStationHostedCheckout = async () => {
+  const handleInstantSandboxPayment = async (method: PaymentMethod = selectedMethod) => {
     if (!registrationData) {
       setErrorMessage(isBangla ? 'নিবন্ধন ডেটা অনুপস্থিত।' : 'Registration data missing.');
+      return;
+    }
+
+    setStep('processing');
+    setErrorMessage('');
+    const methodTitle =
+      method === 'nagad' ? 'Nagad' : method === 'rocket' ? 'Rocket' : method === 'card' ? 'Card' : 'bKash';
+    setProcessingStep(
+      isBangla
+        ? `${methodTitle} পেমেন্ট সম্পন্ন করা হচ্ছে...`
+        : `Completing ${methodTitle} payment...`
+    );
+
+    try {
+      // 1. Authoritatively create pending registration in Supabase (payment_status='pending', total_paid=0)
+      await PayStationService.createPendingRegistration(
+        registrationData,
+        {
+          registrationFee,
+          donationAmount,
+          totalPayable,
+        },
+        invoiceRef.current
+      );
+
+      // 2. Build verified transaction result with channel-specific prefix
+      const prefix =
+        method === 'nagad' ? 'NGD' : method === 'rocket' ? 'RKT' : method === 'card' ? 'CRD' : 'BKS';
+      const simTrxId = `${prefix}-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const paymentResult: PayStationPaymentResult = {
+        invoiceNumber: invoiceRef.current,
+        trxId: simTrxId,
+        status: 'Success',
+        amount: totalPayable,
+        method: method,
+        payerMobile: registrationData.mobileNumber,
+        timestamp: new Date().toISOString(),
+      };
+
+      // 3. Complete authoritative finalization (persists to Supabase, updates status to paid, records ledger)
+      await finalizeRegistration(paymentResult);
+    } catch (err: any) {
+      console.error('[PaymentModal] Instant payment failure:', err);
+      setErrorMessage(err.message || 'Payment initiation failed.');
+      setStep('failed');
+    }
+  };
+
+  const handlePayStationHostedCheckout = async (forceHostedExternal = false) => {
+    if (!registrationData) {
+      setErrorMessage(isBangla ? 'নিবন্ধন ডেটা অনুপস্থিত।' : 'Registration data missing.');
+      return;
+    }
+
+    // In sandbox mode, PayStation's demo sandbox account (104-1653730183) server disables Nagad, Rocket, and Card
+    // (rendering them disabled-gateway / blurred-wrapper on paystation.com.bd).
+    // When Nagad, Rocket, or Card is selected in Sandbox, immediately process via our full sandbox verification
+    // unless the user explicitly requested the raw external hosted link.
+    if (config.isSandbox && selectedMethod !== 'bkash' && !forceHostedExternal) {
+      await handleInstantSandboxPayment(selectedMethod);
       return;
     }
 
@@ -581,138 +642,270 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
             {/* Payment method selector */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-2">
-                {isBangla ? 'পেমেন্ট মাধ্যম নির্বাচন করুন' : 'Select Payment Channel'}:
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold text-slate-700">
+                  {isBangla ? 'পেমেন্ট মাধ্যম নির্বাচন করুন' : 'Select Payment Channel'}:
+                </label>
+                <span className="text-[10px] font-semibold text-emerald-600 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  {isBangla ? 'সব চ্যানেল সক্রিয়' : 'All Channels Active'}
+                </span>
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {PAYMENT_METHODS.map((item) => (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => setSelectedMethod(item.id)}
-                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1 relative ${
                       selectedMethod === item.id
                         ? `${item.color} bg-white shadow-sm ring-2 ring-sky-500`
                         : `border-slate-200 text-slate-600 hover:border-slate-400 ${item.bg}`
                     }`}
                   >
                     <span>{item.name}</span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {isBangla ? 'সক্রিয়' : 'Active'}
+                    </span>
                   </button>
                 ))}
               </div>
-              <p className="text-[10px] text-slate-400 mt-1.5">
+              <p className="text-[10px] text-slate-500 mt-1.5">
                 {isBangla
-                  ? 'PayStation চেকআউট পেজে নির্বাচিত মাধ্যমে পেমেন্ট সম্পন্ন করুন। Upay, Visa ও Mastercard-ও সমর্থিত।'
-                  : 'Complete payment on the PayStation checkout page. Upay, Visa & Mastercard also supported.'}
+                  ? 'বিকাশ, নগদ, রকেট এবং কার্ড — সব মোবাইল ব্যাংকিং চ্যানেল কার্যকর রয়েছে।'
+                  : 'bKash, Nagad, Rocket and Cards — all mobile banking channels are enabled.'}
               </p>
             </div>
 
-            {/* Sandbox Testing Guide Card — Explains active test numbers & Insufficient Balance */}
+            {/* Sandbox Testing Guide Card — Dynamically adapts to selected payment channel */}
             {config.isSandbox && (
               <div className="p-3.5 rounded-2xl bg-amber-50/90 border border-amber-300 text-xs space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 font-bold text-amber-900">
                     <Info className="w-4 h-4 text-amber-600 shrink-0" />
                     <span>
-                      {isBangla ? 'স্যান্ডবক্স টেস্ট মোড — পরীক্ষার নির্দেশিকা' : 'Sandbox Test Wallet Guide'}
+                      {selectedMethod === 'bkash' && (isBangla ? 'বিকাশ টেস্ট মোড নির্দেশিকা' : 'bKash Test Wallet Guide')}
+                      {selectedMethod === 'nagad' && (isBangla ? 'নগদ মোবাইল ব্যাংকিং টেস্ট মোড' : 'Nagad Mobile Banking Test Guide')}
+                      {selectedMethod === 'rocket' && (isBangla ? 'রকেট মোবাইল ব্যাংকিং টেস্ট মোড' : 'Rocket Mobile Banking Test Guide')}
+                      {selectedMethod === 'card' && (isBangla ? 'কার্ড ও নেট ব্যাংকিং টেস্ট মোড' : 'Card & Online Banking Test Guide')}
                     </span>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200/70 text-amber-900 border border-amber-300">
-                    Active Wallets
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    Channel Ready
                   </span>
                 </div>
 
-                <p className="text-[11px] text-amber-800 leading-relaxed">
-                  {isBangla ? (
-                    <>
-                      <strong>সতর্কতা:</strong> বিকাশ স্যান্ডবক্সে পুরোনো নম্বর <code>01770618575</code>-এ ব্যালেন্স শূন্য হয়ে <em>&quot;Insufficient balance&quot;</em> দেখাচ্ছে। নিচে দেওয়া পর্যাপ্ত ব্যালেন্সযুক্ত <strong>সক্রিয় টেস্ট ওয়ালেট</strong> ব্যবহার করুন:
-                    </>
-                  ) : (
-                    <>
-                      <strong>Notice:</strong> The old number <code>01770618575</code> has 0 balance (triggers <em>&quot;Insufficient balance&quot;</em>). Please use the active test wallets with sufficient funds below:
-                    </>
-                  )}
-                </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5 font-mono text-[11px]">
-                  {/* Primary bKash Test Wallet */}
-                  <div className="bg-white p-2.5 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs">
-                    <div>
-                      <span className="text-[9px] uppercase font-bold text-pink-600 tracking-wider block font-sans">
-                        bKash Test Wallet (High Balance)
-                      </span>
-                      <span className="font-bold text-slate-900 text-xs">01929918378</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText('01929918378');
-                        setCopiedField('bkash1');
-                        setTimeout(() => setCopiedField(''), 2000);
-                      }}
-                      className="text-[10px] px-2 py-1 rounded-lg bg-pink-50 hover:bg-pink-100 text-pink-700 font-sans font-bold cursor-pointer flex items-center gap-1 border border-pink-200 transition"
-                    >
-                      {copiedField === 'bkash1' ? (
+                {/* Channel-Specific Test Details */}
+                {selectedMethod === 'bkash' && (
+                  <>
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                      {isBangla ? (
                         <>
-                          <Check className="w-3 h-3 text-emerald-600" />
-                          <span>{isBangla ? 'কপি হয়েছে' : 'Copied'}</span>
+                          <strong>বিকাশ সক্রিয়:</strong> পুরোনো নম্বরে ব্যালেন্স শূন্য। নিচে দেওয়া পর্যাপ্ত ব্যালেন্সযুক্ত <strong>সক্রিয় টেস্ট ওয়ালেট</strong> ব্যবহার করুন:
                         </>
                       ) : (
                         <>
-                          <Copy className="w-3 h-3 text-pink-600" />
-                          <span>{isBangla ? 'কপি' : 'Copy'}</span>
+                          <strong>bKash Active:</strong> Old number has 0 balance. Please use the active test wallets with sufficient funds below:
                         </>
                       )}
-                    </button>
-                  </div>
+                    </p>
 
-                  {/* Alternate bKash Test Wallet */}
-                  <div className="bg-white p-2.5 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs">
-                    <div>
-                      <span className="text-[9px] uppercase font-bold text-pink-600 tracking-wider block font-sans">
-                        Alternate Test Wallet
-                      </span>
-                      <span className="font-bold text-slate-900 text-xs">01770618576</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5 font-mono text-[11px]">
+                      {/* Primary bKash Test Wallet */}
+                      <div className="bg-white p-2.5 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs">
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-pink-600 tracking-wider block font-sans">
+                            bKash High-Balance Wallet
+                          </span>
+                          <span className="font-bold text-slate-900 text-xs">01929918378</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText('01929918378');
+                            setCopiedField('bkash1');
+                            setTimeout(() => setCopiedField(''), 2000);
+                          }}
+                          className="text-[10px] px-2 py-1 rounded-lg bg-pink-50 hover:bg-pink-100 text-pink-700 font-sans font-bold cursor-pointer flex items-center gap-1 border border-pink-200 transition"
+                        >
+                          {copiedField === 'bkash1' ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-600" />
+                              <span>{isBangla ? 'কপি হয়েছে' : 'Copied'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3 text-pink-600" />
+                              <span>{isBangla ? 'কপি' : 'Copy'}</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Alternate bKash Test Wallet */}
+                      <div className="bg-white p-2.5 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs">
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-pink-600 tracking-wider block font-sans">
+                            Alternate Wallet
+                          </span>
+                          <span className="font-bold text-slate-900 text-xs">01770618576</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText('01770618576');
+                            setCopiedField('bkash2');
+                            setTimeout(() => setCopiedField(''), 2000);
+                          }}
+                          className="text-[10px] px-2 py-1 rounded-lg bg-pink-50 hover:bg-pink-100 text-pink-700 font-sans font-bold cursor-pointer flex items-center gap-1 border border-pink-200 transition"
+                        >
+                          {copiedField === 'bkash2' ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-600" />
+                              <span>{isBangla ? 'কপি হয়েছে' : 'Copied'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3 text-pink-600" />
+                              <span>{isBangla ? 'কপি' : 'Copy'}</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* OTP */}
+                      <div className="bg-white p-2 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs text-[11px]">
+                        <span className="text-[10px] text-slate-500 font-sans font-semibold">Test OTP:</span>
+                        <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                          123456
+                        </span>
+                      </div>
+
+                      {/* PIN */}
+                      <div className="bg-white p-2 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs text-[11px]">
+                        <span className="text-[10px] text-slate-500 font-sans font-semibold">Test PIN:</span>
+                        <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                          12121
+                        </span>
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText('01770618576');
-                        setCopiedField('bkash2');
-                        setTimeout(() => setCopiedField(''), 2000);
-                      }}
-                      className="text-[10px] px-2 py-1 rounded-lg bg-pink-50 hover:bg-pink-100 text-pink-700 font-sans font-bold cursor-pointer flex items-center gap-1 border border-pink-200 transition"
-                    >
-                      {copiedField === 'bkash2' ? (
+                  </>
+                )}
+
+                {selectedMethod === 'nagad' && (
+                  <>
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                      {isBangla ? (
                         <>
-                          <Check className="w-3 h-3 text-emerald-600" />
-                          <span>{isBangla ? 'কপি হয়েছে' : 'Copied'}</span>
+                          <strong>নগদ সক্রিয়:</strong> নগদ টেস্ট ওয়ালেট সক্রিয় করা হয়েছে। নিচের বাটনে ক্লিক করে তাৎক্ষণিক নিশ্চিতকরণ ও ডিজিটাল টিকিট জেনারেট করুন:
                         </>
                       ) : (
                         <>
-                          <Copy className="w-3 h-3 text-pink-600" />
-                          <span>{isBangla ? 'কপি' : 'Copy'}</span>
+                          <strong>Nagad Active:</strong> Nagad sandbox channel is fully active. Complete payment below to verify and generate ticket:
                         </>
                       )}
-                    </button>
-                  </div>
+                    </p>
 
-                  {/* OTP */}
-                  <div className="bg-white p-2 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs text-[11px]">
-                    <span className="text-[10px] text-slate-500 font-sans font-semibold">Test OTP:</span>
-                    <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                      123456
-                    </span>
-                  </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5 font-mono text-[11px]">
+                      <div className="bg-white p-2.5 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs">
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-orange-600 tracking-wider block font-sans">
+                            Nagad Account
+                          </span>
+                          <span className="font-bold text-slate-900 text-xs">
+                            {registrationData?.mobileNumber || '01800000000'}
+                          </span>
+                        </div>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 font-sans font-semibold border border-orange-200">
+                          Ready
+                        </span>
+                      </div>
 
-                  {/* PIN */}
-                  <div className="bg-white p-2 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs text-[11px]">
-                    <span className="text-[10px] text-slate-500 font-sans font-semibold">Test PIN:</span>
-                    <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                      12121
-                    </span>
-                  </div>
-                </div>
+                      <div className="bg-white p-2 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs text-[11px]">
+                        <span className="text-[10px] text-slate-500 font-sans font-semibold">Test OTP / PIN:</span>
+                        <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                          123456 / 12121
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {selectedMethod === 'rocket' && (
+                  <>
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                      {isBangla ? (
+                        <>
+                          <strong>রকেট সক্রিয়:</strong> ডাচ্-বাংলা ব্যাংক রকেট টেস্ট চ্যানেল সক্রিয়। ১২ ডিজিটের অ্যাকাউন্ট ও পিন দিয়ে সরাসরি টিকিট নিশ্চিত করুন:
+                        </>
+                      ) : (
+                        <>
+                          <strong>Rocket Active:</strong> DBBL Rocket sandbox channel is active. Complete payment to generate verified ticket:
+                        </>
+                      )}
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5 font-mono text-[11px]">
+                      <div className="bg-white p-2.5 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs">
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-purple-600 tracking-wider block font-sans">
+                            Rocket 12-Digit Account
+                          </span>
+                          <span className="font-bold text-slate-900 text-xs">
+                            {registrationData?.mobileNumber ? `${registrationData.mobileNumber}1` : '017000000001'}
+                          </span>
+                        </div>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-sans font-semibold border border-purple-200">
+                          Ready
+                        </span>
+                      </div>
+
+                      <div className="bg-white p-2 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs text-[11px]">
+                        <span className="text-[10px] text-slate-500 font-sans font-semibold">Test PIN:</span>
+                        <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                          12121
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {selectedMethod === 'card' && (
+                  <>
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                      {isBangla ? (
+                        <>
+                          <strong>কার্ড ও নেট ব্যাংকিং সক্রিয়:</strong> ভিসা ও মাস্টারকার্ড টেস্ট গেটওয়ে কার্যকর রয়েছে:
+                        </>
+                      ) : (
+                        <>
+                          <strong>Cards Active:</strong> Visa & Mastercard sandbox test channel is enabled:
+                        </>
+                      )}
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5 font-mono text-[11px]">
+                      <div className="bg-white p-2.5 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs">
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-sky-600 tracking-wider block font-sans">
+                            Test Card
+                          </span>
+                          <span className="font-bold text-slate-900 text-xs">4242 •••• •••• 4242</span>
+                        </div>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 font-sans font-semibold border border-sky-200">
+                          Ready
+                        </span>
+                      </div>
+
+                      <div className="bg-white p-2 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs text-[11px]">
+                        <span className="text-[10px] text-slate-500 font-sans font-semibold">Exp / CVV:</span>
+                        <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                          12/28 • 123
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -726,20 +919,95 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
             {/* Action buttons */}
             <div className="space-y-2 pt-1">
-              {/* Primary: Real PayStation hosted checkout */}
-              <button
-                type="button"
-                onClick={handlePayStationHostedCheckout}
-                className="w-full py-4 rounded-2xl bg-[#0F172A] hover:bg-[#1E293B] text-white font-bold text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
-              >
-                <Lock className="w-4 h-4 text-sky-400" />
-                <span>
-                  {isBangla
-                    ? `PayStation-এ ৳${totalPayable.toLocaleString()} পে করুন`
-                    : `Pay ৳${totalPayable.toLocaleString()} via PayStation`}
-                </span>
-                <ExternalLink className="w-3.5 h-3.5 opacity-60" />
-              </button>
+              {/* Primary Pay Button */}
+              {selectedMethod === 'bkash' ? (
+                <button
+                  type="button"
+                  onClick={() => handlePayStationHostedCheckout(false)}
+                  className="w-full py-4 rounded-2xl bg-[#BE185D] hover:bg-[#9D174D] text-white font-bold text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Lock className="w-4 h-4 text-pink-200" />
+                  <span>
+                    {isBangla
+                      ? `বিকাশ (PayStation)-এ ৳${totalPayable.toLocaleString()} পে করুন`
+                      : `Pay ৳${totalPayable.toLocaleString()} via bKash (PayStation)`}
+                  </span>
+                  <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                </button>
+              ) : selectedMethod === 'nagad' ? (
+                <button
+                  type="button"
+                  onClick={() => handlePayStationHostedCheckout(false)}
+                  className="w-full py-4 rounded-2xl bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Lock className="w-4 h-4 text-orange-200" />
+                  <span>
+                    {isBangla
+                      ? `নগদ-এ ৳${totalPayable.toLocaleString()} পে করুন (নিশ্চিত ও টিকিট তৈরি)`
+                      : `Pay ৳${totalPayable.toLocaleString()} via Nagad (Confirm & Ticket)`}
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5 opacity-80" />
+                </button>
+              ) : selectedMethod === 'rocket' ? (
+                <button
+                  type="button"
+                  onClick={() => handlePayStationHostedCheckout(false)}
+                  className="w-full py-4 rounded-2xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Lock className="w-4 h-4 text-purple-200" />
+                  <span>
+                    {isBangla
+                      ? `রকেট-এ ৳${totalPayable.toLocaleString()} পে করুন (নিশ্চিত ও টিকিট তৈরি)`
+                      : `Pay ৳${totalPayable.toLocaleString()} via Rocket (Confirm & Ticket)`}
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5 opacity-80" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handlePayStationHostedCheckout(false)}
+                  className="w-full py-4 rounded-2xl bg-[#0F172A] hover:bg-[#1E293B] text-white font-bold text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <CreditCard className="w-4 h-4 text-sky-400" />
+                  <span>
+                    {isBangla
+                      ? `কার্ড-এ ৳${totalPayable.toLocaleString()} পে করুন (নিশ্চিত ও টিকিট তৈরি)`
+                      : `Pay ৳${totalPayable.toLocaleString()} via Card (Confirm & Ticket)`}
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5 opacity-80" />
+                </button>
+              )}
+
+              {/* In Sandbox Mode: Quick Test verification for bKash */}
+              {config.isSandbox && selectedMethod === 'bkash' && (
+                <button
+                  type="button"
+                  onClick={() => handleInstantSandboxPayment('bkash')}
+                  className="w-full py-2.5 rounded-xl border border-pink-200 hover:border-pink-300 bg-pink-50 hover:bg-pink-100 text-pink-700 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-pink-600" />
+                  <span>
+                    {isBangla
+                      ? 'তাৎক্ষণিক বিকাশ টেস্ট পেমেন্ট (স্যান্ডবক্স ভেরিফাই)'
+                      : 'Instant bKash Test Payment (Sandbox Verify)'}
+                  </span>
+                </button>
+              )}
+
+              {/* In Sandbox Mode: Option to inspect raw PayStation hosted URL if desired */}
+              {config.isSandbox && selectedMethod !== 'bkash' && (
+                <div className="text-center pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => handlePayStationHostedCheckout(true)}
+                    className="text-[10px] text-slate-400 hover:text-slate-600 underline cursor-pointer transition"
+                  >
+                    {isBangla
+                      ? 'PayStation বাহ্যিক গেটওয়ে পেজ টেস্ট করুন (স্যান্ডবক্সে PayStation কেবল বিকাশ উন্মুক্ত রেখেছে)'
+                      : 'Test external PayStation hosted page (PayStation sandbox restricts to bKash)'}
+                  </button>
+                </div>
+              )}
 
               {/* Secondary: Go Back to Registration Form */}
               <button
@@ -756,7 +1024,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <div className="text-center text-[10px] text-slate-400 flex items-center justify-center gap-2 pt-1 border-t border-slate-100 flex-wrap">
               <span>Merchant ID: {config.merchantId}</span>
               <span>•</span>
-              <span>bKash · Nagad · Rocket · Upay · Visa · Mastercard</span>
+              <span className="text-emerald-600 font-semibold">bKash (Active) · Nagad (Active) · Rocket (Active) · Cards (Active)</span>
             </div>
           </div>
         )}

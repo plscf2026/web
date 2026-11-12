@@ -52,6 +52,7 @@ test('Registration Form Data Preservation on Payment Failure and Reset on Succes
     PayStationService.savePendingSession({
       invoiceNumber: 'INV-TEST-001',
       type: 'registration',
+      amount: 2000,
       formData: sampleStudent,
       fees: {
         registrationFee: 1500,
@@ -92,3 +93,4 @@ test('Registration Form Data Preservation on Payment Failure and Reset on Succes
     assert.equal(draftAfterSuccess, null, 'Registration draft must be removed after success');
   });
 });
+
