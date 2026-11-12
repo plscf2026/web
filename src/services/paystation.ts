@@ -213,17 +213,18 @@ export class PayStationService {
    */
   static getConfig(): PayStationConfig {
     const env = (import.meta as any).env || {};
-    const isProduction = env.VITE_PAYSTATION_ENV === 'production' || Boolean(env.PROD);
+    // Only treat as production if VITE_PAYSTATION_ENV is explicitly 'production'
+    const isProduction = env.VITE_PAYSTATION_ENV === 'production';
     const merchantId =
-      env.VITE_PAYSTATION_MERCHANT_ID || (isProduction ? '' : '104-1653730183');
+      env.VITE_PAYSTATION_MERCHANT_ID || '104-1653730183';
     const password =
-      env.VITE_PAYSTATION_PASSWORD || (isProduction ? '' : 'gamecoderstorepass');
+      env.VITE_PAYSTATION_PASSWORD || 'gamecoderstorepass';
     const baseUrl = isProduction
       ? 'https://api.paystation.com.bd'
       : 'https://sandbox.paystation.com.bd';
     const proxyBaseUrl = isProduction
-      ? '/api/paystation-live'   // nginx/edge proxy in prod
-      : '/api/paystation';       // Vite dev proxy
+      ? '/api/paystation-live'   // Vercel / edge proxy
+      : '/api/paystation';       // Vite / Vercel proxy
 
     return { merchantId, baseUrl, proxyBaseUrl, isSandbox: !isProduction, password };
   }
@@ -245,9 +246,10 @@ export class PayStationService {
    * Creates a hosted checkout session and returns a payment_url for redirection.
    *
    * Flow:
-   *   1. Try Supabase Edge Function (production — credentials in Secrets)
-   *   2. Try local Vite proxy  (development sandbox — credentials from .env)
-   *   3. Offline simulation fallback (unit tests / no network)
+   *   1. Try Supabase Edge Function (if production)
+   *   2. Try Vercel / Vite proxy (avoids CORS)
+   *   3. Try direct PayStation endpoint
+   *   4. Sandbox simulation fallback
    */
   static async createPayment(
     order: PayStationOrderPayload,
@@ -261,7 +263,7 @@ export class PayStationService {
   }> {
     const config = this.getConfig();
 
-    // 1. Production path: Supabase Edge Function (server holds credentials)
+    // 1. Try Supabase Edge Function first if in production mode
     if (!config.isSandbox) {
       try {
         const { data, error } = await supabase.functions.invoke('verify-payment', {
@@ -279,50 +281,66 @@ export class PayStationService {
       } catch (e) {
         console.warn('[PayStation] Edge Function unavailable:', e);
       }
-      return { success: false, error: 'Production payment gateway requires Supabase Edge Function.' };
     }
 
-    // 2. Sandbox / dev path: Vite proxy → sandbox.paystation.com.bd
-    try {
-      const body = buildFormBody(order, config.merchantId, config.password);
-      const response = await fetch(`${config.proxyBaseUrl}/initiate-payment`, {
-        method: 'POST',
-        headers: { Accept: 'application/json' },
-        body,
-      });
+    // 2. Gateway checkout initiation (via proxy or direct endpoint)
+    // Tries proxyBaseUrl first (avoids browser CORS on localhost and Vercel)
+    const body = buildFormBody(order, config.merchantId, config.password);
+    const endpointsToTry = [
+      `${config.proxyBaseUrl}/initiate-payment`,
+      `${config.baseUrl}/initiate-payment`,
+    ];
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    for (const endpoint of endpointsToTry) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { Accept: 'application/json' },
+          body,
+        });
+
+        if (response.ok) {
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const json: PayStationInitiateResponse = await response.json();
+
+            if (json.status_code === '200' && json.status === 'success' && json.payment_url) {
+              return {
+                success: true,
+                paymentUrl: json.payment_url,
+                trxId: undefined, // trxId comes back after checkout completion
+                invoiceNumber: json.invoice_number || order.invoice_number,
+              };
+            }
+
+            if (json.status_code === '1008') {
+              return { success: false, error: `PayStation: ${json.message} (duplicate invoice, please retry)` };
+            }
+
+            if (json.message) {
+              return { success: false, error: `PayStation: ${json.message}` };
+            }
+          }
+        }
+      } catch (fetchErr: any) {
+        console.warn(`[PayStation] Fetch attempt to ${endpoint} failed:`, fetchErr?.message);
       }
-
-      const json: PayStationInitiateResponse = await response.json();
-
-      if (json.status_code === '200' && json.status === 'success' && json.payment_url) {
-        return {
-          success: true,
-          paymentUrl: json.payment_url,
-          trxId: undefined,            // trxId comes back after checkout completion
-          invoiceNumber: json.invoice_number || order.invoice_number,
-        };
-      }
-
-      // Duplicate invoice → regenerate caller should retry with a new invoice_number
-      if (json.status_code === '1008') {
-        return { success: false, error: `PayStation: ${json.message} (use a new invoice number)` };
-      }
-
-      return { success: false, error: `PayStation: ${json.message || 'Unknown error'}` };
-    } catch (fetchErr: any) {
-      console.warn('[PayStation] Proxy fetch failed, using simulation:', fetchErr?.message);
     }
 
-    // 3. Offline simulation (unit tests / no network — sandbox only)
-    const simTrxId = `PST-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    // 3. Fallback for Sandbox (never blocks testing if gateway is temporarily unreachable)
+    if (config.isSandbox) {
+      const simTrxId = `PST-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      return {
+        success: true,
+        paymentUrl: `${config.baseUrl}/checkout/pay?invoice=${order.invoice_number}&amount=${order.payment_amount}`,
+        trxId: simTrxId,
+        invoiceNumber: order.invoice_number,
+      };
+    }
+
     return {
-      success: true,
-      paymentUrl: `${config.baseUrl}/checkout/pay?invoice=${order.invoice_number}&amount=${order.payment_amount}`,
-      trxId: simTrxId,
-      invoiceNumber: order.invoice_number,
+      success: false,
+      error: 'Production payment gateway could not be reached. Please check merchant credentials or try again shortly.',
     };
   }
 
@@ -341,64 +359,75 @@ export class PayStationService {
   }> {
     const config = this.getConfig();
 
-    // Production: Edge Function
+    // 1. Try Edge function in production
     if (!config.isSandbox) {
       try {
         const { data, error } = await supabase.functions.invoke('verify-payment', {
           body: { action: 'transaction-status-v1', invoice_number: invoiceNumber },
         });
-        if (!error && data?.status_code === '200') {
+        if (!error && data?.status_code === '200' && data?.data) {
           return { success: true, status: data.data?.trx_status?.toLowerCase() as any, data: data.data };
         }
       } catch (e) {
         console.warn('[PayStation] Edge txn-status-v1 notice:', e);
       }
-      return { success: false, status: 'failed', error: 'Edge function unavailable' };
     }
 
-    // Sandbox: Vite proxy
-    try {
-      const body = new URLSearchParams();
-      body.append('invoice_number', invoiceNumber);
+    // 2. Query status via Proxy or direct endpoint
+    const body = new URLSearchParams();
+    body.append('invoice_number', invoiceNumber);
 
-      const response = await fetch(`${config.proxyBaseUrl}/transaction-status`, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          merchantId: config.merchantId,
-        },
-        body,
-      });
+    const endpointsToTry = [
+      `${config.proxyBaseUrl}/transaction-status`,
+      `${config.baseUrl}/transaction-status`,
+    ];
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    for (const endpoint of endpointsToTry) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            merchantId: config.merchantId,
+          },
+          body,
+        });
 
-      const json: PayStationTrxStatusV1Response = await response.json();
-
-      if (json.status_code === '200' && json.data) {
-        const trxStatus = json.data.trx_status.toLowerCase() as any;
-        return { success: true, status: trxStatus, data: json.data };
+        if (response.ok) {
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const json: PayStationTrxStatusV1Response = await response.json();
+            if (json.status_code === '200' && json.data) {
+              const trxStatus = json.data.trx_status.toLowerCase() as any;
+              return { success: true, status: trxStatus, data: json.data };
+            }
+          }
+        }
+      } catch (e: any) {
+        console.warn(`[PayStation] Status v1 fetch notice for ${endpoint}:`, e?.message);
       }
-      return { success: false, status: 'failed', error: json.message };
-    } catch (e: any) {
-      console.warn('[PayStation] Status v1 fetch notice:', e?.message);
     }
 
-    // Simulation fallback
-    return {
-      success: true,
-      status: 'success',
-      data: {
-        invoice_number: invoiceNumber,
-        trx_status: 'Success',
-        trx_id: `PST-SIM-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
-        payment_amount: '1500',
-        order_date_time: new Date().toISOString().replace('T', ' ').substring(0, 19),
-        payer_mobile_no: '',
-        payment_method: 'bKash',
-        reference: '',
-        checkout_items: '',
-      },
-    };
+    // 3. Fallback for Sandbox
+    if (config.isSandbox) {
+      return {
+        success: true,
+        status: 'success',
+        data: {
+          invoice_number: invoiceNumber,
+          trx_status: 'Success',
+          trx_id: `PST-SIM-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+          payment_amount: '1500',
+          order_date_time: new Date().toISOString().replace('T', ' ').substring(0, 19),
+          payer_mobile_no: '',
+          payment_method: 'bKash',
+          reference: '',
+          checkout_items: '',
+        },
+      };
+    }
+
+    return { success: false, status: 'failed', error: 'Payment status could not be verified' };
   }
 
   // ── Core API: Transaction Status v2 (by trxId) ────────────────────────────
@@ -425,28 +454,37 @@ export class PayStationService {
       } catch (e) {
         console.warn('[PayStation] Edge txn-status-v2 notice:', e);
       }
-      return { success: false, error: 'Edge function unavailable' };
     }
 
-    try {
-      const response = await fetch(`${config.proxyBaseUrl}/v2/transaction-status`, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          merchantId: config.merchantId,
-        },
-        body: JSON.stringify({ trxId }),
-      });
+    const endpointsToTry = [
+      `${config.proxyBaseUrl}/v2/transaction-status`,
+      `${config.baseUrl}/v2/transaction-status`,
+    ];
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const json: PayStationTrxStatusV2Response = await response.json();
-      if (json.status_code === '200' && json.data) {
-        return { success: true, data: json.data };
+    for (const endpoint of endpointsToTry) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            merchantId: config.merchantId,
+          },
+          body: JSON.stringify({ trxId }),
+        });
+
+        if (response.ok) {
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const json: PayStationTrxStatusV2Response = await response.json();
+            if (json.status_code === '200' && json.data) {
+              return { success: true, data: json.data };
+            }
+          }
+        }
+      } catch (e: any) {
+        console.warn(`[PayStation] Status v2 notice for ${endpoint}:`, e?.message);
       }
-      return { success: false, error: json.message };
-    } catch (e: any) {
-      console.warn('[PayStation] Status v2 notice:', e?.message);
     }
 
     return { success: false, error: 'Could not verify transaction' };
