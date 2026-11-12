@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   FileText,
   Image as ImageIcon,
+  Printer,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -31,13 +32,119 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
   className = '',
 }) => {
   const isBangla = language === 'bn';
-  const [downloadingType, setDownloadingType] = useState<'pdf' | 'image' | null>(null);
+  const [downloadingType, setDownloadingType] = useState<'pdf' | 'image' | 'print' | null>(null);
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   const isCurrentStudent = student.batchName.toLowerCase().includes('class');
 
   const safeFilename = `Student_ID_${student.idNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+
+  const handlePrintCard = async () => {
+    try {
+      setDownloadingType('print');
+      setErrorMessage('');
+
+      // Generate high-resolution PNG image
+      const { dataUrl } = await generateIndividualIdCardImage(student);
+
+      // Create an invisible iframe for dedicated printing
+      let iframe = document.getElementById('idcard-print-iframe') as HTMLIFrameElement;
+      if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'idcard-print-iframe';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.style.visibility = 'hidden';
+        document.body.appendChild(iframe);
+      }
+
+      const doc = iframe.contentWindow?.document;
+      if (!doc) {
+        window.print();
+        return;
+      }
+
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>Student ID - ${student.studentName} (${student.idNumber})</title>
+            <style>
+              @page {
+                size: auto;
+                margin: 8mm;
+              }
+              body {
+                margin: 0;
+                padding: 10mm 0;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                font-family: system-ui, -apple-system, sans-serif;
+                background: #ffffff;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+              .card-container {
+                width: 54mm;
+                height: 86mm;
+                page-break-inside: avoid;
+                margin: 0 auto;
+                box-shadow: none;
+              }
+              .card-container img {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+                display: block;
+                border-radius: 3.5mm;
+              }
+              .cut-guide {
+                margin-top: 4mm;
+                font-size: 8pt;
+                color: #64748b;
+                text-align: center;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="card-container">
+              <img src="${dataUrl}" alt="Student ID Card" />
+            </div>
+            <div class="cut-guide">
+              <strong>Police Lines School and College, Faridpur</strong><br/>
+              Standard Physical ID Dimensions: 54 × 86 mm (CR80)
+            </div>
+            <script>
+              window.onload = function() {
+                setTimeout(function() {
+                  window.focus();
+                  window.print();
+                }, 300);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      doc.close();
+
+      setSuccessMessage(isBangla ? 'প্রিন্ট উইন্ডো খোলা হয়েছে!' : 'Print dialog opened!');
+      setTimeout(() => setSuccessMessage(''), 3500);
+    } catch (err: any) {
+      console.error('[StudentIdCardBadge] Print error:', err);
+      window.print();
+    } finally {
+      setDownloadingType(null);
+    }
+  };
 
   const handleDownloadPdf = async () => {
     try {
@@ -276,40 +383,58 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
         </div>
       )}
 
-      {/* Download Action Buttons */}
+      {/* Print & Download Action Buttons */}
       {showActions && (
-        <div className="mt-4 grid grid-cols-2 gap-2.5 w-full max-w-[280px]">
-          {/* Download PDF Button */}
+        <div className="mt-4 flex flex-col gap-2 w-full max-w-[280px]">
+          {/* Primary Action: Print ID Card Photo */}
           <button
             type="button"
-            onClick={handleDownloadPdf}
+            onClick={handlePrintCard}
             disabled={downloadingType !== null}
-            className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60 active:scale-95"
+            className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-bold text-xs sm:text-sm shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2 border border-slate-700 disabled:opacity-60"
           >
-            {downloadingType === 'pdf' ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+            {downloadingType === 'print' ? (
+              <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
             ) : (
-              <FileText className="w-3.5 h-3.5 text-amber-400" />
+              <Printer className="w-4 h-4 text-amber-400" />
             )}
-            <span>{isBangla ? 'PDF ডাউনলোড' : 'Download PDF'}</span>
+            <span>{isBangla ? 'আইডি কার্ড প্রিন্ট করুন' : 'Print ID Card Photo'}</span>
           </button>
 
-          {/* Download Photo Button */}
-          <button
-            type="button"
-            onClick={handleDownloadPhoto}
-            disabled={downloadingType !== null}
-            className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60 active:scale-95"
-          >
-            {downloadingType === 'image' ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-200" />
-            ) : (
-              <ImageIcon className="w-3.5 h-3.5 text-sky-300" />
-            )}
-            <span>{isBangla ? 'ছবি ডাউনলোড' : 'Download Photo'}</span>
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            {/* Download Photo Button */}
+            <button
+              type="button"
+              onClick={handleDownloadPhoto}
+              disabled={downloadingType !== null}
+              className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60 active:scale-95"
+            >
+              {downloadingType === 'image' ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-200" />
+              ) : (
+                <ImageIcon className="w-3.5 h-3.5 text-sky-300" />
+              )}
+              <span>{isBangla ? 'ছবি ডাউনলোড' : 'Download Photo'}</span>
+            </button>
+
+            {/* Download PDF Button */}
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={downloadingType !== null}
+              className="py-2.5 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-bold text-xs shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60 active:scale-95"
+            >
+              {downloadingType === 'pdf' ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+              ) : (
+                <FileText className="w-3.5 h-3.5 text-amber-600" />
+              )}
+              <span>{isBangla ? 'PDF ডাউনলোড' : 'Download PDF'}</span>
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 };
+

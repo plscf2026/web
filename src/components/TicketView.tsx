@@ -112,12 +112,12 @@ export const TicketView: React.FC<TicketViewProps> = ({
               <span>{language === 'bn' ? 'অফিসিয়াল স্টুডেন্ট আইডি কার্ড' : 'Official Student ID Card'}</span>
             </span>
             <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              {language === 'bn' ? 'আপনার আইডি কার্ড ডাউনলোড করুন' : 'Download Your Student ID Card'}
+              {language === 'bn' ? 'আইডি কার্ড প্রিন্ট বা ডাউনলোড করুন' : 'Print or Download Your Student ID Card'}
             </h2>
             <p className="text-xs text-sky-200/80 leading-relaxed">
               {language === 'bn'
-                ? 'ইভেন্টে প্রবেশের জন্য অফিসিয়াল আইডি কার্ডের প্রিন্ট-রেডি PDF অথবা মোবাইল গ্যালারির জন্য উচ্চমানের ছবি (Photo) ডাউনলোড করুন।'
-                : 'Download your official print-ready ID card PDF or high-resolution photo image for your mobile gallery.'}
+                ? 'ইভেন্টে প্রবেশের জন্য অফিসিয়াল আইডি কার্ডের ছবি সরাসরি প্রিন্ট করুন অথবা উচ্চমানের PDF ও Photo ডাউনলোড করুন।'
+                : 'Print your official ID card photo directly, or download print-ready PDF and photo image for your mobile gallery.'}
             </p>
           </div>
           <div className="flex-shrink-0">

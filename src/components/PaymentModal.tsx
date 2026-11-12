@@ -286,65 +286,76 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           {/* ── SUCCESS ── */}
           {step === 'success' && completedTicket && transactionSummary ? (
             <div className="space-y-4 py-1">
-              <div className="text-center space-y-1.5">
-                <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                  <CheckCircle2 className="w-8 h-8" />
+              <div className="text-center space-y-1">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold mb-1 shadow-2xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>{isBangla ? 'পেমেন্ট সফলভাবে সম্পন্ন হয়েছে!' : 'Payment Verified & Confirmed!'}</span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                  {isBangla ? 'পেমেন্ট সফলভাবে সম্পন্ন!' : 'Payment Verified & Confirmed!'}
+                  {isBangla ? 'আপনার স্টুডেন্ট আইডি কার্ড' : 'Your Official Student ID Card'}
                 </h2>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto">
                   {isBangla
-                    ? 'আপনার অফিসিয়াল স্টুডেন্ট আইডি কার্ড প্রস্তুত। নিচে থেকে PDF অথবা ছবি ডাউনলোড করুন।'
-                    : 'Your official Student ID Card is ready. Download the printable PDF or Photo image below.'}
+                    ? 'আইডি কার্ডের ছবি সরাসরি প্রিন্ট করুন অথবা মোবাইল ও কম্পিউটারে ডাউনলোড করুন।'
+                    : 'Print your ID card photo directly or download it to your device below.'}
                 </p>
               </div>
 
-              {/* Official Student ID Card Badge with Live Preview and Download Actions */}
+              {/* Official Student ID Card Badge with Live Preview, Direct Print, and Download Actions */}
               <div className="py-2 flex flex-col items-center justify-center bg-slate-50/80 p-3 sm:p-4 rounded-3xl border border-slate-200">
-                <h3 className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  <span>{isBangla ? 'অফিসিয়াল স্টুডেন্ট আইডি কার্ড' : 'Official Student ID Card'}</span>
-                </h3>
                 <StudentIdCardBadge
                   student={IdCardStore.getOrBuildCardForRegistration(completedTicket)}
                   language={language}
                 />
               </div>
 
-              {/* Receipt */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2.5">
-                <div className="flex justify-between items-center text-slate-600">
-                  <span>{isBangla ? 'ট্রানজেকশন আইডি' : 'Transaction ID'}:</span>
-                  <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
-                    {transactionSummary.trxId}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-slate-600">
-                  <span>{isBangla ? 'ইনভয়েস নম্বর' : 'Invoice Number'}:</span>
-                  <span className="font-mono text-slate-700">{transactionSummary.invoiceNumber}</span>
-                </div>
-                <div className="flex justify-between items-center text-slate-600">
-                  <span>{isBangla ? 'নিবন্ধন আইডি' : 'Registration ID'}:</span>
-                  <span className="font-mono font-bold text-slate-900">{completedTicket.id}</span>
-                </div>
-                <div className="flex justify-between items-center text-slate-600">
-                  <span>{isBangla ? 'পেমেন্ট পদ্ধতি' : 'Payment Method'}:</span>
-                  <span className="font-bold text-slate-800 uppercase">
-                    {transactionSummary.rawResponse?.payment_method || transactionSummary.method} (PayStation)
-                  </span>
-                </div>
-                {transactionSummary.payerMobile && (
-                  <div className="flex justify-between items-center text-slate-600">
-                    <span>{isBangla ? 'পেয়ারের মোবাইল' : 'Payer Mobile'}:</span>
-                    <span className="font-mono text-slate-700">{transactionSummary.payerMobile}</span>
+              {/* Receipt Summary — Compact & Clean */}
+              <details className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs group cursor-pointer">
+                <summary className="font-bold text-slate-700 flex items-center justify-between select-none list-none">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span>{isBangla ? 'পেমেন্ট রসিদ বিবরণ' : 'Payment Receipt & Telemetry'}</span>
                   </div>
-                )}
-                <div className="flex justify-between items-center border-t border-slate-200 pt-2 text-sm font-black text-slate-900">
-                  <span>{isBangla ? 'পরিশোধিত পরিমাণ' : 'Total Paid'}:</span>
-                  <span className="text-emerald-700">৳ {transactionSummary.amount.toLocaleString()} BDT</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-emerald-700 font-bold">
+                      ৳ {transactionSummary.amount.toLocaleString()} BDT
+                    </span>
+                    <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+                  </div>
+                </summary>
+                <div className="mt-3 pt-3 border-t border-slate-200 space-y-2 text-slate-600">
+                  <div className="flex justify-between items-center">
+                    <span>{isBangla ? 'ট্রানজেকশন আইডি' : 'Transaction ID'}:</span>
+                    <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      {transactionSummary.trxId}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>{isBangla ? 'ইনভয়েস নম্বর' : 'Invoice Number'}:</span>
+                    <span className="font-mono text-slate-700">{transactionSummary.invoiceNumber}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>{isBangla ? 'নিবন্ধন আইডি' : 'Registration ID'}:</span>
+                    <span className="font-mono font-bold text-slate-900">{completedTicket.id}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>{isBangla ? 'পেমেন্ট পদ্ধতি' : 'Payment Method'}:</span>
+                    <span className="font-bold text-slate-800 uppercase">
+                      {transactionSummary.rawResponse?.payment_method || transactionSummary.method} (PayStation)
+                    </span>
+                  </div>
+                  {transactionSummary.payerMobile && (
+                    <div className="flex justify-between items-center">
+                      <span>{isBangla ? 'পেয়ারের মোবাইল' : 'Payer Mobile'}:</span>
+                      <span className="font-mono text-slate-700">{transactionSummary.payerMobile}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center border-t border-slate-200 pt-1.5 font-bold text-slate-900">
+                    <span>{isBangla ? 'পরিশোধিত পরিমাণ' : 'Total Paid'}:</span>
+                    <span className="text-emerald-700">৳ {transactionSummary.amount.toLocaleString()} BDT</span>
+                  </div>
                 </div>
-              </div>
+              </details>
 
               <button
                 onClick={() => {

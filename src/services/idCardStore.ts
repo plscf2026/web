@@ -198,13 +198,10 @@ export class IdCardStore {
 
   // ==========================================================================
   // 3. STUDENT REGISTRATION INTEGRATION & ID CARD RECORDS
-  // Only paid and eligible registrations are processed.
+  // Pure on-the-fly dynamic ID card generation.
+  // Note: ID cards are NOT saved in the database; only student data is saved.
   // ==========================================================================
   static getOrBuildCardForRegistration(reg: RegistrationRecord): StudentIdCardRecord {
-    const list = this.getIdCards();
-    const existing = list.find((c) => c.registrationId === reg.id || c.idNumber === reg.id);
-    if (existing) return existing;
-
     let batchYear = '';
     let isFlagged = false;
     let reviewReason = '';
@@ -233,7 +230,7 @@ export class IdCardStore {
       reg.id
     )}&token=${encodeURIComponent(reg.qrToken)}`;
 
-    const newCard: StudentIdCardRecord = {
+    return {
       id: `IDC-${reg.id}`,
       registrationId: reg.id,
       eventYear: reg.year || 2026,
@@ -255,9 +252,6 @@ export class IdCardStore {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-
-    this.saveIdCards([newCard, ...list]);
-    return newCard;
   }
 
   static syncWithRegistrations(): StudentIdCardRecord[] {
