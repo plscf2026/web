@@ -4,49 +4,68 @@
 ---
 
 ## 1. Overview
-The platform utilizes a hybrid PostgreSQL database schema on Supabase paired with synchronized local cache persistence. Tables for transactional event data are year-partitioned to support annual reunions without data collision.
+The platform utilizes a consolidated PostgreSQL database schema on Supabase paired with synchronized local cache persistence. `public.registrations_2027` is the authoritative, primary registration table for all student registrations, payments, QR verification, and ID cards. The legacy `registrations_2026` table has been permanently removed after completing data consolidation.
 
 ---
 
 ## 2. Table Definitions
 
-### 2.1 `registrations_YYYY` (e.g. `registrations_2026`, `registrations_2027`)
-Stores verified online and on-spot attendee registrations.
+### 2.1 `registrations_2027` (Consolidated Primary Registration Table)
+Stores verified online and on-spot attendee registrations for the Grand Reunion 2027.
 ```sql
-CREATE TABLE registrations_2026 (
-    id TEXT PRIMARY KEY,                       -- e.g. 'PLSCF-2026-F1001'
+CREATE TABLE registrations_2027 (
+    id TEXT PRIMARY KEY,                       -- e.g. 'PLSCF-2027-F8472'
     full_name TEXT NOT NULL,
     full_name_bn TEXT,
     photo_url TEXT NOT NULL,                   -- Compressed JPEG data URL or Storage URI (<200KB)
     mobile_number TEXT NOT NULL,               -- Validated 11-digit Bangladeshi mobile
     email TEXT,                                -- Optional attendee email
-    address TEXT NOT NULL,
+    address TEXT,
     category TEXT NOT NULL CHECK (category IN ('former', 'current')),
     student_id TEXT,                           -- Mandatory verified ID for current students
     passing_year TEXT,                         -- e.g. '1998', '2012' for former students
-    last_class_attended TEXT,
+    last_class_attended TEXT,                  -- Optional for students who left before SSC
     current_class TEXT,                        -- e.g. 'Class 10', 'Class 12'
     batch_name TEXT NOT NULL,                  -- e.g. 'SSC 1998', 'HSC 2014'
     group_or_section TEXT,
     roll_number TEXT,
-    t_shirt_size TEXT NOT NULL CHECK (t_shirt_size IN ('S', 'M', 'L', 'XL', 'XXL')),
-    registration_fee NUMERIC(10, 2) NOT NULL,
+    t_shirt_size TEXT NOT NULL CHECK (t_shirt_size IN ('XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Oversize 50')),
+    registration_fee NUMERIC(10, 2) NOT NULL DEFAULT 1000.00,
     donation_amount NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
-    total_paid NUMERIC(10, 2) NOT NULL,
-    payment_status TEXT NOT NULL CHECK (payment_status IN ('paid', 'pending', 'refunded', 'failed')),
-    transaction_id TEXT NOT NULL,
-    payment_method TEXT NOT NULL CHECK (payment_method IN ('bkash', 'nagad', 'rocket', 'bank', 'cash')),
-    registered_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
-    qr_token TEXT NOT NULL UNIQUE,
-    is_t_shirt_collected BOOLEAN NOT NULL DEFAULT false,
+    total_paid NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    payment_status TEXT NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('paid', 'pending', 'refunded', 'failed')),
+    transaction_id TEXT,
+    payment_method TEXT CHECK (payment_method IN ('bkash', 'nagad', 'rocket', 'card')),
+    gateway_invoice_number TEXT,
+    gateway_provider TEXT DEFAULT 'PAYSTATION',
+    gateway_response JSONB DEFAULT '{}'::jsonb,
     server_verification_signature TEXT,
     verification_timestamp TIMESTAMPTZ,
-    verified_by TEXT
+    verified_by TEXT,
+    registered_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    qr_token TEXT NOT NULL UNIQUE,
+    is_tshirt_collected BOOLEAN NOT NULL DEFAULT false,
+    is_checked_in BOOLEAN NOT NULL DEFAULT false,
+    notes TEXT,
+    year INTEGER NOT NULL DEFAULT 2027,
+    is_demo BOOLEAN NOT NULL DEFAULT false,
+    is_legacy BOOLEAN NOT NULL DEFAULT false,
+    migration_source TEXT,
+    legacy_source_year INTEGER
 );
 
-CREATE INDEX idx_registrations_mobile ON registrations_2026 (mobile_number);
-CREATE INDEX idx_registrations_batch ON registrations_2026 (batch_name);
-CREATE INDEX idx_registrations_qr ON registrations_2026 (qr_token);
+CREATE INDEX idx_reg_2027_mobile ON registrations_2027 (mobile_number);
+CREATE INDEX idx_reg_2027_trx ON registrations_2027 (transaction_id);
+CREATE INDEX idx_reg_2027_qr ON registrations_2027 (qr_token);
+CREATE INDEX idx_reg_2027_status ON registrations_2027 (payment_status);
+CREATE INDEX idx_reg_2027_gateway_inv ON registrations_2027 (gateway_invoice_number);
+CREATE UNIQUE INDEX uq_registrations_2027_mobile_normalized ON registrations_2027 (
+  (CASE
+    WHEN regexp_replace(mobile_number, '[^0-9]', '', 'g') LIKE '880%'
+      THEN '0' || substr(regexp_replace(mobile_number, '[^0-9]', '', 'g'), 4)
+    ELSE regexp_replace(mobile_number, '[^0-9]', '', 'g')
+  END)
+) WHERE mobile_number IS NOT NULL AND mobile_number <> '';
 ```
 
 ### 2.2 `donations_YYYY`
