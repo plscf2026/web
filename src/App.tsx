@@ -13,6 +13,7 @@ import { RegistrationFormData } from './utils/rules';
 import { StudentIdService } from './services/studentIdStore';
 import { findRegistrationByTokenOrId } from './utils/tokenGenerator';
 import { PayStationService } from './services/paystation';
+import type { ModalStep } from './components/PaymentModal';
 
 // Route-level code-splitting: heavy pages and portals are loaded on-demand
 const RegistrationPage = lazy(() => import('./components/RegistrationPage').then((m) => ({ default: m.RegistrationPage })));
@@ -64,6 +65,8 @@ export default function App() {
 
   // Payment Modal State
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentModalStep, setPaymentModalStep] = useState<ModalStep>('select');
+  const [paymentModalInvoice, setPaymentModalInvoice] = useState<string>('');
   const [pendingRegistrationData, setPendingRegistrationData] = useState<RegistrationFormData | null>(null);
   const [paymentModalError, setPaymentModalError] = useState<string>('');
   const [pendingFees, setPendingFees] = useState<{
@@ -101,6 +104,7 @@ export default function App() {
       if (isPaymentReturn) {
         const payType = params.get('type') as 'registration' | 'donation' | null;
         const statusParam = (params.get('status') || params.get('trx_status') || '').toLowerCase();
+        const invoiceFromUrl = params.get('invoice') || params.get('invoice_number');
 
         // Clean the URL immediately to prevent re-triggering on refresh
         const cleanUrl = window.location.pathname;
@@ -115,13 +119,21 @@ export default function App() {
             setPendingFees(pendingSession.fees);
           }
 
+          const activeInvoice = invoiceFromUrl || pendingSession.invoiceNumber || '';
+          setPaymentModalInvoice(activeInvoice);
+
           // If gateway reported failure/cancel or user pressed "GO BACK" after an error
           if (statusParam.includes('fail') || statusParam.includes('cancel')) {
+            setPaymentModalStep('select');
             setPaymentModalError(
               language === 'bn'
                 ? 'পেমেন্ট সম্পন্ন হয়নি বা বাতিল করা হয়েছে। বিকাশ/নগদ স্যান্ডবক্সে ব্যক্তিগত নম্বর প্রবেশ করালে "The input wallet is not eligible" দেখায়। অনুগ্রহ করে টেস্ট নম্বর 01770618575, OTP: 123456, PIN: 12121 দিয়ে আবার চেষ্টা করুন।'
                 : 'Payment was not completed or failed. Entering personal numbers in sandbox triggers "The input wallet is not eligible". Please try again with test wallet 01770618575, OTP 123456, PIN 12121.'
             );
+          } else {
+            // Success or pending callback: immediately verify the transaction
+            setPaymentModalStep('verifying');
+            setPaymentModalError('');
           }
           setIsPaymentModalOpen(true);
         } else if (payType === 'donation' || (pendingSession && pendingSession.type === 'donation')) {
@@ -162,6 +174,9 @@ export default function App() {
   ) => {
     setPendingRegistrationData(formData);
     setPendingFees(fees);
+    setPaymentModalStep('select');
+    setPaymentModalInvoice('');
+    setPaymentModalError('');
 
     // If current student, reserve the Student ID in atomic state
     if (formData.category === 'current' && formData.studentId) {
@@ -179,6 +194,8 @@ export default function App() {
     setIsPaymentModalOpen(false);
     setPendingRegistrationData(null);
     setPaymentModalError('');
+    setPaymentModalInvoice('');
+    setPaymentModalStep('select');
     PayStationService.clearPendingSession();
   };
 
@@ -311,6 +328,8 @@ export default function App() {
               setIsPaymentModalOpen(false);
               setPendingRegistrationData(null);
               setPaymentModalError('');
+              setPaymentModalInvoice('');
+              setPaymentModalStep('select');
               PayStationService.clearPendingSession();
               try {
                 localStorage.removeItem('plscf_registration_draft');
@@ -325,6 +344,8 @@ export default function App() {
             totalPayable={pendingFees.totalPayable}
             studentName={pendingRegistrationData.fullName}
             registrationData={pendingRegistrationData}
+            initialStep={paymentModalStep}
+            initialInvoice={paymentModalInvoice}
             initialErrorMessage={paymentModalError}
           />
         </Suspense>

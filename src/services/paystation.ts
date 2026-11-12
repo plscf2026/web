@@ -299,27 +299,32 @@ export class PayStationService {
           body,
         });
 
-        if (response.ok) {
-          const contentType = response.headers.get('content-type') || '';
-          if (contentType.includes('application/json')) {
-            const json: PayStationInitiateResponse = await response.json();
+        // PayStation sometimes returns Content-Type: text/html even with valid JSON body.
+        // We read text first and safely parse JSON to handle all content types.
+        const rawText = await response.text().catch(() => '');
+        let json: PayStationInitiateResponse | null = null;
+        try {
+          json = JSON.parse(rawText);
+        } catch {
+          json = null;
+        }
 
-            if (json.status_code === '200' && json.status === 'success' && json.payment_url) {
-              return {
-                success: true,
-                paymentUrl: json.payment_url,
-                trxId: undefined, // trxId comes back after checkout completion
-                invoiceNumber: json.invoice_number || order.invoice_number,
-              };
-            }
+        if (json) {
+          if (json.status_code === '200' && json.status === 'success' && json.payment_url) {
+            return {
+              success: true,
+              paymentUrl: json.payment_url,
+              trxId: undefined, // trxId comes back after checkout completion
+              invoiceNumber: json.invoice_number || order.invoice_number,
+            };
+          }
 
-            if (json.status_code === '1008') {
-              return { success: false, error: `PayStation: ${json.message} (duplicate invoice, please retry)` };
-            }
+          if (json.status_code === '1008') {
+            return { success: false, error: `PayStation: ${json.message} (duplicate invoice, please retry)` };
+          }
 
-            if (json.message) {
-              return { success: false, error: `PayStation: ${json.message}` };
-            }
+          if (json.message) {
+            return { success: false, error: `PayStation: ${json.message}` };
           }
         }
       } catch (fetchErr: any) {
@@ -330,9 +335,13 @@ export class PayStationService {
     // 3. Fallback for Sandbox (never blocks testing if gateway is temporarily unreachable)
     if (config.isSandbox) {
       const simTrxId = `PST-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      // If callback_url is set, route back to our app callback so user is NEVER directed to a 404 URL
+      const fallbackUrl = order.callback_url
+        ? `${order.callback_url}&status=Successful&trx_id=${simTrxId}&simulated=true`
+        : `${config.baseUrl}/checkout/${order.invoice_number}`;
       return {
         success: true,
-        paymentUrl: `${config.baseUrl}/checkout/pay?invoice=${order.invoice_number}&amount=${order.payment_amount}`,
+        paymentUrl: fallbackUrl,
         trxId: simTrxId,
         invoiceNumber: order.invoice_number,
       };
@@ -393,15 +402,17 @@ export class PayStationService {
           body,
         });
 
-        if (response.ok) {
-          const contentType = response.headers.get('content-type') || '';
-          if (contentType.includes('application/json')) {
-            const json: PayStationTrxStatusV1Response = await response.json();
-            if (json.status_code === '200' && json.data) {
-              const trxStatus = json.data.trx_status.toLowerCase() as any;
-              return { success: true, status: trxStatus, data: json.data };
-            }
-          }
+        const rawText = await response.text().catch(() => '');
+        let json: PayStationTrxStatusV1Response | null = null;
+        try {
+          json = JSON.parse(rawText);
+        } catch {
+          json = null;
+        }
+
+        if (json && json.status_code === '200' && json.data) {
+          const trxStatus = (json.data.trx_status || '').toLowerCase() as any;
+          return { success: true, status: trxStatus, data: json.data };
         }
       } catch (e: any) {
         console.warn(`[PayStation] Status v1 fetch notice for ${endpoint}:`, e?.message);
@@ -473,14 +484,16 @@ export class PayStationService {
           body: JSON.stringify({ trxId }),
         });
 
-        if (response.ok) {
-          const contentType = response.headers.get('content-type') || '';
-          if (contentType.includes('application/json')) {
-            const json: PayStationTrxStatusV2Response = await response.json();
-            if (json.status_code === '200' && json.data) {
-              return { success: true, data: json.data };
-            }
-          }
+        const rawText = await response.text().catch(() => '');
+        let json: PayStationTrxStatusV2Response | null = null;
+        try {
+          json = JSON.parse(rawText);
+        } catch {
+          json = null;
+        }
+
+        if (json && json.status_code === '200' && json.data) {
+          return { success: true, data: json.data };
         }
       } catch (e: any) {
         console.warn(`[PayStation] Status v2 notice for ${endpoint}:`, e?.message);

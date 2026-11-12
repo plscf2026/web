@@ -20,7 +20,7 @@ import { Language, PaymentMethod, RegistrationRecord } from '../types';
 import { RegistrationFormData } from '../utils/rules';
 import { PayStationService, PayStationPaymentResult } from '../services/paystation';
 
-interface PaymentModalProps {
+export interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (ticket: RegistrationRecord) => void;
@@ -32,9 +32,10 @@ interface PaymentModalProps {
   registrationData?: RegistrationFormData | null;
   initialStep?: ModalStep;
   initialErrorMessage?: string;
+  initialInvoice?: string;
 }
 
-type ModalStep =
+export type ModalStep =
   | 'select'        // User picks a channel & clicks Pay
   | 'processing'    // Calling PayStation API
   | 'waiting'       // Hosted checkout window opened — waiting for user to complete payment
@@ -66,6 +67,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   registrationData,
   initialStep,
   initialErrorMessage,
+  initialInvoice,
 }) => {
   if (!isOpen) return null;
 
@@ -82,8 +84,66 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [copiedField, setCopiedField] = useState('');
 
   // Persist invoice & amount across renders so the polling closure uses fresh values
-  const invoiceRef = useRef(`PLSCF26-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`);
+  const pendingSession = PayStationService.getPendingSession();
+  const invoiceRef = useRef(
+    initialInvoice ||
+    pendingSession?.invoiceNumber ||
+    `PLSCF26-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`
+  );
   const amountRef  = useRef(totalPayable);
+
+  // ── Finalize after confirmed payment ────────────────────────────────────
+
+  const finalizeRegistration = async (payment: PayStationPaymentResult) => {
+    if (!registrationData) return;
+    setStep('verifying');
+    setProcessingStep(isBangla ? 'ডিজিটাল টিকিট তৈরি হচ্ছে...' : 'Generating secure digital ticket...');
+    try {
+      const ticket = await PayStationService.completeRegistrationAfterPayment(
+        registrationData,
+        payment
+      );
+      setTransactionSummary(payment);
+      setCompletedTicket(ticket);
+      setStep('success');
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Ticket generation failed.');
+      setStep('failed');
+    }
+  };
+
+  // ── Manual or automatic verification ─────────────────────────────────────
+
+  const handleManualVerify = async () => {
+    setStep('verifying');
+    setProcessingStep(isBangla ? 'পেমেন্ট স্ট্যাটাস যাচাই করা হচ্ছে...' : 'Verifying payment status...');
+    try {
+      const verifyRes = await PayStationService.verifyReturnedPayment(
+        invoiceRef.current,
+        amountRef.current
+      );
+      if (verifyRes.verified && verifyRes.result) {
+        await finalizeRegistration(verifyRes.result);
+      } else {
+        setErrorMessage(
+          verifyRes.error ||
+            (isBangla ? 'পেমেন্ট নিশ্চিত হয়নি।' : 'Payment not yet confirmed.')
+        );
+        setStep('waiting');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Verification failed.');
+      setStep('waiting');
+    }
+  };
+
+  // ── Auto-verify on mount / step change ─────────────────────────────────────
+
+  useEffect(() => {
+    if (step === 'verifying' && !completedTicket) {
+      handleManualVerify();
+    }
+  }, [step]);
 
   // ── Status polling ───────────────────────────────────────────────────────
 
@@ -120,26 +180,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
     return () => clearInterval(interval);
   }, [step]);
-
-  // ── Finalize after confirmed payment ────────────────────────────────────
-
-  const finalizeRegistration = async (payment: PayStationPaymentResult) => {
-    if (!registrationData) return;
-    setStep('verifying');
-    setProcessingStep(isBangla ? 'ডিজিটাল টিকিট তৈরি হচ্ছে...' : 'Generating secure digital ticket...');
-    try {
-      const ticket = await PayStationService.completeRegistrationAfterPayment(
-        registrationData,
-        payment
-      );
-      setTransactionSummary(payment);
-      setCompletedTicket(ticket);
-      setStep('success');
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Ticket generation failed.');
-      setStep('failed');
-    }
-  };
 
   // ── Hosted checkout launch (real gateway) ───────────────────────────────
 
@@ -227,32 +267,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setProcessingStep(isBangla ? 'PayStation Sandbox সিমুলেশন চলছে...' : 'Running PayStation Sandbox simulation...');
 
     try {
-      await new Promise((r) => setTimeout(r, 1000));
+      await new Promise((r) => setTimeout(r, 600));
 
-      // Create payment session (gets sandbox URL)
-      const createRes = await PayStationService.createPayment({
-        invoice_number: invoiceRef.current,
-        currency: 'BDT',
-        payment_amount: totalPayable,
-        pay_with_charge: 0,
-        reference: 'SANDBOX-TEST',
-        cust_name: studentName,
-        cust_phone: registrationData.mobileNumber,
-        cust_email: registrationData.email || undefined,
-        cust_address: registrationData.address || 'Faridpur',
-        callback_url: PayStationService.buildCallbackUrl({
-          type: 'registration',
-          invoiceNumber: invoiceRef.current,
-          amount: totalPayable,
-        }),
-      });
-
-      setProcessingStep(isBangla ? 'পেমেন্ট যাচাই করা হচ্ছে...' : 'Verifying simulated payment...');
-      await new Promise((r) => setTimeout(r, 800));
-
-      const simTrxId =
-        createRes.trxId ||
-        `PST-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const simTrxId = `PST-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
       const paymentResult: PayStationPaymentResult = {
         invoiceNumber: invoiceRef.current,
@@ -270,31 +287,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       console.error('[PayStation] Simulation error:', err);
       setErrorMessage(err.message || 'Simulation failed.');
       setStep('failed');
-    }
-  };
-
-  // ── Manual verification after returning from checkout ───────────────────
-
-  const handleManualVerify = async () => {
-    setStep('verifying');
-    setProcessingStep(isBangla ? 'পেমেন্ট স্ট্যাটাস যাচাই করা হচ্ছে...' : 'Verifying payment status...');
-    try {
-      const verifyRes = await PayStationService.verifyReturnedPayment(
-        invoiceRef.current,
-        amountRef.current
-      );
-      if (verifyRes.verified && verifyRes.result) {
-        await finalizeRegistration(verifyRes.result);
-      } else {
-        setErrorMessage(
-          verifyRes.error ||
-            (isBangla ? 'পেমেন্ট নিশ্চিত হয়নি।' : 'Payment not yet confirmed.')
-        );
-        setStep('waiting');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Verification failed.');
-      setStep('waiting');
     }
   };
 
@@ -485,22 +477,33 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <AlertCircle className="w-8 h-8" />
               </div>
               <h2 className="font-black text-slate-900 text-lg">
-                {isBangla ? 'পেমেন্ট ব্যর্থ হয়েছে' : 'Payment Failed'}
+                {isBangla ? 'পেমেন্ট সম্পন্ন হয়নি' : 'Payment Not Completed'}
               </h2>
               <p className="text-xs text-rose-700 max-w-xs mx-auto">{errorMessage}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setStep('select');
-                setErrorMessage('');
-                setPollCount(0);
-                invoiceRef.current = `PLSCF26-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-              }}
-              className="w-full py-3 rounded-2xl bg-slate-900 hover:bg-slate-700 text-white font-bold text-sm cursor-pointer transition"
-            >
-              {isBangla ? 'আবার চেষ্টা করুন' : 'Try Again'}
-            </button>
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('select');
+                  setErrorMessage('');
+                  setPollCount(0);
+                  invoiceRef.current = `PLSCF26-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+                }}
+                className="w-full py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-700 text-white font-bold text-sm cursor-pointer transition shadow"
+              >
+                {isBangla ? 'আবার চেষ্টা করুন' : 'Try Again'}
+              </button>
+              {config.isSandbox && (
+                <button
+                  type="button"
+                  onClick={handleSandboxSimulation}
+                  className="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs cursor-pointer transition shadow flex items-center justify-center gap-1.5"
+                >
+                  <span>{isBangla ? 'স্যান্ডবক্স টেস্ট মোডে সম্পন্ন করুন' : 'Complete with Sandbox Test Mode'}</span>
+                </button>
+              )}
+            </div>
           </div>
 
         /* ── SELECT / DEFAULT ── */
