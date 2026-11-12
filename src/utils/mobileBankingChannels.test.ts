@@ -6,6 +6,7 @@ import { AppStore } from '../services/store';
 
 const testAttendee: RegistrationFormData = {
   fullName: 'Tamim Iqbal',
+  photoUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
   category: 'former',
   passingYear: '2015',
   batchName: 'SSC 2015',
