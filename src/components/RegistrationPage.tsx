@@ -33,8 +33,9 @@ import {
 } from '../utils/rules';
 import { StudentIdService } from '../services/studentIdStore';
 import { readValidatedImage } from '../utils/fileValidation';
-import { compressImageTo200KB } from '../utils/imageCompressor';
 import { AppStore } from '../services/store';
+import { StudentIdCardRecord } from '../types/idcard';
+import { SynchronizedCameraCardModal } from './idcard/SynchronizedCameraCardModal';
 
 interface RegistrationPageProps {
   language: Language;
@@ -134,14 +135,11 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     termsAccepted,
   ]);
 
-  // Photo live camera & compression state (Requirement 4)
+  // Photo live camera, adjustment & compression state (Requirement 4)
   const [photoSizeKb, setPhotoSizeKb] = useState<number | null>(null);
   const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
-  const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('user');
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const webcamVideoRef = React.useRef<HTMLVideoElement | null>(null);
-  const webcamStreamRef = React.useRef<MediaStream | null>(null);
+  const [modalInitialImage, setModalInitialImage] = useState<string | null>(null);
 
   // Errors state
   const [validationErrors, setValidationErrors] = useState<Record<string, { en: string; bn: string }>>({});
@@ -168,111 +166,24 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     return `${currentClass} (${groupOrSection})`;
   };
 
-  // Open Live Camera
-  const openLiveCamera = async (facing: 'user' | 'environment' = cameraFacing) => {
-    setCameraError(null);
+  // Open Synchronized Live Camera & ID Card Preview Modal
+  const openLiveCamera = () => {
+    setModalInitialImage(null);
     setIsCameraModalOpen(true);
-
-    if (webcamStreamRef.current) {
-      webcamStreamRef.current.getTracks().forEach((t) => t.stop());
-      webcamStreamRef.current = null;
-    }
-
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setCameraError(
-        language === 'bn'
-          ? 'আপনার ব্রাউজারে সরাসরি ক্যামেরা অ্যাক্সেস সমর্থিত নয় (HTTPS অথবা localhost প্রয়োজন)। অনুগ্রহ করে ফাইল আপলোড বিকল্পটি ব্যবহার করুন।'
-          : 'Live camera is not supported or blocked in this browser context (requires HTTPS or localhost). Please use the photo file upload option.'
-      );
-      return;
-    }
-
-    try {
-      let stream: MediaStream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false,
-        });
-      } catch (_) {
-        // Fallback to any camera
-        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-      }
-
-      webcamStreamRef.current = stream;
-      if (webcamVideoRef.current) {
-        webcamVideoRef.current.srcObject = stream;
-        webcamVideoRef.current.setAttribute('playsinline', 'true');
-        webcamVideoRef.current.setAttribute('muted', 'true');
-        await webcamVideoRef.current.play().catch(() => {});
-      }
-    } catch (err: any) {
-      console.warn('Webcam stream error:', err);
-      setCameraError(
-        language === 'bn'
-          ? 'ক্যামেরা চালু করা সম্ভব হয়নি। অনুগ্রহ করে ব্রাউজার পারমিশন চেক করুন অথবা ফাইল আপলোড করুন।'
-          : 'Unable to start camera feed. Please check browser permissions or upload an image file.'
-      );
-    }
   };
 
-  const closeLiveCamera = () => {
-    if (webcamStreamRef.current) {
-      webcamStreamRef.current.getTracks().forEach((t) => t.stop());
-      webcamStreamRef.current = null;
-    }
-    setIsCameraModalOpen(false);
-    setCameraError(null);
+  // Callback when user confirms photo crop in the modal
+  const handlePhotoConfirmed = (confirmedDataUrl: string, sizeKb: number) => {
+    setPhotoUrl(confirmedDataUrl);
+    setPhotoSizeKb(sizeKb);
+    setValidationErrors((current) => {
+      const next = { ...current };
+      delete next.photoUrl;
+      return next;
+    });
   };
 
-  // Capture Photo from Live Camera and Compress to <= 200KB
-  const handleCapturePhoto = async () => {
-    if (!webcamVideoRef.current) return;
-    const video = webcamVideoRef.current;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Flip horizontal if selfie/user camera
-    if (cameraFacing === 'user') {
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
-    }
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const rawDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-    closeLiveCamera();
-
-    // Compress to strictly <= 200KB
-    setIsCompressingPhoto(true);
-    try {
-      const compressed = await compressImageTo200KB(rawDataUrl, 200 * 1024);
-      setPhotoUrl(compressed.dataUrl);
-      setPhotoSizeKb(compressed.sizeKb);
-      if (validationErrors.photoUrl) {
-        const next = { ...validationErrors };
-        delete next.photoUrl;
-        setValidationErrors(next);
-      }
-    } catch (err) {
-      console.error('Compression error on captured photo:', err);
-      setPhotoUrl(rawDataUrl);
-    } finally {
-      setIsCompressingPhoto(false);
-    }
-  };
-
-  // Switch between front and back cameras
-  const toggleCameraFacing = () => {
-    const nextFacing = cameraFacing === 'user' ? 'environment' : 'user';
-    setCameraFacing(nextFacing);
-    openLiveCamera(nextFacing);
-  };
-
-  // Handle Photo File Upload & Compress to <= 200KB
+  // Handle Photo File Upload & Open Synchronized Adjuster with ID Card Preview
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -280,26 +191,46 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     setIsCompressingPhoto(true);
     try {
       const validDataUrl = await readValidatedImage(file);
-      // Run automatic compression to guarantee <= 200 KB
-      const compressed = await compressImageTo200KB(validDataUrl, 200 * 1024);
-      setPhotoUrl(compressed.dataUrl);
-      setPhotoSizeKb(compressed.sizeKb);
-      setValidationErrors((current) => {
-        const next = { ...current };
-        delete next.photoUrl;
-        return next;
-      });
+      setModalInitialImage(validDataUrl);
+      setIsCameraModalOpen(true);
     } catch (error) {
       e.target.value = '';
       const message =
         error instanceof Error ? error.message : 'Unable to validate the selected image.';
       setValidationErrors((current) => ({
         ...current,
-        photoUrl: { en: message, bn: message },
+        photoUrl: {
+          en: message,
+          bn: message,
+        },
       }));
     } finally {
       setIsCompressingPhoto(false);
     }
+  };
+
+  // Live Student ID Card Preview Record (reflects current registration inputs)
+  const previewStudentRecord: StudentIdCardRecord = {
+    id: `PREVIEW-${Date.now()}`,
+    registrationId: 'PLSC-2027-PREV',
+    eventYear: 2027,
+    idNumber: rollNumber || studentId || 'PLSC-2027-PREV',
+    studentName: fullName.trim() || (language === 'bn' ? 'আপনার নাম' : 'Your Full Name'),
+    batchName:
+      category === 'current'
+        ? `${currentClass} (${groupOrSection})`
+        : getComputedBatch() || `SSC ${passingYear || 'Batch'}`,
+    batchYear: category === 'former' ? passingYear || '2026' : 'Current',
+    contactNumber: mobileNumber || '01XXXXXXXXX',
+    photoUrl: photoUrl || '',
+    hasPhoto: Boolean(photoUrl),
+    qrToken: 'PREV27',
+    verificationUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/ticket-verification?token=PREV27`,
+    cardStatus: 'ELIGIBLE',
+    cardDimensions: '54x86mm',
+    version: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 
   // Student ID Verification Handler
@@ -690,80 +621,18 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               )}
             </div>
 
-            {/* Live Camera Snapshot Modal Dialog */}
-            {isCameraModalOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs">
-                <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                      <Camera className="w-5 h-5 text-emerald-700" />
-                      <span>{language === 'bn' ? 'ক্যামেরা দিয়ে ছবি তুলুন' : 'Live Camera Snapshot'}</span>
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={closeLiveCamera}
-                      className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center cursor-pointer"
-                    >
-                      ✕
-                    </button>
-                  </div>
-
-                  {cameraError ? (
-                    <div className="p-4 bg-rose-50 border border-rose-300 text-rose-800 rounded-2xl text-xs space-y-2">
-                      <p className="font-semibold">{cameraError}</p>
-                      <p className="text-[11px] text-rose-700">
-                        {language === 'bn'
-                          ? 'টিপস: ব্রাউজারে ক্যামেরার অনুমতি দিন অথবা সরাসরি "ফাইল আপলোড করুন" বাটন দিয়ে আপনার ফটো যুক্ত করুন।'
-                          : 'Tip: Please allow camera access in browser permissions or use the file upload button to pick a photo.'}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="relative rounded-2xl overflow-hidden bg-slate-950 aspect-4/3 flex items-center justify-center border-2 border-dashed border-emerald-500">
-                      <video
-                        ref={webcamVideoRef}
-                        className={`w-full h-full object-cover ${cameraFacing === 'user' ? 'scale-x-[-1]' : ''}`}
-                        autoPlay
-                        playsInline
-                        muted
-                      />
-                      <div className="absolute inset-8 border border-white/40 rounded-2xl pointer-events-none" />
-                      <span className="absolute bottom-2 text-white/80 bg-slate-900/60 px-3 py-1 rounded-full text-[10px] font-medium">
-                        {language === 'bn' ? 'মুখমণ্ডল ফ্রেমের মাঝে রাখুন' : 'Center your face in the frame'}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={toggleCameraFacing}
-                      className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer transition-colors"
-                    >
-                      🔄 {language === 'bn' ? 'ক্যামেরা পরিবর্তন' : 'Flip Camera'}
-                    </button>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={closeLiveCamera}
-                        className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
-                      >
-                        {language === 'bn' ? 'বাতিল' : 'Cancel'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleCapturePhoto}
-                        disabled={Boolean(cameraError)}
-                        className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-bold shadow-md cursor-pointer transition-all flex items-center gap-1.5"
-                      >
-                        <Camera className="w-4 h-4" />
-                        <span>{language === 'bn' ? 'ছবি তুলুন (Capture)' : 'Capture Photo'}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Synchronized Camera Capture & Live Student ID Card Preview Modal */}
+            <SynchronizedCameraCardModal
+              isOpen={isCameraModalOpen}
+              onClose={() => {
+                setIsCameraModalOpen(false);
+                setModalInitialImage(null);
+              }}
+              onPhotoConfirmed={handlePhotoConfirmed}
+              studentPreview={previewStudentRecord}
+              language={language}
+              initialImageUrl={modalInitialImage}
+            />
 
             {/* Mobile number must be unique for each registration */}
             <div>

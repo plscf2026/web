@@ -23,6 +23,7 @@ export interface StudentIdCardBadgeProps {
   language?: Language;
   showActions?: boolean;
   className?: string;
+  customPhotoSlot?: React.ReactNode;
 }
 
 export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
@@ -30,6 +31,7 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
   language = 'en',
   showActions = true,
   className = '',
+  customPhotoSlot,
 }) => {
   const isBangla = language === 'bn';
   const [downloadingType, setDownloadingType] = useState<'pdf' | 'image' | 'print' | null>(null);
@@ -248,7 +250,9 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
           {/* Photo Frame & Avatar */}
           <div className="absolute top-[102px] left-3 w-[84px] h-[96px] rounded-lg p-[2px] bg-gradient-to-br from-[#AE7108] via-[#FFE590] to-[#B4780B] shadow-md">
             <div className="w-full h-full rounded-[6px] overflow-hidden bg-[#E4EDF2] flex items-center justify-center">
-              {student.photoUrl ? (
+              {customPhotoSlot ? (
+                customPhotoSlot
+              ) : student.photoUrl ? (
                 <img
                   src={student.photoUrl}
                   alt={student.studentName}
