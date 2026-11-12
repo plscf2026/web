@@ -129,3 +129,19 @@ test('PayStation Complete Registration supports explicit 2026 legacy records', a
   assert.ok(/^[A-Z0-9]{6}$/.test(ticket.qrToken));
   assert.equal(ticket.qrToken.length, 6);
 });
+
+test('PayStation Payment Status Verification accepts "Successful" case variants and verifies correctly', async () => {
+  // Test validation of various status string variations from real gateway responses
+  const statuses = ['Successful', 'successful', 'SUCCESSFUL', 'Success', 'success', 'SUCCESS', 'completed', 'captured'];
+
+  for (const st of statuses) {
+    const payload = {
+      invoice_number: 'INV-ST-TEST-001',
+      trx_status: st as any,
+      trx_amount: '1500',
+      trx_id: 'TRX-ST-1234',
+    };
+    const res = PayStationService.validateIpnPayload(payload as any, 'INV-ST-TEST-001', 1500);
+    assert.equal(res.valid, true, `Status "${st}" must be considered valid`);
+  }
+});

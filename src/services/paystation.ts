@@ -24,6 +24,7 @@ import { AppStore } from './store';
 import { SupabaseService, supabase } from './supabase';
 import { EventStore } from './eventStore';
 import { StudentIdService } from './studentIdStore';
+import { IdCardStore } from './idCardStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -375,7 +376,16 @@ export class PayStationService {
           body: { action: 'transaction-status-v1', invoice_number: invoiceNumber },
         });
         if (!error && data?.status_code === '200' && data?.data) {
-          return { success: true, status: data.data?.trx_status?.toLowerCase() as any, data: data.data };
+          const rawStatus = (data.data?.trx_status || '').toLowerCase().trim();
+          const isSuccess =
+            rawStatus === 'success' ||
+            rawStatus === 'successful' ||
+            rawStatus === 'completed' ||
+            rawStatus === 'captured' ||
+            rawStatus === 'paid' ||
+            rawStatus.includes('success');
+          const trxStatus = isSuccess ? 'success' : (rawStatus as any);
+          return { success: true, status: trxStatus, data: data.data };
         }
       } catch (e) {
         console.warn('[PayStation] Edge txn-status-v1 notice:', e);
@@ -411,7 +421,15 @@ export class PayStationService {
         }
 
         if (json && json.status_code === '200' && json.data) {
-          const trxStatus = (json.data.trx_status || '').toLowerCase() as any;
+          const rawStatus = (json.data.trx_status || '').toLowerCase().trim();
+          const isSuccess =
+            rawStatus === 'success' ||
+            rawStatus === 'successful' ||
+            rawStatus === 'completed' ||
+            rawStatus === 'captured' ||
+            rawStatus === 'paid' ||
+            rawStatus.includes('success');
+          const trxStatus = isSuccess ? 'success' : (rawStatus as any);
           return { success: true, status: trxStatus, data: json.data };
         }
       } catch (e: any) {
@@ -520,7 +538,14 @@ export class PayStationService {
     if (!payload.invoice_number || payload.invoice_number !== expectedInvoiceNumber) {
       return { valid: false, reason: 'Invoice number mismatch' };
     }
-    if (payload.trx_status !== 'Success') {
+    const rawStatus = (payload.trx_status || '').toLowerCase().trim();
+    if (
+      rawStatus !== 'success' &&
+      rawStatus !== 'successful' &&
+      rawStatus !== 'completed' &&
+      rawStatus !== 'captured' &&
+      !rawStatus.includes('success')
+    ) {
       return { valid: false, reason: `Unexpected trx_status: ${payload.trx_status}` };
     }
     if (Number(payload.trx_amount) !== expectedAmount) {
@@ -606,15 +631,22 @@ export class PayStationService {
     }
 
     const d = statusRes.data;
+    const rawStatus = (d.trx_status || '').toLowerCase().trim();
     const isSuccess =
-      d.trx_status.toLowerCase() === 'success';
+      rawStatus === 'success' ||
+      rawStatus === 'successful' ||
+      rawStatus === 'completed' ||
+      rawStatus === 'captured' ||
+      rawStatus === 'paid' ||
+      rawStatus.includes('success');
 
     if (!isSuccess) {
       return { verified: false, error: `Payment status: ${d.trx_status}` };
     }
 
     const paidAmount = Number(d.payment_amount);
-    if (paidAmount < expectedAmount) {
+    // Allow small tolerance for gateway processing charge variations (e.g. 5 BDT delta)
+    if (paidAmount < expectedAmount - 5) {
       return {
         verified: false,
         error: `Amount mismatch: paid ${paidAmount}, expected ${expectedAmount}`,
@@ -652,7 +684,14 @@ export class PayStationService {
     if (!statusRes.success || !statusRes.data) {
       return { success: false, status: 'Failed', error: statusRes.error };
     }
-    const isOk = statusRes.data.trx_status.toLowerCase() === 'success';
+    const rawStatus = (statusRes.data.trx_status || '').toLowerCase().trim();
+    const isOk =
+      rawStatus === 'success' ||
+      rawStatus === 'successful' ||
+      rawStatus === 'completed' ||
+      rawStatus === 'captured' ||
+      rawStatus === 'paid' ||
+      rawStatus.includes('success');
     return {
       success: isOk,
       status: isOk ? 'Success' : 'Failed',
@@ -787,6 +826,12 @@ export class PayStationService {
       );
     } catch (err) {
       console.warn('[PayStation] Background Supabase sync notice:', err);
+    }
+
+    try {
+      IdCardStore.syncWithRegistrations();
+    } catch (e) {
+      console.warn('[PayStation] ID Card store auto-sync notice:', e);
     }
 
     void this.verifyWithSupabaseEdge(

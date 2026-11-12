@@ -125,6 +125,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         amountRef.current
       );
       if (verifyRes.verified && verifyRes.result) {
+        setErrorMessage('');
         await finalizeRegistration(verifyRes.result);
       } else {
         setErrorMessage(
@@ -165,6 +166,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
         if (verifyRes.verified && verifyRes.result) {
           clearInterval(interval);
+          setErrorMessage('');
           await finalizeRegistration(verifyRes.result);
           return;
         }
