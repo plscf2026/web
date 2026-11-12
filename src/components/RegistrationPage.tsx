@@ -359,10 +359,10 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Title */}
       <div className="text-center mb-8">
-        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-[#172554]/10 text-[#172554] border border-[#172554]/20 mb-2">
+        <span className="inline-flex items-center px-3.5 py-1 rounded-full text-xs font-bold bg-[#E2EEF8] text-[#0284C7] border border-[#0284C7]/20 mb-2">
           {t.reunionTitle} • {t.reunionDates}
         </span>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] tracking-tight">
           {t.regPageTitle}
         </h1>
         <p className="text-xs sm:text-sm text-slate-600 mt-2 max-w-2xl mx-auto">
@@ -385,9 +385,9 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8" noValidate>
-        {/* Category Selector Card - Flat Navy & Royal Blue styling */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-          <label className="block text-sm font-bold text-slate-900 mb-3">
+        {/* Category Selector Card - RAW FORM tokens */}
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#E2EEF8]">
+          <label className="block text-sm font-bold text-[#0F172A] mb-3">
             {t.categoryLabel} *
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -403,17 +403,17 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   setValidationErrors(next);
                 }
               }}
-              className={`p-4 rounded-xl border-2 text-left transition-all cursor-pointer ${
+              className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
                 category === 'former'
-                  ? 'border-[#172554] bg-[#F3F4F6] shadow-xs'
-                  : 'border-slate-200 hover:border-slate-300 bg-white'
+                  ? 'border-[#0284C7] bg-[#E2EEF8]/40 shadow-xs'
+                  : 'border-[#E2EEF8] hover:border-slate-300 bg-white'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-900 text-base">
+                <span className="font-bold text-[#0F172A] text-base">
                   {t.categoryFormer}
                 </span>
-                <span className="px-2.5 py-1 rounded-lg bg-[#172554] text-white font-extrabold text-xs">
+                <span className="px-3 py-1 rounded-full bg-[#0284C7] text-white font-extrabold text-xs">
                   ৳ {feeSettings.formerStudentFee}
                 </span>
               </div>
@@ -434,17 +434,17 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   setValidationErrors(next);
                 }
               }}
-              className={`p-4 rounded-xl border-2 text-left transition-all cursor-pointer ${
+              className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
                 category === 'current'
-                  ? 'border-[#263B8C] bg-[#F3F4F6] shadow-xs'
-                  : 'border-slate-200 hover:border-slate-300 bg-white'
+                  ? 'border-[#0EA5E9] bg-[#E2EEF8]/40 shadow-xs'
+                  : 'border-[#E2EEF8] hover:border-slate-300 bg-white'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-900 text-base">
+                <span className="font-bold text-[#0F172A] text-base">
                   {t.categoryCurrent}
                 </span>
-                <span className="px-2.5 py-1 rounded-lg bg-[#263B8C] text-white font-extrabold text-xs">
+                <span className="px-3 py-1 rounded-full bg-[#0EA5E9] text-white font-extrabold text-xs">
                   ৳ {feeSettings.currentStudentFee}
                 </span>
               </div>
@@ -1194,16 +1194,16 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           {feeSettings.registrationOpen ? (
             <button
               type="submit"
-              className="w-full py-4 rounded-xl bg-[#263B8C] hover:bg-[#1f3073] text-white font-black text-base shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98 border border-blue-400/30"
+              className="w-full py-4 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-black text-base shadow-lg shadow-sky-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
             >
-              <ShieldCheck className="w-5 h-5 text-[#C5A45D]" />
+              <ShieldCheck className="w-5 h-5 text-[#38BDF8]" />
               <span>{t.btnProceedToPayment} (৳ {fees.totalPayable})</span>
             </button>
           ) : (
             <button
               type="button"
               disabled
-              className="w-full py-4 rounded-xl bg-slate-800 text-slate-400 font-bold text-base shadow-lg cursor-not-allowed flex items-center justify-center gap-2 border border-slate-700"
+              className="w-full py-4 rounded-full bg-slate-800 text-slate-400 font-bold text-base shadow-lg cursor-not-allowed flex items-center justify-center gap-2 border border-slate-700"
             >
               <Lock className="w-5 h-5 text-slate-500" />
               <span>{t.btnRegistrationClosed}</span>

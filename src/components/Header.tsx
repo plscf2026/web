@@ -56,15 +56,15 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+    <header className="sticky top-0 z-50 bg-[#F0F6FA]/95 backdrop-blur-md border-b border-[#E2EEF8] shadow-xs">
       {/* Top emergency announcement & quick portals bar */}
-      <div className="bg-sky-950 text-sky-50 text-xs py-1.5 px-3 sm:px-4 border-b border-sky-900">
+      <div className="bg-[#0F172A] text-white text-xs py-1.5 px-3 sm:px-4 border-b border-[#1E293B]">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-1.5">
           <div className="flex items-center gap-2 max-w-full overflow-hidden">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white uppercase shrink-0 tracking-wide">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-[#0284C7] text-white uppercase shrink-0 tracking-wide">
               {language === 'bn' ? 'অফিসিয়াল' : 'OFFICIAL'}
             </span>
-            <span className="font-semibold text-[11px] sm:text-xs truncate">
+            <span className="font-semibold text-[11px] sm:text-xs truncate text-[#E2EEF8]">
               {language === 'bn'
                 ? 'পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজ, ফরিদপুর পুনর্মিলনী ২০২৭ • ২৮-২৯ জানুয়ারি ২০২৭'
                 : 'Police Lines High School & College, Faridpur Reunion 2027 • Jan 28-29, 2027'}
@@ -75,10 +75,10 @@ export const Header: React.FC<HeaderProps> = ({
             {/* RMS ERP Management Portal Button */}
             <button
               onClick={() => handleNav('portal')}
-              className={`flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold transition-all shadow-xs cursor-pointer ${
+              className={`flex items-center gap-1 px-3 py-0.5 rounded-full text-[11px] font-bold transition-all shadow-xs cursor-pointer ${
                 activeView === 'portal'
-                  ? 'bg-rose-500 text-white'
-                  : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  ? 'bg-[#0EA5E9] text-white'
+                  : 'bg-[#0284C7] hover:bg-[#0EA5E9] text-white'
               }`}
               title="Central Organizing Committee ERP Portal"
             >
@@ -89,24 +89,24 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Quick Scanner Portal Switcher */}
             <button
               onClick={() => handleNav('scanner')}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+              className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-colors cursor-pointer ${
                 activeView === 'scanner'
-                  ? 'bg-amber-400 text-slate-900 font-bold'
-                  : 'bg-sky-800 hover:bg-sky-700 text-sky-50 border border-sky-700'
+                  ? 'bg-[#0EA5E9] text-white font-bold'
+                  : 'bg-[#0F172A] hover:bg-[#1E293B] text-[#38BDF8] border border-[#0284C7]/40'
               }`}
               title="QR Scanner Gate Portal"
             >
-              <QrCode className="w-3 h-3 text-amber-400" />
+              <QrCode className="w-3 h-3 text-[#38BDF8]" />
               <span>{t.navScannerPortal}</span>
             </button>
 
             {/* Bilingual Switcher */}
             <button
               onClick={() => onLanguageChange(language === 'en' ? 'bn' : 'en')}
-              className="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold transition-all shadow-2xs cursor-pointer text-[11px]"
+              className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#E2EEF8] hover:bg-white text-[#0F172A] border border-[#0284C7]/30 font-bold transition-all shadow-2xs cursor-pointer text-[11px]"
               aria-label="Toggle language between Bangla and English"
             >
-              <Globe className="w-3 h-3" />
+              <Globe className="w-3 h-3 text-[#0284C7]" />
               <span>{t.switchLanguage}</span>
             </button>
           </div>
@@ -121,7 +121,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => handleNav('home')}
             className="flex items-center gap-2.5 sm:gap-3.5 cursor-pointer select-none group min-w-0"
           >
-            <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-full overflow-hidden bg-white p-0.5 shadow-md group-hover:scale-105 transition-transform duration-200 border-2 border-amber-400 shrink-0 flex items-center justify-center">
+            <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-full overflow-hidden bg-white p-0.5 shadow-md group-hover:scale-105 transition-transform duration-200 border-2 border-[#0284C7] shrink-0 flex items-center justify-center">
               <img
                 src="/assets/school_logo.png"
                 alt="Police Lines School & College Faridpur Crest"
@@ -129,11 +129,11 @@ export const Header: React.FC<HeaderProps> = ({
               />
             </div>
 
-            <div className="min-w-0 pr-3 border-r border-slate-200">
-              <h1 className="text-xs sm:text-base font-extrabold text-slate-900 tracking-tight leading-tight group-hover:text-sky-700 transition-colors">
+            <div className="min-w-0 pr-3 border-r border-[#E2EEF8]">
+              <h1 className="text-xs sm:text-base font-extrabold text-[#0F172A] tracking-tight leading-tight group-hover:text-[#0284C7] transition-colors">
                 {t.institutionName}
               </h1>
-              <p className="text-[10px] sm:text-xs text-slate-500 font-semibold italic flex items-center gap-1.5 mt-0.5">
+              <p className="text-[10px] sm:text-xs text-[#0284C7] font-semibold italic flex items-center gap-1.5 mt-0.5">
                 <span>{language === 'bn' ? 'স্থাপিত ১৯৬২ • ফরিদপুর' : 'Est. 1962 • Faridpur'}</span>
               </p>
             </div>
@@ -149,10 +149,10 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   key={item.id}
                   onClick={() => handleNav(item.id)}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-[#104a88] text-white shadow-xs'
-                      : 'text-slate-800 hover:text-sky-900 hover:bg-slate-100'
+                      ? 'bg-[#0F172A] text-white shadow-xs'
+                      : 'text-[#0F172A] hover:text-[#0284C7] hover:bg-[#E2EEF8]'
                   }`}
                 >
                   {IconComponent && <IconComponent className="w-3.5 h-3.5" />}
@@ -166,13 +166,13 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex lg:hidden items-center gap-2">
             <button
               onClick={() => onLanguageChange(language === 'en' ? 'bn' : 'en')}
-              className="px-2.5 py-1 text-xs font-bold rounded-md bg-amber-400 text-slate-900 cursor-pointer"
+              className="px-2.5 py-1 text-xs font-bold rounded-full bg-[#E2EEF8] text-[#0F172A] border border-[#0284C7]/20 cursor-pointer"
             >
               {t.switchLanguage}
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-slate-700 hover:bg-slate-100 cursor-pointer"
+              className="p-2 rounded-lg text-[#0F172A] hover:bg-[#E2EEF8] cursor-pointer"
               aria-label="Toggle mobile menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -183,38 +183,37 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="lg:hidden bg-white border-b border-slate-200 px-4 pt-2 pb-6 space-y-2 shadow-xl animate-in slide-in-from-top-2 duration-150">
+        <div className="lg:hidden bg-[#F0F6FA] border-b border-[#E2EEF8] px-4 pt-2 pb-6 space-y-2 shadow-xl animate-in slide-in-from-top-2 duration-150">
           {navItems.map((item) => (
             <button
               key={item.id}
               onClick={() => handleNav(item.id)}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left text-sm font-medium cursor-pointer ${
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-full text-left text-sm font-medium cursor-pointer ${
                 activeView === item.id
-                  ? 'bg-sky-50 text-sky-800 font-semibold'
-                  : 'text-slate-700 hover:bg-slate-50'
+                  ? 'bg-[#0F172A] text-white font-bold'
+                  : 'text-[#0F172A] hover:bg-[#E2EEF8]'
               }`}
             >
               <div className="flex items-center gap-2">
-                {item.icon && <item.icon className="w-4 h-4 text-sky-700" />}
+                {item.icon && <item.icon className="w-4 h-4" />}
                 <span>{item.label}</span>
               </div>
               {item.highlight && (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-sky-700 text-white">
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#0284C7] text-white">
                   Join
                 </span>
               )}
             </button>
           ))}
 
-          <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
+          <div className="pt-3 border-t border-[#E2EEF8] flex flex-col gap-2">
             <button
               onClick={() => handleNav('scanner')}
-              className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-800 cursor-pointer"
+              className="w-full flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium bg-[#E2EEF8] text-[#0F172A] hover:bg-white cursor-pointer"
             >
-              <QrCode className="w-4 h-4 text-amber-600" />
+              <QrCode className="w-4 h-4 text-[#0284C7]" />
               <span>{t.navScannerPortal}</span>
             </button>
-            {/* Scanner portal for gate staff */}
           </div>
         </div>
       )}

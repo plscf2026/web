@@ -97,7 +97,7 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
       <section className="space-y-6">
         <div className="text-center max-w-3xl mx-auto space-y-3">
           <div className="flex justify-center mb-2">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white p-1 shadow-lg border-2 border-amber-400 overflow-hidden flex items-center justify-center">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white p-1 shadow-lg border-2 border-[#0284C7] overflow-hidden flex items-center justify-center">
               <img
                 src="/assets/school_logo.png"
                 alt="Police Lines School & College Faridpur Crest"
@@ -105,11 +105,11 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
               />
             </div>
           </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#172554]/10 text-[#172554] text-xs font-bold border border-[#172554]/20">
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#E2EEF8] text-[#0284C7] text-xs font-bold border border-[#0284C7]/20">
             <img src="/assets/school_logo.png" alt="School Logo" className="w-4 h-4 object-contain rounded-full" />
             <span>{t.institutionSubtitle}</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-black text-[#0F172A] tracking-tight">
             {t.aboutHeading}
           </h1>
           <p className="text-sm text-slate-600 leading-relaxed">
@@ -117,23 +117,23 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
           </p>
         </div>
 
-        <div className="bg-white rounded-3xl p-8 sm:p-12 border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+        <div className="bg-white rounded-3xl p-8 sm:p-12 border border-[#E2EEF8] shadow-sm grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-[#172554]">
-              <History className="w-5 h-5 text-[#263B8C]" />
-              <h2 className="text-xl font-bold text-slate-900">{t.historyTitle}</h2>
+            <div className="flex items-center gap-2 text-[#0F172A]">
+              <History className="w-5 h-5 text-[#0284C7]" />
+              <h2 className="text-xl font-bold text-[#0F172A]">{t.historyTitle}</h2>
             </div>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               {t.historyContent}
             </p>
-            <div className="pt-2 text-xs text-slate-500 space-y-1 border-t border-slate-100">
+            <div className="pt-2 text-xs text-slate-500 space-y-1 border-t border-[#E2EEF8]">
               <div>• <strong>Location:</strong> Joyrampur, Faridpur Sadar, Dhaka Division</div>
               <div>• <strong>Affiliation:</strong> Board of Intermediate & Secondary Education, Dhaka</div>
               <div>• <strong>Patron:</strong> Faridpur District Police Force</div>
             </div>
           </div>
 
-          <div className="rounded-2xl overflow-hidden aspect-4/3 shadow-md border border-slate-200 bg-slate-100">
+          <div className="rounded-2xl overflow-hidden aspect-4/3 shadow-md border border-[#E2EEF8] bg-slate-100">
             <img
               src="https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=800&auto=format&fit=crop&q=80"
               alt="Police Lines Campus Grounds"
@@ -146,15 +146,15 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
       {/* Reunion Objectives */}
       <section className="space-y-6">
         <div className="flex items-center gap-2 justify-center">
-          <Target className="w-5 h-5 text-[#263B8C]" />
-          <h2 className="text-2xl font-black text-slate-900">
-            {language === 'bn' ? 'পুনর্মিলনী ২০২৬-এর মূল উদ্দেশ্য' : 'Reunion 2026 Core Objectives'}
+          <Target className="w-5 h-5 text-[#0284C7]" />
+          <h2 className="text-2xl font-black text-[#0F172A]">
+            {language === 'bn' ? 'পুনর্মিলনী ২০২৭-এর মূল উদ্দেশ্য' : 'Reunion 2027 Core Objectives'}
           </h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-2">
-            <h3 className="font-bold text-slate-900 text-base">
+          <div className="bg-white rounded-2xl p-6 border border-[#E2EEF8] shadow-xs space-y-2">
+            <h3 className="font-bold text-[#0F172A] text-base">
               {language === 'bn' ? '১. প্রাক্তন ও বর্তমানের মেলবন্ধন' : '1. Cross-Generation Network'}
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">
@@ -164,8 +164,8 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
             </p>
           </div>
 
-          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-2">
-            <h3 className="font-bold text-slate-900 text-base">
+          <div className="bg-white rounded-2xl p-6 border border-[#E2EEF8] shadow-xs space-y-2">
+            <h3 className="font-bold text-[#0F172A] text-base">
               {language === 'bn' ? '২. ক্যাম্পাস ও ল্যাব আধুনিকায়ন' : '2. Campus Modernization'}
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">
@@ -175,8 +175,8 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
             </p>
           </div>
 
-          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-2">
-            <h3 className="font-bold text-slate-900 text-base">
+          <div className="bg-white rounded-2xl p-6 border border-[#E2EEF8] shadow-xs space-y-2">
+            <h3 className="font-bold text-[#0F172A] text-base">
               {language === 'bn' ? '৩. অসচ্ছল শিক্ষার্থী কল্যাণ তহবিল' : '3. Student Welfare & Trust'}
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">
@@ -189,13 +189,13 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
       </section>
 
       {/* Contact & Secretariat Helpdesk Form */}
-      <section className="bg-white rounded-3xl p-8 sm:p-12 border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-10">
+      <section className="bg-white rounded-3xl p-8 sm:p-12 border border-[#E2EEF8] shadow-sm grid grid-cols-1 md:grid-cols-2 gap-10">
         <div className="space-y-6">
           <div>
-            <span className="text-xs font-bold text-[#263B8C] uppercase tracking-wider block">
+            <span className="text-xs font-bold text-[#0284C7] uppercase tracking-wider block">
               Direct Contact
             </span>
-            <h2 className="text-2xl font-black text-slate-900 mt-1">{t.helpdeskTitle}</h2>
+            <h2 className="text-2xl font-black text-[#0F172A] mt-1">{t.helpdeskTitle}</h2>
             <p className="text-xs text-slate-500 mt-1">
               {language === 'bn'
                 ? 'যেকোনো জিজ্ঞাসা, টিকিট সংক্রান্ত সমস্যা বা সহায়তার জন্য যোগাযোগ করুন।'
@@ -348,9 +348,9 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
               <button
                 type="submit"
                 disabled={!isFormValid || submitting}
-                className={`w-full py-2.5 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 text-xs ${
+                className={`w-full py-3.5 rounded-full font-bold transition-all flex items-center justify-center gap-2 text-xs sm:text-sm ${
                   isFormValid && !submitting
-                    ? 'bg-[#172554] hover:bg-[#263B8C] text-white cursor-pointer shadow-sm'
+                    ? 'bg-[#0284C7] hover:bg-[#0EA5E9] text-white cursor-pointer shadow-md shadow-sky-600/30'
                     : 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-70'
                 }`}
               >

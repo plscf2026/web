@@ -5,6 +5,14 @@
   --font-heading: -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-clash: -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-satoshi: -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* RAW FORM // LIGHT SKY EDITION DESIGN TOKENS */
+  --color-raw-base: #F0F6FA;
+  --color-raw-obsidian: #0F172A;
+  --color-raw-electric: #0284C7;
+  --color-raw-cyan: #0EA5E9;
+  --color-raw-soft: #38BDF8;
+  --color-raw-tint: #E2EEF8;
 }
 
 @layer base {
@@ -49,7 +57,7 @@
     background: #0284c7;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #0369a1;
+    background: #0ea5e9;
   }
 
   body {

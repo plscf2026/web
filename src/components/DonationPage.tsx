@@ -280,18 +280,18 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
 
         {/* Live Patronage Summary Metric */}
         <div className="mx-auto max-w-md pt-2">
-          <div className="flex items-center justify-between rounded-2xl bg-gradient-to-r from-emerald-900 to-teal-900 p-4 text-white shadow-lg">
+          <div className="flex items-center justify-between rounded-3xl bg-[#0F172A] border border-[#0284C7]/30 p-4 text-white shadow-xl">
             <div className="text-left">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
-                <TrendingUp className="w-3.5 h-3.5" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#38BDF8] flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5 text-[#0EA5E9]" />
                 {isBangla ? 'সর্বমোট সংগৃহীত পৃষ্ঠপোষকতা' : 'Total Patronage Raised'}
               </span>
-              <p className="text-2xl font-black tracking-tight text-amber-300">
+              <p className="text-2xl font-black tracking-tight text-[#38BDF8]">
                 ৳{totalRaised.toLocaleString('en-US')}
               </p>
             </div>
             <div className="text-right">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-300">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#E2EEF8]">
                 {isBangla ? 'অনুদাতা সদস্য' : 'Verified Donors'}
               </span>
               <p className="text-xl font-bold font-mono text-white">
@@ -564,9 +564,9 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
                         key={method.id}
                         type="button"
                         onClick={() => setPaymentMethod(method.id as PaymentMethod)}
-                        className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer font-bold text-xs flex items-center justify-center gap-1.5 ${
+                        className={`p-2.5 rounded-full border text-center transition-all cursor-pointer font-bold text-xs flex items-center justify-center gap-1.5 ${
                           isSelected
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                            ? 'bg-[#0284C7] text-white border-[#0284C7] shadow-sm'
                             : `bg-slate-50 text-slate-700 ${method.color}`
                         }`}
                       >
@@ -590,7 +590,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
               <button
                 type="submit"
                 disabled={isProcessing}
-                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-extrabold text-base shadow-lg hover:shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full py-4 px-6 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-extrabold text-base shadow-lg shadow-sky-600/30 hover:shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {isProcessing ? (
                   <>

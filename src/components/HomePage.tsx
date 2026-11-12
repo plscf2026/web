@@ -196,12 +196,12 @@ export const HomePage: React.FC<HomePageProps> = ({
         <div className="max-w-7xl mx-auto relative z-10 w-full">
           <div className="max-w-2xl space-y-4 sm:space-y-5 text-left">
             {/* Stylized Italic Tagline */}
-            <div className="font-serif italic text-2xl sm:text-3xl text-[#104a88] tracking-wide font-medium drop-shadow-xs">
+            <div className="font-serif italic text-2xl sm:text-3xl text-[#0284C7] tracking-wide font-medium drop-shadow-xs">
               {language === 'bn' ? 'একবার পিএলসিয়ান, চিরকাল পিএলসিয়ান...' : 'Once a PLSian, Always a PLSian...'}
             </div>
 
             {/* Institution Title */}
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-[#104a88] tracking-tight leading-tight drop-shadow-xs">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-[#0F172A] tracking-tight leading-tight drop-shadow-xs">
               {language === 'bn'
                 ? 'পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজ, ফরিদপুর'
                 : 'Police Lines High School & College, Faridpur'}
@@ -209,10 +209,10 @@ export const HomePage: React.FC<HomePageProps> = ({
 
             {/* Deep Navy Pill Badge: Grand Reunion 2027 */}
             <div>
-              <div className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#0e3b6e] text-white shadow-xl hover:shadow-2xl transition-shadow">
+              <div className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#0F172A] text-white shadow-xl hover:shadow-2xl transition-shadow">
                 <span className="text-xl sm:text-2xl md:text-3xl font-black tracking-wide">
                   {language === 'bn' ? 'গ্র্যান্ড রিইউনিয়ন' : 'Grand Reunion'}{' '}
-                  <span className="text-[#fbb03b]">2027</span>
+                  <span className="text-[#38BDF8]">2027</span>
                 </span>
               </div>
             </div>
@@ -225,18 +225,18 @@ export const HomePage: React.FC<HomePageProps> = ({
             </p>
 
             {/* Date & Venue Pills */}
-            <div className="flex flex-wrap items-center gap-3 pt-1 text-xs sm:text-sm font-semibold text-slate-800">
-              <div className="flex items-center gap-2 bg-white/95 backdrop-blur-md px-4 py-2 rounded-xl border border-sky-200/80 shadow-xs">
-                <Calendar className="w-4 h-4 text-[#104a88]" />
+            <div className="flex flex-wrap items-center gap-3 pt-1 text-xs sm:text-sm font-semibold text-[#0F172A]">
+              <div className="flex items-center gap-2 bg-[#E2EEF8]/90 backdrop-blur-md px-4 py-2 rounded-full border border-[#0284C7]/20 shadow-xs">
+                <Calendar className="w-4 h-4 text-[#0284C7]" />
                 <span>
-                  <strong className="text-[#104a88] font-bold">{language === 'bn' ? 'তারিখ:' : 'Date:'}</strong>{' '}
+                  <strong className="text-[#0284C7] font-bold">{language === 'bn' ? 'তারিখ:' : 'Date:'}</strong>{' '}
                   {language === 'bn' ? '২৮ - ২৯ জানুয়ারি, ২০২৭' : 'January 28 - 29, 2027'}
                 </span>
               </div>
-              <div className="flex items-center gap-2 bg-white/95 backdrop-blur-md px-4 py-2 rounded-xl border border-sky-200/80 shadow-xs">
-                <MapPin className="w-4 h-4 text-[#104a88]" />
+              <div className="flex items-center gap-2 bg-[#E2EEF8]/90 backdrop-blur-md px-4 py-2 rounded-full border border-[#0284C7]/20 shadow-xs">
+                <MapPin className="w-4 h-4 text-[#0284C7]" />
                 <span>
-                  <strong className="text-[#104a88] font-bold">{language === 'bn' ? 'স্থান:' : 'Venue:'}</strong>{' '}
+                  <strong className="text-[#0284C7] font-bold">{language === 'bn' ? 'স্থান:' : 'Venue:'}</strong>{' '}
                   {language === 'bn' ? 'স্কুল ক্যাম্পাস, বড় মাঠ, ফরিদপুর' : 'School Campus, Large Field, Faridpur'}
                 </span>
               </div>
@@ -258,9 +258,9 @@ export const HomePage: React.FC<HomePageProps> = ({
               {feeSettings.registrationOpen ? (
                 <button
                   onClick={() => onNavigate('register')}
-                  className="px-7 py-3.5 rounded-full bg-[#fbb03b] hover:bg-[#f39c12] text-slate-950 font-black text-sm sm:text-base shadow-lg shadow-amber-500/30 hover:shadow-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center gap-2 group"
+                  className="px-7 py-3.5 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-black text-sm sm:text-base shadow-lg shadow-sky-600/30 hover:shadow-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center gap-2 group"
                 >
-                  <PenLine className="w-4 h-4 text-slate-950" />
+                  <PenLine className="w-4 h-4 text-white" />
                   <span>{language === 'bn' ? 'নিবন্ধন করুন' : 'Register Now'}</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
@@ -276,9 +276,9 @@ export const HomePage: React.FC<HomePageProps> = ({
 
               <button
                 onClick={() => onNavigate('donate')}
-                className="px-6 py-3.5 rounded-full bg-white/95 hover:bg-white text-[#104a88] border border-[#104a88]/30 font-bold text-sm sm:text-base shadow-xs hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer flex items-center gap-2"
+                className="px-6 py-3.5 rounded-full bg-[#E2EEF8] hover:bg-white text-[#0F172A] border border-[#0284C7]/30 font-bold text-sm sm:text-base shadow-xs hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer flex items-center gap-2"
               >
-                <HeartHandshake className="w-4 h-4 text-[#104a88]" />
+                <HeartHandshake className="w-4 h-4 text-[#0284C7]" />
                 <span>{language === 'bn' ? 'অনুদান / সহায়তা' : 'Contribute / Donate'}</span>
               </button>
             </div>
@@ -288,17 +288,17 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* FLOATING STATS BAR */}
       <div className="-mt-12 sm:-mt-16 relative z-25 max-w-5xl mx-auto px-4 sm:px-6 w-full">
-        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl border border-slate-100 px-6 py-5 grid grid-cols-2 md:grid-cols-4 gap-4 divide-y md:divide-y-0 md:divide-x divide-slate-100 text-center">
+        <div className="bg-white rounded-3xl shadow-xl border border-[#E2EEF8] px-6 py-5 grid grid-cols-2 md:grid-cols-4 gap-4 divide-y md:divide-y-0 md:divide-x divide-[#E2EEF8] text-center">
           {/* Stat 1: Total Registered */}
           <div className="flex items-center justify-center gap-3 pt-2 md:pt-0">
-            <div className="w-10 h-10 rounded-full bg-sky-50 flex items-center justify-center shrink-0">
-              <Users className="w-5 h-5 text-[#104a88]" />
+            <div className="w-10 h-10 rounded-full bg-[#E2EEF8] flex items-center justify-center shrink-0">
+              <Users className="w-5 h-5 text-[#0284C7]" />
             </div>
             <div className="text-left">
-              <div className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
+              <div className="text-2xl sm:text-3xl font-black text-[#0F172A] leading-tight">
                 {displayPaidCount}
               </div>
-              <div className="text-xs text-slate-500 font-semibold">
+              <div className="text-xs text-slate-600 font-semibold">
                 {language === 'bn' ? 'মোট নিবন্ধিত' : 'Total Registered'}
               </div>
             </div>
@@ -306,14 +306,14 @@ export const HomePage: React.FC<HomePageProps> = ({
 
           {/* Stat 2: Former Students */}
           <div className="flex items-center justify-center gap-3 pt-2 md:pt-0">
-            <div className="w-10 h-10 rounded-full bg-sky-50 flex items-center justify-center shrink-0">
-              <GraduationCap className="w-5 h-5 text-[#104a88]" />
+            <div className="w-10 h-10 rounded-full bg-[#E2EEF8] flex items-center justify-center shrink-0">
+              <GraduationCap className="w-5 h-5 text-[#0284C7]" />
             </div>
             <div className="text-left">
-              <div className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
+              <div className="text-2xl sm:text-3xl font-black text-[#0F172A] leading-tight">
                 {displayFormerCount}
               </div>
-              <div className="text-xs text-slate-500 font-semibold">
+              <div className="text-xs text-slate-600 font-semibold">
                 {language === 'bn' ? 'প্রাক্তন শিক্ষার্থী' : 'Former Students'}
               </div>
             </div>
@@ -321,14 +321,14 @@ export const HomePage: React.FC<HomePageProps> = ({
 
           {/* Stat 3: Current Students */}
           <div className="flex items-center justify-center gap-3 pt-2 md:pt-0">
-            <div className="w-10 h-10 rounded-full bg-sky-50 flex items-center justify-center shrink-0">
-              <User className="w-5 h-5 text-[#104a88]" />
+            <div className="w-10 h-10 rounded-full bg-[#E2EEF8] flex items-center justify-center shrink-0">
+              <User className="w-5 h-5 text-[#0284C7]" />
             </div>
             <div className="text-left">
-              <div className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
+              <div className="text-2xl sm:text-3xl font-black text-[#0F172A] leading-tight">
                 {displayCurrentCount}
               </div>
-              <div className="text-xs text-slate-500 font-semibold">
+              <div className="text-xs text-slate-600 font-semibold">
                 {language === 'bn' ? 'বর্তমান শিক্ষার্থী' : 'Current Students'}
               </div>
             </div>
@@ -336,14 +336,14 @@ export const HomePage: React.FC<HomePageProps> = ({
 
           {/* Stat 4: Batches Represented */}
           <div className="flex items-center justify-center gap-3 pt-2 md:pt-0">
-            <div className="w-10 h-10 rounded-full bg-sky-50 flex items-center justify-center shrink-0">
-              <Users className="w-5 h-5 text-[#104a88]" />
+            <div className="w-10 h-10 rounded-full bg-[#E2EEF8] flex items-center justify-center shrink-0">
+              <Users className="w-5 h-5 text-[#0284C7]" />
             </div>
             <div className="text-left">
-              <div className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
+              <div className="text-2xl sm:text-3xl font-black text-[#0F172A] leading-tight">
                 50+
               </div>
-              <div className="text-xs text-slate-500 font-semibold">
+              <div className="text-xs text-slate-600 font-semibold">
                 {language === 'bn' ? 'ব্যাচ প্রতিনিধিত্বকারী' : 'Batches Represented'}
               </div>
             </div>
@@ -376,15 +376,15 @@ export const HomePage: React.FC<HomePageProps> = ({
 
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Card 1: Latest Notices */}
-          <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden flex flex-col">
-            <div className="bg-[#104a88] text-white px-4 py-3 flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-md border border-[#E2EEF8] overflow-hidden flex flex-col">
+            <div className="bg-[#0F172A] text-white px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2 font-bold text-sm sm:text-base">
-                <Megaphone className="w-4 h-4 text-amber-300" />
+                <Megaphone className="w-4 h-4 text-[#38BDF8]" />
                 <span>{language === 'bn' ? 'সর্বশেষ নোটিশ' : 'Latest Notices'}</span>
               </div>
               <button
                 onClick={() => onNavigate('notices')}
-                className="text-xs text-sky-200 hover:text-white font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                className="text-xs text-[#38BDF8] hover:text-white font-medium flex items-center gap-1 transition-colors cursor-pointer"
               >
                 <span>{language === 'bn' ? 'সবগুলো দেখুন' : 'View All'}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -393,14 +393,14 @@ export const HomePage: React.FC<HomePageProps> = ({
             <div className="p-4 space-y-3 flex-1 flex flex-col justify-around">
               <div
                 onClick={() => onNavigate('notices')}
-                className="flex items-start gap-3 p-2 rounded-xl hover:bg-sky-50/60 transition-colors cursor-pointer group"
+                className="flex items-start gap-3 p-2 rounded-xl hover:bg-[#E2EEF8]/60 transition-colors cursor-pointer group"
               >
-                <div className="bg-sky-100 text-[#104a88] font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg text-center shrink-0 leading-tight">
+                <div className="bg-[#E2EEF8] text-[#0284C7] font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg text-center shrink-0 leading-tight">
                   <div>Nov</div>
                   <div className="text-sm">15</div>
                 </div>
                 <div className="min-w-0">
-                  <div className="font-bold text-xs sm:text-sm text-slate-800 group-hover:text-[#104a88] transition-colors truncate">
+                  <div className="font-bold text-xs sm:text-sm text-[#0F172A] group-hover:text-[#0284C7] transition-colors truncate">
                     {language === 'bn' ? 'রিইউনিয়ন নিবন্ধন উন্মুক্ত!' : 'Reunion Registration Open!'}
                   </div>
                   <div className="text-[11px] sm:text-xs text-slate-500 truncate">
@@ -411,14 +411,14 @@ export const HomePage: React.FC<HomePageProps> = ({
 
               <div
                 onClick={() => onNavigate('notices')}
-                className="flex items-start gap-3 p-2 rounded-xl hover:bg-sky-50/60 transition-colors cursor-pointer group"
+                className="flex items-start gap-3 p-2 rounded-xl hover:bg-[#E2EEF8]/60 transition-colors cursor-pointer group"
               >
-                <div className="bg-sky-100 text-[#104a88] font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg text-center shrink-0 leading-tight">
+                <div className="bg-[#E2EEF8] text-[#0284C7] font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg text-center shrink-0 leading-tight">
                   <div>Nov</div>
                   <div className="text-sm">15</div>
                 </div>
                 <div className="min-w-0">
-                  <div className="font-bold text-xs sm:text-sm text-slate-800 group-hover:text-[#104a88] transition-colors truncate">
+                  <div className="font-bold text-xs sm:text-sm text-[#0F172A] group-hover:text-[#0284C7] transition-colors truncate">
                     {language === 'bn' ? 'পেমেন্ট গেটওয়ে সক্রিয় হয়েছে' : 'Payment Gateway is Live'}
                   </div>
                   <div className="text-[11px] sm:text-xs text-slate-500 truncate">
@@ -429,14 +429,14 @@ export const HomePage: React.FC<HomePageProps> = ({
 
               <div
                 onClick={() => onNavigate('notices')}
-                className="flex items-start gap-3 p-2 rounded-xl hover:bg-sky-50/60 transition-colors cursor-pointer group"
+                className="flex items-start gap-3 p-2 rounded-xl hover:bg-[#E2EEF8]/60 transition-colors cursor-pointer group"
               >
-                <div className="bg-sky-100 text-[#104a88] font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg text-center shrink-0 leading-tight">
+                <div className="bg-[#E2EEF8] text-[#0284C7] font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg text-center shrink-0 leading-tight">
                   <div>Nov</div>
                   <div className="text-sm">15</div>
                 </div>
                 <div className="min-w-0">
-                  <div className="font-bold text-xs sm:text-sm text-slate-800 group-hover:text-[#104a88] transition-colors truncate">
+                  <div className="font-bold text-xs sm:text-sm text-[#0F172A] group-hover:text-[#0284C7] transition-colors truncate">
                     {language === 'bn' ? 'ইভেন্ট সূচি প্রকাশিত' : 'Event Schedule Released'}
                   </div>
                   <div className="text-[11px] sm:text-xs text-slate-500 truncate">
@@ -448,15 +448,15 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
 
           {/* Card 2: Our Memories */}
-          <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden flex flex-col">
-            <div className="bg-[#104a88] text-white px-4 py-3 flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-md border border-[#E2EEF8] overflow-hidden flex flex-col">
+            <div className="bg-[#0F172A] text-white px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2 font-bold text-sm sm:text-base">
-                <ImageIcon className="w-4 h-4 text-amber-300" />
+                <ImageIcon className="w-4 h-4 text-[#38BDF8]" />
                 <span>{language === 'bn' ? 'আমাদের স্মৃতিমালা' : 'Our Memories'}</span>
               </div>
               <button
                 onClick={() => onNavigate('gallery')}
-                className="text-xs text-sky-200 hover:text-white font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                className="text-xs text-[#38BDF8] hover:text-white font-medium flex items-center gap-1 transition-colors cursor-pointer"
               >
                 <span>{language === 'bn' ? 'গ্যালারি দেখুন' : 'View Gallery'}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -465,7 +465,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             <div className="p-4 flex-1 flex items-center justify-between gap-2.5">
               <div
                 onClick={() => onNavigate('gallery')}
-                className="relative flex-1 aspect-square rounded-xl overflow-hidden border border-slate-200 hover:shadow-md transition-all cursor-pointer group"
+                className="relative flex-1 aspect-square rounded-xl overflow-hidden border border-[#E2EEF8] hover:shadow-md transition-all cursor-pointer group"
               >
                 <img
                   src="/assets/homepage/memory_1.jpg"
@@ -475,7 +475,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               </div>
               <div
                 onClick={() => onNavigate('gallery')}
-                className="relative flex-1 aspect-square rounded-xl overflow-hidden border border-slate-200 hover:shadow-md transition-all cursor-pointer group"
+                className="relative flex-1 aspect-square rounded-xl overflow-hidden border border-[#E2EEF8] hover:shadow-md transition-all cursor-pointer group"
               >
                 <img
                   src="/assets/homepage/memory_2.jpg"
@@ -485,7 +485,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               </div>
               <div
                 onClick={() => onNavigate('gallery')}
-                className="relative flex-1 aspect-square rounded-xl overflow-hidden border border-slate-200 hover:shadow-md transition-all cursor-pointer group"
+                className="relative flex-1 aspect-square rounded-xl overflow-hidden border border-[#E2EEF8] hover:shadow-md transition-all cursor-pointer group"
               >
                 <img
                   src="/assets/homepage/memory_3.jpg"
@@ -497,15 +497,15 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
 
           {/* Card 3: Our Videos */}
-          <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden flex flex-col">
-            <div className="bg-[#104a88] text-white px-4 py-3 flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-md border border-[#E2EEF8] overflow-hidden flex flex-col">
+            <div className="bg-[#0F172A] text-white px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2 font-bold text-sm sm:text-base">
-                <Play className="w-4 h-4 text-amber-300" />
+                <Play className="w-4 h-4 text-[#38BDF8]" />
                 <span>{language === 'bn' ? 'আমাদের ভিডিও' : 'Our Videos'}</span>
               </div>
               <button
                 onClick={() => setIsVideoModalOpen(true)}
-                className="text-xs text-sky-200 hover:text-white font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                className="text-xs text-[#38BDF8] hover:text-white font-medium flex items-center gap-1 transition-colors cursor-pointer"
               >
                 <span>{language === 'bn' ? 'সবগুলো দেখুন' : 'View All'}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -514,7 +514,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             <div className="p-4 flex-1 flex flex-col justify-center">
               <div
                 onClick={() => setIsVideoModalOpen(true)}
-                className="relative rounded-xl overflow-hidden shadow-xs cursor-pointer group border border-slate-200"
+                className="relative rounded-xl overflow-hidden shadow-xs cursor-pointer group border border-[#E2EEF8]"
               >
                 <img
                   src="/assets/homepage/video_thumb.jpg"
@@ -523,14 +523,14 @@ export const HomePage: React.FC<HomePageProps> = ({
                 />
                 {/* Centered Play Button */}
                 <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 flex items-center justify-center transition-colors">
-                  <div className="w-12 h-12 rounded-full bg-white/90 text-[#104a88] shadow-lg flex items-center justify-center pl-1 transform group-hover:scale-110 transition-transform">
+                  <div className="w-12 h-12 rounded-full bg-white/95 text-[#0284C7] shadow-lg flex items-center justify-center pl-1 transform group-hover:scale-110 transition-transform">
                     <Play className="w-6 h-6 fill-current" />
                   </div>
                 </div>
                 {/* Video Info Bottom Overlay */}
                 <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2.5 flex items-center justify-between text-white text-xs">
                   <span className="font-semibold truncate drop-shadow-xs">PLS Reunion 2027 – Official Promo</span>
-                  <span className="bg-black/60 px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 ml-2">1:57</span>
+                  <span className="bg-[#0F172A]/80 px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 ml-2">1:57</span>
                 </div>
               </div>
             </div>
@@ -540,7 +540,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* BOTTOM NAVY WAVE RIBBON */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 w-full -mt-6">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#0c2f58] via-[#104077] to-[#0c2f58] text-white p-6 sm:p-8 shadow-xl border border-sky-900/40">
+        <div className="relative overflow-hidden rounded-3xl bg-[#0F172A] text-white p-6 sm:p-8 shadow-xl border border-[#0284C7]/30">
           {/* Subtle watermark illustration of campus */}
           <div className="absolute right-0 bottom-0 top-0 w-96 opacity-15 pointer-events-none overflow-hidden">
             <img
@@ -554,17 +554,17 @@ export const HomePage: React.FC<HomePageProps> = ({
             {/* Core Reunion Pillars */}
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 sm:gap-6 text-xs sm:text-sm font-bold text-white">
               <div className="flex items-center gap-2">
-                <Handshake className="w-5 h-5 text-[#fbb03b]" />
+                <Handshake className="w-5 h-5 text-[#38BDF8]" />
                 <span>{language === 'bn' ? 'বন্ধুদের সাথে পুনর্মিলন' : 'Reconnect with Friends'}</span>
               </div>
-              <span className="hidden sm:inline text-sky-400/60 font-light">|</span>
+              <span className="hidden sm:inline text-sky-400/40 font-light">|</span>
               <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-[#fbb03b]" />
+                <Trophy className="w-5 h-5 text-[#38BDF8]" />
                 <span>{language === 'bn' ? 'আমাদের ঐতিহ্য উদযাপন' : 'Celebrate Our Legacy'}</span>
               </div>
-              <span className="hidden sm:inline text-sky-400/60 font-light">|</span>
+              <span className="hidden sm:inline text-sky-400/40 font-light">|</span>
               <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-[#fbb03b]" />
+                <Users className="w-5 h-5 text-[#38BDF8]" />
                 <span>{language === 'bn' ? 'আমাদের বন্ধন সুদৃঢ়করণ' : 'Strengthen Our Bond'}</span>
               </div>
             </div>
@@ -572,10 +572,10 @@ export const HomePage: React.FC<HomePageProps> = ({
             {/* Action CTA Button */}
             <button
               onClick={() => onNavigate('register')}
-              className="px-6 py-3.5 rounded-full bg-[#fbb03b] hover:bg-[#f39c12] text-slate-950 font-black text-xs sm:text-sm shadow-lg transition-all transform hover:scale-105 active:scale-100 cursor-pointer flex items-center gap-2 shrink-0"
+              className="px-6 py-3.5 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-black text-xs sm:text-sm shadow-lg shadow-sky-600/30 transition-all transform hover:scale-105 active:scale-100 cursor-pointer flex items-center gap-2 shrink-0"
             >
               <span>{language === 'bn' ? 'রিইউনিয়ন যাত্রায় যোগ দিন' : 'Join the Reunion Journey'}</span>
-              <ArrowRight className="w-4 h-4 text-slate-950" />
+              <ArrowRight className="w-4 h-4 text-white" />
             </button>
           </div>
         </div>
@@ -669,10 +669,10 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         ) : (
           /* ACTIVE LIVE COUNTDOWN TIMER */
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xl space-y-6">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E2EEF8] shadow-xl space-y-6">
             <div className="text-center space-y-1">
-              <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#172554] uppercase tracking-wider">
-                <Clock className="w-4 h-4 text-[#263B8C]" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2EEF8] text-xs font-bold text-[#0284C7] uppercase tracking-wider">
+                <Clock className="w-4 h-4 text-[#0284C7]" />
                 <span>{t.countdownHeading}</span>
               </div>
               <p className="text-xs text-slate-500">{t.countdownSubtitle}</p>
@@ -681,41 +681,41 @@ export const HomePage: React.FC<HomePageProps> = ({
             {/* Countdown Solid Cards */}
             <div className="grid grid-cols-4 gap-2 sm:gap-4 max-w-2xl mx-auto text-center">
               {/* Days */}
-              <div className="bg-[#172554] text-white rounded-2xl p-3 sm:p-5 shadow-md border border-blue-900">
-                <span className="text-2xl sm:text-4xl md:text-5xl font-black text-[#C5A45D] block tabular-nums">
+              <div className="bg-[#0F172A] text-white rounded-2xl p-3 sm:p-5 shadow-md border border-[#0284C7]/30">
+                <span className="text-2xl sm:text-4xl md:text-5xl font-black text-[#38BDF8] block tabular-nums">
                   {String(timeLeft.days).padStart(2, '0')}
                 </span>
-                <span className="text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider mt-1 block">
+                <span className="text-[10px] sm:text-xs font-bold text-[#E2EEF8] uppercase tracking-wider mt-1 block">
                   {t.daysLabel}
                 </span>
               </div>
 
               {/* Hours */}
-              <div className="bg-[#172554] text-white rounded-2xl p-3 sm:p-5 shadow-md border border-blue-900">
-                <span className="text-2xl sm:text-4xl md:text-5xl font-black text-blue-300 block tabular-nums">
+              <div className="bg-[#0F172A] text-white rounded-2xl p-3 sm:p-5 shadow-md border border-[#0284C7]/30">
+                <span className="text-2xl sm:text-4xl md:text-5xl font-black text-[#0EA5E9] block tabular-nums">
                   {String(timeLeft.hours).padStart(2, '0')}
                 </span>
-                <span className="text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider mt-1 block">
+                <span className="text-[10px] sm:text-xs font-bold text-[#E2EEF8] uppercase tracking-wider mt-1 block">
                   {t.hoursLabel}
                 </span>
               </div>
 
               {/* Minutes */}
-              <div className="bg-[#172554] text-white rounded-2xl p-3 sm:p-5 shadow-md border border-blue-900">
-                <span className="text-2xl sm:text-4xl md:text-5xl font-black text-cyan-300 block tabular-nums">
+              <div className="bg-[#0F172A] text-white rounded-2xl p-3 sm:p-5 shadow-md border border-[#0284C7]/30">
+                <span className="text-2xl sm:text-4xl md:text-5xl font-black text-[#38BDF8] block tabular-nums">
                   {String(timeLeft.minutes).padStart(2, '0')}
                 </span>
-                <span className="text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider mt-1 block">
+                <span className="text-[10px] sm:text-xs font-bold text-[#E2EEF8] uppercase tracking-wider mt-1 block">
                   {t.minutesLabel}
                 </span>
               </div>
 
               {/* Seconds */}
-              <div className="bg-[#172554] text-white rounded-2xl p-3 sm:p-5 shadow-md border border-blue-900">
-                <span className="text-2xl sm:text-4xl md:text-5xl font-black text-amber-300 block tabular-nums">
+              <div className="bg-[#0F172A] text-white rounded-2xl p-3 sm:p-5 shadow-md border border-[#0284C7]/30">
+                <span className="text-2xl sm:text-4xl md:text-5xl font-black text-[#0EA5E9] block tabular-nums">
                   {String(timeLeft.seconds).padStart(2, '0')}
                 </span>
-                <span className="text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider mt-1 block">
+                <span className="text-[10px] sm:text-xs font-bold text-[#E2EEF8] uppercase tracking-wider mt-1 block">
                   {t.secondsLabel}
                 </span>
               </div>
@@ -730,13 +730,13 @@ export const HomePage: React.FC<HomePageProps> = ({
         className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8"
         style={getHomePageSectionStyle('status')}
       >
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xl space-y-6">
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E2EEF8] shadow-xl space-y-6">
           <div className="text-center max-w-xl mx-auto space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#E2EEF8] text-[#0284C7] text-xs font-bold border border-[#0284C7]/20">
               <Search className="w-3.5 h-3.5" />
               <span>{language === 'bn' ? 'অনলাইন যাচাইকরণ সেবা' : 'Online Verification Portal'}</span>
             </div>
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+            <h2 className="text-2xl font-black text-[#0F172A] tracking-tight">
               {t.checkStatusHeading}
             </h2>
             <p className="text-xs text-slate-600 leading-relaxed">
@@ -745,12 +745,12 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
 
           {/* Testing Credentials Banner (For quick attendee lookup testing) */}
-          <div className="max-w-2xl mx-auto p-3 bg-sky-50 border border-sky-300 text-sky-900 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+          <div className="max-w-2xl mx-auto p-3 bg-[#E2EEF8]/70 border border-[#0284C7]/30 text-[#0F172A] rounded-2xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xs">
             <div className="flex items-center gap-1.5 font-medium flex-wrap">
-              <span className="font-bold text-sky-950">🧪 Testing Credentials:</span>
-              <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">PLSCF-2026-F1001</span>
+              <span className="font-bold text-[#0F172A]">🧪 Testing Credentials:</span>
+              <span className="font-mono bg-white px-2 py-0.5 rounded-lg border border-[#0284C7]/20 text-[#0284C7] font-bold">PLSCF-2026-F1001</span>
               <span className="text-slate-400">/</span>
-              <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">01712345678</span>
+              <span className="font-mono bg-white px-2 py-0.5 rounded-lg border border-[#0284C7]/20 text-[#0284C7] font-bold">01712345678</span>
             </div>
             <button
               type="button"
@@ -758,7 +758,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 setSearchRegId('PLSCF-2026-F1001');
                 setSearchMobile('01712345678');
               }}
-              className="text-[10px] text-sky-800 bg-sky-100 hover:bg-sky-200 px-2.5 py-1 rounded-full font-bold cursor-pointer transition-colors shadow-2xs"
+              className="text-[10px] text-[#0284C7] bg-white hover:bg-[#E2EEF8] border border-[#0284C7]/30 px-3 py-1 rounded-full font-bold cursor-pointer transition-colors shadow-2xs"
             >
               Auto-fill
             </button>
@@ -767,7 +767,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           {/* Verification Form */}
           <form onSubmit={handleCheckStatus} className="grid grid-cols-1 sm:grid-cols-5 gap-3 max-w-2xl mx-auto">
             <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label className="block text-xs font-bold text-[#0F172A] mb-1">
                 {t.inputRegIdLabel}
               </label>
               <input
@@ -775,13 +775,13 @@ export const HomePage: React.FC<HomePageProps> = ({
                 value={searchRegId}
                 onChange={(e) => setSearchRegId(e.target.value)}
                 placeholder={t.inputRegIdPlaceholder}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-mono uppercase focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2EEF8] text-xs sm:text-sm font-mono uppercase focus:border-[#0284C7] focus:ring-1 focus:ring-[#0284C7] focus:outline-hidden"
                 required
               />
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label className="block text-xs font-bold text-[#0F172A] mb-1">
                 {t.inputMobileLabel}
               </label>
               <input
@@ -789,7 +789,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 value={searchMobile}
                 onChange={(e) => setSearchMobile(e.target.value)}
                 placeholder={t.inputMobilePlaceholder}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-mono focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2EEF8] text-xs sm:text-sm font-mono focus:border-[#0284C7] focus:ring-1 focus:ring-[#0284C7] focus:outline-hidden"
                 required
               />
             </div>
@@ -798,7 +798,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               <button
                 type="submit"
                 disabled={isCheckingStatus}
-                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold text-xs sm:text-sm shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                className="w-full py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0EA5E9] disabled:opacity-60 text-white font-bold text-xs sm:text-sm shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <Search className="w-4 h-4" />
                 <span>{isCheckingStatus ? (language === 'bn' ? 'যাচাই হচ্ছে...' : 'Checking...') : t.btnCheckStatus}</span>
@@ -808,7 +808,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
           {/* RESULT CARD IF FOUND */}
           {searchAttempted && foundRegistration && (
-            <div className="p-5 rounded-2xl bg-emerald-50 border-2 border-emerald-500 shadow-md animate-fade-in">
+            <div className="p-5 rounded-2xl bg-[#E2EEF8]/60 border-2 border-[#0284C7] shadow-md animate-fade-in">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <img
@@ -818,27 +818,27 @@ export const HomePage: React.FC<HomePageProps> = ({
                   />
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-emerald-700 text-white">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-[#0284C7] text-white">
                         {foundRegistration.id}
                       </span>
-                      <span className="flex items-center gap-1 text-xs font-bold text-emerald-800">
-                        <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="flex items-center gap-1 text-xs font-bold text-[#0284C7]">
+                        <CheckCircle className="w-3.5 h-3.5 text-[#0284C7]" />
                         {t.statusFoundTitle}
                       </span>
                     </div>
 
-                    <h4 className="font-extrabold text-slate-900 text-base mt-1">
+                    <h4 className="font-extrabold text-[#0F172A] text-base mt-1">
                       {foundRegistration.fullName}
                     </h4>
 
                     <div className="text-xs text-slate-600 mt-0.5 flex flex-wrap gap-2">
                       <span>{foundRegistration.batchName}</span>
                       <span>•</span>
-                      <span>{t.statusTShirtLabel} <strong className="text-slate-800">{foundRegistration.tShirtSize}</strong></span>
+                      <span>{t.statusTShirtLabel} <strong className="text-[#0F172A]">{foundRegistration.tShirtSize}</strong></span>
                       <span>•</span>
                       <span>
                         {t.statusPaymentStatusLabel}{' '}
-                        <strong className="text-emerald-700 uppercase">
+                        <strong className="text-[#0284C7] uppercase">
                           {foundRegistration.paymentStatus} (৳{foundRegistration.totalPaid})
                         </strong>
                       </span>
@@ -855,7 +855,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                         onNavigate('find-ticket');
                       }
                     }}
-                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
                   >
                     <QrCode className="w-4 h-4" />
                     <span>{t.btnOpenTicketDirect}</span>
