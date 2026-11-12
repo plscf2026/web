@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Camera,
   RefreshCw,
-  ZoomIn,
-  ZoomOut,
   RotateCcw,
   CheckCircle2,
   X,
@@ -12,10 +10,6 @@ import {
   Eye,
   Sparkles,
   Loader2,
-  ChevronUp,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 import { StudentIdCardRecord } from '../../types/idcard';
 import { Language } from '../../types';
@@ -46,8 +40,8 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
 }) => {
   const isBangla = language === 'bn';
 
-  // Mode: 'camera' (live webcam) vs 'adjust' (adjusting captured/uploaded photo)
-  const [mode, setMode] = useState<'camera' | 'adjust'>('camera');
+  // Mode: 'camera' (live webcam) vs 'preview' (captured/uploaded photo preview)
+  const [mode, setMode] = useState<'camera' | 'preview'>('camera');
   const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('user');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isInitializingCamera, setIsInitializingCamera] = useState(false);
@@ -59,12 +53,6 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
 
   // Captured / Loaded image data
   const [capturedImageSrc, setCapturedImageSrc] = useState<string | null>(null);
-  const loadedImageRef = useRef<HTMLImageElement | null>(null);
-
-  // Unified Adjustment State (Zoom & Pan)
-  const [zoom, setZoom] = useState<number>(1.0);
-  const [panX, setPanX] = useState<number>(0);
-  const [panY, setPanY] = useState<number>(0);
 
   // Real-time cropped data URL synced to ID Card
   const [liveCroppedPhotoUrl, setLiveCroppedPhotoUrl] = useState<string | null>(null);
@@ -73,10 +61,6 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
 
   // Mobile layout tab: 'camera' | 'card'
   const [mobileTab, setMobileTab] = useState<'camera' | 'card'>('camera');
-
-  // Drag interaction state
-  const isDraggingRef = useRef(false);
-  const dragStartRef = useRef({ x: 0, y: 0 });
 
   // ─────────────────────────────────────────────────────────────────────────────
   // 1. CAMERA LIFECYCLE MANAGEMENT
@@ -161,12 +145,10 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
   useEffect(() => {
     if (isOpen) {
       if (initialImageUrl) {
-        // If an initial image is provided (e.g. from file upload), open in adjust mode
+        // If an initial image is provided (e.g. from file upload), open in preview mode
         setCapturedImageSrc(initialImageUrl);
-        setMode('adjust');
-        setZoom(1.0);
-        setPanX(0);
-        setPanY(0);
+        setLiveCroppedPhotoUrl(initialImageUrl);
+        setMode('preview');
       } else {
         setMode('camera');
         setCapturedImageSrc(null);
@@ -191,6 +173,7 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
 
   // ─────────────────────────────────────────────────────────────────────────────
   // 2. CAPTURE LOGIC (FROM LIVE VIDEO FEED)
+  // Perfectly center-crops to ID Card aspect ratio (15.5 : 18.0) matching the live card preview
   // ─────────────────────────────────────────────────────────────────────────────
   const handleCapturePhoto = () => {
     if (!videoRef.current) return;
@@ -199,36 +182,46 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
     const vWidth = video.videoWidth || 1280;
     const vHeight = video.videoHeight || 720;
 
+    const targetRatio = CARD_PHOTO_ASPECT_RATIO; // 15.5 / 18.0
+    let cropW: number;
+    let cropH: number;
+
+    if (vWidth / vHeight > targetRatio) {
+      cropH = vHeight;
+      cropW = cropH * targetRatio;
+    } else {
+      cropW = vWidth;
+      cropH = cropW / targetRatio;
+    }
+
+    const sx = Math.max(0, (vWidth - cropW) / 2);
+    const sy = Math.max(0, (vHeight - cropH) / 2);
+
     const canvas = document.createElement('canvas');
-    canvas.width = vWidth;
-    canvas.height = vHeight;
+    canvas.width = OUTPUT_CANVAS_WIDTH;
+    canvas.height = OUTPUT_CANVAS_HEIGHT;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     // Mirror horizontally if user/selfie camera so capture matches preview
     if (cameraFacing === 'user') {
-      ctx.translate(vWidth, 0);
+      ctx.translate(OUTPUT_CANVAS_WIDTH, 0);
       ctx.scale(-1, 1);
     }
-    ctx.drawImage(video, 0, 0, vWidth, vHeight);
+    ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, OUTPUT_CANVAS_WIDTH, OUTPUT_CANVAS_HEIGHT);
 
-    const rawDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
 
     stopCameraStream();
-    setCapturedImageSrc(rawDataUrl);
-    setMode('adjust');
-    setZoom(1.0);
-    setPanX(0);
-    setPanY(0);
+    setCapturedImageSrc(croppedDataUrl);
+    setLiveCroppedPhotoUrl(croppedDataUrl);
+    setMode('preview');
   };
 
   // Retake photo: reopen live camera
   const handleRetake = () => {
     setCapturedImageSrc(null);
     setLiveCroppedPhotoUrl(null);
-    setZoom(1.0);
-    setPanX(0);
-    setPanY(0);
     setMode('camera');
     startCameraStream(cameraFacing);
   };
@@ -242,136 +235,46 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
     reader.onload = (event) => {
       const dataUrl = event.target?.result as string;
       if (dataUrl) {
-        stopCameraStream();
-        setCapturedImageSrc(dataUrl);
-        setMode('adjust');
-        setZoom(1.0);
-        setPanX(0);
-        setPanY(0);
+        const img = new Image();
+        img.onload = () => {
+          const imgW = img.naturalWidth || img.width;
+          const imgH = img.naturalHeight || img.height;
+          const targetRatio = CARD_PHOTO_ASPECT_RATIO;
+          let cropW: number;
+          let cropH: number;
+
+          if (imgW / imgH > targetRatio) {
+            cropH = imgH;
+            cropW = cropH * targetRatio;
+          } else {
+            cropW = imgW;
+            cropH = cropW / targetRatio;
+          }
+
+          const sx = Math.max(0, (imgW - cropW) / 2);
+          const sy = Math.max(0, (imgH - cropH) / 2);
+
+          const canvas = document.createElement('canvas');
+          canvas.width = OUTPUT_CANVAS_WIDTH;
+          canvas.height = OUTPUT_CANVAS_HEIGHT;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, OUTPUT_CANVAS_WIDTH, OUTPUT_CANVAS_HEIGHT);
+            const croppedUrl = canvas.toDataURL('image/jpeg', 0.95);
+            stopCameraStream();
+            setCapturedImageSrc(croppedUrl);
+            setLiveCroppedPhotoUrl(croppedUrl);
+            setMode('preview');
+          }
+        };
+        img.src = dataUrl;
       }
     };
     reader.readAsDataURL(file);
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 3. UNIFIED PHOTO CROP & REAL-TIME CARD SYNCHRONIZATION
-  // Calculates high-fidelity crop strictly matching 15.5 : 18.0 card dimensions
-  // ─────────────────────────────────────────────────────────────────────────────
-  const updateCroppedPreview = useCallback(
-    (img: HTMLImageElement, currentZoom: number, currentPanX: number, currentPanY: number) => {
-      const imgW = img.naturalWidth || img.width;
-      const imgH = img.naturalHeight || img.height;
-      if (!imgW || !imgH) return;
-
-      const targetRatio = CARD_PHOTO_ASPECT_RATIO; // 15.5 / 18.0
-
-      // Base crop dimension inside image (leave 5% safety margin)
-      let baseW: number;
-      let baseH: number;
-
-      if (imgW / imgH > targetRatio) {
-        baseH = imgH * 0.92;
-        baseW = baseH * targetRatio;
-      } else {
-        baseW = imgW * 0.92;
-        baseH = baseW / targetRatio;
-      }
-
-      // Apply zoom (higher zoom = smaller crop window in source image)
-      const cropW = baseW / Math.max(1.0, currentZoom);
-      const cropH = baseH / Math.max(1.0, currentZoom);
-
-      // Center coords in source image
-      const cx = imgW / 2;
-      const cy = imgH / 2;
-
-      // Scale pan offset to image coordinate space
-      // Normalized: currentPanX and currentPanY are in screen pixels (-150 to +150)
-      const panFactor = (baseW / 250);
-      const imgPanX = currentPanX * panFactor;
-      const imgPanY = currentPanY * panFactor;
-
-      // Bound clamping to prevent pulling in empty borders
-      const minX = cropW / 2;
-      const maxX = imgW - cropW / 2;
-      const minY = cropH / 2;
-      const maxY = imgH - cropH / 2;
-
-      const targetCenterX = Math.max(minX, Math.min(maxX, cx - imgPanX));
-      const targetCenterY = Math.max(minY, Math.min(maxY, cy - imgPanY));
-
-      const sx = Math.max(0, targetCenterX - cropW / 2);
-      const sy = Math.max(0, targetCenterY - cropH / 2);
-
-      // Render to offscreen canvas
-      const canvas = document.createElement('canvas');
-      canvas.width = OUTPUT_CANVAS_WIDTH;
-      canvas.height = OUTPUT_CANVAS_HEIGHT;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, OUTPUT_CANVAS_WIDTH, OUTPUT_CANVAS_HEIGHT);
-      ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, OUTPUT_CANVAS_WIDTH, OUTPUT_CANVAS_HEIGHT);
-
-      const previewDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-      setLiveCroppedPhotoUrl(previewDataUrl);
-    },
-    []
-  );
-
-  // Sync crop whenever captured image, zoom, or pan values change
-  useEffect(() => {
-    if (mode === 'adjust' && capturedImageSrc) {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        loadedImageRef.current = img;
-        updateCroppedPreview(img, zoom, panX, panY);
-      };
-      img.src = capturedImageSrc;
-    }
-  }, [mode, capturedImageSrc, zoom, panX, panY, updateCroppedPreview]);
-
-  // Mouse & Touch Drag Handlers
-  const handlePointerDown = (clientX: number, clientY: number) => {
-    isDraggingRef.current = true;
-    dragStartRef.current = { x: clientX - panX, y: clientY - panY };
-  };
-
-  const handlePointerMove = (clientX: number, clientY: number) => {
-    if (!isDraggingRef.current) return;
-    const nextPanX = Math.round(clientX - dragStartRef.current.x);
-    const nextPanY = Math.round(clientY - dragStartRef.current.y);
-
-    // Limit drag radius based on zoom level
-    const maxDrag = Math.round(75 * zoom);
-    const clampedX = Math.max(-maxDrag, Math.min(maxDrag, nextPanX));
-    const clampedY = Math.max(-maxDrag, Math.min(maxDrag, nextPanY));
-
-    setPanX(clampedX);
-    setPanY(clampedY);
-  };
-
-  const handlePointerUp = () => {
-    isDraggingRef.current = false;
-  };
-
-  // Nudge Pan buttons
-  const nudgePan = (dx: number, dy: number) => {
-    const maxDrag = Math.round(75 * zoom);
-    setPanX((prev) => Math.max(-maxDrag, Math.min(maxDrag, prev + dx)));
-    setPanY((prev) => Math.max(-maxDrag, Math.min(maxDrag, prev + dy)));
-  };
-
-  const resetAdjustment = () => {
-    setZoom(1.0);
-    setPanX(0);
-    setPanY(0);
-  };
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // 4. CONFIRM PHOTO & EMIT OPTIMIZED IMAGE (<= 200 KB)
+  // 3. CONFIRM PHOTO & EMIT OPTIMIZED IMAGE (<= 200 KB)
   // ─────────────────────────────────────────────────────────────────────────────
   const handleConfirmPhoto = async () => {
     if (!liveCroppedPhotoUrl) return;
@@ -399,7 +302,7 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
   // Active student preview object for the live card
   const activeStudentRecord: StudentIdCardRecord = {
     ...studentPreview,
-    photoUrl: mode === 'adjust' && liveCroppedPhotoUrl ? liveCroppedPhotoUrl : studentPreview.photoUrl,
+    photoUrl: mode === 'preview' && liveCroppedPhotoUrl ? liveCroppedPhotoUrl : studentPreview.photoUrl,
   };
 
   return (
@@ -478,7 +381,7 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
         <div className="p-4 sm:p-6 overflow-y-auto flex-1">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
             {/* ═════════════════════════════════════════════════════════════════ */}
-            {/* SECTION 1: CAMERA CAPTURE / PHOTO ADJUSTMENT (Left Column)      */}
+            {/* SECTION 1: CAMERA CAPTURE / PHOTO PREVIEW (Left Column)          */}
             {/* ═════════════════════════════════════════════════════════════════ */}
             <div
               className={`md:col-span-7 flex flex-col space-y-4 ${
@@ -495,239 +398,148 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                      <span>{isBangla ? 'ফটো পজিশন ও জুম অ্যাডজাস্টমেন্ট' : 'Photo Position & Zoom Adjustment'}</span>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-emerald-800 font-bold">{isBangla ? 'ছবি তোলা সম্পন্ন' : 'Photo Captured'}</span>
                     </>
                   )}
                 </span>
 
-                <button
-                  type="button"
-                  onClick={() => setShowFaceGuideLabels((prev) => !prev)}
-                  className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline cursor-pointer"
-                >
-                  {showFaceGuideLabels
-                    ? isBangla
-                      ? 'গাইড টেক্সট লুকান'
-                      : 'Hide Guide Labels'
-                    : isBangla
-                      ? 'গাইড টেক্সট দেখুন'
-                      : 'Show Guide Labels'}
-                </button>
+                {mode === 'camera' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowFaceGuideLabels((prev) => !prev)}
+                    className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                  >
+                    {showFaceGuideLabels
+                      ? isBangla
+                        ? 'গাইড টেক্সট লুকান'
+                        : 'Hide Guide Labels'
+                      : isBangla
+                        ? 'গাইড টেক্সট দেখুন'
+                        : 'Show Guide Labels'}
+                  </button>
+                )}
               </div>
 
               {/* VIEWPORT CONTAINER */}
-              <div className="relative w-full aspect-[4/3] sm:aspect-[16/11] bg-slate-950 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center border-2 border-slate-800 select-none">
-                {/* 1A. LIVE CAMERA MODE */}
-                {mode === 'camera' && (
-                  <>
-                    {cameraError ? (
-                      <div className="p-4 text-center max-w-sm text-rose-300 space-y-2">
-                        <AlertCircle className="w-8 h-8 mx-auto text-rose-400" />
-                        <p className="text-xs font-semibold">{cameraError}</p>
-                        <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-slate-900 font-bold text-xs cursor-pointer shadow-md hover:bg-slate-100 mt-2">
-                          <Upload className="w-3.5 h-3.5" />
-                          <span>{isBangla ? 'ছবি আপলোড করুন' : 'Upload Photo'}</span>
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            onChange={handleFileInputChange}
-                            className="hidden"
-                          />
-                        </label>
-                      </div>
-                    ) : (
-                      <>
-                        {isInitializingCamera && (
-                          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-950/80 text-white text-xs gap-2">
-                            <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
-                            <span>{isBangla ? 'ক্যামেরা চালু করা হচ্ছে...' : 'Initializing device camera...'}</span>
-                          </div>
-                        )}
-                        <video
-                          ref={videoRef}
-                          autoPlay
-                          playsInline
-                          muted
-                          className={`w-full h-full object-cover ${
-                            cameraFacing === 'user' ? 'scale-x-[-1]' : ''
-                          }`}
+              {mode === 'camera' ? (
+                /* 1A. LIVE CAMERA MODE */
+                <div className="relative w-full aspect-[4/3] sm:aspect-[16/11] bg-slate-950 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center border-2 border-slate-800 select-none">
+                  {cameraError ? (
+                    <div className="p-4 text-center max-w-sm text-rose-300 space-y-2">
+                      <AlertCircle className="w-8 h-8 mx-auto text-rose-400" />
+                      <p className="text-xs font-semibold">{cameraError}</p>
+                      <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-slate-900 font-bold text-xs cursor-pointer shadow-md hover:bg-slate-100 mt-2">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>{isBangla ? 'ছবি আপলোড করুন' : 'Upload Photo'}</span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handleFileInputChange}
+                          className="hidden"
                         />
-                      </>
-                    )}
-                  </>
-                )}
+                      </label>
+                    </div>
+                  ) : (
+                    <>
+                      {isInitializingCamera && (
+                        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-950/80 text-white text-xs gap-2">
+                          <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
+                          <span>{isBangla ? 'ক্যামেরা চালু করা হচ্ছে...' : 'Initializing device camera...'}</span>
+                        </div>
+                      )}
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className={`w-full h-full object-cover ${
+                          cameraFacing === 'user' ? 'scale-x-[-1]' : ''
+                        }`}
+                      />
+                    </>
+                  )}
 
-                {/* 1B. ADJUST MODE (Captured / Loaded photo with Drag & Zoom) */}
-                {mode === 'adjust' && capturedImageSrc && (
-                  <div
-                    className="relative w-full h-full overflow-hidden flex items-center justify-center cursor-move"
-                    onMouseDown={(e) => handlePointerDown(e.clientX, e.clientY)}
-                    onMouseMove={(e) => handlePointerMove(e.clientX, e.clientY)}
-                    onMouseUp={handlePointerUp}
-                    onMouseLeave={handlePointerUp}
-                    onTouchStart={(e) => {
-                      const t = e.touches[0];
-                      if (t) handlePointerDown(t.clientX, t.clientY);
-                    }}
-                    onTouchMove={(e) => {
-                      const t = e.touches[0];
-                      if (t) handlePointerMove(t.clientX, t.clientY);
-                    }}
-                    onTouchEnd={handlePointerUp}
-                  >
+                  {/* TRANSPARENT FACE POSITIONING GUIDE */}
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <div className="relative w-[215px] h-[250px] sm:w-[248px] sm:h-[288px] rounded-2xl shadow-[0_0_0_9999px_rgba(15,23,42,0.68)] border-2 border-amber-400">
+                      <svg
+                        className="absolute inset-0 w-full h-full overflow-visible"
+                        viewBox="0 0 248 288"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path d="M 8 28 L 8 8 L 28 8" stroke="#F59E0B" strokeWidth="3.5" strokeLinecap="round" />
+                        <path d="M 220 8 L 240 8 L 240 28" stroke="#F59E0B" strokeWidth="3.5" strokeLinecap="round" />
+                        <path d="M 8 260 L 8 280 L 28 280" stroke="#F59E0B" strokeWidth="3.5" strokeLinecap="round" />
+                        <path d="M 220 280 L 240 280 L 240 260" stroke="#F59E0B" strokeWidth="3.5" strokeLinecap="round" />
+                        <line x1="20" y1="28" x2="228" y2="28" stroke="#F59E0B" strokeWidth="1.2" strokeDasharray="4 4" strokeOpacity="0.8" />
+                        <ellipse cx="124" cy="116" rx="56" ry="74" stroke="#FDE68A" strokeWidth="1.8" strokeDasharray="5 4" strokeOpacity="0.85" />
+                        <line x1="76" y1="110" x2="172" y2="110" stroke="#67E8F9" strokeWidth="1.2" strokeDasharray="3 3" strokeOpacity="0.8" />
+                        <path d="M 96 186 Q 124 200 152 186" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeOpacity="0.95" />
+                        <path d="M 88 206 Q 64 224 16 282" stroke="#FDE68A" strokeWidth="2" strokeLinecap="round" strokeOpacity="0.8" />
+                        <path d="M 160 206 Q 184 224 232 282" stroke="#FDE68A" strokeWidth="2" strokeLinecap="round" strokeOpacity="0.8" />
+                      </svg>
+
+                      {showFaceGuideLabels && (
+                        <div className="absolute inset-0 flex flex-col justify-between p-1.5 text-white pointer-events-none text-[9px] font-bold">
+                          <div className="flex justify-between items-center text-amber-300">
+                            <span className="bg-slate-900/80 px-1.5 py-0.5 rounded shadow-xs">
+                              {isBangla ? 'মাথার শীর্ষ (খালি রাখুন)' : 'Head Top (Leave Space)'}
+                            </span>
+                          </div>
+                          <div className="space-y-4">
+                            <div className="flex justify-center">
+                              <span className="bg-sky-950/80 text-cyan-200 px-1.5 py-0.5 rounded text-[8px]">
+                                {isBangla ? 'চোখের লেভেল' : 'Eye Level'}
+                              </span>
+                            </div>
+                            <div className="flex justify-center">
+                              <span className="bg-amber-950/85 text-amber-200 px-1.5 py-0.5 rounded text-[8px]">
+                                {isBangla ? 'চিবুকের অবস্থান' : 'Chin Position'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center text-amber-200">
+                            <span className="bg-slate-900/80 px-1.5 py-0.5 rounded text-[8px]">
+                              {isBangla ? 'বাম কাঁধ' : 'Left Shoulder'}
+                            </span>
+                            <span className="bg-slate-900/80 px-1.5 py-0.5 rounded text-[8px]">
+                              {isBangla ? 'ডান কাঁধ' : 'Right Shoulder'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between text-[10px] text-white/90 bg-slate-900/75 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-white/10 pointer-events-none">
+                    <span>{isBangla ? 'গাইডের মাঝে মুখ রাখুন' : 'Align face with guidelines'}</span>
+                    <span className="font-mono text-amber-300 font-bold">15.5 × 18 mm</span>
+                  </div>
+                </div>
+              ) : (
+                /* 1B. CAPTURED PHOTO CLEAN PREVIEW (No zoom-in / no adjustment section) */
+                <div className="relative w-full aspect-[4/3] sm:aspect-[16/11] bg-slate-900 rounded-2xl overflow-hidden shadow-inner flex flex-col items-center justify-center p-4 border-2 border-slate-800 select-none">
+                  <div className="relative w-[155px] h-[180px] sm:w-[174px] sm:h-[202px] rounded-xl overflow-hidden shadow-2xl border-2 border-emerald-400 bg-black">
                     <img
-                      src={capturedImageSrc}
-                      alt="Captured Crop Target"
-                      draggable={false}
-                      className="max-w-none transition-transform duration-75 ease-out select-none pointer-events-none"
-                      style={{
-                        transform: `translate(${panX}px, ${panY}px) scale(${zoom})`,
-                      }}
+                      src={capturedImageSrc || liveCroppedPhotoUrl || ''}
+                      alt="Captured Profile"
+                      className="w-full h-full object-cover"
                     />
+                    <span className="absolute bottom-1 right-1 bg-emerald-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded shadow">
+                      {isBangla ? 'ক্যাপচার্ড' : 'Captured'}
+                    </span>
                   </div>
-                )}
-
-                {/* ═══════════════════════════════════════════════════════════ */}
-                {/* 1C. TRANSPARENT FACE POSITIONING GUIDE (Requirement B)       */}
-                {/* Proportions strictly match ID Card photo frame: 15.5 : 18.0 */}
-                {/* ═══════════════════════════════════════════════════════════ */}
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  {/* Surrounding Scrim Backdrop */}
-                  <div className="relative w-[215px] h-[250px] sm:w-[248px] sm:h-[288px] rounded-2xl shadow-[0_0_0_9999px_rgba(15,23,42,0.68)] border-2 border-amber-400">
-                    {/* SVG Anatomical Face Positioning Guides */}
-                    <svg
-                      className="absolute inset-0 w-full h-full overflow-visible"
-                      viewBox="0 0 248 288"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      {/* Corner Accents */}
-                      <path d="M 8 28 L 8 8 L 28 8" stroke="#F59E0B" strokeWidth="3.5" strokeLinecap="round" />
-                      <path d="M 220 8 L 240 8 L 240 28" stroke="#F59E0B" strokeWidth="3.5" strokeLinecap="round" />
-                      <path d="M 8 260 L 8 280 L 28 280" stroke="#F59E0B" strokeWidth="3.5" strokeLinecap="round" />
-                      <path d="M 220 280 L 240 280 L 240 260" stroke="#F59E0B" strokeWidth="3.5" strokeLinecap="round" />
-
-                      {/* 1. Headroom Guide (Space above head: ~10% from top) */}
-                      <line
-                        x1="20"
-                        y1="28"
-                        x2="228"
-                        y2="28"
-                        stroke="#F59E0B"
-                        strokeWidth="1.2"
-                        strokeDasharray="4 4"
-                        strokeOpacity="0.8"
-                      />
-
-                      {/* 2. Head & Face Oval Guide (Where face should be positioned) */}
-                      <ellipse
-                        cx="124"
-                        cy="116"
-                        rx="56"
-                        ry="74"
-                        stroke="#FDE68A"
-                        strokeWidth="1.8"
-                        strokeDasharray="5 4"
-                        strokeOpacity="0.85"
-                      />
-
-                      {/* 3. Eye Level Guideline (~42% from top) */}
-                      <line
-                        x1="76"
-                        y1="110"
-                        x2="172"
-                        y2="110"
-                        stroke="#67E8F9"
-                        strokeWidth="1.2"
-                        strokeDasharray="3 3"
-                        strokeOpacity="0.8"
-                      />
-
-                      {/* 4. Chin Guideline Bracket (~70% from top) */}
-                      <path
-                        d="M 96 186 Q 124 200 152 186"
-                        stroke="#F59E0B"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeOpacity="0.95"
-                      />
-
-                      {/* 5. Shoulders Guide (How much of shoulders should be visible) */}
-                      <path
-                        d="M 88 206 Q 64 224 16 282"
-                        stroke="#FDE68A"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeOpacity="0.8"
-                      />
-                      <path
-                        d="M 160 206 Q 184 224 232 282"
-                        stroke="#FDE68A"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeOpacity="0.8"
-                      />
-                    </svg>
-
-                    {/* Informative Text Labels (Can be toggled) */}
-                    {showFaceGuideLabels && (
-                      <div className="absolute inset-0 flex flex-col justify-between p-1.5 text-white pointer-events-none text-[9px] font-bold">
-                        {/* Headroom Label */}
-                        <div className="flex justify-between items-center text-amber-300">
-                          <span className="bg-slate-900/80 px-1.5 py-0.5 rounded shadow-xs">
-                            {isBangla ? 'মাথার শীর্ষ (খালি রাখুন)' : 'Head Top (Leave Space)'}
-                          </span>
-                        </div>
-
-                        {/* Eye & Chin Labels */}
-                        <div className="space-y-4">
-                          <div className="flex justify-center">
-                            <span className="bg-sky-950/80 text-cyan-200 px-1.5 py-0.5 rounded text-[8px]">
-                              {isBangla ? 'চোখের লেভেল' : 'Eye Level'}
-                            </span>
-                          </div>
-                          <div className="flex justify-center">
-                            <span className="bg-amber-950/85 text-amber-200 px-1.5 py-0.5 rounded text-[8px]">
-                              {isBangla ? 'চিবুকের অবস্থান' : 'Chin Position'}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Shoulders Label */}
-                        <div className="flex justify-between items-center text-amber-200">
-                          <span className="bg-slate-900/80 px-1.5 py-0.5 rounded text-[8px]">
-                            {isBangla ? 'বাম কাঁধ' : 'Left Shoulder'}
-                          </span>
-                          <span className="bg-slate-900/80 px-1.5 py-0.5 rounded text-[8px]">
-                            {isBangla ? 'ডান কাঁধ' : 'Right Shoulder'}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <p className="text-white/85 text-xs font-semibold mt-3 text-center">
+                    {isBangla
+                      ? 'ডানপাশের লাইভ আইডি কার্ড প্রিভিউ-তে আপনার কার্ডের চূড়ান্ত রূপ দেখে নিন।'
+                      : 'Please check your finalized Student ID Card preview on the right.'}
+                  </p>
                 </div>
+              )}
 
-                {/* Floating Hint Overlay */}
-                <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between text-[10px] text-white/90 bg-slate-900/75 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-white/10 pointer-events-none">
-                  <span>
-                    {mode === 'camera'
-                      ? isBangla
-                        ? 'গাইডের মাঝে মুখ রাখুন'
-                        : 'Align face with guidelines'
-                      : isBangla
-                        ? 'ছবিটি ড্র্যাগ করে ঠিক স্থানে আনুন'
-                        : 'Drag to pan • Use slider to zoom'}
-                  </span>
-                  <span className="font-mono text-amber-300 font-bold">
-                    {mode === 'adjust' ? `${zoom.toFixed(1)}x` : '15.5 × 18 mm'}
-                  </span>
-                </div>
-              </div>
-
-              {/* ═══════════════════════════════════════════════════════════ */}
-              {/* CONTROLS BAR: CAMERA OR ADJUSTMENT                           */}
-              {/* ═══════════════════════════════════════════════════════════ */}
+              {/* CONTROLS BAR */}
               {mode === 'camera' ? (
                 /* LIVE CAMERA CONTROLS */
                 <div className="flex items-center justify-between gap-2 pt-1">
@@ -764,145 +576,37 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
                   </button>
                 </div>
               ) : (
-                /* ADJUSTMENT CONTROLS (Requirement D) */
-                <div className="space-y-3 bg-slate-50 p-3 sm:p-4 rounded-2xl border border-slate-200">
-                  {/* Zoom Slider & Steppers */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                      <span className="flex items-center gap-1">
-                        <ZoomIn className="w-3.5 h-3.5 text-amber-600" />
-                        <span>{isBangla ? 'জুম স্কেল (Zoom Level)' : 'Zoom Level'}</span>
-                      </span>
-                      <span className="font-mono text-emerald-800 bg-white px-2 py-0.5 rounded border border-slate-200 text-[11px]">
-                        {zoom.toFixed(2)}x
-                      </span>
-                    </div>
+                /* CAPTURED PHOTO CONTROLS — EXACTLY 2 BUTTONS: RETAKE & CONFIRM */
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  {/* Button 1: Retake */}
+                  <button
+                    type="button"
+                    onClick={handleRetake}
+                    className="w-full py-3.5 rounded-2xl bg-white hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold border-2 border-slate-300 shadow-xs cursor-pointer transition-all flex items-center justify-center gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4 text-slate-500" />
+                    <span>{isBangla ? 'আবার তুলুন (Retake)' : 'Retake'}</span>
+                  </button>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setZoom((z) => Math.max(1.0, Number((z - 0.1).toFixed(2))))}
-                        className="w-7 h-7 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 flex items-center justify-center text-slate-700 cursor-pointer"
-                        title="Zoom out"
-                      >
-                        <ZoomOut className="w-3.5 h-3.5" />
-                      </button>
-
-                      <input
-                        type="range"
-                        min="1.0"
-                        max="3.0"
-                        step="0.05"
-                        value={zoom}
-                        onChange={(e) => setZoom(parseFloat(e.target.value))}
-                        className="flex-1 accent-emerald-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => setZoom((z) => Math.min(3.0, Number((z + 0.1).toFixed(2))))}
-                        className="w-7 h-7 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 flex items-center justify-center text-slate-700 cursor-pointer"
-                        title="Zoom in"
-                      >
-                        <ZoomIn className="w-3.5 h-3.5" />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={resetAdjustment}
-                        className="px-2 py-1 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-[11px] font-semibold text-slate-600 cursor-pointer flex items-center gap-1"
-                        title="Reset zoom & pan"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>{isBangla ? 'রিসেট' : 'Reset'}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Fine Nudge Direction Controls */}
-                  <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200/80">
-                    <span className="text-[11px] text-slate-500 font-medium">
-                      {isBangla ? 'পজিশন অ্যাডজাস্ট (Nudge):' : 'Fine Position Nudge:'}
-                    </span>
-
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => nudgePan(-8, 0)}
-                        className="p-1 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 cursor-pointer"
-                        title="Move left"
-                      >
-                        <ChevronLeft className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => nudgePan(0, -8)}
-                        className="p-1 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 cursor-pointer"
-                        title="Move up"
-                      >
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => nudgePan(0, 8)}
-                        className="p-1 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 cursor-pointer"
-                        title="Move down"
-                      >
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => nudgePan(8, 0)}
-                        className="p-1 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 cursor-pointer"
-                        title="Move right"
-                      >
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Over-zoom / Clipping warning */}
-                  {zoom > 2.3 && (
-                    <div className="text-[11px] text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 flex items-center gap-1.5 font-medium">
-                      <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
-                      <span>
-                        {isBangla
-                          ? 'সতর্কতা: বেশি জুম করলে মাথার শীর্ষ বা চিবুক ফ্রেমের বাইরে চলে যেতে পারে।'
-                          : 'Caution: Excessive zoom may clip the top of head or chin.'}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Confirm or Retake Actions */}
-                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200">
-                    <button
-                      type="button"
-                      onClick={handleRetake}
-                      className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold cursor-pointer border border-slate-300 transition-colors flex items-center gap-1.5"
-                    >
-                      <Camera className="w-3.5 h-3.5 text-slate-500" />
-                      <span>{isBangla ? 'আবার তুলুন (Retake)' : 'Retake Photo'}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleConfirmPhoto}
-                      disabled={isProcessingConfirm}
-                      className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold text-xs sm:text-sm shadow-md cursor-pointer transition-all flex items-center gap-2 active:scale-95 disabled:opacity-60"
-                    >
-                      {isProcessingConfirm ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin text-white" />
-                          <span>{isBangla ? 'প্রসেসিং হচ্ছে...' : 'Optimizing Photo...'}</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                          <span>{isBangla ? 'ছবি নিশ্চিত করুন (Confirm)' : 'Confirm & Use Photo'}</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  {/* Button 2: Confirm & Use Photo */}
+                  <button
+                    type="button"
+                    onClick={handleConfirmPhoto}
+                    disabled={isProcessingConfirm}
+                    className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 disabled:opacity-60 text-white text-xs sm:text-sm font-bold shadow-lg cursor-pointer transition-all flex items-center justify-center gap-2 active:scale-95"
+                  >
+                    {isProcessingConfirm ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        <span>{isBangla ? 'প্রসেসিং হচ্ছে...' : 'Processing...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                        <span>{isBangla ? 'ছবি নিশ্চিত করুন ও ব্যবহার করুন (Confirm & Use)' : 'Confirm & Use the photo'}</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
             </div>
@@ -925,8 +629,17 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
                 </div>
 
                 <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping" />
-                  <span>{isBangla ? 'রিয়েল-টাইম সিঙ্ক' : 'Live Synced'}</span>
+                  {mode === 'camera' ? (
+                    <>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping" />
+                      <span>{isBangla ? 'রিয়েল-টাইম সিঙ্ক' : 'Live Synced'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{isBangla ? 'ছবি সিঙ্ক হয়েছে' : 'Photo Synced'}</span>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -958,9 +671,13 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
                 />
 
                 <p className="mt-2 text-[10px] text-slate-500 text-center max-w-[260px] leading-tight">
-                  {isBangla
-                    ? 'আপনার ক্যামেরার অবস্থান অনুযায়ী কার্ডে ছবিটি স্বয়ংক্রিয়ভাবে প্রদর্শন ও সিঙ্ক হচ্ছে।'
-                    : 'The photo frame on this card updates dynamically in real time with your camera and adjustments.'}
+                  {mode === 'camera'
+                    ? isBangla
+                      ? 'আপনার ক্যামেরার অবস্থান অনুযায়ী কার্ডে ছবিটি স্বয়ংক্রিয়ভাবে প্রদর্শন ও সিঙ্ক হচ্ছে।'
+                      : 'The photo frame on this card updates dynamically in real time with your camera.'
+                    : isBangla
+                      ? 'আপনার তোলা ছবিটি আইডি কার্ডে সিঙ্ক হয়েছে। সন্তুষ্ট হলে "Confirm & Use the photo" বাটনে চাপুন।'
+                      : 'Your captured photo is now synced to the card. Click "Confirm & Use the photo" to continue.'}
                 </p>
               </div>
 
