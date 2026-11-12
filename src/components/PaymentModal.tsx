@@ -593,46 +593,52 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </p>
             </div>
 
-            {/* Sandbox Testing Guide Card — Explains "The input wallet is not eligible" */}
+            {/* Sandbox Testing Guide Card — Explains active test numbers & Insufficient Balance */}
             {config.isSandbox && (
-              <div className="p-3.5 rounded-2xl bg-amber-50/90 border border-amber-300 text-xs space-y-2">
-                <div className="flex items-center gap-1.5 font-bold text-amber-900">
-                  <Info className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>
-                    {isBangla ? 'স্যান্ডবক্স টেস্ট মোড — পরীক্ষার নির্দেশিকা' : 'Sandbox Test Wallet Guide'}
+              <div className="p-3.5 rounded-2xl bg-amber-50/90 border border-amber-300 text-xs space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                    <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      {isBangla ? 'স্যান্ডবক্স টেস্ট মোড — পরীক্ষার নির্দেশিকা' : 'Sandbox Test Wallet Guide'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200/70 text-amber-900 border border-amber-300">
+                    Active Wallets
                   </span>
                 </div>
+
                 <p className="text-[11px] text-amber-800 leading-relaxed">
                   {isBangla ? (
                     <>
-                      <strong>সতর্কতা:</strong> বিকাশ/নগদে আপনার <strong>ব্যক্তিগত মোবাইল নম্বর দিবেন না</strong> (দিলে <em>&quot;The input wallet is not eligible&quot;</em> দেখায়)। নিচের টেস্ট অ্যাকাউন্ট ব্যবহার করুন:
+                      <strong>সতর্কতা:</strong> বিকাশ স্যান্ডবক্সে পুরোনো নম্বর <code>01770618575</code>-এ ব্যালেন্স শূন্য হয়ে <em>&quot;Insufficient balance&quot;</em> দেখাচ্ছে। নিচে দেওয়া পর্যাপ্ত ব্যালেন্সযুক্ত <strong>সক্রিয় টেস্ট ওয়ালেট</strong> ব্যবহার করুন:
                     </>
                   ) : (
                     <>
-                      <strong>Notice:</strong> Do <strong>NOT</strong> enter your real phone number (it triggers <em>&quot;The input wallet is not eligible&quot;</em>). Use official sandbox test credentials:
+                      <strong>Notice:</strong> The old number <code>01770618575</code> has 0 balance (triggers <em>&quot;Insufficient balance&quot;</em>). Please use the active test wallets with sufficient funds below:
                     </>
                   )}
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5 font-mono text-[11px]">
-                  {/* bKash Test Wallet */}
+                  {/* Primary bKash Test Wallet */}
                   <div className="bg-white p-2.5 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs">
                     <div>
                       <span className="text-[9px] uppercase font-bold text-pink-600 tracking-wider block font-sans">
-                        bKash Test Wallet
+                        bKash Test Wallet (High Balance)
                       </span>
-                      <span className="font-bold text-slate-900 text-xs">01770618575</span>
+                      <span className="font-bold text-slate-900 text-xs">01929918378</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
-                        navigator.clipboard.writeText('01770618575');
-                        setCopiedField('bkash');
+                        navigator.clipboard.writeText('01929918378');
+                        setCopiedField('bkash1');
                         setTimeout(() => setCopiedField(''), 2000);
                       }}
                       className="text-[10px] px-2 py-1 rounded-lg bg-pink-50 hover:bg-pink-100 text-pink-700 font-sans font-bold cursor-pointer flex items-center gap-1 border border-pink-200 transition"
                     >
-                      {copiedField === 'bkash' ? (
+                      {copiedField === 'bkash1' ? (
                         <>
                           <Check className="w-3 h-3 text-emerald-600" />
                           <span>{isBangla ? 'কপি হয়েছে' : 'Copied'}</span>
@@ -646,26 +652,68 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     </button>
                   </div>
 
-                  {/* OTP & PIN */}
-                  <div className="bg-white p-2.5 rounded-xl border border-amber-200 space-y-1 shadow-2xs text-[11px]">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-slate-500 font-sans font-semibold">Test OTP:</span>
-                      <span className="font-bold text-slate-900 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
-                        123456
+                  {/* Alternate bKash Test Wallet */}
+                  <div className="bg-white p-2.5 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs">
+                    <div>
+                      <span className="text-[9px] uppercase font-bold text-pink-600 tracking-wider block font-sans">
+                        Alternate Test Wallet
                       </span>
+                      <span className="font-bold text-slate-900 text-xs">01770618576</span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-slate-500 font-sans font-semibold">Test PIN:</span>
-                      <span className="font-bold text-slate-900 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
-                        12121
-                      </span>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText('01770618576');
+                        setCopiedField('bkash2');
+                        setTimeout(() => setCopiedField(''), 2000);
+                      }}
+                      className="text-[10px] px-2 py-1 rounded-lg bg-pink-50 hover:bg-pink-100 text-pink-700 font-sans font-bold cursor-pointer flex items-center gap-1 border border-pink-200 transition"
+                    >
+                      {copiedField === 'bkash2' ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-600" />
+                          <span>{isBangla ? 'কপি হয়েছে' : 'Copied'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3 text-pink-600" />
+                          <span>{isBangla ? 'কপি' : 'Copy'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* OTP */}
+                  <div className="bg-white p-2 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs text-[11px]">
+                    <span className="text-[10px] text-slate-500 font-sans font-semibold">Test OTP:</span>
+                    <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                      123456
+                    </span>
+                  </div>
+
+                  {/* PIN */}
+                  <div className="bg-white p-2 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs text-[11px]">
+                    <span className="text-[10px] text-slate-500 font-sans font-semibold">Test PIN:</span>
+                    <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                      12121
+                    </span>
                   </div>
                 </div>
 
-                <div className="text-[10px] text-amber-700 font-sans flex items-center justify-between pt-0.5">
-                  <span>{isBangla ? 'বিকল্প টেস্ট নম্বর:' : 'Alt test numbers:'} 01770618576, 01929918378</span>
-                  <span className="font-bold text-amber-900">Sandbox Mode</span>
+                {/* Instant Simulation Callout */}
+                <div className="pt-1 border-t border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px]">
+                  <span className="text-amber-800">
+                    {isBangla
+                      ? 'বা কোনো ঝামেলা ছাড়াই সরাসরি টেস্ট টিকিট দেখতে চান?'
+                      : 'Want to skip MFS gateway limits and test instantly?'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleSandboxSimulation}
+                    className="inline-flex items-center justify-center gap-1 px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-sans font-bold text-xs shadow-xs cursor-pointer transition shrink-0"
+                  >
+                    <span>{isBangla ? '⚡ তাৎক্ষণিক টেস্ট টিকিট তৈরি' : '⚡ Instant Sandbox Ticket'}</span>
+                  </button>
                 </div>
               </div>
             )}

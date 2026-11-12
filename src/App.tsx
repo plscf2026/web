@@ -125,11 +125,22 @@ export default function App() {
           // If gateway reported failure/cancel or user pressed "GO BACK" after an error
           if (statusParam.includes('fail') || statusParam.includes('cancel')) {
             setPaymentModalStep('select');
-            setPaymentModalError(
-              language === 'bn'
-                ? 'পেমেন্ট সম্পন্ন হয়নি বা বাতিল করা হয়েছে। বিকাশ/নগদ স্যান্ডবক্সে ব্যক্তিগত নম্বর প্রবেশ করালে "The input wallet is not eligible" দেখায়। অনুগ্রহ করে টেস্ট নম্বর 01770618575, OTP: 123456, PIN: 12121 দিয়ে আবার চেষ্টা করুন।'
-                : 'Payment was not completed or failed. Entering personal numbers in sandbox triggers "The input wallet is not eligible". Please try again with test wallet 01770618575, OTP 123456, PIN 12121.'
-            );
+            const rawMsg = (params.get('message') || params.get('error') || params.get('reason') || '').toLowerCase();
+            const isInsufficientBalance = rawMsg.includes('balance') || statusParam.includes('balance');
+
+            if (isInsufficientBalance) {
+              setPaymentModalError(
+                language === 'bn'
+                  ? 'পেমেন্ট ব্যর্থ: বিকাশ স্যান্ডবক্স টেস্ট নম্বরে ব্যালেন্স অপ্রতুল ("Insufficient balance")। অনুগ্রহ করে পর্যাপ্ত ব্যালেন্সযুক্ত সক্রিয় টেস্ট ওয়ালেট 01929918378 বা 01770618576 ব্যবহার করুন (OTP: 123456, PIN: 12121), অথবা নিচের "Sandbox সিমুলেশন" বাটনে চাপুন।'
+                  : 'Payment Failed: The test bKash wallet has insufficient sandbox mock balance. Please use active wallet 01929918378 or 01770618576 (OTP: 123456, PIN: 12121), or click "Simulate Sandbox Payment" below.'
+              );
+            } else {
+              setPaymentModalError(
+                language === 'bn'
+                  ? 'পেমেন্ট সম্পন্ন হয়নি বা বাতিল করা হয়েছে। বিকাশ স্যান্ডবক্সে সক্রিয় টেস্ট ওয়ালেট 01929918378 বা 01770618576 (OTP: 123456, PIN: 12121) ব্যবহার করুন, অথবা নিচের "Sandbox সিমুলেশন" দিয়ে সরাসরি টেস্ট করুন।'
+                  : 'Payment was not completed or failed. In Sandbox, please use active test wallet 01929918378 or 01770618576 (OTP: 123456, PIN: 12121), or click "Simulate Sandbox Payment" below.'
+              );
+            }
           } else {
             // Success or pending callback: immediately verify the transaction
             setPaymentModalStep('verifying');
