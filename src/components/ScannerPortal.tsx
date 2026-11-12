@@ -9,9 +9,12 @@ import {
   AlertCircle,
   Layers,
   Lock,
+  RefreshCw,
+  CheckCircle2,
 } from 'lucide-react';
 import { StaffAccount, Language } from '../types';
 import { EventStore } from '../services/eventStore';
+import { AppStore } from '../services/store';
 import { isDevTestBypassAllowed } from '../services/supabase';
 import { isBreakfastCollectionOpen } from '../utils/eventRules';
 import { FoodScannerModule } from './FoodScannerModule';
@@ -36,6 +39,36 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
 
   // Active module tab if Super Admin - default to Multi-Station Desk
   const [activeAdminModule, setActiveAdminModule] = useState<string>('multi_station');
+
+  // Cloud sync state
+  const [isSyncingDb, setIsSyncingDb] = useState(false);
+  const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+  const [totalRegistrationsCount, setTotalRegistrationsCount] = useState<number>(() => AppStore.getRegistrations().length);
+
+  const handleSyncDatabase = async () => {
+    setIsSyncingDb(true);
+    setSyncStatusMsg(null);
+    try {
+      const res = await AppStore.syncWithSupabase();
+      setTotalRegistrationsCount(res.count);
+      setSyncStatusMsg(`Successfully synchronized ${res.count} student tickets from cloud.`);
+      setTimeout(() => setSyncStatusMsg(null), 4000);
+    } catch {
+      setSyncStatusMsg('Sync notice: Using local cached registrations.');
+      setTimeout(() => setSyncStatusMsg(null), 4000);
+    } finally {
+      setIsSyncingDb(false);
+    }
+  };
+
+  useEffect(() => {
+    // Initial background cloud synchronization on scanner mount
+    AppStore.syncWithSupabase()
+      .then((res) => {
+        setTotalRegistrationsCount(res.count);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -402,14 +435,46 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
           </div>
         )}
 
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-900/60 hover:bg-rose-900 text-rose-200 text-xs font-bold border border-rose-700/60 transition-colors cursor-pointer"
-        >
-          <LogOut className="w-3.5 h-3.5 text-rose-400" />
-          <span>Sign Out</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSyncDatabase}
+            disabled={isSyncingDb}
+            title="Synchronize attendee tickets with Supabase cloud database"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${isSyncingDb ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{isSyncingDb ? 'Syncing...' : 'Sync Database'}</span>
+            <span className="px-1.5 py-0.5 rounded-md bg-slate-900 text-emerald-400 text-[10px] font-mono border border-slate-700">
+              {totalRegistrationsCount}
+            </span>
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-900/60 hover:bg-rose-900 text-rose-200 text-xs font-bold border border-rose-700/60 transition-colors cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5 text-rose-400" />
+            <span>Sign Out</span>
+          </button>
+        </div>
       </div>
+
+      {/* Sync Status Toast/Notification */}
+      {syncStatusMsg && (
+        <div className="flex items-center justify-between gap-2 px-4 py-2.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/30 text-emerald-200 text-xs shadow-md animate-fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{syncStatusMsg}</span>
+          </div>
+          <button
+            onClick={() => setSyncStatusMsg(null)}
+            className="text-emerald-400 hover:text-emerald-200 text-xs px-2 py-0.5"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Render the Role-Permitted Module */}
       {getRenderedModule()}

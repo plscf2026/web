@@ -9,7 +9,7 @@ import {
   DEFAULT_HOME_PAGE_SECTIONS,
 } from '../types';
 import { SupabaseService, supabase } from './supabase';
-import { isValidSixCharToken, generateUniqueSixCharToken } from '../utils/tokenGenerator';
+import { isValidSixCharToken, generateUniqueSixCharToken, findRegistrationByTokenOrId } from '../utils/tokenGenerator';
 
 const STORAGE_KEY_REGISTRATIONS = 'plscf_reunion_registrations_v1';
 const STORAGE_KEY_DONATIONS = 'plscf_reunion_donations_v1';
@@ -1471,6 +1471,86 @@ export class AppStore {
     supabase.from(yearTableName).delete().eq('id', id).then(undefined, () => { });
     supabase.from('registrations').delete().eq('id', id).then(undefined, () => { });
     return true;
+  }
+
+  /**
+   * Synchronizes registrations from Supabase cloud into local storage.
+   * Merges newly registered attendees across 2027 and 2026 without data loss.
+   */
+  static async syncWithSupabase(preferredYear?: number): Promise<{ count: number; error?: string }> {
+    try {
+      const years = preferredYear ? [preferredYear] : [2027, 2026];
+      const fetched: RegistrationRecord[] = [];
+
+      for (const y of years) {
+        const res = await SupabaseService.fetchRegistrations(y);
+        if (res.data && res.data.length > 0) {
+          fetched.push(...res.data);
+        }
+      }
+
+      if (fetched.length === 0) {
+        return { count: this.getRegistrations().length };
+      }
+
+      const existing = this.getRegistrations();
+      const map = new Map<string, RegistrationRecord>();
+
+      // Keep existing local records
+      for (const r of existing) {
+        map.set(r.id, r);
+      }
+      // Authoritative update from cloud
+      for (const r of fetched) {
+        map.set(r.id, r);
+      }
+
+      const merged = Array.from(map.values());
+      this.saveRegistrations(merged);
+      return { count: merged.length };
+    } catch (err: any) {
+      console.warn('[AppStore] Supabase sync notice:', err);
+      return { count: this.getRegistrations().length, error: err?.message };
+    }
+  }
+
+  /**
+   * Synchronous lookup in local store.
+   */
+  static findRegistration(input: string): RegistrationRecord | undefined {
+    return findRegistrationByTokenOrId(this.getRegistrations(), input);
+  }
+
+  /**
+   * Asynchronous cloud-resilient lookup:
+   * 1. Checks local memory/storage first (instant 0ms).
+   * 2. If not found, queries Supabase PostgreSQL tables (registrations_2027, registrations_2026).
+   * 3. Caches newly discovered record into local store for offline use.
+   */
+  static async findRegistrationAsync(input: string): Promise<RegistrationRecord | undefined> {
+    if (!input || !input.trim()) return undefined;
+    const clean = input.trim();
+
+    // 1. Instant check in local memory
+    const local = this.findRegistration(clean);
+    if (local) return local;
+
+    // 2. Cloud lookup in Supabase
+    try {
+      const cloudRecord = await SupabaseService.lookupRegistrationByIdOrToken(clean);
+      if (cloudRecord) {
+        // Cache to local storage
+        const current = this.getRegistrations();
+        if (!current.some((r) => r.id === cloudRecord.id)) {
+          this.saveRegistrations([cloudRecord, ...current]);
+        }
+        return cloudRecord;
+      }
+    } catch (err) {
+      console.warn('[AppStore] findRegistrationAsync exception:', err);
+    }
+
+    return undefined;
   }
 
   static getDonations(): DonationRecord[] {

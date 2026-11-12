@@ -26,7 +26,7 @@ import {
 } from '../types';
 import { AppStore } from '../services/store';
 import { EventStore } from '../services/eventStore';
-import { findRegistrationByTokenOrId } from '../utils/tokenGenerator';
+import { findRegistrationByTokenOrId, parseScannedInput } from '../utils/tokenGenerator';
 import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
 import { decodeQRCodeFromImageFile } from '../utils/qrDecoder';
 import { QrCameraScanner } from './common/QrCameraScanner';
@@ -91,20 +91,25 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
   };
 
   // Process QR / Token lookup
-  const handleProcessScan = (codeToSearch: string) => {
+  const handleProcessScan = async (codeToSearch: string) => {
     if (!codeToSearch.trim()) return;
     refreshAllState();
 
     const clean = codeToSearch.trim();
-    const registrations = AppStore.getRegistrations();
-    const student = findRegistrationByTokenOrId(registrations, clean);
+    const parsed = parseScannedInput(clean);
+    const displayTicket = parsed.id || parsed.token || clean;
+
+    let student = findRegistrationByTokenOrId(AppStore.getRegistrations(), clean);
+    if (!student) {
+      student = await AppStore.findRegistrationAsync(clean);
+    }
 
     if (!student) {
       playScanErrorSound();
       setScannedStudent(null);
       setActionNotice({
         type: 'error',
-        message: `Student ticket "${clean}" not found in database.`,
+        message: `Student ticket "${displayTicket}" not found in database.`,
       });
       setIsResultPopupOpen(true);
       return;

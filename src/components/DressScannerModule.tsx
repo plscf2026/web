@@ -21,7 +21,7 @@ import {
 } from '../types';
 import { AppStore } from '../services/store';
 import { EventStore, hasDepartmentPermission } from '../services/eventStore';
-import { findRegistrationByTokenOrId } from '../utils/tokenGenerator';
+import { findRegistrationByTokenOrId, parseScannedInput } from '../utils/tokenGenerator';
 import { validateDressDistribution } from '../utils/eventRules';
 import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
 import { decodeQRCodeFromImageFile } from '../utils/qrDecoder';
@@ -80,13 +80,18 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
     }
   };
 
-  const handleProcessScan = (codeToSearch: string) => {
+  const handleProcessScan = async (codeToSearch: string) => {
     if (!codeToSearch.trim()) return;
     refreshDistributions();
 
     const clean = codeToSearch.trim();
-    const registrations = AppStore.getRegistrations();
-    const student = findRegistrationByTokenOrId(registrations, clean);
+    const parsed = parseScannedInput(clean);
+    const displayTicket = parsed.id || parsed.token || clean;
+
+    let student = findRegistrationByTokenOrId(AppStore.getRegistrations(), clean);
+    if (!student) {
+      student = await AppStore.findRegistrationAsync(clean);
+    }
 
     if (!student) {
       playScanErrorSound();
@@ -94,12 +99,12 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
       setValidationResult({
         canReceive: false,
         status: 'INVALID_TICKET',
-        messageEn: `Student ticket "${clean}" not found.`,
-        messageBn: `"${clean}" নম্বরের কোনো টিকিট পাওয়া যায়নি।`,
+        messageEn: `Student ticket "${displayTicket}" not found.`,
+        messageBn: `"${displayTicket}" নম্বরের কোনো টিকিট পাওয়া যায়নি।`,
       });
       setFeedbackNotice({
         type: 'error',
-        message: `Student ticket "${clean}" not found in database.`,
+        message: `Student ticket "${displayTicket}" not found in database.`,
       });
       setIsResultPopupOpen(true);
       return;

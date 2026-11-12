@@ -119,12 +119,37 @@ export function parseScannedInput(input: string): { token?: string; id?: string;
   if (trimmed.includes('?') || trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     try {
       const url = new URL(trimmed.startsWith('http') ? trimmed : `https://plscf.org/${trimmed.startsWith('/') ? '' : '/'}${trimmed}`);
-      const t = url.searchParams.get('token') || url.searchParams.get('verify') || url.searchParams.get('t');
-      const id = url.searchParams.get('id');
-      if (t || id) {
+      const t =
+        url.searchParams.get('token') ||
+        url.searchParams.get('TOKEN') ||
+        url.searchParams.get('qr_token') ||
+        url.searchParams.get('verify') ||
+        url.searchParams.get('VERIFY') ||
+        url.searchParams.get('t') ||
+        url.searchParams.get('T');
+      const id =
+        url.searchParams.get('id') ||
+        url.searchParams.get('ID') ||
+        url.searchParams.get('student_id') ||
+        url.searchParams.get('reg_id') ||
+        url.searchParams.get('registration_id');
+
+      // Check URL path segments for Ticket ID pattern (e.g., /verify-student-id/PLSCF-2027-F8472)
+      let pathId: string | undefined;
+      const pathSegments = url.pathname.split('/').filter(Boolean);
+      for (const seg of pathSegments) {
+        if (/^PLSCF-\d{4}-[A-Z0-9]+$/i.test(seg)) {
+          pathId = seg.toUpperCase();
+          break;
+        }
+      }
+
+      const effectiveId = id ? id.trim().toUpperCase() : pathId;
+
+      if (t || effectiveId) {
         return {
           token: t ? t.trim().toUpperCase() : undefined,
-          id: id ? id.trim().toUpperCase() : undefined,
+          id: effectiveId,
           raw: trimmed.toUpperCase(),
         };
       }
@@ -150,13 +175,14 @@ export function findRegistrationByTokenOrId<T extends { id: string; qrToken?: st
   if (!input || !registrations || registrations.length === 0) return undefined;
   const parsed = parseScannedInput(input);
 
-  return registrations.find((r) => {
-    const rId = (r.id || '').toUpperCase();
-    const rToken = (r.qrToken || '').toUpperCase();
+  return registrations.find((r: any) => {
+    const rId = String(r.id || r.studentId || r.registrationId || '').toUpperCase().trim();
+    const rToken = String(r.qrToken || r.qr_token || '').toUpperCase().trim();
 
-    if (parsed.token && rToken === parsed.token) return true;
-    if (parsed.id && rId === parsed.id) return true;
-    if (rId === parsed.raw || rToken === parsed.raw) return true;
+    if (parsed.token && rToken && rToken === parsed.token) return true;
+    if (parsed.id && rId && rId === parsed.id) return true;
+    if (parsed.id && (rId === parsed.id.trim() || rId.includes(parsed.id) || parsed.id.includes(rId))) return true;
+    if (parsed.raw && (rId === parsed.raw || rToken === parsed.raw)) return true;
     return false;
   });
 }

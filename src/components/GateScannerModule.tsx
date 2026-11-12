@@ -22,7 +22,7 @@ import {
 } from '../types';
 import { AppStore } from '../services/store';
 import { EventStore, hasDepartmentPermission } from '../services/eventStore';
-import { findRegistrationByTokenOrId } from '../utils/tokenGenerator';
+import { findRegistrationByTokenOrId, parseScannedInput } from '../utils/tokenGenerator';
 import { validateGateAction } from '../utils/eventRules';
 import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
 import { decodeQRCodeFromImageFile } from '../utils/qrDecoder';
@@ -80,20 +80,25 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
     }
   };
 
-  const handleProcessScan = (codeToSearch: string) => {
+  const handleProcessScan = async (codeToSearch: string) => {
     if (!codeToSearch.trim()) return;
     refreshEvents();
 
     const clean = codeToSearch.trim();
-    const registrations = AppStore.getRegistrations();
-    const student = findRegistrationByTokenOrId(registrations, clean);
+    const parsed = parseScannedInput(clean);
+    const displayTicket = parsed.id || parsed.token || clean;
+
+    let student = findRegistrationByTokenOrId(AppStore.getRegistrations(), clean);
+    if (!student) {
+      student = await AppStore.findRegistrationAsync(clean);
+    }
 
     if (!student) {
       playScanErrorSound();
       setScannedStudent(null);
       setActionNotice({
         type: 'error',
-        message: `Student ticket "${clean}" not found in database.`,
+        message: `Student ticket "${displayTicket}" not found in database.`,
       });
       setIsResultPopupOpen(true);
       return;

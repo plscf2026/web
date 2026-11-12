@@ -1528,6 +1528,29 @@ export class EventStore {
     };
   }
 
+  /**
+   * Cloud-resilient async scanner validation.
+   * If student is not found in local memory, checks Supabase backend before rejecting.
+   */
+  static async verifyStudentTokenForDepartmentAsync(
+    tokenOrId: string,
+    department: DepartmentType,
+    staffUser?: StaffAccount
+  ): Promise<ReturnType<typeof EventStore.verifyStudentTokenForDepartment>> {
+    const localRes = this.verifyStudentTokenForDepartment(tokenOrId, department, staffUser);
+    if (localRes.valid || localRes.status !== 'STUDENT_NOT_FOUND') {
+      return localRes;
+    }
+
+    // Try cloud lookup
+    const student = await AppStore.findRegistrationAsync(tokenOrId);
+    if (student) {
+      return this.verifyStudentTokenForDepartment(tokenOrId, department, staffUser);
+    }
+
+    return localRes;
+  }
+
   // ==========================================
   // 2. FOOD DISTRIBUTION MANAGEMENT (PART 3)
   // ==========================================

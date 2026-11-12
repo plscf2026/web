@@ -13,6 +13,7 @@ import {
   validateTransactionIdFormat,
   hasSqlInjectionPattern,
 } from '../utils/security';
+import { parseScannedInput } from '../utils/tokenGenerator';
 
 // Supabase configuration provided by the user
 export const SUPABASE_PROJECT_ID =
@@ -450,6 +451,49 @@ export const SupabaseService = {
     }
 
     return { registration: fromRegistrationDbRow(data.ticket) };
+  },
+
+  /**
+   * Authoritative cloud ticket lookup by Token, ID, URL, or scanned QR payload.
+   * Checks registrations_2027, registrations_2026, and generic registrations tables.
+   */
+  async lookupRegistrationByIdOrToken(
+    identifier: string
+  ): Promise<RegistrationRecord | null> {
+    if (!identifier || !identifier.trim()) return null;
+    const clean = identifier.trim();
+    const parsed = parseScannedInput(clean);
+
+    const safeId = parsed.id?.replace(/[,%()]/g, '').trim();
+    const safeToken = parsed.token?.replace(/[,%()]/g, '').trim();
+    const safeRaw = parsed.raw?.replace(/[,%()]/g, '').trim();
+
+    const tablesToTry = ['registrations_2027', 'registrations_2026', 'registrations'];
+
+    for (const table of tablesToTry) {
+      try {
+        let query = supabase.from(table).select('*');
+
+        if (safeId && safeToken) {
+          query = query.or(`id.ilike.%${safeId}%,qr_token.ilike.%${safeToken}%`);
+        } else if (safeId) {
+          query = query.or(`id.ilike.%${safeId}%,qr_token.ilike.%${safeId}%`);
+        } else if (safeToken) {
+          query = query.or(`qr_token.ilike.%${safeToken}%,id.ilike.%${safeToken}%`);
+        } else if (safeRaw) {
+          query = query.or(`id.ilike.%${safeRaw}%,qr_token.ilike.%${safeRaw}%`);
+        }
+
+        const { data, error } = await query.limit(1);
+        if (!error && Array.isArray(data) && data.length > 0) {
+          return fromRegistrationDbRow(data[0]);
+        }
+      } catch (err) {
+        console.warn(`[Supabase] Cloud lookup on ${table} error:`, err);
+      }
+    }
+
+    return null;
   },
 
   async verifyStudentId(
