@@ -176,155 +176,113 @@ export const HomePage: React.FC<HomePageProps> = ({
     <div className="flex flex-col gap-16 pb-16">
       {/* HERO SECTION MATCHING MOCKUP */}
       <section
-        className="relative overflow-hidden bg-gradient-to-b from-[#e3f0fc] via-[#e8f3fc] to-[#d6e9f8] text-slate-900 pt-8 sm:pt-12 pb-24 sm:pb-32 px-4 sm:px-6 lg:px-8"
+        className="relative overflow-hidden min-h-[580px] lg:min-h-[660px] flex items-center pt-8 sm:pt-12 pb-24 sm:pb-32 px-4 sm:px-6 lg:px-8"
         style={getHomePageSectionStyle('hero')}
       >
-        {/* Soft Background Clouds / Blur overlay */}
-        <div className="absolute inset-0 pointer-events-none opacity-60 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/80 via-transparent to-transparent" />
+        {/* Full-bleed Panoramic Campus Hero Background */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src="/assets/homepage/hero_panorama.jpg"
+            alt="Police Lines High School & College, Faridpur Campus"
+            className="w-full h-full object-cover object-[70%_center] sm:object-center select-none"
+          />
+        </div>
 
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-            {/* Left Content Column */}
-            <div className="lg:col-span-6 space-y-4 sm:space-y-5 text-left">
-              {/* Stylized Italic Tagline */}
-              <div className="font-serif italic text-2xl sm:text-3xl text-[#104a88] tracking-wide font-medium">
-                {language === 'bn' ? 'একবার পিএলসিয়ান, চিরকাল পিএলসিয়ান...' : 'Once a PLSian, Always a PLSian...'}
+        {/* Sophisticated Soft Glassmorphism / Frosted Gradient Overlay on Left */}
+        {/* Ensures the text has ultra-sharp contrast while gracefully revealing the Shaheed Minar and campus on the right */}
+        <div className="absolute inset-0 z-1 pointer-events-none bg-gradient-to-r from-white/95 via-white/80 via-45% to-transparent hidden sm:block" />
+        <div className="absolute inset-0 z-1 pointer-events-none bg-white/90 sm:hidden" />
+
+        <div className="max-w-7xl mx-auto relative z-10 w-full">
+          <div className="max-w-2xl space-y-4 sm:space-y-5 text-left">
+            {/* Stylized Italic Tagline */}
+            <div className="font-serif italic text-2xl sm:text-3xl text-[#104a88] tracking-wide font-medium drop-shadow-xs">
+              {language === 'bn' ? 'একবার পিএলসিয়ান, চিরকাল পিএলসিয়ান...' : 'Once a PLSian, Always a PLSian...'}
+            </div>
+
+            {/* Institution Title */}
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-[#104a88] tracking-tight leading-tight drop-shadow-xs">
+              {language === 'bn'
+                ? 'পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজ, ফরিদপুর'
+                : 'Police Lines High School & College, Faridpur'}
+            </h1>
+
+            {/* Deep Navy Pill Badge: Grand Reunion 2027 */}
+            <div>
+              <div className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#0e3b6e] text-white shadow-xl hover:shadow-2xl transition-shadow">
+                <span className="text-xl sm:text-2xl md:text-3xl font-black tracking-wide">
+                  {language === 'bn' ? 'গ্র্যান্ড রিইউনিয়ন' : 'Grand Reunion'}{' '}
+                  <span className="text-[#fbb03b]">2027</span>
+                </span>
               </div>
+            </div>
 
-              {/* Institution Title */}
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-[#104a88] tracking-tight leading-tight">
-                {language === 'bn'
-                  ? 'পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজ, ফরিদপুর'
-                  : 'Police Lines High School & College, Faridpur'}
-              </h1>
+            {/* Subtitle / Invitation */}
+            <p className="italic text-slate-700 text-sm sm:text-base font-normal leading-relaxed max-w-xl">
+              {language === 'bn'
+                ? 'আসুন আমরা সবাই মিলে শৈশবের স্মৃতি রোমন্থন করি, আমাদের বন্ধনকে উদযাপন করি এবং নতুন সম্পর্কের মেলবন্ধন গড়ি!'
+                : "Let's come together to relive our memories, celebrate our bond and build new connections!"}
+            </p>
 
-              {/* Deep Navy Pill Badge: Grand Reunion 2027 */}
-              <div>
-                <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-[#0e3b6e] text-white shadow-lg">
-                  <span className="text-xl sm:text-2xl md:text-3xl font-black tracking-wide">
-                    {language === 'bn' ? 'গ্র্যান্ড রিইউনিয়ন' : 'Grand Reunion'}{' '}
-                    <span className="text-[#fbb03b]">2027</span>
-                  </span>
-                </div>
+            {/* Date & Venue Pills */}
+            <div className="flex flex-wrap items-center gap-3 pt-1 text-xs sm:text-sm font-semibold text-slate-800">
+              <div className="flex items-center gap-2 bg-white/95 backdrop-blur-md px-4 py-2 rounded-xl border border-sky-200/80 shadow-xs">
+                <Calendar className="w-4 h-4 text-[#104a88]" />
+                <span>
+                  <strong className="text-[#104a88] font-bold">{language === 'bn' ? 'তারিখ:' : 'Date:'}</strong>{' '}
+                  {language === 'bn' ? '২৮ - ২৯ জানুয়ারি, ২০২৭' : 'January 28 - 29, 2027'}
+                </span>
               </div>
-
-              {/* Subtitle / Invitation */}
-              <p className="italic text-slate-700 text-sm sm:text-base font-normal leading-relaxed max-w-xl">
-                {language === 'bn'
-                  ? 'আসুন আমরা সবাই মিলে শৈশবের স্মৃতি রোমন্থন করি, আমাদের বন্ধনকে উদযাপন করি এবং নতুন সম্পর্কের মেলবন্ধন গড়ি!'
-                  : "Let's come together to relive our memories, celebrate our bond and build new connections!"}
-              </p>
-
-              {/* Date & Venue Pills */}
-              <div className="flex flex-wrap items-center gap-3 pt-1 text-xs sm:text-sm font-semibold text-slate-800">
-                <div className="flex items-center gap-2 bg-white/90 backdrop-blur-xs px-4 py-2 rounded-xl border border-sky-200/80 shadow-xs">
-                  <Calendar className="w-4 h-4 text-[#104a88]" />
-                  <span>
-                    <strong className="text-[#104a88] font-bold">{language === 'bn' ? 'তারিখ:' : 'Date:'}</strong>{' '}
-                    {language === 'bn' ? '২৮ - ২৯ জানুয়ারি, ২০২৭' : 'January 28 - 29, 2027'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 bg-white/90 backdrop-blur-xs px-4 py-2 rounded-xl border border-sky-200/80 shadow-xs">
-                  <MapPin className="w-4 h-4 text-[#104a88]" />
-                  <span>
-                    <strong className="text-[#104a88] font-bold">{language === 'bn' ? 'স্থান:' : 'Venue:'}</strong>{' '}
-                    {language === 'bn' ? 'স্কুল ক্যাম্পাস, বড় মাঠ, ফরিদপুর' : 'School Campus, Large Field, Faridpur'}
-                  </span>
-                </div>
+              <div className="flex items-center gap-2 bg-white/95 backdrop-blur-md px-4 py-2 rounded-xl border border-sky-200/80 shadow-xs">
+                <MapPin className="w-4 h-4 text-[#104a88]" />
+                <span>
+                  <strong className="text-[#104a88] font-bold">{language === 'bn' ? 'স্থান:' : 'Venue:'}</strong>{' '}
+                  {language === 'bn' ? 'স্কুল ক্যাম্পাস, বড় মাঠ, ফরিদপুর' : 'School Campus, Large Field, Faridpur'}
+                </span>
               </div>
+            </div>
 
-              {/* Registration Closed Banner if applicable */}
-              {!feeSettings.registrationOpen && (
-                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs sm:text-sm shadow-xs">
-                  <div className="flex items-center gap-2 font-bold mb-1 text-amber-800">
-                    <AlertTriangle className="w-4 h-4" />
-                    <span>{language === 'bn' ? 'জরুরি প্রশাসনিক বিজ্ঞপ্তি' : 'Official Notice'}</span>
-                  </div>
-                  <p>{closedNotice}</p>
+            {/* Registration Closed Banner if applicable */}
+            {!feeSettings.registrationOpen && (
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs sm:text-sm shadow-xs">
+                <div className="flex items-center gap-2 font-bold mb-1 text-amber-800">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>{language === 'bn' ? 'জরুরি প্রশাসনিক বিজ্ঞপ্তি' : 'Official Notice'}</span>
                 </div>
+                <p>{closedNotice}</p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              {feeSettings.registrationOpen ? (
+                <button
+                  onClick={() => onNavigate('register')}
+                  className="px-7 py-3.5 rounded-full bg-[#fbb03b] hover:bg-[#f39c12] text-slate-950 font-black text-sm sm:text-base shadow-lg shadow-amber-500/30 hover:shadow-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center gap-2 group"
+                >
+                  <PenLine className="w-4 h-4 text-slate-950" />
+                  <span>{language === 'bn' ? 'নিবন্ধন করুন' : 'Register Now'}</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </button>
+              ) : (
+                <button
+                  disabled
+                  className="px-7 py-3.5 rounded-full bg-slate-800 text-slate-400 font-bold text-sm sm:text-base border border-slate-700 cursor-not-allowed flex items-center gap-2 opacity-80"
+                >
+                  <Lock className="w-4 h-4 text-slate-500" />
+                  <span>{t.btnRegistrationClosed}</span>
+                </button>
               )}
 
-              {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-                {feeSettings.registrationOpen ? (
-                  <button
-                    onClick={() => onNavigate('register')}
-                    className="px-6 py-3.5 rounded-full bg-[#fbb03b] hover:bg-[#f39c12] text-slate-950 font-bold text-sm sm:text-base shadow-md transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center gap-2 group"
-                  >
-                    <PenLine className="w-4 h-4 text-slate-950" />
-                    <span>{language === 'bn' ? 'নিবন্ধন করুন' : 'Register Now'}</span>
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                ) : (
-                  <button
-                    disabled
-                    className="px-6 py-3.5 rounded-full bg-slate-800 text-slate-400 font-bold text-sm sm:text-base border border-slate-700 cursor-not-allowed flex items-center gap-2 opacity-80"
-                  >
-                    <Lock className="w-4 h-4 text-slate-500" />
-                    <span>{t.btnRegistrationClosed}</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={() => onNavigate('donate')}
-                  className="px-6 py-3.5 rounded-full bg-white/90 hover:bg-white text-[#104a88] border border-[#104a88]/30 font-bold text-sm sm:text-base shadow-xs transition-all hover:-translate-y-0.5 cursor-pointer flex items-center gap-2"
-                >
-                  <HeartHandshake className="w-4 h-4 text-[#104a88]" />
-                  <span>{language === 'bn' ? 'অনুদান / সহায়তা' : 'Contribute / Donate'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Right Campus Hero Photo */}
-            <div className="lg:col-span-6 flex justify-center lg:justify-end">
-              <div className="relative w-full max-w-lg lg:max-w-none group">
-                <div className="overflow-hidden rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/80 bg-white">
-                  <img
-                    src="/assets/homepage/campus_hero.jpg"
-                    alt="Police Lines High School & College, Faridpur Campus & Shaheed Minar"
-                    className="w-full h-auto object-cover transform group-hover:scale-102 transition-transform duration-700"
-                  />
-                </div>
-              </div>
+              <button
+                onClick={() => onNavigate('donate')}
+                className="px-6 py-3.5 rounded-full bg-white/95 hover:bg-white text-[#104a88] border border-[#104a88]/30 font-bold text-sm sm:text-base shadow-xs hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer flex items-center gap-2"
+              >
+                <HeartHandshake className="w-4 h-4 text-[#104a88]" />
+                <span>{language === 'bn' ? 'অনুদান / সহায়তা' : 'Contribute / Donate'}</span>
+              </button>
             </div>
           </div>
-        </div>
-
-        {/* BOTTOM ORGANIC WHITE WAVE WITH BOTANICAL LEAF FLOURISHES */}
-        <div className="absolute bottom-0 left-0 right-0 overflow-hidden leading-none z-10 pointer-events-none">
-          <svg
-            className="relative block w-full h-16 sm:h-24 md:h-28 text-white"
-            viewBox="0 0 1200 120"
-            preserveAspectRatio="none"
-          >
-            <path
-              d="M0,0 C150,90 350,-40 500,50 C650,140 900,10 1200,60 L1200,120 L0,120 Z"
-              fill="currentColor"
-            />
-          </svg>
-        </div>
-
-        {/* Botanical leaf flourishes on left and right */}
-        <div className="absolute bottom-2 left-2 sm:left-6 z-15 pointer-events-none opacity-40 sm:opacity-60 text-sky-400">
-          <svg width="120" height="80" viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 70 C30 50, 60 40, 100 20" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-            <path d="M40 55 C45 42, 60 45, 55 58 C50 62, 42 60, 40 55 Z" fill="currentColor" opacity="0.8" />
-            <path d="M60 45 C65 30, 80 34, 76 48 C72 52, 62 49, 60 45 Z" fill="currentColor" opacity="0.8" />
-            <path d="M80 32 C88 20, 102 24, 98 37 C94 41, 82 36, 80 32 Z" fill="currentColor" opacity="0.8" />
-            <path d="M30 63 C20 54, 24 40, 36 46 C40 52, 35 60, 30 63 Z" fill="currentColor" opacity="0.8" />
-            <path d="M52 50 C44 38, 48 26, 59 33 C63 39, 58 48, 52 50 Z" fill="currentColor" opacity="0.8" />
-          </svg>
-        </div>
-
-        <div className="absolute bottom-2 right-2 sm:right-6 z-15 pointer-events-none opacity-40 sm:opacity-60 text-sky-400 transform -scale-x-100">
-          <svg width="120" height="80" viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 70 C30 50, 60 40, 100 20" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-            <path d="M40 55 C45 42, 60 45, 55 58 C50 62, 42 60, 40 55 Z" fill="currentColor" opacity="0.8" />
-            <path d="M60 45 C65 30, 80 34, 76 48 C72 52, 62 49, 60 45 Z" fill="currentColor" opacity="0.8" />
-            <path d="M80 32 C88 20, 102 24, 98 37 C94 41, 82 36, 80 32 Z" fill="currentColor" opacity="0.8" />
-            <path d="M30 63 C20 54, 24 40, 36 46 C40 52, 35 60, 30 63 Z" fill="currentColor" opacity="0.8" />
-            <path d="M52 50 C44 38, 48 26, 59 33 C63 39, 58 48, 52 50 Z" fill="currentColor" opacity="0.8" />
-          </svg>
         </div>
       </section>
 
@@ -394,8 +352,29 @@ export const HomePage: React.FC<HomePageProps> = ({
       </div>
 
       {/* THREE MAIN FEATURE CARDS */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 w-full -mt-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <section className="relative max-w-7xl mx-auto px-4 sm:px-6 w-full -mt-6">
+        {/* Soft Decorative Botanical Leaves on Left & Right Margins (matching mockup) */}
+        <div className="hidden 2xl:block absolute -left-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-45 text-sky-400">
+          <svg width="120" height="220" viewBox="0 0 120 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M15 210 C35 150, 45 90, 95 15" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M28 170 C40 152, 62 158, 55 174 C48 180, 35 178, 28 170 Z" fill="currentColor" opacity="0.8" />
+            <path d="M40 125 C54 106, 76 112, 70 130 C63 136, 48 133, 40 125 Z" fill="currentColor" opacity="0.8" />
+            <path d="M58 80 C74 60, 96 66, 90 84 C83 90, 68 87, 58 80 Z" fill="currentColor" opacity="0.8" />
+            <path d="M75 35 C88 18, 108 24, 102 40 C97 45, 82 43, 75 35 Z" fill="currentColor" opacity="0.8" />
+          </svg>
+        </div>
+
+        <div className="hidden 2xl:block absolute -right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-45 text-sky-400 transform -scale-x-100">
+          <svg width="120" height="220" viewBox="0 0 120 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M15 210 C35 150, 45 90, 95 15" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M28 170 C40 152, 62 158, 55 174 C48 180, 35 178, 28 170 Z" fill="currentColor" opacity="0.8" />
+            <path d="M40 125 C54 106, 76 112, 70 130 C63 136, 48 133, 40 125 Z" fill="currentColor" opacity="0.8" />
+            <path d="M58 80 C74 60, 96 66, 90 84 C83 90, 68 87, 58 80 Z" fill="currentColor" opacity="0.8" />
+            <path d="M75 35 C88 18, 108 24, 102 40 C97 45, 82 43, 75 35 Z" fill="currentColor" opacity="0.8" />
+          </svg>
+        </div>
+
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Card 1: Latest Notices */}
           <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden flex flex-col">
             <div className="bg-[#104a88] text-white px-4 py-3 flex items-center justify-between">
