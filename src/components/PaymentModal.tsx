@@ -254,42 +254,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }
   };
 
-  // ── Sandbox direct simulation (dev only) ────────────────────────────────
-
-  const handleSandboxSimulation = async () => {
-    if (!registrationData) {
-      setErrorMessage(isBangla ? 'নিবন্ধন ডেটা অনুপস্থিত।' : 'Registration data missing.');
-      return;
-    }
-
-    setStep('processing');
-    setErrorMessage('');
-    setProcessingStep(isBangla ? 'PayStation Sandbox সিমুলেশন চলছে...' : 'Running PayStation Sandbox simulation...');
-
-    try {
-      await new Promise((r) => setTimeout(r, 600));
-
-      const simTrxId = `PST-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-
-      const paymentResult: PayStationPaymentResult = {
-        invoiceNumber: invoiceRef.current,
-        trxId: simTrxId,
-        status: 'Success',
-        amount: totalPayable,
-        method: selectedMethod,
-        payerMobile: registrationData.mobileNumber,
-        timestamp: new Date().toISOString(),
-      };
-
-      setProcessingStep(isBangla ? 'ডিজিটাল টিকিট তৈরি হচ্ছে...' : 'Generating secure ticket...');
-      await finalizeRegistration(paymentResult);
-    } catch (err: any) {
-      console.error('[PayStation] Simulation error:', err);
-      setErrorMessage(err.message || 'Simulation failed.');
-      setStep('failed');
-    }
-  };
-
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -481,29 +445,18 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </h2>
               <p className="text-xs text-rose-700 max-w-xs mx-auto">{errorMessage}</p>
             </div>
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setStep('select');
-                  setErrorMessage('');
-                  setPollCount(0);
-                  invoiceRef.current = `PLSCF26-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-                }}
-                className="w-full py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-700 text-white font-bold text-sm cursor-pointer transition shadow"
-              >
-                {isBangla ? 'আবার চেষ্টা করুন' : 'Try Again'}
-              </button>
-              {config.isSandbox && (
-                <button
-                  type="button"
-                  onClick={handleSandboxSimulation}
-                  className="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs cursor-pointer transition shadow flex items-center justify-center gap-1.5"
-                >
-                  <span>{isBangla ? 'স্যান্ডবক্স টেস্ট মোডে সম্পন্ন করুন' : 'Complete with Sandbox Test Mode'}</span>
-                </button>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setStep('select');
+                setErrorMessage('');
+                setPollCount(0);
+                invoiceRef.current = `PLSCF26-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+              }}
+              className="w-full py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-700 text-white font-bold text-sm cursor-pointer transition shadow"
+            >
+              {isBangla ? 'আবার চেষ্টা করুন' : 'Try Again'}
+            </button>
           </div>
 
         /* ── SELECT / DEFAULT ── */
@@ -699,22 +652,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     </span>
                   </div>
                 </div>
-
-                {/* Instant Simulation Callout */}
-                <div className="pt-1 border-t border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px]">
-                  <span className="text-amber-800">
-                    {isBangla
-                      ? 'বা কোনো ঝামেলা ছাড়াই সরাসরি টেস্ট টিকিট দেখতে চান?'
-                      : 'Want to skip MFS gateway limits and test instantly?'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleSandboxSimulation}
-                    className="inline-flex items-center justify-center gap-1 px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-sans font-bold text-xs shadow-xs cursor-pointer transition shrink-0"
-                  >
-                    <span>{isBangla ? '⚡ তাৎক্ষণিক টেস্ট টিকিট তৈরি' : '⚡ Instant Sandbox Ticket'}</span>
-                  </button>
-                </div>
               </div>
             )}
 
@@ -742,26 +679,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </span>
                 <ExternalLink className="w-3.5 h-3.5 opacity-60" />
               </button>
-
-              {/* Sandbox simulation (only in sandbox/dev mode) */}
-              {config.isSandbox && (
-                <div className="text-center pt-1">
-                  <button
-                    type="button"
-                    onClick={handleSandboxSimulation}
-                    className="text-xs text-amber-700 hover:text-amber-900 font-semibold underline cursor-pointer inline-flex items-center gap-1"
-                  >
-                    <span>
-                      {isBangla ? 'Sandbox সিমুলেশন (টেস্ট মোড)' : 'Simulate Sandbox Payment (Test Mode)'}
-                    </span>
-                  </button>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    {isBangla
-                      ? 'শুধুমাত্র ডেভেলপমেন্ট পরীক্ষার জন্য'
-                      : 'For development testing only — no real money moved'}
-                  </p>
-                </div>
-              )}
             </div>
 
             {/* Footer */}
