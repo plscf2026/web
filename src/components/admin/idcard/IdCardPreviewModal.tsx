@@ -4,10 +4,13 @@
  * Replicates the PowerPoint ID Card Design with live CSS & Canvas rendering
  */
 
-import React, { useState } from 'react';
-import { X, Download, Printer, CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Download, Printer, CheckCircle2, AlertTriangle, ShieldCheck, Loader2 } from 'lucide-react';
 import { StudentIdCardRecord } from '../../../types/idcard';
-import { generateIndividualIdCardPdf } from '../../../utils/idCardGenerator';
+import {
+  generateIndividualIdCardPdf,
+  generateStudentQrCodeDataUrl,
+} from '../../../utils/idCardGenerator';
 import { IdCardStore } from '../../../services/idCardStore';
 import {
   SCHOOL_CREST_PNG,
@@ -31,6 +34,38 @@ export const IdCardPreviewModal: React.FC<IdCardPreviewModalProps> = ({
 }) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [localQrDataUrl, setLocalQrDataUrl] = useState<string>('');
+
+  useEffect(() => {
+    let isCancelled = false;
+    if (student) {
+      const targetUrl =
+        student.verificationUrl ||
+        `https://plscf2026.reunion.org/verify-student-id?id=${encodeURIComponent(
+          student.idNumber || student.registrationId || 'ID'
+        )}&token=${encodeURIComponent(student.qrToken || 'TOKEN')}`;
+
+      generateStudentQrCodeDataUrl(targetUrl)
+        .then((url) => {
+          if (!isCancelled) setLocalQrDataUrl(url);
+        })
+        .catch((err) => {
+          console.warn('[IdCardPreviewModal] QR code generation notice:', err);
+        });
+    }
+    return () => {
+      isCancelled = true;
+    };
+  }, [student?.verificationUrl, student?.idNumber, student?.qrToken, student?.registrationId]);
+
+  if (!student) {
+    return null;
+  }
+
+  const safeIdNumber = (student.idNumber || student.registrationId || 'card').replace(
+    /[^a-zA-Z0-9_-]/g,
+    '_'
+  );
 
   const handleDownloadPdf = async () => {
     try {
@@ -41,7 +76,7 @@ export const IdCardPreviewModal: React.FC<IdCardPreviewModalProps> = ({
       const url = URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Student_ID_${student.idNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+      a.download = `Student_ID_${safeIdNumber}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -59,11 +94,11 @@ export const IdCardPreviewModal: React.FC<IdCardPreviewModalProps> = ({
         userName: currentUserName,
         userRole: currentUserRole,
         downloadType: 'INDIVIDUAL_PDF',
-        batchYear: student.batchYear,
-        registrationId: student.idNumber,
+        batchYear: student.batchYear || 'N/A',
+        registrationId: student.idNumber || student.registrationId,
         cardCount: 1,
         status: 'SUCCESS',
-        details: `Downloaded individual ID card for ${student.studentName} (${student.idNumber})`,
+        details: `Downloaded individual ID card for ${student.studentName || 'Student'} (${student.idNumber || 'ID'})`,
       });
 
       setDownloadSuccess(true);
@@ -77,7 +112,7 @@ export const IdCardPreviewModal: React.FC<IdCardPreviewModalProps> = ({
     }
   };
 
-  const isCurrentStudent = student.batchName.toLowerCase().includes('class');
+  const isCurrentStudent = (student.batchName || student.batchYear || '').toLowerCase().includes('class');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
@@ -166,7 +201,7 @@ export const IdCardPreviewModal: React.FC<IdCardPreviewModalProps> = ({
               <div className="absolute top-[135px] left-[105px] right-2 text-left">
                 <div className="w-5 h-[2px] bg-[#EBC474] mb-1" />
                 <h3 className="text-[15px] font-bold text-[#FFFCF5] leading-tight line-clamp-2">
-                  {student.studentName}
+                  {student.studentName || 'Student Name'}
                 </h3>
                 <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[8px] font-semibold tracking-wider text-[#8ED9F5] bg-sky-950/60 border border-sky-400/30">
                   {isCurrentStudent ? 'CURRENT STUDENT' : 'ALUMNI MEMBER'}
@@ -190,7 +225,7 @@ export const IdCardPreviewModal: React.FC<IdCardPreviewModalProps> = ({
                 <div className="border-b border-slate-300 pb-0.5">
                   <span className="text-[9px] font-bold text-[#10203A] mr-1">Batch:</span>
                   <span className="text-[10px] font-extrabold text-[#1E3A8A]">
-                    {student.batchYear || student.batchName}
+                    {student.batchYear || student.batchName || 'General'}
                   </span>
                 </div>
 
@@ -198,7 +233,7 @@ export const IdCardPreviewModal: React.FC<IdCardPreviewModalProps> = ({
                 <div className="border-b border-slate-300 pb-0.5">
                   <span className="text-[9px] font-bold text-[#10203A] mr-1">ID No:</span>
                   <span className="text-[9px] font-extrabold text-[#1E3A8A]">
-                    {student.idNumber}
+                    {student.idNumber || student.registrationId || 'N/A'}
                   </span>
                 </div>
 
@@ -206,7 +241,7 @@ export const IdCardPreviewModal: React.FC<IdCardPreviewModalProps> = ({
                 <div className="border-b border-slate-300 pb-0.5">
                   <span className="text-[9px] font-bold text-[#10203A] mr-1">Contact:</span>
                   <span className="text-[9px] font-bold text-[#1E3A8A]">
-                    {student.contactNumber}
+                    {student.contactNumber || 'N/A'}
                   </span>
                 </div>
 
@@ -214,7 +249,7 @@ export const IdCardPreviewModal: React.FC<IdCardPreviewModalProps> = ({
                 <div className="pb-0.5 flex items-center justify-between">
                   <span className="text-[9px] font-bold text-[#10203A]">Token:</span>
                   <span className="text-[10px] font-mono font-black tracking-widest text-[#B45309] bg-amber-50 px-1.5 py-0.2 rounded border border-amber-300">
-                    {student.qrToken}
+                    {student.qrToken || 'TOKEN'}
                   </span>
                 </div>
               </div>
@@ -229,13 +264,17 @@ export const IdCardPreviewModal: React.FC<IdCardPreviewModalProps> = ({
                   <div className="absolute bottom-1 right-1 w-2 h-2 border-b-2 border-r-2 border-[#76A4BE]" />
 
                   {/* QR Code graphic */}
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-                      student.verificationUrl
-                    )}`}
-                    alt="Verification QR"
-                    className="w-[80px] h-[80px] object-contain"
-                  />
+                  {localQrDataUrl ? (
+                    <img
+                      src={localQrDataUrl}
+                      alt="Verification QR"
+                      className="w-[80px] h-[80px] object-contain"
+                    />
+                  ) : (
+                    <div className="w-[80px] h-[80px] flex items-center justify-center bg-slate-50 rounded text-slate-400">
+                      <Loader2 className="w-5 h-5 animate-spin text-amber-600" />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -289,14 +328,14 @@ export const IdCardPreviewModal: React.FC<IdCardPreviewModalProps> = ({
         </div>
 
         {/* Modal Actions */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800 bg-slate-950/80">
-          <div className="text-xs text-slate-400">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-4 border-t border-slate-800 bg-slate-950/80">
+          <div className="text-xs text-slate-400 text-center sm:text-left">
             Dimensions: <strong className="text-white">54 × 86 mm</strong> (Standard CR80)
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2.5 w-full sm:w-auto">
             <button
               onClick={() => window.print()}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs flex items-center gap-1.5 transition"
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs flex items-center gap-1.5 transition cursor-pointer"
             >
               <Printer className="w-4 h-4" />
               Print Preview
@@ -304,7 +343,7 @@ export const IdCardPreviewModal: React.FC<IdCardPreviewModalProps> = ({
             <button
               onClick={handleDownloadPdf}
               disabled={isDownloading}
-              className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 transition disabled:opacity-50"
+              className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
             >
               <Download className="w-4 h-4" />
               {isDownloading ? 'Generating PDF...' : 'Download Individual PDF'}

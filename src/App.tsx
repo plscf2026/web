@@ -13,6 +13,7 @@ import { RegistrationFormData } from './utils/rules';
 import { StudentIdService } from './services/studentIdStore';
 import { findRegistrationByTokenOrId } from './utils/tokenGenerator';
 import { PayStationService } from './services/paystation';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import type { ModalStep } from './components/PaymentModal';
 
 // Route-level code-splitting: heavy pages and portals are loaded on-demand
@@ -240,7 +241,20 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1">
-        <Suspense fallback={<PageLoadingFallback />}>
+        <ErrorBoundary
+          fallbackTitle={language === 'bn' ? 'পৃষ্ঠা লোড করতে ত্রুটি হয়েছে' : 'Page Load Notice'}
+          fallbackMessage={
+            language === 'bn'
+              ? 'এই পৃষ্ঠাটি লোড করতে একটি ত্রুটি ঘটেছে। দয়া করে পুনরায় চেষ্টা করুন অথবা হোমে ফিরে যান।'
+              : 'An unexpected issue occurred while rendering this view. Please try again or return home.'
+          }
+          showHomeButton
+          onNavigateHome={() => {
+            setActiveView('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        >
+          <Suspense fallback={<PageLoadingFallback />}>
           {activeView === 'home' && (
             <HomePage
               language={language}
@@ -316,7 +330,8 @@ export default function App() {
             />
           )}
         </Suspense>
-      </main>
+      </ErrorBoundary>
+    </main>
 
       {/* Universal Footer */}
       <div className="no-print">

@@ -181,10 +181,10 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
       }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchesName = item.studentName.toLowerCase().includes(q);
-        const matchesId = item.idNumber.toLowerCase().includes(q);
-        const matchesContact = item.contactNumber.toLowerCase().includes(q);
-        const matchesBatch = item.batchName.toLowerCase().includes(q);
+        const matchesName = (item.studentName || '').toLowerCase().includes(q);
+        const matchesId = (item.idNumber || item.registrationId || '').toLowerCase().includes(q);
+        const matchesContact = (item.contactNumber || '').toLowerCase().includes(q);
+        const matchesBatch = (item.batchName || item.batchYear || '').toLowerCase().includes(q);
         if (!matchesName && !matchesId && !matchesContact && !matchesBatch) {
           return false;
         }
@@ -221,7 +221,8 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
       const url = URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Student_ID_${student.idNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+      const safeId = (student.idNumber || student.registrationId || 'card').replace(/[^a-zA-Z0-9_-]/g, '_');
+      a.download = `Student_ID_${safeId}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -237,11 +238,11 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
         userName: currentUserEmail,
         userRole: currentUserRole,
         downloadType: 'INDIVIDUAL_PDF',
-        batchYear: student.batchYear,
-        registrationId: student.idNumber,
+        batchYear: student.batchYear || 'N/A',
+        registrationId: student.idNumber || student.registrationId,
         cardCount: 1,
         status: 'SUCCESS',
-        details: `Downloaded individual ID card for ${student.studentName}`,
+        details: `Downloaded individual ID card for ${student.studentName || 'Student'} (${student.idNumber || 'ID'})`,
       });
 
       refreshData();

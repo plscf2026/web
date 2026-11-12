@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileText,
   Image as ImageIcon,
@@ -12,6 +12,7 @@ import { Language } from '../../types';
 import {
   generateIndividualIdCardPdf,
   generateIndividualIdCardImage,
+  generateStudentQrCodeDataUrl,
 } from '../../utils/idCardGenerator';
 import {
   SCHOOL_CREST_PNG,
@@ -37,10 +38,40 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
   const [downloadingType, setDownloadingType] = useState<'pdf' | 'image' | 'print' | null>(null);
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [localQrDataUrl, setLocalQrDataUrl] = useState<string>('');
 
-  const isCurrentStudent = student.batchName.toLowerCase().includes('class');
+  useEffect(() => {
+    let isCancelled = false;
+    if (student) {
+      const targetUrl =
+        student.verificationUrl ||
+        `https://plscf2026.reunion.org/verify-student-id?id=${encodeURIComponent(
+          student.idNumber || student.registrationId || 'ID'
+        )}&token=${encodeURIComponent(student.qrToken || 'TOKEN')}`;
 
-  const safeFilename = `Student_ID_${student.idNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+      generateStudentQrCodeDataUrl(targetUrl)
+        .then((url) => {
+          if (!isCancelled) setLocalQrDataUrl(url);
+        })
+        .catch((err) => {
+          console.warn('[StudentIdCardBadge] QR code generation notice:', err);
+        });
+    }
+    return () => {
+      isCancelled = true;
+    };
+  }, [student?.verificationUrl, student?.idNumber, student?.qrToken, student?.registrationId]);
+
+  if (!student) {
+    return null;
+  }
+
+  const isCurrentStudent = (student.batchName || student.batchYear || '').toLowerCase().includes('class');
+
+  const safeFilename = `Student_ID_${(student.idNumber || student.registrationId || 'card').replace(
+    /[^a-zA-Z0-9_-]/g,
+    '_'
+  )}`;
 
   const handlePrintCard = async () => {
     try {
@@ -271,7 +302,7 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
           <div className="absolute top-[132px] left-[105px] right-2 text-left">
             <div className="w-5 h-[2px] bg-[#EBC474] mb-1" />
             <h3 className="text-[14px] font-bold text-[#FFFCF5] leading-tight line-clamp-2">
-              {student.studentName}
+              {student.studentName || 'Student Name'}
             </h3>
             <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[8px] font-semibold tracking-wider text-[#8ED9F5] bg-sky-950/70 border border-sky-400/40">
               {isCurrentStudent ? 'CURRENT STUDENT' : 'ALUMNI MEMBER'}
@@ -295,7 +326,7 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
             <div className="border-b border-slate-300 pb-0.5">
               <span className="text-[9px] font-bold text-[#10203A] mr-1">Batch:</span>
               <span className="text-[10px] font-extrabold text-[#1E3A8A]">
-                {student.batchYear || student.batchName}
+                {student.batchYear || student.batchName || 'General'}
               </span>
             </div>
 
@@ -303,7 +334,7 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
             <div className="border-b border-slate-300 pb-0.5">
               <span className="text-[9px] font-bold text-[#10203A] mr-1">ID No:</span>
               <span className="text-[9px] font-extrabold text-[#1E3A8A]">
-                {student.idNumber}
+                {student.idNumber || student.registrationId || 'N/A'}
               </span>
             </div>
 
@@ -311,7 +342,7 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
             <div className="border-b border-slate-300 pb-0.5">
               <span className="text-[9px] font-bold text-[#10203A] mr-1">Contact:</span>
               <span className="text-[9px] font-bold text-[#1E3A8A]">
-                {student.contactNumber}
+                {student.contactNumber || 'N/A'}
               </span>
             </div>
 
@@ -319,7 +350,7 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
             <div className="pb-0.5 flex items-center justify-between">
               <span className="text-[9px] font-bold text-[#10203A]">Token:</span>
               <span className="text-[10px] font-mono font-black tracking-widest text-[#B45309] bg-amber-50 px-1.5 py-0.2 rounded border border-amber-300">
-                {student.qrToken}
+                {student.qrToken || 'TOKEN'}
               </span>
             </div>
           </div>
@@ -333,13 +364,17 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
               <div className="absolute bottom-1 left-1 w-2 h-2 border-b-2 border-l-2 border-[#76A4BE]" />
               <div className="absolute bottom-1 right-1 w-2 h-2 border-b-2 border-r-2 border-[#76A4BE]" />
 
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-                  student.verificationUrl
-                )}`}
-                alt="Verification QR"
-                className="w-[78px] h-[78px] object-contain"
-              />
+              {localQrDataUrl ? (
+                <img
+                  src={localQrDataUrl}
+                  alt="Verification QR"
+                  className="w-[78px] h-[78px] object-contain"
+                />
+              ) : (
+                <div className="w-[78px] h-[78px] flex items-center justify-center bg-slate-50 rounded text-slate-400">
+                  <Loader2 className="w-5 h-5 animate-spin text-amber-600" />
+                </div>
+              )}
             </div>
           </div>
         </div>

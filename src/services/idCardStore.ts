@@ -226,27 +226,36 @@ export class IdCardStore {
         : 'Missing student photograph';
     }
 
+    const defaultBatchName =
+      reg.batchName?.trim() ||
+      (reg.category === 'former'
+        ? `SSC ${reg.passingYear || 'Alumni'}`
+        : `Class ${reg.currentClass || 'Current'}`);
+
+    const safeId = reg.id || 'IDC-CARD';
+    const safeToken = reg.qrToken || 'TOKEN';
+
     const verificationUrl = `https://plscf2026.reunion.org/verify-student-id?id=${encodeURIComponent(
-      reg.id
-    )}&token=${encodeURIComponent(reg.qrToken)}`;
+      safeId
+    )}&token=${encodeURIComponent(safeToken)}`;
 
     return {
-      id: `IDC-${reg.id}`,
-      registrationId: reg.id,
+      id: `IDC-${safeId}`,
+      registrationId: safeId,
       eventYear: reg.year || 2026,
-      studentName: reg.fullName,
+      studentName: reg.fullName || 'Student',
       studentNameBn: reg.fullNameBn,
       batchYear: batchYear || '2026',
-      batchName: reg.batchName,
-      idNumber: reg.id,
-      contactNumber: reg.mobileNumber,
+      batchName: defaultBatchName,
+      idNumber: safeId,
+      contactNumber: reg.mobileNumber || 'N/A',
       photoUrl: reg.photoUrl,
       hasPhoto: Boolean(reg.photoUrl),
-      qrToken: reg.qrToken,
+      qrToken: safeToken,
       verificationUrl,
       cardStatus: isFlagged ? 'FLAGGED_REVIEW' : 'ELIGIBLE',
       reviewReason: isFlagged ? reviewReason : undefined,
-      pdfStoragePath: `STUDENT_ID_CARDS/Batch_${batchYear || 'REVIEW'}/Individual_Cards/Student_${reg.id.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+      pdfStoragePath: `STUDENT_ID_CARDS/Batch_${batchYear || 'REVIEW'}/Individual_Cards/Student_${safeId.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
       cardDimensions: '54x86mm',
       version: 1,
       createdAt: new Date().toISOString(),
@@ -289,19 +298,28 @@ export class IdCardStore {
           : 'Missing student photograph';
       }
 
+      const defaultBatchName =
+        reg.batchName?.trim() ||
+        (reg.category === 'former'
+          ? `SSC ${reg.passingYear || 'Alumni'}`
+          : `Class ${reg.currentClass || 'Current'}`);
+
+      const safeId = reg.id || 'IDC-CARD';
+      const safeToken = reg.qrToken || 'TOKEN';
+
       const existing = existingMap.get(reg.id);
 
       if (existing) {
         // Update fields while preserving generation status and paths
         updatedCards.push({
           ...existing,
-          studentName: reg.fullName,
-          studentNameBn: reg.fullNameBn,
-          contactNumber: reg.mobileNumber,
+          studentName: reg.fullName || existing.studentName || 'Student',
+          studentNameBn: reg.fullNameBn || existing.studentNameBn,
+          contactNumber: reg.mobileNumber || existing.contactNumber || 'N/A',
           photoUrl: reg.photoUrl || existing.photoUrl,
           hasPhoto: Boolean(reg.photoUrl || existing.photoUrl),
-          batchYear: batchYear || existing.batchYear,
-          batchName: reg.batchName,
+          batchYear: batchYear || existing.batchYear || '2026',
+          batchName: defaultBatchName || existing.batchName || 'General',
           cardStatus: isFlagged
             ? 'FLAGGED_REVIEW'
             : existing.cardStatus === 'FLAGGED_REVIEW'
@@ -313,26 +331,26 @@ export class IdCardStore {
       } else {
         // Create new ID card record
         const verificationUrl = `https://plscf2026.reunion.org/verify-student-id?id=${encodeURIComponent(
-          reg.id
-        )}&token=${encodeURIComponent(reg.qrToken)}`;
+          safeId
+        )}&token=${encodeURIComponent(safeToken)}`;
 
         updatedCards.push({
-          id: `IDC-${reg.id}`,
-          registrationId: reg.id,
+          id: `IDC-${safeId}`,
+          registrationId: safeId,
           eventYear: reg.year || 2026,
-          studentName: reg.fullName,
+          studentName: reg.fullName || 'Student',
           studentNameBn: reg.fullNameBn,
           batchYear: batchYear || 'REVIEW_REQUIRED',
-          batchName: reg.batchName,
-          idNumber: reg.id,
-          contactNumber: reg.mobileNumber,
+          batchName: defaultBatchName,
+          idNumber: safeId,
+          contactNumber: reg.mobileNumber || 'N/A',
           photoUrl: reg.photoUrl,
           hasPhoto: Boolean(reg.photoUrl),
-          qrToken: reg.qrToken,
+          qrToken: safeToken,
           verificationUrl,
           cardStatus: isFlagged ? 'FLAGGED_REVIEW' : 'ELIGIBLE',
           reviewReason: isFlagged ? reviewReason : undefined,
-          pdfStoragePath: `STUDENT_ID_CARDS/Batch_${batchYear || 'REVIEW'}/Individual_Cards/Student_${reg.id.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+          pdfStoragePath: `STUDENT_ID_CARDS/Batch_${batchYear || 'REVIEW'}/Individual_Cards/Student_${safeId.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
           cardDimensions: '54x86mm',
           version: 1,
           createdAt: new Date().toISOString(),
@@ -348,7 +366,25 @@ export class IdCardStore {
   static getIdCards(): StudentIdCardRecord[] {
     try {
       const saved = safeGetItem(KEY_ID_CARD_RECORDS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((card) => ({
+            ...card,
+            studentName: card.studentName || 'Student',
+            batchName: card.batchName || card.batchYear || 'Batch',
+            batchYear: card.batchYear || '2026',
+            idNumber: card.idNumber || card.registrationId || 'ID',
+            contactNumber: card.contactNumber || 'N/A',
+            qrToken: card.qrToken || 'TOKEN',
+            verificationUrl:
+              card.verificationUrl ||
+              `https://plscf2026.reunion.org/verify-student-id?id=${encodeURIComponent(
+                card.idNumber || card.registrationId || 'ID'
+              )}&token=${encodeURIComponent(card.qrToken || 'TOKEN')}`,
+          }));
+        }
+      }
       // Auto initial sync
       return this.syncWithRegistrations();
     } catch {
@@ -424,7 +460,7 @@ export class IdCardStore {
     }
 
     const result = Array.from(batchMap.values()).sort((a, b) =>
-      b.batchYear.localeCompare(a.batchYear)
+      (b.batchYear || '').localeCompare(a.batchYear || '')
     );
     return result;
   }

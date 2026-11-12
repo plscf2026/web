@@ -65,6 +65,7 @@ import { StudentIdService } from '../services/studentIdStore';
 import { EventStore } from '../services/eventStore';
 import { GlobalPagination } from './common/GlobalPagination';
 import { paginate } from '../utils/pagination';
+import { ErrorBoundary } from './common/ErrorBoundary';
 // Heavy administrative portals loaded lazily to preserve bundle performance
 const AdminRmsContainer = lazy(() =>
   import('./admin/rms/AdminRmsContainer').then((m) => ({ default: m.AdminRmsContainer }))
@@ -1354,13 +1355,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* TAB: CURRENT STUDENT ID MANAGEMENT */}
       {activeTab === 'studentIds' && (
-        <StudentIdManagementTab
-          language={language}
-          onSelectTicket={(regId) => {
-            const reg = registrations.find((r) => r.id === regId);
-            if (reg && onSelectTicket) onSelectTicket(reg);
-          }}
-        />
+        <ErrorBoundary
+          fallbackTitle={language === 'bn' ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা ত্রুটি' : 'Student ID Management Error'}
+          fallbackMessage={
+            language === 'bn'
+              ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা লোড করার সময় একটি সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।'
+              : 'An error occurred while loading the Student ID Management tab. Please click retry.'
+          }
+        >
+          <StudentIdManagementTab
+            language={language}
+            onSelectTicket={(regId) => {
+              const reg = registrations.find((r) => r.id === regId);
+              if (reg && onSelectTicket) onSelectTicket(reg);
+            }}
+          />
+        </ErrorBoundary>
       )}
 
       {/* TAB 3: OVERVIEW & TELEMETRY */}

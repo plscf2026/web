@@ -90,9 +90,9 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchesId = item.studentId.toLowerCase().includes(q);
-        const matchesName = item.studentName?.toLowerCase().includes(q);
-        const matchesReg = item.usedRegistrationId?.toLowerCase().includes(q);
+        const matchesId = (item.studentId || '').toLowerCase().includes(q);
+        const matchesName = (item.studentName || '').toLowerCase().includes(q);
+        const matchesReg = (item.usedRegistrationId || '').toLowerCase().includes(q);
         if (!matchesId && !matchesName && !matchesReg) return false;
       }
       return true;
