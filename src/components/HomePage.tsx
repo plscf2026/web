@@ -352,29 +352,8 @@ export const HomePage: React.FC<HomePageProps> = ({
       </div>
 
       {/* THREE MAIN FEATURE CARDS */}
-      <section className="relative max-w-7xl mx-auto px-4 sm:px-6 w-full -mt-6">
-        {/* Soft Decorative Botanical Leaves on Left & Right Margins (matching mockup) */}
-        <div className="hidden 2xl:block absolute -left-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-45 text-sky-400">
-          <svg width="120" height="220" viewBox="0 0 120 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M15 210 C35 150, 45 90, 95 15" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-            <path d="M28 170 C40 152, 62 158, 55 174 C48 180, 35 178, 28 170 Z" fill="currentColor" opacity="0.8" />
-            <path d="M40 125 C54 106, 76 112, 70 130 C63 136, 48 133, 40 125 Z" fill="currentColor" opacity="0.8" />
-            <path d="M58 80 C74 60, 96 66, 90 84 C83 90, 68 87, 58 80 Z" fill="currentColor" opacity="0.8" />
-            <path d="M75 35 C88 18, 108 24, 102 40 C97 45, 82 43, 75 35 Z" fill="currentColor" opacity="0.8" />
-          </svg>
-        </div>
-
-        <div className="hidden 2xl:block absolute -right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-45 text-sky-400 transform -scale-x-100">
-          <svg width="120" height="220" viewBox="0 0 120 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M15 210 C35 150, 45 90, 95 15" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-            <path d="M28 170 C40 152, 62 158, 55 174 C48 180, 35 178, 28 170 Z" fill="currentColor" opacity="0.8" />
-            <path d="M40 125 C54 106, 76 112, 70 130 C63 136, 48 133, 40 125 Z" fill="currentColor" opacity="0.8" />
-            <path d="M58 80 C74 60, 96 66, 90 84 C83 90, 68 87, 58 80 Z" fill="currentColor" opacity="0.8" />
-            <path d="M75 35 C88 18, 108 24, 102 40 C97 45, 82 43, 75 35 Z" fill="currentColor" opacity="0.8" />
-          </svg>
-        </div>
-
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 w-full -mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Card 1: Latest Notices */}
           <div className="bg-white rounded-2xl shadow-md border border-[#E2EEF8] overflow-hidden flex flex-col">
             <div className="bg-[#0F172A] text-white px-4 py-3 flex items-center justify-between">
@@ -511,24 +490,24 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
-            <div className="p-4 flex-1 flex flex-col justify-center">
+            <div className="p-4 flex-1 flex items-center justify-center">
               <div
                 onClick={() => setIsVideoModalOpen(true)}
-                className="relative rounded-xl overflow-hidden shadow-xs cursor-pointer group border border-[#E2EEF8]"
+                className="relative w-full rounded-xl overflow-hidden shadow-xs cursor-pointer group border border-[#E2EEF8]"
               >
                 <img
                   src="/assets/homepage/video_thumb.jpg"
                   alt="Reunion Promo Video"
-                  className="w-full h-32 sm:h-36 object-cover group-hover:scale-105 transition-transform duration-500"
+                  className="w-full h-36 sm:h-40 object-cover group-hover:scale-105 transition-transform duration-500"
                 />
-                {/* Centered Play Button */}
-                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 flex items-center justify-center transition-colors">
-                  <div className="w-12 h-12 rounded-full bg-white/95 text-[#0284C7] shadow-lg flex items-center justify-center pl-1 transform group-hover:scale-110 transition-transform">
-                    <Play className="w-6 h-6 fill-current" />
+                {/* Perfectly Centered Play Button */}
+                <div className="absolute inset-0 bg-black/35 group-hover:bg-black/25 flex items-center justify-center transition-colors">
+                  <div className="w-14 h-14 rounded-full bg-white/95 text-[#0284C7] shadow-2xl flex items-center justify-center transition-all group-hover:scale-110">
+                    <Play className="w-7 h-7 fill-current translate-x-0.5" />
                   </div>
                 </div>
                 {/* Video Info Bottom Overlay */}
-                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2.5 flex items-center justify-between text-white text-xs">
+                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-2.5 flex items-center justify-between text-white text-xs">
                   <span className="font-semibold truncate drop-shadow-xs">PLS Reunion 2027 – Official Promo</span>
                   <span className="bg-[#0F172A]/80 px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 ml-2">1:57</span>
                 </div>
