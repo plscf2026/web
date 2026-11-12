@@ -36,7 +36,7 @@ test('1. XSS Input Sanitization prevents script injection and escapes HTML', () 
 
 test('2. SQL Injection Pattern Detection flags attack vectors', () => {
   assert.equal(hasSqlInjectionPattern("' OR '1'='1"), true);
-  assert.equal(hasSqlInjectionPattern("admin'; DROP TABLE registrations_2026; --"), true);
+  assert.equal(hasSqlInjectionPattern("admin'; DROP TABLE registrations_2027; --"), true);
   assert.equal(hasSqlInjectionPattern("UNION SELECT * FROM admin_accounts"), true);
   assert.equal(hasSqlInjectionPattern("/* comment attack */"), true);
 

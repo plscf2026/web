@@ -1475,19 +1475,13 @@ export class AppStore {
 
   /**
    * Synchronizes registrations from Supabase cloud into local storage.
-   * Merges newly registered attendees across 2027 and 2026 without data loss.
+   * Pulls authoritative records from consolidated registrations_2027.
    */
   static async syncWithSupabase(preferredYear?: number): Promise<{ count: number; error?: string }> {
     try {
-      const years = preferredYear ? [preferredYear] : [2027, 2026];
-      const fetched: RegistrationRecord[] = [];
-
-      for (const y of years) {
-        const res = await SupabaseService.fetchRegistrations(y);
-        if (res.data && res.data.length > 0) {
-          fetched.push(...res.data);
-        }
-      }
+      const targetYear = preferredYear || 2027;
+      const res = await SupabaseService.fetchRegistrations(targetYear);
+      const fetched: RegistrationRecord[] = res.data && res.data.length > 0 ? res.data : [];
 
       if (fetched.length === 0) {
         return { count: this.getRegistrations().length };
@@ -1524,7 +1518,7 @@ export class AppStore {
   /**
    * Asynchronous cloud-resilient lookup:
    * 1. Checks local memory/storage first (instant 0ms).
-   * 2. If not found, queries Supabase PostgreSQL tables (registrations_2027, registrations_2026).
+   * 2. If not found, queries Supabase PostgreSQL table (registrations_2027).
    * 3. Caches newly discovered record into local store for offline use.
    */
   static async findRegistrationAsync(input: string, tokenInput?: string): Promise<RegistrationRecord | undefined> {

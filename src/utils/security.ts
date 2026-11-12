@@ -575,7 +575,7 @@ export const CRITICAL_SECURITY_CHECKLIST: SecurityAuditItem[] = [
     description: 'RLS policies enforced on registrations, donations, admin_accounts, and audit_logs.',
     status: 'passed',
     verificationMethod: 'Automated DDL migration script with ALTER TABLE ... ENABLE ROW LEVEL SECURITY.',
-    policyCode: 'ALTER TABLE registrations_2026 ENABLE ROW LEVEL SECURITY;',
+    policyCode: 'ALTER TABLE registrations_2027 ENABLE ROW LEVEL SECURITY;',
   },
   {
     id: 'SEC-03',

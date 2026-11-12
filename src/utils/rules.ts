@@ -293,9 +293,14 @@ export function verifyGateScan(
 export function calculateFinancialSummary(
   registrations: RegistrationRecord[],
   donations: DonationRecord[],
-  expenses: ExpenseRecord[]
+  expenses: ExpenseRecord[],
+  options?: { excludeDemo?: boolean }
 ) {
-  const paidRegistrations = registrations.filter((r) => r.paymentStatus === 'paid');
+  const effectiveRegistrations =
+    options?.excludeDemo !== false
+      ? registrations.filter((r) => !r.isDemo)
+      : registrations;
+  const paidRegistrations = effectiveRegistrations.filter((r) => r.paymentStatus === 'paid');
   const totalRegistrationRevenue = paidRegistrations.reduce((acc, r) => acc + r.registrationFee, 0);
   const registrationDonations = paidRegistrations.reduce((acc, r) => acc + (r.donationAmount || 0), 0);
   const independentDonations = donations.reduce((acc, d) => acc + d.amount, 0);

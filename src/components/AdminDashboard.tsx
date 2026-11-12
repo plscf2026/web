@@ -190,11 +190,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [deleteReason, setDeleteReason] = useState<string>('');
   const [isDeletingBooking, setIsDeletingBooking] = useState<boolean>(false);
 
-  // Year Selection for Year-Specific Supabase Tables (e.g. registrations_2026, registrations_2027)
-  const [selectedYear, setSelectedYear] = useState<number>(2026);
+  // Consolidated Registration Database Table (registrations_2027)
+  const selectedYear = 2027;
   const [isFetchingFromSupabase, setIsFetchingFromSupabase] = useState<boolean>(false);
   const [supabaseTableUsed, setSupabaseTableUsed] = useState<string>(
-    getRegistrationsTableName(2026)
+    getRegistrationsTableName(2027)
   );
 
   // State from AppStore
@@ -349,9 +349,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const registrationsForYear = registrations.filter(
-    (registration) => (registration.year ?? 2026) === selectedYear
+    (registration) => (registration.year ?? 2027) === selectedYear
   );
-  const financial = calculateFinancialSummary(registrationsForYear, donations, expenses);
+  const genuineRegistrations = registrationsForYear.filter((r) => !r.isDemo);
+  const financial = calculateFinancialSummary(genuineRegistrations, donations, expenses);
   const homePageSectionLabels: Record<HomePageSectionId, string> = {
     hero: 'Main event banner',
     countdown: 'Countdown',
@@ -1088,39 +1089,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </p>
             </div>
 
-            {/* Year Selector Control */}
+            {/* Consolidated Registration Database Status & Sync Control */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+              <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800">
                 <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{language === 'bn' ? 'ইভেন্ট বছর:' : 'Event Year:'}</span>
+                <span>{language === 'bn' ? 'কনসোলিডেটেড ডাটাবেস:' : 'Consolidated Table:'} <code className="font-mono font-bold text-[11px] text-emerald-900">registrations_2027</code></span>
               </span>
 
-              {[2026, 2027, 2028].map((yr) => (
-                <button
-                  key={yr}
-                  onClick={() => setSelectedYear(yr)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                    selectedYear === yr
-                      ? 'bg-slate-900 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {yr}
-                </button>
-              ))}
-
               <button
-                onClick={() => fetchSupabaseRegistrationsForYear(selectedYear)}
+                onClick={() => fetchSupabaseRegistrationsForYear(2027)}
                 disabled={isFetchingFromSupabase}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold cursor-pointer transition-colors"
-                title="Fetch latest bookings directly from Supabase"
+                title="Fetch latest bookings directly from Supabase (registrations_2027)"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isFetchingFromSupabase ? 'animate-spin' : ''}`} />
                 <span>{isFetchingFromSupabase ? 'Syncing...' : 'Fetch from Supabase'}</span>
               </button>
 
               <button
-                onClick={() => exportToCSV(filteredRegistrations, `PLSCF_Bookings_${selectedYear}`)}
+                onClick={() => exportToCSV(filteredRegistrations, `PLSCF_Bookings_2027`)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -1132,17 +1119,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* Bookings Statistics Bar */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <span className="text-[11px] text-slate-500 font-bold uppercase block">Total Bookings</span>
+              <span className="text-[11px] text-slate-500 font-bold uppercase block">Genuine Paid Bookings</span>
               <span className="text-2xl font-black text-slate-900 mt-1 block">
-                {registrationsForYear.length}
+                {genuineRegistrations.filter((r) => r.paymentStatus === 'paid').length}
               </span>
-              <span className="text-[10px] text-emerald-600 font-medium">In Table: {supabaseTableUsed}</span>
+              <span className="text-[10px] text-emerald-600 font-medium">
+                {registrationsForYear.length > genuineRegistrations.length
+                  ? `+${registrationsForYear.length - genuineRegistrations.length} demo seed records preserved`
+                  : `In Table: ${supabaseTableUsed}`}
+              </span>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
               <span className="text-[11px] text-slate-500 font-bold uppercase block">Former Students</span>
               <span className="text-2xl font-black text-emerald-700 mt-1 block">
-                {registrationsForYear.filter((r) => r.category === 'former').length}
+                {genuineRegistrations.filter((r) => r.category === 'former').length}
               </span>
               <span className="text-[10px] text-slate-400">Alumni SSC/HSC</span>
             </div>
@@ -1150,7 +1141,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
               <span className="text-[11px] text-slate-500 font-bold uppercase block">Current Students</span>
               <span className="text-2xl font-black text-teal-700 mt-1 block">
-                {registrationsForYear.filter((r) => r.category === 'current').length}
+                {genuineRegistrations.filter((r) => r.category === 'current').length}
               </span>
               <span className="text-[10px] text-slate-400">Enrolled School & College</span>
             </div>
@@ -1158,9 +1149,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
               <span className="text-[11px] text-slate-500 font-bold uppercase block">Total Booking Revenue</span>
               <span className="text-2xl font-black text-amber-700 mt-1 block">
-                ৳{registrationsForYear.reduce((sum, r) => sum + r.totalPaid, 0).toLocaleString()}
+                ৳{genuineRegistrations.reduce((sum, r) => sum + r.totalPaid, 0).toLocaleString()}
               </span>
-              <span className="text-[10px] text-slate-400">Fees + Additional Donations</span>
+              <span className="text-[10px] text-slate-400">Genuine Paid Inflow</span>
             </div>
           </div>
 
@@ -1237,9 +1228,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           />
                           <div>
                             <span className="font-bold text-slate-900 block">{reg.fullName}</span>
-                            <span className="font-mono text-[10px] text-emerald-700 font-bold block">
-                              {reg.id}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-[10px] text-emerald-700 font-bold">
+                                {reg.id}
+                              </span>
+                              {reg.isDemo && (
+                                <span className="px-1.5 py-0.2 bg-amber-100 text-amber-800 text-[9px] font-bold rounded">
+                                  DEMO SEED
+                                </span>
+                              )}
+                              {reg.isLegacy && !reg.isDemo && (
+                                <span className="px-1.5 py-0.2 bg-sky-100 text-sky-800 text-[9px] font-bold rounded">
+                                  MIGRATED
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>

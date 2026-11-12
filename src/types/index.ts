@@ -36,6 +36,10 @@ export interface RegistrationRecord {
   isTShirtCollected: boolean;
   notes?: string;
   year?: number;
+  isDemo?: boolean;
+  isLegacy?: boolean;
+  migrationSource?: string;
+  legacySourceYear?: number;
   serverVerificationSignature?: string;
   verificationTimestamp?: string;
   verifiedBy?: string;

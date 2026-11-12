@@ -55,11 +55,11 @@ export function isDevTestBypassAllowed(): boolean {
 }
 
 /**
- * Returns year-specific table names:
- * e.g., 'registrations_2027', 'donations_2027'
+ * Returns the consolidated registration table name:
+ * 'registrations_2027' is the sole authoritative registration table.
  */
-export function getRegistrationsTableName(year: number = 2027): string {
-  return `registrations_${year}`;
+export function getRegistrationsTableName(_year: number = 2027): string {
+  return 'registrations_2027';
 }
 
 export function getDonationsTableName(year: number = 2027): string {
@@ -103,7 +103,11 @@ function toRegistrationDbRow(reg: RegistrationRecord, year: number = 2027) {
     is_tshirt_collected: reg.isTShirtCollected ?? false,
     is_checked_in: false,
     notes: sanitizeInput(reg.notes || ''),
-    year: year,
+    year: year || 2027,
+    is_demo: reg.isDemo ?? false,
+    is_legacy: reg.isLegacy ?? false,
+    migration_source: reg.migrationSource ?? null,
+    legacy_source_year: reg.legacySourceYear ?? null,
   };
 }
 
@@ -142,13 +146,17 @@ function fromRegistrationDbRow(row: any): RegistrationRecord {
     isTShirtCollected: Boolean(row.is_tshirt_collected ?? row.isTShirtCollected ?? false),
     notes: row.notes || undefined,
     year: Number(row.year || 2027),
+    isDemo: Boolean(row.is_demo ?? false),
+    isLegacy: Boolean(row.is_legacy ?? false),
+    migrationSource: row.migration_source || undefined,
+    legacySourceYear: row.legacy_source_year ? Number(row.legacy_source_year) : undefined,
   };
 }
 
 export const SupabaseService = {
   /**
    * Save a registration to Supabase backend.
-   * Targets year-specific table (e.g. registrations_2026), with fallback to 'registrations'.
+   * Targets consolidated table 'registrations_2027', with fallback to 'registrations'.
    */
   async saveRegistration(
     reg: RegistrationRecord,
@@ -158,7 +166,7 @@ export const SupabaseService = {
     const row = toRegistrationDbRow(reg, year);
 
     try {
-      // 1. Try year-specific table: registrations_2026
+      // 1. Try consolidated table: registrations_2027
       const { error: yearTableError } = await supabase
         .from(yearTableName)
         .upsert(row, { onConflict: 'id' });
@@ -455,7 +463,7 @@ export const SupabaseService = {
 
   /**
    * Authoritative cloud ticket lookup by Token, ID, URL, or scanned QR payload.
-   * Checks registrations_2027, registrations_2026, and generic registrations tables.
+   * Checks consolidated registrations_2027 and generic registrations table.
    */
   async lookupRegistrationByIdOrToken(
     identifier: string,
@@ -469,7 +477,7 @@ export const SupabaseService = {
     const safeToken = (tokenParam?.trim() || parsed.token)?.replace(/[,%()]/g, '').trim();
     const safeRaw = parsed.raw?.replace(/[,%()]/g, '').trim();
 
-    const tablesToTry = ['registrations_2027', 'registrations_2026', 'registrations'];
+    const tablesToTry = ['registrations_2027', 'registrations'];
 
     for (const table of tablesToTry) {
       try {

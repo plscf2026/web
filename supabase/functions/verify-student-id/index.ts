@@ -82,24 +82,13 @@ serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // 1. Query target year registrations table
-    let { data: registration, error } = await supabase
-      .from(`registrations_${year}`)
+    // 1. Query consolidated registrations_2027 table
+    const targetTable = 'registrations_2027';
+    const { data: registration, error } = await supabase
+      .from(targetTable)
       .select('id, full_name, full_name_bn, photo_url, category, passing_year, current_class, batch_name, payment_status, qr_token, year')
       .eq('id', studentId)
       .maybeSingle();
-
-    // Fallback to registrations_2026 if not found in 2027
-    if (!registration && year === 2027) {
-      const fallback = await supabase
-        .from('registrations_2026')
-        .select('id, full_name, full_name_bn, photo_url, category, passing_year, current_class, batch_name, payment_status, qr_token, year')
-        .eq('id', studentId)
-        .maybeSingle();
-      if (fallback.data) {
-        registration = fallback.data;
-      }
-    }
 
     if (error || !registration) {
       return jsonResponse(
