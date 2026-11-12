@@ -31,6 +31,8 @@ export interface RegistrationRecord {
   paymentStatus: PaymentStatus;
   transactionId: string;
   paymentMethod: PaymentMethod;
+  gatewayInvoiceNumber?: string;
+  gatewayProvider?: string;
   registeredAt: string;
   qrToken: string;
   isTShirtCollected: boolean;
@@ -67,6 +69,8 @@ export interface DonationRecord {
   amount: number;
   purpose: string;
   paymentMethod: PaymentMethod;
+  gatewayInvoiceNumber?: string;
+  gatewayProvider?: string;
   transactionId: string;
   date: string;
   paymentStatus?: PaymentStatus;

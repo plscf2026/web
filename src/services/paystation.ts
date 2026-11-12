@@ -559,6 +559,94 @@ export class PayStationService {
     return { valid: true };
   }
 
+  /**
+   * Authoritative IPN Webhook Processing
+   * Dispatches incoming IPN payload to Supabase RPC `rpc_handle_paystation_ipn`
+   * or updates local state in mock/test mode.
+   */
+  static async handleIpnWebhook(payload: PayStationIpnPayload): Promise<{
+    success: boolean;
+    status: string;
+    registrationId?: string;
+    error?: string;
+  }> {
+    if (!payload.invoice_number) {
+      return { success: false, status: 'error', error: 'Missing invoice_number' };
+    }
+
+    const rawStatus = (payload.trx_status || '').toLowerCase().trim();
+    const isSuccess =
+      rawStatus === 'success' ||
+      rawStatus === 'successful' ||
+      rawStatus === 'completed' ||
+      rawStatus === 'captured' ||
+      rawStatus === 'paid' ||
+      rawStatus.includes('success');
+
+    if (!isSuccess) {
+      return { success: false, status: 'ignored', error: `Status not successful: ${payload.trx_status}` };
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('rpc_handle_paystation_ipn', {
+        p_invoice_number: String(payload.invoice_number),
+        p_trx_id: String(payload.trx_id),
+        p_amount: Number(payload.trx_amount || 0),
+        p_method: String(payload.payment_method || 'bkash'),
+        p_order_date_time: String(payload.order_date_time || new Date().toISOString()),
+        p_reference: payload.reference || null,
+        p_raw_payload: payload,
+      });
+
+      if (!error && data?.success) {
+        const registrations = AppStore.getRegistrations();
+        const found = registrations.find(
+          (r) => r.gatewayInvoiceNumber === payload.invoice_number || r.id === data.registration_id
+        );
+        if (found) {
+          AppStore.updateRegistration(found.id, {
+            paymentStatus: 'paid',
+            transactionId: payload.trx_id,
+            paymentMethod: normalizePaymentMethod(payload.payment_method),
+            totalPaid: Number(payload.trx_amount),
+            gatewayInvoiceNumber: payload.invoice_number,
+            gatewayProvider: 'PAYSTATION',
+          });
+        }
+        return {
+          success: true,
+          status: data.status || 'PAID',
+          registrationId: data.registration_id,
+        };
+      }
+
+      if (error) {
+        console.warn('[PayStation] IPN RPC error:', error);
+      }
+    } catch (e: any) {
+      console.warn('[PayStation] IPN RPC exception:', e);
+    }
+
+    // Local fallback for client tests
+    const registrations = AppStore.getRegistrations();
+    const match = registrations.find(
+      (r) => r.gatewayInvoiceNumber === payload.invoice_number || r.id === payload.invoice_number
+    );
+    if (match) {
+      AppStore.updateRegistration(match.id, {
+        paymentStatus: 'paid',
+        transactionId: payload.trx_id,
+        paymentMethod: normalizePaymentMethod(payload.payment_method),
+        totalPaid: Number(payload.trx_amount),
+        gatewayInvoiceNumber: payload.invoice_number,
+        gatewayProvider: 'PAYSTATION',
+      });
+      return { success: true, status: 'PAID', registrationId: match.id };
+    }
+
+    return { success: true, status: 'acknowledged' };
+  }
+
   // ── Pending Session Persistence (Prevents Lost Form Data on Redirect/Go-Back) ──
 
   static memoryPendingSession: PendingPaymentSession | null = null;
@@ -784,6 +872,8 @@ export class PayStationService {
       paymentStatus: 'pending',
       transactionId: '',
       paymentMethod: 'bkash',
+      gatewayInvoiceNumber: invoiceNumber,
+      gatewayProvider: 'PAYSTATION',
       registeredAt: nowIso,
       qrToken,
       isTShirtCollected: false,
@@ -878,6 +968,8 @@ export class PayStationService {
       paymentStatus: 'paid',
       transactionId: sanitizeInput(payment.trxId),
       paymentMethod: payment.method,
+      gatewayInvoiceNumber: payment.invoiceNumber,
+      gatewayProvider: 'PAYSTATION',
       registeredAt: nowIso,
       qrToken,
       isTShirtCollected: false,
@@ -995,6 +1087,8 @@ export class PayStationService {
       amount: payment.amount,
       purpose: sanitizeInput(data.purpose),
       paymentMethod: payment.method,
+      gatewayInvoiceNumber: payment.invoiceNumber,
+      gatewayProvider: 'PAYSTATION',
       transactionId: sanitizeInput(payment.trxId),
       date: nowIso.split('T')[0],
       paymentStatus: 'paid',

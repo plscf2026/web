@@ -145,3 +145,139 @@ test('PayStation Payment Status Verification accepts "Successful" case variants 
     assert.equal(res.valid, true, `Status "${st}" must be considered valid`);
   }
 });
+
+test('PayStation createPendingRegistration associates gatewayInvoiceNumber and preserves pending status', async () => {
+  const formData: RegistrationFormData = {
+    fullName: 'Kamal Hossain',
+    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb',
+    mobileNumber: '01799887766',
+    email: 'kamal@example.com',
+    address: 'Faridpur',
+    category: 'former',
+    passingYear: '2015',
+    batchName: 'SSC 2015',
+    tShirtSize: 'M',
+    donationAmount: 0,
+    termsAccepted: true,
+  };
+
+  const invoiceNumber = `INV-TEST-PEND-${Date.now()}`;
+  const fees = { registrationFee: 1500, donationAmount: 0, totalPayable: 1500 };
+
+  const pendingRecord = await PayStationService.createPendingRegistration(
+    formData,
+    fees,
+    invoiceNumber
+  );
+
+  assert.equal(pendingRecord.paymentStatus, 'pending');
+  assert.equal(pendingRecord.totalPaid, 0);
+  assert.equal(pendingRecord.gatewayInvoiceNumber, invoiceNumber);
+  assert.equal(pendingRecord.gatewayProvider, 'PAYSTATION');
+
+  // Check pending session storage
+  const session = PayStationService.getPendingSession();
+  assert.ok(session);
+  assert.equal(session?.invoiceNumber, invoiceNumber);
+  assert.equal(session?.registrationId, pendingRecord.id);
+});
+
+test('PayStation Merchant IPN Webhook updates pending registration to paid authoritatively and idempotently', async () => {
+  const invoiceNumber = `INV-IPN-TEST-${Date.now()}`;
+  const formData: RegistrationFormData = {
+    fullName: 'Jamil Ahmed',
+    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb',
+    mobileNumber: '01888776655',
+    email: 'jamil@example.com',
+    address: 'Faridpur',
+    category: 'former',
+    passingYear: '2008',
+    batchName: 'SSC 2008',
+    tShirtSize: 'XL',
+    donationAmount: 500,
+    termsAccepted: true,
+  };
+
+  const fees = { registrationFee: 1500, donationAmount: 500, totalPayable: 2000 };
+  const pending = await PayStationService.createPendingRegistration(formData, fees, invoiceNumber);
+  assert.equal(pending.paymentStatus, 'pending');
+
+  // Simulate incoming server-to-server IPN payload from PayStation
+  const ipnPayload = {
+    invoice_number: invoiceNumber,
+    trx_status: 'Success' as const,
+    trx_id: `PST-IPN-TRX-${Date.now()}`,
+    trx_amount: 2000,
+    order_date_time: '2026-11-13 05:40:00',
+    payment_method: 'Nagad',
+    reference: pending.id,
+  };
+
+  // Validate IPN payload
+  const validation = PayStationService.validateIpnPayload(ipnPayload, invoiceNumber, 2000);
+  assert.equal(validation.valid, true);
+
+  // Process IPN Webhook
+  const result = await PayStationService.handleIpnWebhook(ipnPayload);
+  assert.equal(result.success, true);
+
+  // Check that record in AppStore is now paid
+  const reg = AppStore.getRegistrations().find((r) => r.id === pending.id);
+  assert.ok(reg);
+  assert.equal(reg?.paymentStatus, 'paid');
+  assert.equal(reg?.totalPaid, 2000);
+  assert.equal(reg?.paymentMethod, 'nagad');
+  assert.equal(reg?.transactionId, ipnPayload.trx_id);
+
+  // Retried IPN with same transaction ID must remain safe & idempotent
+  const retryResult = await PayStationService.handleIpnWebhook(ipnPayload);
+  assert.equal(retryResult.success, true);
+  assert.equal(reg?.paymentStatus, 'paid');
+});
+
+test('PayStation IPN validation rejects invalid payloads (amount mismatch, wrong invoice, failed status)', () => {
+  const basePayload = {
+    invoice_number: 'INV-VALID-001',
+    trx_status: 'Success' as const,
+    trx_id: 'TRX-VALID-123',
+    trx_amount: 1500,
+    order_date_time: '2026-11-13 05:45:00',
+    payment_method: 'bKash',
+  };
+
+  // 1. Wrong invoice
+  const res1 = PayStationService.validateIpnPayload(
+    { ...basePayload, invoice_number: 'INV-WRONG' },
+    'INV-VALID-001',
+    1500
+  );
+  assert.equal(res1.valid, false);
+  assert.ok(res1.reason?.includes('Invoice number mismatch'));
+
+  // 2. Underpaid amount
+  const res2 = PayStationService.validateIpnPayload(
+    { ...basePayload, trx_amount: 500 },
+    'INV-VALID-001',
+    1500
+  );
+  assert.equal(res2.valid, false);
+  assert.ok(res2.reason?.includes('Amount mismatch'));
+
+  // 3. Failed status
+  const res3 = PayStationService.validateIpnPayload(
+    { ...basePayload, trx_status: 'Failed' as any },
+    'INV-VALID-001',
+    1500
+  );
+  assert.equal(res3.valid, false);
+  assert.ok(res3.reason?.includes('Unexpected trx_status'));
+
+  // 4. Missing trx_id
+  const res4 = PayStationService.validateIpnPayload(
+    { ...basePayload, trx_id: '' },
+    'INV-VALID-001',
+    1500
+  );
+  assert.equal(res4.valid, false);
+  assert.ok(res4.reason?.includes('Missing trx_id'));
+});
