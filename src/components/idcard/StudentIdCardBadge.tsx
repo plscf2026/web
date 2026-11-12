@@ -17,6 +17,7 @@ export interface StudentIdCardBadgeProps {
   showActions?: boolean;
   className?: string;
   customPhotoSlot?: React.ReactNode;
+  isPreview?: boolean;
 }
 
 export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
@@ -25,6 +26,7 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
   showActions = true,
   className = '',
   customPhotoSlot,
+  isPreview = false,
 }) => {
   const isBangla = language === 'bn';
   const [downloadingType, setDownloadingType] = useState<'pdf' | 'image' | 'print' | null>(null);
@@ -59,6 +61,20 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
   }
 
   const isCurrentStudent = (student.batchName || student.batchYear || '').toLowerCase().includes('class');
+
+  const isPreviewCard =
+    isPreview ||
+    student.idNumber?.includes('PREV') ||
+    student.idNumber?.includes('XXXX') ||
+    student.registrationId?.includes('PREV') ||
+    student.registrationId?.includes('XXXX') ||
+    student.qrToken === 'XXXXXX' ||
+    student.qrToken === 'PREV27';
+
+  const displayBatch = isPreviewCard ? 'XXXXXX' : (student.batchYear || student.batchName || 'General');
+  const displayIdNumber = isPreviewCard ? 'PLSC-XXXX-XXXX' : (student.idNumber || student.registrationId || 'N/A');
+  const displayContact = isPreviewCard ? '01XXXXXXXXX' : (student.contactNumber || 'N/A');
+  const displayToken = isPreviewCard ? 'XXXXXX' : (student.qrToken || 'TOKEN');
 
   const safeFilename = `Student_ID_${(student.idNumber || student.registrationId || 'card').replace(
     /[^a-zA-Z0-9_-]/g,
@@ -314,44 +330,44 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
         />
 
         {/* 2. Middle Student Details & QR Code */}
-        <div className="absolute top-[210px] left-3 right-3 flex justify-between items-start">
+        <div className="absolute top-[207px] left-3 right-3 flex justify-between items-center z-10 h-[122px]">
           {/* Left Column: Data fields */}
-          <div className="flex-1 pr-2 space-y-2 text-left">
+          <div className="flex-1 pr-2.5 flex flex-col justify-between h-[106px] text-left">
             {/* Batch */}
-            <div className="border-b border-slate-300 pb-0.5">
-              <span className="text-[9px] font-bold text-[#10203A] mr-1">Batch:</span>
-              <span className="text-[10px] font-extrabold text-[#1E3A8A]">
-                {student.batchYear || student.batchName || 'General'}
+            <div className="border-b border-slate-300/80 pb-0.5 flex items-center justify-between">
+              <span className="text-[9px] font-bold text-[#10203A] shrink-0">Batch:</span>
+              <span className="text-[10px] font-extrabold text-[#1E3A8A] font-mono truncate max-w-[90px] text-right">
+                {displayBatch}
               </span>
             </div>
 
             {/* ID Number */}
-            <div className="border-b border-slate-300 pb-0.5">
-              <span className="text-[9px] font-bold text-[#10203A] mr-1">ID No:</span>
-              <span className="text-[9px] font-extrabold text-[#1E3A8A]">
-                {student.idNumber || student.registrationId || 'N/A'}
+            <div className="border-b border-slate-300/80 pb-0.5 flex items-center justify-between">
+              <span className="text-[9px] font-bold text-[#10203A] shrink-0">ID No:</span>
+              <span className="text-[9px] font-extrabold text-[#1E3A8A] font-mono truncate max-w-[95px] text-right" title={displayIdNumber}>
+                {displayIdNumber}
               </span>
             </div>
 
             {/* Contact */}
-            <div className="border-b border-slate-300 pb-0.5">
-              <span className="text-[9px] font-bold text-[#10203A] mr-1">Contact:</span>
-              <span className="text-[9px] font-bold text-[#1E3A8A]">
-                {student.contactNumber || 'N/A'}
+            <div className="border-b border-slate-300/80 pb-0.5 flex items-center justify-between">
+              <span className="text-[9px] font-bold text-[#10203A] shrink-0">Contact:</span>
+              <span className="text-[9px] font-bold text-[#1E3A8A] font-mono truncate max-w-[95px] text-right">
+                {displayContact}
               </span>
             </div>
 
             {/* 6-Character QR Token */}
-            <div className="pb-0.5 flex items-center justify-between">
-              <span className="text-[9px] font-bold text-[#10203A]">Token:</span>
-              <span className="text-[10px] font-mono font-black tracking-widest text-[#B45309] bg-amber-50 px-1.5 py-0.2 rounded border border-amber-300">
-                {student.qrToken || 'TOKEN'}
+            <div className="pt-0.5 flex items-center justify-between">
+              <span className="text-[9px] font-bold text-[#10203A] shrink-0">Token:</span>
+              <span className="text-[10px] font-mono font-black tracking-widest text-[#B45309] bg-amber-50 px-1.5 py-0.5 rounded border border-amber-300 shadow-2xs leading-none">
+                {displayToken}
               </span>
             </div>
           </div>
 
           {/* Right Column: QR Code Box */}
-          <div className="w-[96px] h-[96px] rounded-lg p-[2px] bg-gradient-to-br from-[#AE7108] via-[#FFE590] to-[#B4780B] shadow-md flex-shrink-0">
+          <div className="w-[94px] h-[94px] rounded-lg p-[2px] bg-gradient-to-br from-[#AE7108] via-[#FFE590] to-[#B4780B] shadow-md flex-shrink-0">
             <div className="w-full h-full bg-white rounded-[6px] p-1 flex flex-col items-center justify-center relative">
               {/* Decorative corner ticks */}
               <div className="absolute top-1 left-1 w-2 h-2 border-t-2 border-l-2 border-[#76A4BE]" />
@@ -363,10 +379,10 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
                 <img
                   src={localQrDataUrl}
                   alt="Verification QR"
-                  className="w-[78px] h-[78px] object-contain"
+                  className="w-[76px] h-[76px] object-contain"
                 />
               ) : (
-                <div className="w-[78px] h-[78px] flex items-center justify-center bg-slate-50 rounded text-slate-400">
+                <div className="w-[76px] h-[76px] flex items-center justify-center bg-slate-50 rounded text-slate-400">
                   <Loader2 className="w-5 h-5 animate-spin text-amber-600" />
                 </div>
               )}
@@ -375,7 +391,7 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
         </div>
 
         {/* 3. Campus Signature Footer Artwork */}
-        <div className="absolute bottom-0 left-0 right-0 h-[112px]">
+        <div className="absolute bottom-0 left-0 right-0 h-[106px] pointer-events-none overflow-hidden">
           <div
             className="w-full h-[2px]"
             style={{
@@ -385,7 +401,7 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
           <img
             src="/assets/id_card/campus_footer.png"
             alt="Campus Signature"
-            className="w-full h-[110px] object-cover"
+            className="w-full h-[104px] object-cover"
           />
 
           {/* Bottom-right navy corner triangle */}

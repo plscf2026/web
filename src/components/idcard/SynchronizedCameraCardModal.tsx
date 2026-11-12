@@ -649,6 +649,7 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
                   student={activeStudentRecord}
                   language={language}
                   showActions={false}
+                  isPreview={true}
                   customPhotoSlot={
                     mode === 'camera' ? (
                       /* Live Camera Feed inside Card Frame (Requirement C) */

@@ -241,23 +241,20 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     }
   };
 
-  // Live Student ID Card Preview Record (reflects current registration inputs)
+  // Live Student ID Card Preview Record (placeholder "XXXXXX" style for pre-registration camera preview)
   const previewStudentRecord: StudentIdCardRecord = {
     id: `PREVIEW-${Date.now()}`,
-    registrationId: 'PLSC-2027-PREV',
+    registrationId: 'PLSC-XXXX-XXXX',
     eventYear: 2027,
-    idNumber: rollNumber || studentId || 'PLSC-2027-PREV',
+    idNumber: 'PLSC-XXXX-XXXX',
     studentName: fullName.trim() || (language === 'bn' ? 'আপনার নাম' : 'Your Full Name'),
-    batchName:
-      category === 'current'
-        ? `${currentClass} (${groupOrSection})`
-        : getComputedBatch() || `SSC ${passingYear || 'Batch'}`,
-    batchYear: category === 'former' ? passingYear || '2026' : 'Current',
-    contactNumber: mobileNumber || '01XXXXXXXXX',
+    batchName: 'XXXXXX',
+    batchYear: 'XXXXXX',
+    contactNumber: '01XXXXXXXXX',
     photoUrl: photoUrl || '',
     hasPhoto: Boolean(photoUrl),
-    qrToken: 'PREV27',
-    verificationUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/ticket-verification?token=PREV27`,
+    qrToken: 'XXXXXX',
+    verificationUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/ticket-verification?token=PREVIEW`,
     cardStatus: 'ELIGIBLE',
     cardDimensions: '54x86mm',
     version: 1,
