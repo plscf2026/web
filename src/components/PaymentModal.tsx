@@ -22,6 +22,7 @@ import { RegistrationFormData } from '../utils/rules';
 import { PayStationService, PayStationPaymentResult } from '../services/paystation';
 import { StudentIdCardBadge } from './idcard/StudentIdCardBadge';
 import { IdCardStore } from '../services/idCardStore';
+import { AppStore } from '../services/store';
 
 export interface PaymentModalProps {
   isOpen: boolean;
@@ -141,6 +142,23 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       setStep('success');
     } catch (err: any) {
       console.error('[PaymentModal] Finalization failure:', err);
+      // Resilient recovery: If the customer already paid and PayStation verified the transaction,
+      // present the digital ticket rather than stranding the user on a failed screen
+      if (payment && payment.trxId) {
+        try {
+          const registered = AppStore.getRegistrations().find(
+            (r: RegistrationRecord) => r.transactionId === payment.trxId || r.gatewayInvoiceNumber === payment.invoiceNumber
+          );
+          if (registered) {
+            setTransactionSummary(payment);
+            setCompletedTicket(registered);
+            setStep('success');
+            return;
+          }
+        } catch (recErr) {
+          console.warn('[PaymentModal] Ticket recovery notice:', recErr);
+        }
+      }
       setErrorMessage(
         isBangla
           ? `ডাটাবেজ নিশ্চিতকরণ ব্যর্থ হয়েছে: ${err?.message || 'অনুগ্রহ করে সহায়তা দলের সাথে যোগাযোগ করুন।'}`

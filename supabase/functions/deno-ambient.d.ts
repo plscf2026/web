@@ -1,0 +1,40 @@
+/// <reference no-default-lib="true"/>
+/// <reference lib="esnext" />
+/// <reference lib="dom" />
+
+/**
+ * Ambient type declarations for Deno runtime & HTTPS module imports.
+ * Resolves VS Code TypeScript red squiggles when the Deno extension is not active.
+ */
+
+declare namespace Deno {
+  export interface Env {
+    get(key: string): string | undefined;
+    set(key: string, value: string): void;
+    delete(key: string): void;
+    toObject(): Record<string, string>;
+  }
+  export const env: Env;
+}
+
+declare module 'https://deno.land/std@0.168.0/http/server.ts' {
+  export function serve(
+    handler: (req: Request) => Response | Promise<Response>,
+    options?: { port?: number }
+  ): void;
+}
+
+declare module 'https://esm.sh/@supabase/supabase-js@2' {
+  export function createClient(
+    supabaseUrl: string,
+    supabaseKey: string,
+    options?: any
+  ): any;
+}
+
+declare module 'https://*' {
+  const content: any;
+  export default content;
+  export const serve: any;
+  export const createClient: any;
+}
