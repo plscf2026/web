@@ -61,7 +61,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               </p>
             </div>
 
-            {process.env.NODE_ENV !== 'production' && this.state.error && (
+            {typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production' && this.state.error && (
               <details className="text-left text-[11px] p-3 rounded-xl bg-slate-900 text-rose-300 font-mono overflow-x-auto max-h-36">
                 <summary className="cursor-pointer text-slate-400 font-semibold mb-1">
                   Technical Details (Debug)

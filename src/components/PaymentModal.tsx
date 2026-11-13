@@ -772,7 +772,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            navigator.clipboard.writeText('01929918378');
+                            try {
+                              if (navigator?.clipboard?.writeText) {
+                                navigator.clipboard.writeText('01929918378').catch(() => {});
+                              }
+                            } catch {}
                             setCopiedField('bkash1');
                             setTimeout(() => setCopiedField(''), 2000);
                           }}
@@ -803,7 +807,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            navigator.clipboard.writeText('01770618576');
+                            try {
+                              if (navigator?.clipboard?.writeText) {
+                                navigator.clipboard.writeText('01770618576').catch(() => {});
+                              }
+                            } catch {}
                             setCopiedField('bkash2');
                             setTimeout(() => setCopiedField(''), 2000);
                           }}

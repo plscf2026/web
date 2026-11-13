@@ -253,14 +253,28 @@ export default function App() {
 
   if (activeView === 'portal') {
     return (
-      <Suspense fallback={<PageLoadingFallback />}>
-        <RmsManagementPortal
-          onBackToPublic={() => {
-            setActiveView('home');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-        />
-      </Suspense>
+      <ErrorBoundary
+        fallbackTitle={language === 'bn' ? 'আরএমএস পোর্টাল লোড করতে সমস্যা হয়েছে' : 'RMS Portal Notice'}
+        fallbackMessage={
+          language === 'bn'
+            ? 'আরএমএস পোর্টাল লোড করতে একটি ত্রুটি ঘটেছে। দয়া করে পুনরায় চেষ্টা করুন অথবা হোমে ফিরে যান।'
+            : 'An unexpected issue occurred while rendering the RMS portal. Please try again or return home.'
+        }
+        showHomeButton
+        onNavigateHome={() => {
+          setActiveView('home');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      >
+        <Suspense fallback={<PageLoadingFallback />}>
+          <RmsManagementPortal
+            onBackToPublic={() => {
+              setActiveView('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        </Suspense>
+      </ErrorBoundary>
     );
   }
 

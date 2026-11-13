@@ -61,6 +61,9 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
 
   // Mobile layout tab: 'camera' | 'card'
   const [mobileTab, setMobileTab] = useState<'camera' | 'card'>('camera');
+  const isMobileDevice =
+    typeof navigator !== 'undefined' &&
+    /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
 
   // ─────────────────────────────────────────────────────────────────────────────
   // 1. CAMERA LIFECYCLE MANAGEMENT
@@ -112,20 +115,33 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
 
         mediaStreamRef.current = stream;
 
-        // Pipe to main camera video element
+        // Pipe to main camera video element with explicit iOS Safari inline attributes & DOM properties
         if (videoRef.current) {
+          videoRef.current.defaultMuted = true;
+          videoRef.current.muted = true;
+          videoRef.current.playsInline = true;
           videoRef.current.srcObject = stream;
           videoRef.current.setAttribute('playsinline', 'true');
+          videoRef.current.setAttribute('webkit-playsinline', 'true');
           videoRef.current.setAttribute('muted', 'true');
-          await videoRef.current.play().catch(() => {});
+          await videoRef.current.play().catch((playErr) => {
+            console.warn('[CameraCapture] Video play notice:', playErr);
+          });
         }
 
-        // Pipe simultaneously to Card Preview video element for live sync
-        if (cardPreviewVideoRef.current) {
-          cardPreviewVideoRef.current.srcObject = stream;
-          cardPreviewVideoRef.current.setAttribute('playsinline', 'true');
-          cardPreviewVideoRef.current.setAttribute('muted', 'true');
-          await cardPreviewVideoRef.current.play().catch(() => {});
+        // Pipe to Card Preview video element ONLY on non-mobile/desktop devices
+        // (On iOS Safari, binding the same camera stream to two video elements causes WebKit decoder crash)
+        if (!isMobileDevice && cardPreviewVideoRef.current) {
+          try {
+            cardPreviewVideoRef.current.defaultMuted = true;
+            cardPreviewVideoRef.current.muted = true;
+            cardPreviewVideoRef.current.playsInline = true;
+            cardPreviewVideoRef.current.srcObject = stream;
+            cardPreviewVideoRef.current.setAttribute('playsinline', 'true');
+            cardPreviewVideoRef.current.setAttribute('webkit-playsinline', 'true');
+            cardPreviewVideoRef.current.setAttribute('muted', 'true');
+            await cardPreviewVideoRef.current.play().catch(() => {});
+          } catch (_) {}
         }
       } catch (err: any) {
         console.warn('[CameraCapture] Stream initialization error:', err);
@@ -652,21 +668,34 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
                   isPreview={true}
                   customPhotoSlot={
                     mode === 'camera' ? (
-                      /* Live Camera Feed inside Card Frame (Requirement C) */
-                      <div className="relative w-full h-full bg-slate-950 flex items-center justify-center overflow-hidden">
-                        <video
-                          ref={cardPreviewVideoRef}
-                          autoPlay
-                          playsInline
-                          muted
-                          className={`w-full h-full object-cover ${
-                            cameraFacing === 'user' ? 'scale-x-[-1]' : ''
-                          }`}
-                        />
-                        <span className="absolute top-1 right-1 bg-red-600 text-white text-[7px] font-black px-1 rounded-xs uppercase tracking-wider animate-pulse shadow-xs">
-                          LIVE
-                        </span>
-                      </div>
+                      isMobileDevice ? (
+                        /* Mobile / iOS Safari Safe Frame (prevents WebKit dual-decoder crash) */
+                        <div className="relative w-full h-full bg-slate-900 flex flex-col items-center justify-center p-2 text-center select-none overflow-hidden">
+                          <Camera className="w-8 h-8 text-emerald-400 animate-pulse mb-1" />
+                          <span className="text-[8px] font-bold text-emerald-300">
+                            {isBangla ? 'ক্যামেরা চালু' : 'Camera Live'}
+                          </span>
+                          <span className="text-[7px] text-slate-400">
+                            {isBangla ? 'ছবি তুললে সিঙ্ক হবে' : 'Syncs on capture'}
+                          </span>
+                        </div>
+                      ) : (
+                        /* Live Camera Feed inside Card Frame for Desktop */
+                        <div className="relative w-full h-full bg-slate-950 flex items-center justify-center overflow-hidden">
+                          <video
+                            ref={cardPreviewVideoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            className={`w-full h-full object-cover ${
+                              cameraFacing === 'user' ? 'scale-x-[-1]' : ''
+                            }`}
+                          />
+                          <span className="absolute top-1 right-1 bg-red-600 text-white text-[7px] font-black px-1 rounded-xs uppercase tracking-wider animate-pulse shadow-xs">
+                            LIVE
+                          </span>
+                        </div>
+                      )
                     ) : undefined
                   }
                 />
