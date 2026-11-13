@@ -435,7 +435,32 @@ export const SupabaseService = {
       if (pendingData) {
         payload.p_pending_data = toRegistrationDbRow(pendingData, pendingData.year || 2027);
       }
-      const { data, error } = await supabase.rpc('rpc_verify_payment', payload);
+      let { data, error } = await supabase.rpc('rpc_verify_payment', payload);
+      if (error && error.code === 'PGRST202' && payload.p_pending_data) {
+        delete payload.p_pending_data;
+        const res6 = await supabase.rpc('rpc_verify_payment', payload);
+        data = res6.data;
+        error = res6.error;
+      }
+
+      if (error && (error.code === '42501' || error.message?.includes('permission denied'))) {
+        try {
+          const { data: edgeData, error: edgeError } = await supabase.functions.invoke('verify-payment', {
+            body: {
+              action: 'verify-payment',
+              registration_id: registrationId,
+              trx_id: trxId,
+              payment_method: paymentMethod,
+              payment_amount: amount,
+            },
+          });
+          if (!edgeError && edgeData?.success) {
+            return { success: true, data: edgeData };
+          }
+        } catch (edgeEx) {
+          console.warn('[SupabaseService] Edge verify-payment fallback notice:', edgeEx);
+        }
+      }
 
       if (!error && (data as any)?.success) {
         return { success: true, data };

@@ -88,12 +88,33 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   // Persist invoice & amount across renders so the polling closure uses fresh values
   const pendingSession = PayStationService.getPendingSession();
-  const invoiceRef = useRef(
+  const isVerifying = initialStep === 'verifying' || Boolean(initialInvoice);
+
+  const initialInv =
     initialInvoice ||
-    pendingSession?.invoiceNumber ||
-    `PLSCF26-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`
-  );
-  const amountRef  = useRef(totalPayable);
+    (isVerifying ? pendingSession?.invoiceNumber : null) ||
+    `PLSCF27-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+  const initialAmt =
+    (isVerifying && pendingSession?.amount) ? pendingSession.amount : totalPayable;
+
+  const invoiceRef = useRef(initialInv);
+  const amountRef = useRef(initialAmt);
+
+  // Keep refs synchronized when props or sessions change
+  useEffect(() => {
+    if (initialInvoice) {
+      invoiceRef.current = initialInvoice;
+    }
+  }, [initialInvoice]);
+
+  useEffect(() => {
+    if (isVerifying && pendingSession?.amount) {
+      amountRef.current = pendingSession.amount;
+    } else if (totalPayable > 0) {
+      amountRef.current = totalPayable;
+    }
+  }, [totalPayable, isVerifying, pendingSession?.amount]);
 
   // ── Finalize after confirmed payment ────────────────────────────────────
 
@@ -102,8 +123,17 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setStep('verifying');
     setProcessingStep(isBangla ? 'ডিজিটাল টিকিট তৈরি হচ্ছে...' : 'Generating secure digital ticket...');
     try {
+      // Synchronize donationAmount so totalPaid matches actual payment.amount
+      const effectiveBaseFee = registrationData.category === 'current' ? 1000 : 1500;
+      const effectiveFee = Math.min(payment.amount, effectiveBaseFee);
+      const effectiveDonation = Math.max(0, payment.amount - effectiveFee);
+      const synchronizedFormData: RegistrationFormData = {
+        ...registrationData,
+        donationAmount: effectiveDonation,
+      };
+
       const ticket = await PayStationService.completeRegistrationAfterPayment(
-        registrationData,
+        synchronizedFormData,
         payment
       );
       setTransactionSummary(payment);
@@ -132,6 +162,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       );
       if (verifyRes.verified && verifyRes.result) {
         setErrorMessage('');
+        amountRef.current = verifyRes.result.amount;
         await finalizeRegistration(verifyRes.result);
       } else {
         setErrorMessage(
@@ -173,6 +204,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         if (verifyRes.verified && verifyRes.result) {
           clearInterval(interval);
           setErrorMessage('');
+          amountRef.current = verifyRes.result.amount;
           await finalizeRegistration(verifyRes.result);
           return;
         }
@@ -494,7 +526,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
               <div className="flex justify-between text-slate-700">
                 <span>{isBangla ? 'পরিমাণ' : 'Amount'}:</span>
-                <span className="font-bold">৳ {totalPayable.toLocaleString()} BDT</span>
+                <span className="font-bold">৳ {amountRef.current.toLocaleString()} BDT</span>
               </div>
             </div>
 
@@ -533,7 +565,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   setErrorMessage('');
                   setPollCount(0);
                   // Regenerate invoice to avoid duplicate
-                  invoiceRef.current = `PLSCF26-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+                  invoiceRef.current = `PLSCF27-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
                 }}
                 className="w-full py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition cursor-pointer"
               >
@@ -562,7 +594,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   setStep('select');
                   setErrorMessage('');
                   setPollCount(0);
-                  invoiceRef.current = `PLSCF26-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+                  invoiceRef.current = `PLSCF27-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
                 }}
                 className="w-full py-3.5 rounded-2xl bg-[#0F172A] hover:bg-[#1E293B] text-white font-bold text-sm cursor-pointer transition shadow flex items-center justify-center gap-2"
               >

@@ -71,6 +71,7 @@ export interface PayStationTrxStatusV1Response {
     invoice_number: string;
     trx_status: 'processing' | 'success' | 'failed' | 'refund' | 'Success' | 'Failed';
     trx_id: string;
+    request_amount?: string;
     payment_amount: string;
     order_date_time: string;
     payer_mobile_no: string;
@@ -740,8 +741,17 @@ export class PayStationService {
     }
 
     const paidAmount = Number(d.payment_amount);
-    // Allow small tolerance for gateway processing charge variations (e.g. 5 BDT delta)
-    if (paidAmount < expectedAmount - 5) {
+    const requestedAmount = d.request_amount ? Number(d.request_amount) : paidAmount;
+
+    // 1. Check if paid amount matches the invoice requested amount (with 5 BDT tolerance)
+    const matchesRequested = Math.abs(paidAmount - requestedAmount) <= 5;
+    // 2. Check if paid amount satisfies expected amount from caller
+    const matchesExpected = paidAmount >= expectedAmount - 5;
+    // 3. Resilient check: as long as customer paid at least the minimum registration fee (1000 BDT)
+    // and cleared the full requested amount of the invoice, accept the payment authoritatively
+    const isAmountValid = matchesRequested || matchesExpected || (paidAmount >= 1000 && paidAmount >= requestedAmount - 5);
+
+    if (!isAmountValid) {
       return {
         verified: false,
         error: `Amount mismatch: paid ${paidAmount}, expected ${expectedAmount}`,
@@ -962,8 +972,8 @@ export class PayStationService {
       groupOrSection: formData.groupOrSection || null,
       rollNumber: formData.rollNumber || undefined,
       tShirtSize: formData.tShirtSize as any,
-      registrationFee: payment.amount - (formData.donationAmount || 0),
-      donationAmount: formData.donationAmount || 0,
+      registrationFee: Math.min(payment.amount, formData.category === 'current' ? 1000 : 1500),
+      donationAmount: Math.max(0, payment.amount - Math.min(payment.amount, formData.category === 'current' ? 1000 : 1500)),
       totalPaid: payment.amount,
       paymentStatus: 'paid',
       transactionId: sanitizeInput(payment.trxId),

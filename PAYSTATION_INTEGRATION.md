@@ -312,3 +312,4 @@ Executed with `SECURITY DEFINER` privileges. Atomically updates the registration
 | `1008` | Duplicate Invoice | Invoice number already exists. System automatically generates a fresh timestamped invoice on retry. |
 | `2001` | Invalid Token / Not Found | Transaction cannot be found or merchant password mismatch. Verify environment credentials. |
 | `422` | IPN Validation Failed | Amount mismatch or invalid status in IPN. Logged in `ipn_logs` for review. |
+

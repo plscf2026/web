@@ -126,7 +126,19 @@ export default function App() {
           setActiveView('register');
           setPendingRegistrationData(pendingSession.formData);
           setPreservedRegistrationData(pendingSession.formData);
-          if (pendingSession.fees) {
+
+          // Authoritative amount from PayStation redirect or pending session
+          const amountFromUrl = params.get('amount') ? Number(params.get('amount')) : null;
+          const sessionAmount = amountFromUrl || pendingSession.amount || pendingSession.fees?.totalPayable;
+          if (sessionAmount) {
+            const regFee = pendingSession.fees?.registrationFee || (pendingSession.formData.category === 'current' ? 1000 : 1500);
+            const donAmt = Math.max(0, sessionAmount - regFee);
+            setPendingFees({
+              registrationFee: regFee,
+              donationAmount: donAmt,
+              totalPayable: sessionAmount,
+            });
+          } else if (pendingSession.fees) {
             setPendingFees(pendingSession.fees);
           }
 
