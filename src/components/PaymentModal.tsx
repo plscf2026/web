@@ -265,7 +265,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     );
 
     try {
-      // 1. Authoritatively create pending registration in Supabase (payment_status='pending', total_paid=0)
+      // 1. Authoritatively create or update pending registration in Supabase (payment_status='pending', total_paid=0)
       await PayStationService.createPendingRegistration(
         registrationData,
         {
@@ -273,7 +273,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           donationAmount,
           totalPayable,
         },
-        invoiceRef.current
+        invoiceRef.current,
+        pendingSession?.registrationId
       );
 
       // 2. Build verified transaction result with channel-specific prefix
@@ -320,7 +321,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setProcessingStep(isBangla ? 'PayStation পেমেন্ট সেশন তৈরি হচ্ছে...' : 'Creating PayStation payment session...');
 
     try {
-      // 1. Authoritatively create pending registration in Supabase (payment_status='pending', total_paid=0)
+      // 1. Authoritatively create or update pending registration in Supabase (payment_status='pending', total_paid=0)
       const pendingRecord = await PayStationService.createPendingRegistration(
         registrationData,
         {
@@ -328,7 +329,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           donationAmount,
           totalPayable,
         },
-        invoiceRef.current
+        invoiceRef.current,
+        pendingSession?.registrationId
       );
 
       const callbackUrl = PayStationService.buildCallbackUrl({

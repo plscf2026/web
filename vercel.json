@@ -35,11 +35,7 @@
   "rewrites": [
     {
       "source": "/api/paystation/:path*",
-      "destination": "https://sandbox.paystation.com.bd/:path*"
-    },
-    {
-      "source": "/api/paystation-live/:path*",
-      "destination": "https://api.paystation.com.bd/:path*"
+      "destination": "/api/paystation/:path*"
     },
     {
       "source": "/(.*)",

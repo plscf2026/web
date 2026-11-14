@@ -442,6 +442,8 @@ export class PayStationService {
 
     // 3. Fallback for Sandbox
     if (config.isSandbox) {
+      const pendingSession = this.getPendingSession();
+      const dynamicAmount = pendingSession?.amount ? String(pendingSession.amount) : '1500';
       return {
         success: true,
         status: 'success',
@@ -449,9 +451,9 @@ export class PayStationService {
           invoice_number: invoiceNumber,
           trx_status: 'Success',
           trx_id: `PST-SIM-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
-          payment_amount: '1500',
+          payment_amount: dynamicAmount,
           order_date_time: new Date().toISOString().replace('T', ' ').substring(0, 19),
-          payer_mobile_no: '',
+          payer_mobile_no: pendingSession?.formData?.mobileNumber || '',
           payment_method: 'bKash',
           reference: '',
           checkout_items: '',
@@ -728,13 +730,20 @@ export class PayStationService {
 
     const d = statusRes.data;
     const rawStatus = (d.trx_status || '').toLowerCase().trim();
+    // Critical Security Gate: A transaction in 'processing' or without an authoritative trx_id must NEVER be verified as paid
+    if (rawStatus === 'processing' || !d.trx_id || !d.trx_id.trim()) {
+      return {
+        verified: false,
+        error: `Payment is still processing by gateway (status: ${d.trx_status || 'processing'}). Awaiting final settlement.`,
+      };
+    }
+
     const isSuccess =
       rawStatus === 'success' ||
       rawStatus === 'successful' ||
       rawStatus === 'completed' ||
       rawStatus === 'captured' ||
-      rawStatus === 'paid' ||
-      rawStatus.includes('success');
+      rawStatus === 'paid';
 
     if (!isSuccess) {
       return { verified: false, error: `Payment status: ${d.trx_status}` };
