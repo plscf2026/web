@@ -317,7 +317,7 @@ function teardownMockCloudDb() {
 
 // ─── TEST SUITE: 12 SCENARIOS ────────────────────────────────────────────────
 
-test('Scenario 1: Student registers -> pending record created in Supabase with payment_status = "pending"', async () => {
+test('Scenario 1: Student registers -> pending session stored locally, unpaid draft is NEVER saved to Supabase', async () => {
   setupMockCloudDb();
   try {
     const formData: RegistrationFormData = {
@@ -345,13 +345,14 @@ test('Scenario 1: Student registers -> pending record created in Supabase with p
     assert.equal(pending.transactionId, '');
     assert.ok(pending.qrToken);
 
-    // Verify record in Supabase cloud table
+    // Invariant: Unpaid drafts are NEVER saved to Supabase registrations_2027
     const inCloud = cloudDb.get('PLSCF-2027-F2182');
-    assert.ok(inCloud, 'Must exist in registrations_2027');
-    assert.equal(inCloud.payment_status, 'pending');
-    assert.equal(inCloud.total_paid, 0);
-    assert.equal(inCloud.transaction_id, null);
-    assert.equal(inCloud.qr_token, pending.qrToken);
+    assert.equal(inCloud, undefined, 'Unpaid draft must NOT exist in registrations_2027');
+
+    // Stored safely in local pending session for checkout
+    const session = PayStationService.getPendingSession();
+    assert.ok(session);
+    assert.equal(session?.registrationId, 'PLSCF-2027-F2182');
   } finally {
     teardownMockCloudDb();
   }

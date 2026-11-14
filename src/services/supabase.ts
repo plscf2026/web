@@ -348,62 +348,22 @@ function fromRegistrationDbRow(row: any): RegistrationRecord {
 
 export const SupabaseService = {
   /**
-   * Save a pending registration to Supabase backend in compliance with
-   * RLS policy 'registration_insert_pending_2027' (payment_status='pending', total_paid=0).
+   * Pending registrations: Per strict system requirement, unpaid drafts are NEVER
+   * written to the central database (registrations_2027). They are kept in browser session storage
+   * until payment is confirmed by the gateway.
    */
   async savePendingRegistration(
-    reg: RegistrationRecord,
+    _reg: RegistrationRecord,
     year: number = 2027
   ): Promise<{ success: boolean; table: string; error?: string }> {
     const yearTableName = getRegistrationsTableName(year);
-    const row = toRegistrationDbRow(reg, year) as any;
-
-    // Enforce strict pending invariants for RLS compliance
-    row.payment_status = 'pending';
-    row.total_paid = 0;
-    row.transaction_id = null;
-    row.payment_method = null;
-    row.server_verification_signature = null;
-    row.verification_timestamp = null;
-    row.verified_by = null;
-    row.is_checked_in = false;
-    row.is_tshirt_collected = false;
-
-    try {
-      // 1. Try consolidated table: registrations_2027
-      const { error: yearTableError } = await supabase
-        .from(yearTableName)
-        .upsert(row, { onConflict: 'id' });
-
-      if (!yearTableError) {
-        return { success: true, table: yearTableName };
-      }
-
-      console.warn(`Supabase pending insert into ${yearTableName} returned error:`, yearTableError.message);
-
-      // 2. Try generic 'registrations' table fallback
-      const { error: genericTableError } = await supabase
-        .from('registrations')
-        .upsert(row, { onConflict: 'id' });
-
-      if (!genericTableError) {
-        return { success: true, table: 'registrations' };
-      }
-
-      return {
-        success: false,
-        table: yearTableName,
-        error: yearTableError.message || genericTableError.message,
-      };
-    } catch (err: any) {
-      console.error('Supabase savePendingRegistration exception:', err);
-      return { success: false, table: yearTableName, error: err.message };
-    }
+    // No-op: Do not pollute registrations_2027 with pending records
+    return { success: true, table: yearTableName };
   },
 
   /**
    * Save a registration to Supabase backend.
-   * If status is 'pending', inserts directly in compliance with RLS.
+   * If status is 'pending', intentionally skipped (never saved to database before payment).
    * If status is 'paid', uses authoritative rpc_verify_payment to record payment server-side.
    */
   async saveRegistration(
@@ -411,7 +371,8 @@ export const SupabaseService = {
     year: number = 2027
   ): Promise<{ success: boolean; table: string; error?: string }> {
     if (reg.paymentStatus === 'pending') {
-      return this.savePendingRegistration(reg, year);
+      // Invariant: Unpaid registrations are never persisted to Supabase database.
+      return { success: true, table: getRegistrationsTableName(year) };
     }
 
     // For paid records, finalize authoritatively via rpc_verify_payment

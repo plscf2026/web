@@ -630,7 +630,7 @@ export class PayStationService {
       console.warn('[PayStation] IPN RPC exception:', e);
     }
 
-    // Local fallback for client tests
+    // Local fallback for client tests or client-side IPN reception
     const registrations = AppStore.getRegistrations();
     const match = registrations.find(
       (r) => r.gatewayInvoiceNumber === payload.invoice_number || r.id === payload.invoice_number
@@ -645,6 +645,19 @@ export class PayStationService {
         gatewayProvider: 'PAYSTATION',
       });
       return { success: true, status: 'PAID', registrationId: match.id };
+    }
+
+    // If not in AppStore yet, check pending session and complete registration authoritatively
+    const pendingSession = this.getPendingSession();
+    if (pendingSession && pendingSession.invoiceNumber === payload.invoice_number && pendingSession.formData) {
+      const paidRecord = await this.completeRegistrationAfterPayment(pendingSession.formData, {
+        invoiceNumber: payload.invoice_number,
+        trxId: payload.trx_id,
+        status: 'Success',
+        amount: Number(payload.trx_amount),
+        method: normalizePaymentMethod(payload.payment_method),
+      });
+      return { success: true, status: 'PAID', registrationId: paidRecord.id };
     }
 
     return { success: true, status: 'acknowledged' };
@@ -899,20 +912,9 @@ export class PayStationService {
       year,
     };
 
-    // 1. Save to local AppStore so immediate session knows about it
-    AppStore.addRegistration(pendingRecord, year);
-
-    // 2. Persist to Supabase registrations_2027 with pending status
-    try {
-      const saveRes = await SupabaseService.savePendingRegistration(pendingRecord, year);
-      if (!saveRes.success) {
-        console.warn('[PayStation] Warning saving pending registration to Supabase:', saveRes.error);
-      }
-    } catch (e) {
-      console.warn('[PayStation] Exception saving pending registration:', e);
-    }
-
-    // 3. Store pending session in localStorage with registrationId and qrToken
+    // 1. Preserve checkout session in local browser storage (localStorage & memory)
+    // IMPORTANT: Per strict business rule, pending/unpaid records are NEVER written to the Supabase database.
+    // Database table registrations_2027 only receives rows when payment is verified and confirmed.
     this.savePendingSession({
       type: 'registration',
       invoiceNumber,

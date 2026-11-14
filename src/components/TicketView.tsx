@@ -11,6 +11,7 @@ import {
   Sparkles,
   X,
   UserPlus,
+  AlertTriangle,
 } from 'lucide-react';
 import { RegistrationRecord, Language } from '../types';
 import { translations } from '../i18n/translations';
@@ -59,23 +60,27 @@ export const TicketView: React.FC<TicketViewProps> = ({
     setEmailModalOpen(true);
   };
 
+  const isPaid = registration.paymentStatus === 'paid';
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Top Banner */}
       <div className="no-print mb-6 text-center space-y-2">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">
-          <Sparkles className="w-3.5 h-3.5" />
+        <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${
+          isPaid ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800 border border-amber-300'
+        }`}>
+          {isPaid ? <Sparkles className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />}
           <span>
-            {language === 'bn'
-              ? 'অভিনন্দন! আপনার রেজিস্ট্রেশন ও পেমেন্ট সফল হয়েছে'
-              : 'Congratulations! Registration & Payment Verified'}
+            {isPaid
+              ? (language === 'bn' ? 'অভিনন্দন! আপনার রেজিস্ট্রেশন ও পেমেন্ট সফল হয়েছে' : 'Congratulations! Registration & Payment Verified')
+              : (language === 'bn' ? 'পেমেন্ট অসম্পূর্ণ — রেজিস্ট্রেশন ফি পরিশোধের অপেক্ষায়' : 'Payment Incomplete — Awaiting Registration Fee Payment')}
           </span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-          {t.ticketHeading}
+          {isPaid ? t.ticketHeading : (language === 'bn' ? 'অসম্পূর্ণ রেজিস্ট্রেশন পাস' : 'Incomplete Registration Pass')}
         </h1>
         <p className="text-xs sm:text-sm text-slate-600 max-w-xl mx-auto">
-          {t.ticketNotice}
+          {isPaid ? t.ticketNotice : (language === 'bn' ? 'পেমেন্ট সম্পন্ন না হওয়া পর্যন্ত ডিজিটাল টিকিট ও আইডি কার্ড প্রবেশ বা কিউআর ভেরিফিকেশনের জন্য বৈধ নয়।' : 'Official digital ticket pass and ID card are invalid for event entry or QR verification until payment is completed.')}
         </p>
       </div>
 
@@ -91,21 +96,25 @@ export const TicketView: React.FC<TicketViewProps> = ({
           </button>
         )}
 
-        <button
-          onClick={handlePrint}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold shadow-md transition-all cursor-pointer"
-        >
-          <Printer className="w-4 h-4 text-amber-400" />
-          <span>{t.btnPrintTicket}</span>
-        </button>
+        {isPaid && (
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold shadow-md transition-all cursor-pointer"
+          >
+            <Printer className="w-4 h-4 text-amber-400" />
+            <span>{t.btnPrintTicket}</span>
+          </button>
+        )}
 
-        <button
-          onClick={handleResendEmail}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs sm:text-sm font-semibold shadow-xs transition-all cursor-pointer"
-        >
-          <Mail className="w-4 h-4 text-emerald-600" />
-          <span>{t.btnResendEmail}</span>
-        </button>
+        {isPaid && (
+          <button
+            onClick={handleResendEmail}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs sm:text-sm font-semibold shadow-xs transition-all cursor-pointer"
+          >
+            <Mail className="w-4 h-4 text-emerald-600" />
+            <span>{t.btnResendEmail}</span>
+          </button>
+        )}
 
         <button
           onClick={onNavigateHome}
@@ -116,30 +125,47 @@ export const TicketView: React.FC<TicketViewProps> = ({
       </div>
 
       {/* Official Student ID Card Section */}
-      <div className="no-print mb-8 bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 rounded-3xl p-6 text-white shadow-xl border border-sky-800/40">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-          <div className="text-center lg:text-left space-y-2 max-w-md">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 text-xs font-bold border border-sky-400/30">
-              <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
-              <span>{language === 'bn' ? 'অফিসিয়াল স্টুডেন্ট আইডি কার্ড' : 'Official Student ID Card'}</span>
-            </span>
-            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              {language === 'bn' ? 'আইডি কার্ড প্রিন্ট বা ডাউনলোড করুন' : 'Print or Download Your Student ID Card'}
-            </h2>
-            <p className="text-xs text-sky-200/80 leading-relaxed">
-              {language === 'bn'
-                ? 'ইভেন্টে প্রবেশের জন্য অফিসিয়াল আইডি কার্ডের ছবি সরাসরি প্রিন্ট করুন অথবা উচ্চমানের PDF ও Photo ডাউনলোড করুন।'
-                : 'Print your official ID card photo directly, or download print-ready PDF and photo image for your mobile gallery.'}
-            </p>
-          </div>
-          <div className="flex-shrink-0">
-            <StudentIdCardBadge
-              student={IdCardStore.getOrBuildCardForRegistration(registration)}
-              language={language}
-            />
+      {isPaid ? (
+        <div className="no-print mb-8 bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 rounded-3xl p-6 text-white shadow-xl border border-sky-800/40">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+            <div className="text-center lg:text-left space-y-2 max-w-md">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 text-xs font-bold border border-sky-400/30">
+                <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
+                <span>{language === 'bn' ? 'অফিসিয়াল স্টুডেন্ট আইডি কার্ড' : 'Official Student ID Card'}</span>
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                {language === 'bn' ? 'আইডি কার্ড প্রিন্ট বা ডাউনলোড করুন' : 'Print or Download Your Student ID Card'}
+              </h2>
+              <p className="text-xs text-sky-200/80 leading-relaxed">
+                {language === 'bn'
+                  ? 'ইভেন্টে প্রবেশের জন্য অফিসিয়াল আইডি কার্ডের ছবি সরাসরি প্রিন্ট করুন অথবা উচ্চমানের PDF ও Photo ডাউনলোড করুন।'
+                  : 'Print your official ID card photo directly, or download print-ready PDF and photo image for your mobile gallery.'}
+              </p>
+            </div>
+            <div className="flex-shrink-0">
+              <StudentIdCardBadge
+                student={IdCardStore.getOrBuildCardForRegistration(registration)}
+                language={language}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="no-print mb-8 bg-amber-50 rounded-3xl p-6 border-2 border-amber-300 text-center space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-bold">
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+            <span>{language === 'bn' ? 'আইডি কার্ড লক করা আছে' : 'ID Card Locked'}</span>
+          </div>
+          <h3 className="text-lg font-bold text-amber-950">
+            {language === 'bn' ? 'পেমেন্ট সম্পন্ন হলে আইডি কার্ড উন্মুক্ত হবে' : 'ID Card unlocked only after payment verification'}
+          </h3>
+          <p className="text-xs text-amber-800 max-w-md mx-auto">
+            {language === 'bn'
+              ? 'আপনার নিবন্ধন সম্পন্ন করতে এবং অফিসিয়াল ফটো আইডি কার্ড ডাউনলোড বা প্রিন্ট করতে অনুগ্রহ করে পেমেন্ট সম্পূর্ণ করুন।'
+              : 'Please complete your registration fee payment to unlock and print your official Student Photo ID Card.'}
+          </p>
+        </div>
+      )}
 
       {/* OFFICIAL DIGITAL ENTRY TICKET / BADGE CARD (A4/Print Friendly) */}
       <div className="print-ticket-container bg-white rounded-3xl shadow-xl border-2 border-slate-200 overflow-hidden relative">
@@ -177,12 +203,14 @@ export const TicketView: React.FC<TicketViewProps> = ({
 
             {/* Official Seal / Verified Badge */}
             <div className="flex flex-col items-center sm:items-end">
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-bold shadow-xs">
-                <ShieldCheck className="w-4 h-4" />
-                <span>{t.ticketVerified}</span>
+              <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold shadow-xs ${
+                isPaid ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white'
+              }`}>
+                {isPaid ? <ShieldCheck className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+                <span>{isPaid ? t.ticketVerified : (language === 'bn' ? 'পেমেন্ট বাকি' : 'UNPAID / PENDING')}</span>
               </div>
               <span className="text-[10px] text-slate-400 mt-1 font-mono">
-                TXN: {registration.transactionId}
+                {isPaid ? `TXN: ${registration.transactionId || 'CONFIRMED'}` : (language === 'bn' ? 'ফি বকেয়া' : 'AWAITING PAYMENT')}
               </span>
             </div>
           </div>
