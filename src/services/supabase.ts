@@ -118,7 +118,7 @@ export async function runSupabaseDiagnostic(): Promise<{
 
   // 1. Read test
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from(tableUsed)
       .select('id')
       .limit(1);
