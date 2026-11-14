@@ -137,6 +137,7 @@ export type HomePageSectionId =
   | 'countdown'
   | 'status'
   | 'fees'
+  | 'financials'
   | 'notices'
   | 'gallery'
   | 'committee';
@@ -151,6 +152,7 @@ export const DEFAULT_HOME_PAGE_SECTIONS: HomePageSectionSetting[] = [
   { id: 'countdown', visible: true },
   { id: 'status', visible: true },
   { id: 'fees', visible: true },
+  { id: 'financials', visible: true },
   { id: 'notices', visible: true },
   { id: 'gallery', visible: true },
   { id: 'committee', visible: true },

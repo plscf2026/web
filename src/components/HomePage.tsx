@@ -39,6 +39,7 @@ import {
 import { translations } from '../i18n/translations';
 import { AppStore } from '../services/store';
 import { SupabaseService } from '../services/supabase';
+import { FinancialTransparencyDashboard } from './financials/FinancialTransparencyDashboard';
 
 interface HomePageProps {
   language: Language;
@@ -999,6 +1000,14 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
       </section>
+
+      {/* ── FINANCIAL TRANSPARENCY DASHBOARD ── */}
+      <div style={getHomePageSectionStyle('financials')}>
+        <FinancialTransparencyDashboard
+          language={language}
+          onNavigateDonate={() => onNavigate('donate')}
+        />
+      </div>
 
       {/* LATEST NOTICES PREVIEW */}
       <section

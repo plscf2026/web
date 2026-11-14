@@ -63,6 +63,7 @@ import { AuditHistoryTab } from './admin/AuditHistoryTab';
 import { StudentIdManagementTab } from './admin/StudentIdManagementTab';
 import { StudentIdService } from '../services/studentIdStore';
 import { EventStore } from '../services/eventStore';
+import { FinancialService } from '../services/financialService';
 import { GlobalPagination } from './common/GlobalPagination';
 import { paginate } from '../utils/pagination';
 import { ErrorBoundary } from './common/ErrorBoundary';
@@ -392,6 +393,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     countdown: 'Countdown',
     status: 'Registration status lookup',
     fees: 'Registration fees',
+    financials: 'Financial Transparency Dashboard',
     notices: 'Latest notices',
     gallery: 'Photo and video preview',
     committee: 'Organizing committee',
@@ -477,6 +479,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     };
     AppStore.addExpense(newExp);
     setExpenses(AppStore.getExpenses());
+
+    // Asynchronously record into Supabase expenses and financial audit logs
+    FinancialService.recordExpense(
+      {
+        category_id: 'cat-other',
+        category: expenseCategory,
+        amount: Number(expenseAmount),
+        expense_date: new Date().toISOString().split('T')[0],
+        description: expenseReason,
+        responsible_person: expenseOfficer,
+        voucher_number: expenseReceipt,
+      },
+      { id: adminSession?.id || 'admin', name: adminSession?.fullName || 'Administrator' },
+      `Expense voucher recorded by ${adminSession?.fullName || 'Administrator'}: ${expenseReason}`
+    ).catch(() => {});
+
     setShowAddExpenseModal(false);
     setExpenseAmount('');
     setExpenseReason('');
@@ -2390,13 +2408,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 Audit trail of event procurement, venue construction, acoustic and souvenir costs.
               </p>
             </div>
-            <button
-              onClick={() => setShowAddExpenseModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Record Expense Voucher</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  const summary = await FinancialService.getFinancialTransparencySummary();
+                  const csv = FinancialService.generateFinancialReportCsv(summary);
+                  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `PLSCF_Financial_Report_${new Date().toISOString().split('T')[0]}.csv`;
+                  a.click();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold cursor-pointer transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export CSV Report</span>
+              </button>
+              <button
+                onClick={() => setShowAddExpenseModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Record Expense Voucher</span>
+              </button>
+            </div>
           </div>
 
           {/* Finances Table: Desktop View (>= 640px) */}
