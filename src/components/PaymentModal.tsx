@@ -16,6 +16,7 @@ import {
   Info,
   Copy,
   Check,
+  UserPlus,
 } from 'lucide-react';
 import { Language, PaymentMethod, RegistrationRecord } from '../types';
 import { RegistrationFormData } from '../utils/rules';
@@ -27,7 +28,7 @@ import { AppStore } from '../services/store';
 export interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: (ticket: RegistrationRecord) => void;
+  onSuccess?: (ticket: RegistrationRecord, targetView?: 'register' | 'ticket') => void;
   language: Language;
   registrationFee: number;
   donationAmount: number;
@@ -137,6 +138,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         synchronizedFormData,
         payment
       );
+      try {
+        localStorage.removeItem('plscf_registration_draft');
+        PayStationService.clearPendingSession();
+      } catch {}
       setTransactionSummary(payment);
       setCompletedTicket(ticket);
       setStep('success');
@@ -406,7 +411,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           <button
             aria-label={isBangla ? 'বন্ধ করুন' : 'Close'}
             className="absolute right-3.5 top-3.5 z-20 rounded-full p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-            onClick={step === 'success' && completedTicket && onSuccess ? () => onSuccess(completedTicket) : onClose}
+            onClick={step === 'success' && completedTicket && onSuccess ? () => onSuccess(completedTicket, 'register') : onClose}
             type="button"
           >
             <X className="h-5 w-5" />
@@ -489,17 +494,34 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </div>
               </details>
 
-              <button
-                onClick={() => {
-                  if (onSuccess && completedTicket) onSuccess(completedTicket);
-                  else onClose();
-                }}
-                className="w-full py-3.5 rounded-2xl bg-[#0F172A] hover:bg-[#1E293B] text-white font-bold text-sm shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2 group"
-              >
-                <QrCode className="w-5 h-5 text-sky-400 group-hover:scale-110 transition-transform" />
-                <span>{isBangla ? 'ডিজিটাল টিকিট পাস দেখুন' : 'View Digital Ticket Pass'}</span>
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </button>
+              <div className="space-y-2 pt-1">
+                {/* Primary Action: Register Another Student */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onSuccess && completedTicket) onSuccess(completedTicket, 'register');
+                    else onClose();
+                  }}
+                  className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2 group"
+                >
+                  <UserPlus className="w-5 h-5 text-emerald-100 group-hover:scale-110 transition-transform" />
+                  <span>{isBangla ? 'পরবর্তী শিক্ষার্থী নিবন্ধন করুন' : 'Register Another Student'}</span>
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </button>
+
+                {/* Secondary Action: View Digital Ticket Pass */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onSuccess && completedTicket) onSuccess(completedTicket, 'ticket');
+                    else onClose();
+                  }}
+                  className="w-full py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white font-semibold text-xs border border-slate-700 transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <QrCode className="w-4 h-4 text-sky-400" />
+                  <span>{isBangla ? 'সম্পূর্ণ ডিজিটাল টিকিট পাস দেখুন' : 'View Full Digital Ticket Pass'}</span>
+                </button>
+              </div>
             </div>
 
         /* ── PROCESSING / VERIFYING ── */

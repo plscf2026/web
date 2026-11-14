@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   User,
   Upload,
@@ -16,6 +16,8 @@ import {
   ShieldCheck,
   Search,
   School,
+  X,
+  RefreshCw,
 } from 'lucide-react';
 import {
   StudentCategory,
@@ -48,6 +50,8 @@ interface RegistrationPageProps {
   lastRegisteredName?: string;
   /** Called when user clicks "View Ticket" in the success banner */
   onViewLastTicket?: () => void;
+  /** Whether payment processing is active (prevents duplicate submission) */
+  isProcessingPayment?: boolean;
 }
 
 const SAMPLE_AVATARS = [
@@ -65,6 +69,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   onNavigate: _onNavigate,
   lastRegisteredName,
   onViewLastTicket,
+  isProcessingPayment,
 }) => {
   const t = translations[language];
 
@@ -108,28 +113,95 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   const [donationInput, setDonationInput] = useState<number | ''>(() => (typeof draft?.donationInput === 'number' ? draft.donationInput : ''));
   const [termsAccepted, setTermsAccepted] = useState(() => Boolean(draft?.termsAccepted));
 
-  // Auto-save form draft to localStorage on any field update
+  // Submission & File Input States (Requirement 3 & 10)
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showSuccessBanner, setShowSuccessBanner] = useState(() => Boolean(lastRegisteredName));
+
+  useEffect(() => {
+    if (lastRegisteredName) {
+      setShowSuccessBanner(true);
+    }
+  }, [lastRegisteredName]);
+
+  useEffect(() => {
+    if (!isProcessingPayment) {
+      setIsSubmitting(false);
+    }
+  }, [isProcessingPayment]);
+
+  // Comprehensive form reset — clears all input fields, previews, file input, and state
+  const resetForm = () => {
+    setFullName('');
+    setPhotoUrl('');
+    setMobileNumber('');
+    setEmail('');
+    setAddress('');
+    setCategory('former');
+    setPassingYear('2015');
+    setLastClassAttended('SSC');
+    setCurrentClass('Class 10');
+    setStudentId('');
+    setIdVerificationResult(null);
+    setIsVerifyingId(false);
+    setBatchName('');
+    setGroupOrSection('Section A');
+    setRollNumber('');
+    setTShirtSize('L');
+    setDonationInput('');
+    setTermsAccepted(false);
+    setPhotoSizeKb(null);
+    setIsCompressingPhoto(false);
+    setIsCameraModalOpen(false);
+    setModalInitialImage(null);
+    setValidationErrors({});
+    setIsSubmitting(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    try {
+      localStorage.removeItem('plscf_registration_draft');
+    } catch {}
+    try {
+      PayStationService.clearPendingSession();
+    } catch {}
+  };
+
+  // Auto-save form draft to localStorage on any field update (only if active content exists)
   useEffect(() => {
     try {
-      const currentDraft = {
-        fullName,
-        photoUrl,
-        mobileNumber,
-        email,
-        address,
-        category,
-        passingYear,
-        lastClassAttended,
-        currentClass,
-        studentId,
-        batchName,
-        groupOrSection,
-        rollNumber,
-        tShirtSize,
-        donationInput,
-        termsAccepted,
-      };
-      localStorage.setItem('plscf_registration_draft', JSON.stringify(currentDraft));
+      const hasContent = Boolean(
+        fullName.trim() ||
+        mobileNumber.trim() ||
+        photoUrl ||
+        email.trim() ||
+        address.trim() ||
+        studentId.trim() ||
+        rollNumber.trim()
+      );
+      if (hasContent) {
+        const currentDraft = {
+          fullName,
+          photoUrl,
+          mobileNumber,
+          email,
+          address,
+          category,
+          passingYear,
+          lastClassAttended,
+          currentClass,
+          studentId,
+          batchName,
+          groupOrSection,
+          rollNumber,
+          tShirtSize,
+          donationInput,
+          termsAccepted,
+        };
+        localStorage.setItem('plscf_registration_draft', JSON.stringify(currentDraft));
+      } else {
+        localStorage.removeItem('plscf_registration_draft');
+      }
     } catch {}
   }, [
     fullName,
@@ -150,8 +222,12 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     termsAccepted,
   ]);
 
-  // Synchronize form fields whenever initialData is provided or updated (e.g. after failed payment or return)
+  // Synchronize form fields whenever initialData changes (or reset if null)
   useEffect(() => {
+    if (initialData === null) {
+      resetForm();
+      return;
+    }
     if (!initialData) return;
     if (initialData.fullName !== undefined) setFullName(initialData.fullName || '');
     if (initialData.photoUrl !== undefined) setPhotoUrl(initialData.photoUrl || '');
@@ -299,9 +375,12 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return; // Prevent duplicate submissions (Requirement 10)
     if (!feeSettings.registrationOpen) {
       return;
     }
+
+    setIsSubmitting(true);
 
     const formData: RegistrationFormData = {
       fullName,
@@ -359,6 +438,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
     if (Object.keys(customErrors).length > 0) {
       setValidationErrors(customErrors);
+      setIsSubmitting(false); // Re-enable on validation errors so user can fix
       const firstInvalidField = Object.keys(customErrors)[0];
       window.requestAnimationFrame(() => {
         const field = document.querySelector<HTMLElement>(
@@ -392,33 +472,46 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* ── Post-payment success banner — appears when redirected back after a successful registration ── */}
-      {lastRegisteredName && (
+      {/* ── Post-payment success banner — appears after a confirmed registration ── */}
+      {showSuccessBanner && (
         <div className="mb-6 p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-300 shadow-sm flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
             <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
             <div className="min-w-0">
               <p className="font-bold text-emerald-900 text-sm leading-tight">
                 {language === 'bn'
-                  ? `✅ ${lastRegisteredName} — রেজিস্ট্রেশন ও পেমেন্ট সফল হয়েছে!`
-                  : `✅ ${lastRegisteredName} — Registration & payment completed!`}
+                  ? 'রেজিস্ট্রেশন সফলভাবে সম্পন্ন হয়েছে! এখন আপনি পরবর্তী শিক্ষার্থীর তথ্য পূরণ করতে পারেন।'
+                  : 'Registration Successful! You can now register another student.'}
               </p>
-              <p className="text-xs text-emerald-700 mt-0.5">
-                {language === 'bn'
-                  ? 'এখন পরবর্তী শিক্ষার্থীর তথ্য পূরণ করুন।'
-                  : 'Form is reset. Enter the next student\'s details below.'}
-              </p>
+              {lastRegisteredName && (
+                <p className="text-xs text-emerald-700 mt-0.5">
+                  {language === 'bn'
+                    ? `শিক্ষার্থী: ${lastRegisteredName}`
+                    : `Student: ${lastRegisteredName}`}
+                </p>
+              )}
             </div>
           </div>
-          {onViewLastTicket && (
+          <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+            {onViewLastTicket && (
+              <button
+                type="button"
+                onClick={onViewLastTicket}
+                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer shadow-xs whitespace-nowrap"
+              >
+                {language === 'bn' ? '🎫 টিকিট দেখুন' : '🎫 View Ticket'}
+              </button>
+            )}
             <button
               type="button"
-              onClick={onViewLastTicket}
-              className="shrink-0 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer shadow-xs whitespace-nowrap"
+              onClick={() => setShowSuccessBanner(false)}
+              className="p-1 rounded-lg text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 transition cursor-pointer"
+              title={language === 'bn' ? 'বন্ধ করুন' : 'Dismiss'}
+              aria-label="Dismiss banner"
             >
-              {language === 'bn' ? '🎫 টিকিট দেখুন' : '🎫 View Ticket'}
+              <X className="w-4 h-4" />
             </button>
-          )}
+          </div>
         </div>
       )}
 
@@ -590,6 +683,10 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                       onClick={() => {
                         setPhotoUrl('');
                         setPhotoSizeKb(null);
+                        setModalInitialImage(null);
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = '';
+                        }
                       }}
                       className="absolute -top-2 -right-2 bg-rose-600 text-white rounded-full p-1 text-[10px] cursor-pointer hover:bg-rose-700 shadow-xs"
                       title="Remove photo"
@@ -634,6 +731,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                       <Upload className="w-3.5 h-3.5" />
                       <span>{language === 'bn' ? '📁 ফাইল আপলোড করুন' : '📁 Upload Photo'}</span>
                       <input
+                        ref={fileInputRef}
                         type="file"
                         name="photoUrl"
                         accept="image/jpeg,image/png,image/webp"
@@ -1302,10 +1400,24 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           {feeSettings.registrationOpen ? (
             <button
               type="submit"
-              className="w-full py-4 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-black text-base shadow-lg shadow-sky-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
+              disabled={isSubmitting || isProcessingPayment}
+              className={`w-full py-4 rounded-full text-white font-black text-base shadow-lg transition-all flex items-center justify-center gap-2 ${
+                isSubmitting || isProcessingPayment
+                  ? 'bg-sky-400 cursor-not-allowed opacity-80'
+                  : 'bg-[#0284C7] hover:bg-[#0EA5E9] shadow-sky-600/30 cursor-pointer active:scale-98'
+              }`}
             >
-              <ShieldCheck className="w-5 h-5 text-[#38BDF8]" />
-              <span>{t.btnProceedToPayment} (৳ {fees.totalPayable})</span>
+              {isSubmitting || isProcessingPayment ? (
+                <>
+                  <RefreshCw className="w-5 h-5 text-white animate-spin" />
+                  <span>{language === 'bn' ? 'প্রক্রিয়াধীন...' : 'Processing...'}</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-5 h-5 text-[#38BDF8]" />
+                  <span>{t.btnProceedToPayment} (৳ {fees.totalPayable})</span>
+                </>
+              )}
             </button>
           ) : (
             <button

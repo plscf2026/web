@@ -343,6 +343,7 @@ export default function App() {
               language={language}
               feeSettings={feeSettings}
               initialData={preservedRegistrationData}
+              isProcessingPayment={isPaymentModalOpen}
               onInitiatePayment={handleInitiatePayment}
               onNavigate={(view) => {
                 setActiveView(view);
@@ -442,7 +443,7 @@ export default function App() {
           <PaymentModal
             isOpen={isPaymentModalOpen}
             onClose={handleCancelPaymentModal}
-            onSuccess={(ticket) => {
+            onSuccess={(ticket, targetView = 'register') => {
               setIsPaymentModalOpen(false);
               setPendingRegistrationData(null);
               setPreservedRegistrationData(null);
@@ -453,14 +454,14 @@ export default function App() {
               try {
                 localStorage.removeItem('plscf_registration_draft');
               } catch {}
-              // Store the just-completed ticket so TicketView can be accessed via header if needed
+              // Store the just-completed ticket so TicketView can be accessed via header or button
               setActiveTicket(ticket);
               // Remember last registered name for the success banner
               setLastRegisteredName(ticket.fullName || '');
               // Reset the registration form with a fresh key so it is blank & ready for the next student
               setRegistrationFormKey((prev) => prev + 1);
-              // Navigate directly to a fresh registration page — ready for next student input
-              setActiveView('register');
+              // Navigate to the target view (defaults to 'register' to keep user on Registration Page)
+              setActiveView(targetView);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             language={language}
