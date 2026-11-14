@@ -1290,7 +1290,12 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                       tabIndex={-1}
                       className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-xl border-2 border-dashed border-amber-300 bg-white shadow-2xs"
                     >
-                      {parentPhotoUrl ? (
+                      {isCompressingParentPhoto ? (
+                        <div className="w-20 h-24 rounded-xl bg-amber-50 border border-amber-300 flex flex-col items-center justify-center text-amber-700 shrink-0">
+                          <RefreshCw className="w-5 h-5 animate-spin text-amber-600 mb-1" />
+                          <span className="text-[8px] font-bold">Compressing...</span>
+                        </div>
+                      ) : parentPhotoUrl ? (
                         <div className="relative shrink-0 text-center">
                           <img
                             src={parentPhotoUrl}

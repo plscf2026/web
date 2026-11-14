@@ -284,10 +284,14 @@ test('Blood Group validation in registration rules', () => {
 });
 
 test('Accompanying Parent / Guardian validation & fee calculation rules', () => {
-  const feeSettings = {
+  const feeSettings: FeeSettings = {
     formerStudentFee: 1500,
     currentStudentFee: 1000,
     registrationOpen: true,
+    startDate: '2026-01-01',
+    endDate: '2026-12-01',
+    lateFeeEnabled: false,
+    lateFeeAmount: 0,
   };
 
   // 1. Fee calculation without parent

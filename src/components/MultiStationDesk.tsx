@@ -102,7 +102,7 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
     const expectedToken = tokenParam?.trim().toUpperCase() || parsed.token;
 
     // Guardian / Parent Pass: strictly blocked from T-shirt distribution
-    if (parsed.isGuardianPass && activeStation === 'dress') {
+    if (parsed.isGuardianPass && activeStation === 'DRESS_BOOTH') {
       playScanErrorSound();
       setScannedStudent(null);
       setActionNotice({

@@ -7,7 +7,6 @@ import {
   AlertCircle,
   Loader2,
   Users,
-  HeartHandshake,
 } from 'lucide-react';
 import { StudentIdCardRecord } from '../../types/idcard';
 import { Language } from '../../types';
