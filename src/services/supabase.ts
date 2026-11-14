@@ -118,12 +118,12 @@ export async function runSupabaseDiagnostic(): Promise<{
 
   // 1. Read test
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from(tableUsed)
       .select('id')
       .limit(1);
     if (!error) {
-      canRead = true;
+      canRead = data !== null;
     } else {
       errors.push(`READ: ${error.message} (code: ${error.code})`);
     }
