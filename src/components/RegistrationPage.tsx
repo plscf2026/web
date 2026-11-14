@@ -44,6 +44,10 @@ interface RegistrationPageProps {
   initialData?: RegistrationFormData | null;
   onInitiatePayment: (formData: RegistrationFormData, fees: { registrationFee: number; donationAmount: number; totalPayable: number }) => void;
   onNavigate: (view: string) => void;
+  /** Name of the student who just paid — shows a success banner at the top of the form */
+  lastRegisteredName?: string;
+  /** Called when user clicks "View Ticket" in the success banner */
+  onViewLastTicket?: () => void;
 }
 
 const SAMPLE_AVATARS = [
@@ -59,6 +63,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   initialData,
   onInitiatePayment,
   onNavigate: _onNavigate,
+  lastRegisteredName,
+  onViewLastTicket,
 }) => {
   const t = translations[language];
 
@@ -386,6 +392,36 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+      {/* ── Post-payment success banner — appears when redirected back after a successful registration ── */}
+      {lastRegisteredName && (
+        <div className="mb-6 p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-300 shadow-sm flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+            <div className="min-w-0">
+              <p className="font-bold text-emerald-900 text-sm leading-tight">
+                {language === 'bn'
+                  ? `✅ ${lastRegisteredName} — রেজিস্ট্রেশন ও পেমেন্ট সফল হয়েছে!`
+                  : `✅ ${lastRegisteredName} — Registration & payment completed!`}
+              </p>
+              <p className="text-xs text-emerald-700 mt-0.5">
+                {language === 'bn'
+                  ? 'এখন পরবর্তী শিক্ষার্থীর তথ্য পূরণ করুন।'
+                  : 'Form is reset. Enter the next student\'s details below.'}
+              </p>
+            </div>
+          </div>
+          {onViewLastTicket && (
+            <button
+              type="button"
+              onClick={onViewLastTicket}
+              className="shrink-0 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer shadow-xs whitespace-nowrap"
+            >
+              {language === 'bn' ? '🎫 টিকিট দেখুন' : '🎫 View Ticket'}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Title */}
       <div className="text-center mb-8">
         <span className="inline-flex items-center px-3.5 py-1 rounded-full text-xs font-bold bg-[#E2EEF8] text-[#0284C7] border border-[#0284C7]/20 mb-2">
@@ -679,21 +715,61 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   onChange={(e) => {
                     const cleaned = e.target.value.replace(/[^\d]/g, '').slice(0, 11);
                     setMobileNumber(cleaned);
-                    clearValidationError('mobileNumber');
+
+                    // Real-time inline feedback while typing
+                    if (cleaned.length === 0) {
+                      clearValidationError('mobileNumber');
+                    } else if (cleaned.length >= 2 && !cleaned.startsWith('01')) {
+                      setValidationErrors((prev) => ({
+                        ...prev,
+                        mobileNumber: {
+                          en: 'Mobile number must start with 01 (e.g. 017XXXXXXXX)',
+                          bn: 'মোবাইল নম্বর অবশ্যই ০১ দিয়ে শুরু হতে হবে (যেমন: ০১৭XXXXXXXX)',
+                        },
+                      }));
+                    } else if (cleaned.length === 11 && !cleaned.startsWith('01')) {
+                      setValidationErrors((prev) => ({
+                        ...prev,
+                        mobileNumber: {
+                          en: 'Mobile number must start with 01 and be exactly 11 digits',
+                          bn: 'মোবাইল নম্বর ০১ দিয়ে শুরু হতে হবে এবং মোট ১১টি ডিজিট হতে হবে',
+                        },
+                      }));
+                    } else if (cleaned.length === 11 && cleaned.startsWith('01')) {
+                      // Full length & correct prefix — clear any error
+                      clearValidationError('mobileNumber');
+                    } else if (validationErrors.mobileNumber && cleaned.startsWith('01')) {
+                      // Prefix is now correct, clear the prefix error while still typing
+                      clearValidationError('mobileNumber');
+                    }
                   }}
                   placeholder="017XXXXXXXX"
                   maxLength={11}
-                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm font-mono transition-all focus:outline-hidden ${
+                  className={`w-full pl-10 pr-14 py-2.5 rounded-xl border text-sm font-mono transition-all focus:outline-hidden ${
                     validationErrors.mobileNumber
                       ? 'border-rose-500 bg-rose-50/30 focus:ring-2 focus:ring-rose-500'
+                      : mobileNumber.length === 11 && mobileNumber.startsWith('01')
+                      ? 'border-emerald-500 bg-emerald-50/20 focus:ring-2 focus:ring-emerald-500'
                       : 'border-slate-300 focus:border-[#172554] focus:ring-2 focus:ring-[#172554]/20'
                   }`}
                 />
+                {/* Live digit counter badge */}
+                <span
+                  className={`absolute right-3 top-2.5 text-[11px] font-bold font-mono px-1.5 py-0.5 rounded-md tabular-nums ${
+                    mobileNumber.length === 11 && mobileNumber.startsWith('01')
+                      ? 'text-emerald-700 bg-emerald-100'
+                      : mobileNumber.length > 0
+                      ? 'text-slate-500 bg-slate-100'
+                      : 'hidden'
+                  }`}
+                >
+                  {mobileNumber.length}/11
+                </span>
               </div>
               <span className="text-[10px] text-slate-500 mt-0.5 block">
                 {language === 'bn'
-                  ? '১১ ডিজিট; প্রতিটি নিবন্ধনের জন্য আলাদা মোবাইল নম্বর আবশ্যক'
-                  : '11 digits; each registration must use a different mobile number'}
+                  ? '০১ দিয়ে শুরু, মোট ১১ ডিজিট — প্রতিটি নিবন্ধনে আলাদা নম্বর আবশ্যক'
+                  : 'Must start with 01, exactly 11 digits — each registration needs a unique number'}
               </span>
               {validationErrors.mobileNumber && (
                 <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">

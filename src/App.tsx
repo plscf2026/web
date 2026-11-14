@@ -80,6 +80,7 @@ export default function App() {
   });
   const [registrationFormKey, setRegistrationFormKey] = useState(0);
   const [paymentModalError, setPaymentModalError] = useState<string>('');
+  const [lastRegisteredName, setLastRegisteredName] = useState<string>('');
   const [pendingFees, setPendingFees] = useState<{
     registrationFee: number;
     donationAmount: number;
@@ -245,6 +246,7 @@ export default function App() {
     } catch {}
     setPendingRegistrationData(null);
     setPreservedRegistrationData(null);
+    setLastRegisteredName('');
     PayStationService.clearPendingSession();
     setRegistrationFormKey((prev) => prev + 1);
     setActiveTicket(null);
@@ -341,6 +343,16 @@ export default function App() {
                 setActiveView(view);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
+              lastRegisteredName={lastRegisteredName}
+              onViewLastTicket={
+                activeTicket && lastRegisteredName
+                  ? () => {
+                      setLastRegisteredName('');
+                      setActiveView('ticket');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  : undefined
+              }
             />
           )}
 
@@ -436,10 +448,14 @@ export default function App() {
               try {
                 localStorage.removeItem('plscf_registration_draft');
               } catch {}
-              // Refresh registration form so it is fresh and clean to add new data
-              setRegistrationFormKey((prev) => prev + 1);
+              // Store the just-completed ticket so TicketView can be accessed via header if needed
               setActiveTicket(ticket);
-              setActiveView('ticket');
+              // Remember last registered name for the success banner
+              setLastRegisteredName(ticket.fullName || '');
+              // Reset the registration form with a fresh key so it is blank & ready for the next student
+              setRegistrationFormKey((prev) => prev + 1);
+              // Navigate directly to a fresh registration page — ready for next student input
+              setActiveView('register');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             language={language}

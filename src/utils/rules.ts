@@ -10,7 +10,9 @@ import {
 
 /**
  * Validates Bangladeshi mobile phone numbers:
- * Starts with optional +88 or 88, then 01[3-9] and 8 more digits (exact 11 digits without country code).
+ * Must start with 01 and be followed by valid operator code [3-9]
+ * and exactly 8 more digits, making a total of 11 digits.
+ * Accepts optional +88 or 88 country code prefix.
  */
 export function isValidBangladeshiMobile(phone: string): boolean {
   if (!phone) return false;
