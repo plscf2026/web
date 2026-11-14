@@ -123,46 +123,80 @@ export const ParentIdCardBadge: React.FC<ParentIdCardBadgeProps> = ({
     // Body Container (Off-white / cream card inset)
     ctx.fillStyle = '#FFFDF8';
     ctx.beginPath();
-    ctx.roundRect(24, 210, canvas.width - 48, 560, 20);
+    ctx.roundRect(24, 210, canvas.width - 48, 570, 20);
     ctx.fill();
     ctx.strokeStyle = '#FDE68A';
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    // Parent details section in body
+    // Draw parent photo on canvas
+    if (student.parentPhotoUrl) {
+      try {
+        const pImg = new Image();
+        pImg.crossOrigin = 'anonymous';
+        await new Promise<void>((resolve) => {
+          pImg.onload = () => resolve();
+          pImg.onerror = () => resolve();
+          pImg.src = student.parentPhotoUrl!;
+        });
+        ctx.drawImage(pImg, 46, 230, 115, 138);
+        ctx.strokeStyle = '#B45309';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(46, 230, 115, 138);
+      } catch (err) {
+        console.warn('Canvas parent photo load notice:', err);
+      }
+    } else {
+      ctx.fillStyle = '#F1F5F9';
+      ctx.fillRect(46, 230, 115, 138);
+      ctx.strokeStyle = '#CBD5E1';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(46, 230, 115, 138);
+      ctx.fillStyle = '#64748B';
+      ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText('GUARDIAN', 60, 295);
+      ctx.fillText('PHOTO', 74, 318);
+    }
+
+    // Parent details beside photo
+    const textStartX = 180;
     ctx.fillStyle = '#1A040B';
-    ctx.font = '900 32px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText(parentName, 50, 265);
+    ctx.font = '900 28px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillText(parentName, textStartX, 265);
 
     ctx.fillStyle = '#991B1B';
-    ctx.font = 'bold 20px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText(`RELATION: ${parentRelation.toUpperCase()}${parentAge ? ` (${parentAge})` : ''}`, 50, 300);
+    ctx.font = 'bold 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillText(`RELATION: ${parentRelation.toUpperCase()}${parentAge ? ` (${parentAge})` : ''}`, textStartX, 300);
+
+    ctx.fillStyle = '#DC2626';
+    ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillText('ENTITLEMENT: ENTRY & FOOD (NO T-SHIRT)', textStartX, 332);
 
     // Divider line
     ctx.strokeStyle = '#E2E8F0';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(50, 320);
-    ctx.lineTo(canvas.width - 50, 320);
+    ctx.moveTo(46, 385);
+    ctx.lineTo(canvas.width - 46, 385);
     ctx.stroke();
 
     // Data rows
     const drawRow = (label: string, value: string, y: number) => {
       ctx.fillStyle = '#64748B';
-      ctx.font = 'bold 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-      ctx.fillText(label, 50, y);
+      ctx.font = 'bold 17px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(label, 46, y);
 
       ctx.fillStyle = '#0F172A';
-      ctx.font = 'bold 20px monospace';
-      ctx.fillText(value, 230, y);
+      ctx.font = 'bold 18px monospace';
+      ctx.fillText(value, 200, y);
     };
 
-    drawRow('Pass ID:', parentPassId, 360);
-    drawRow('Mobile No:', parentPhone, 400);
-    drawRow('Student Name:', student.studentName, 440);
-    drawRow('Student ID:', student.idNumber || student.registrationId || 'N/A', 480);
-    drawRow('Student Batch:', student.batchYear || student.batchName || 'General', 520);
-    drawRow('Access Token:', parentToken, 560);
+    drawRow('Pass ID:', parentPassId, 420);
+    drawRow('Mobile No:', parentPhone, 455);
+    drawRow('Student Name:', student.studentName, 490);
+    drawRow('Student ID:', student.idNumber || student.registrationId || 'N/A', 525);
+    drawRow('Student Batch:', student.batchYear || student.batchName || 'General', 560);
+    drawRow('Access Token:', parentToken, 595);
 
     // QR Code Container
     if (localQrDataUrl) {
@@ -173,27 +207,27 @@ export const ParentIdCardBadge: React.FC<ParentIdCardBadgeProps> = ({
         qrImg.onerror = () => resolve();
         qrImg.src = localQrDataUrl;
       });
-      ctx.drawImage(qrImg, canvas.width - 230, 345, 175, 175);
+      ctx.drawImage(qrImg, canvas.width - 220, 410, 165, 165);
       ctx.strokeStyle = '#B45309';
       ctx.lineWidth = 2;
-      ctx.strokeRect(canvas.width - 230, 345, 175, 175);
+      ctx.strokeRect(canvas.width - 220, 410, 165, 165);
     }
 
     // Security Notice Box inside Inset
     ctx.fillStyle = '#FEF2F2';
-    ctx.fillRect(40, 600, canvas.width - 80, 140);
+    ctx.fillRect(40, 630, canvas.width - 80, 125);
     ctx.strokeStyle = '#FCA5A5';
     ctx.lineWidth = 1;
-    ctx.strokeRect(40, 600, canvas.width - 80, 140);
+    ctx.strokeRect(40, 630, canvas.width - 80, 125);
 
     ctx.fillStyle = '#991B1B';
-    ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText('ENTRY GUIDELINES & SECURITY PROTOCOL:', 55, 630);
+    ctx.font = 'bold 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillText('ENTRY GUIDELINES & PROTOCOL:', 55, 655);
     ctx.fillStyle = '#4B5563';
-    ctx.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText('• This card entitles entry for strictly ONE (1) accompanying parent/guardian.', 55, 658);
-    ctx.fillText('• Must be accompanied by registered student at the campus main security gate.', 55, 684);
-    ctx.fillText('• Non-transferable. QR code verification mandatory at gate stations.', 55, 710);
+    ctx.font = '13.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillText('• Entitlement: Strictly 1 parent/guardian for Gate & Food. NO T-SHIRT.', 55, 680);
+    ctx.fillText('• Must be accompanied by registered student at campus security gate.', 55, 705);
+    ctx.fillText('• Non-transferable. QR code verification mandatory at gate station.', 55, 730);
 
     // Campus Signature Footer
     ctx.fillStyle = '#FFFFFF';
@@ -397,23 +431,46 @@ export const ParentIdCardBadge: React.FC<ParentIdCardBadgeProps> = ({
 
         {/* Middle Content: Inset White/Cream Card */}
         <div className="mx-2.5 my-1.5 bg-[#FFFDF8] rounded-xl p-2.5 shadow-md border border-amber-300 flex-1 flex flex-col justify-between text-left">
-          {/* Parent Headline */}
-          <div className="border-b border-slate-200 pb-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[8px] font-bold text-rose-800 uppercase tracking-wider flex items-center gap-1">
-                <HeartHandshake className="w-3 h-3 text-rose-600" />
-                <span>{parentRelation}</span>
-              </span>
-              {parentAge && (
-                <span className="text-[8px] font-semibold text-slate-500 font-mono">{parentAge}</span>
+          {/* Parent Headline & Photo Frame */}
+          <div className="flex items-center gap-2.5 border-b border-slate-200 pb-2">
+            {/* Parent Photo */}
+            <div className="w-[58px] h-[70px] rounded-lg overflow-hidden border-2 border-amber-600/80 bg-slate-100 shrink-0 shadow-xs relative">
+              {student.parentPhotoUrl ? (
+                <img
+                  src={student.parentPhotoUrl}
+                  alt={parentName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400">
+                  <Users className="w-5 h-5 text-amber-800/40" />
+                  <span className="text-[7px] mt-0.5 text-slate-500 font-bold">Photo</span>
+                </div>
               )}
             </div>
-            <h3 className="text-[13px] font-bold text-slate-900 leading-tight truncate mt-0.5">
-              {parentName}
-            </h3>
-            <p className="text-[9px] text-slate-600 font-mono mt-0.5 truncate">
-              {parentPhone}
-            </p>
+
+            {/* Parent Details beside photo */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] font-black text-rose-800 uppercase tracking-wider bg-rose-100 px-1.5 py-0.5 rounded border border-rose-300">
+                  {parentRelation}
+                </span>
+                {parentAge && (
+                  <span className="text-[8px] font-semibold text-slate-500 font-mono">{parentAge}</span>
+                )}
+              </div>
+              <h3 className="text-[12.5px] font-extrabold text-slate-900 leading-tight truncate mt-1">
+                {parentName}
+              </h3>
+              <p className="text-[9px] text-slate-600 font-mono mt-0.5 truncate">
+                {parentPhone}
+              </p>
+              <div className="mt-1">
+                <span className="text-[7px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 inline-block">
+                  🚫 NO T-SHIRT (ENTRY &amp; FOOD ONLY)
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Student reference info & QR code */}

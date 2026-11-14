@@ -101,6 +101,18 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
     const displayTicket = parsed.id || clean;
     const expectedToken = tokenParam?.trim().toUpperCase() || parsed.token;
 
+    // Guardian / Parent Pass: strictly blocked from T-shirt distribution
+    if (parsed.isGuardianPass && activeStation === 'dress') {
+      playScanErrorSound();
+      setScannedStudent(null);
+      setActionNotice({
+        type: 'error',
+        message: 'Guardian Pass: Accompanying parents/guardians are NOT eligible for T-shirts. Only registered students receive a T-shirt.',
+      });
+      setIsResultPopupOpen(true);
+      return;
+    }
+
     const verifyRes = await AppStore.verifyStudentTicketAsync(clean, expectedToken, staffUser?.id || 'MULTI_STATION_STAFF');
 
     if (!verifyRes.verified || !verifyRes.student) {

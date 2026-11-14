@@ -85,6 +85,16 @@ test('4. Resilient input parser handles direct 6-char token, ID, JSON payload, a
   // Scanned full URL
   const t4 = parseScannedInput('https://plscf.org/verify?token=R8W3N5');
   assert.equal(t4.token, 'R8W3N5');
+
+  // Scanned Guardian Pass URL and raw PAR- pass ID
+  const tGuardian = parseScannedInput('https://plscf2026.reunion.org/verify-parent-pass?id=PAR-PLSCF-2027-F1001&studentId=PLSCF-2027-F1001&token=P-A7K9M2');
+  assert.equal(tGuardian.isGuardianPass, true);
+  assert.equal(tGuardian.id, 'PLSCF-2027-F1001');
+  assert.equal(tGuardian.token, 'A7K9M2');
+
+  const tGuardianRaw = parseScannedInput('PAR-PLSCF-2027-F1001');
+  assert.equal(tGuardianRaw.isGuardianPass, true);
+  assert.equal(tGuardianRaw.id, 'PLSCF-2027-F1001');
 });
 
 test('5. findRegistrationByTokenOrId matches accurately by 6-char token or ID', () => {

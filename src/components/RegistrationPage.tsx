@@ -38,10 +38,12 @@ import {
 } from '../utils/rules';
 import { StudentIdService } from '../services/studentIdStore';
 import { readValidatedImage } from '../utils/fileValidation';
+import { compressImageTo200KB } from '../utils/imageCompressor';
 import { AppStore } from '../services/store';
 import { PayStationService } from '../services/paystation';
 import { StudentIdCardRecord } from '../types/idcard';
 import { SynchronizedCameraCardModal } from './idcard/SynchronizedCameraCardModal';
+import { CameraCaptureModal } from './common/CameraCaptureModal';
 
 interface RegistrationPageProps {
   language: Language;
@@ -107,7 +109,12 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   const [parentName, setParentName] = useState(() => draft?.parentName || '');
   const [parentAge, setParentAge] = useState<number | ''>(() => (typeof draft?.parentAge === 'number' ? draft.parentAge : ''));
   const [parentPhone, setParentPhone] = useState(() => draft?.parentPhone || '');
-  const [parentRelation, setParentRelation] = useState(() => draft?.parentRelation || 'Father');
+  const [parentRelation, setParentRelation] = useState(() => draft?.parentRelation || 'Guardian');
+  const [parentPhotoUrl, setParentPhotoUrl] = useState(() => draft?.parentPhotoUrl || '');
+  const [parentPhotoSizeKb, setParentPhotoSizeKb] = useState<number | null>(null);
+  const [isCompressingParentPhoto, setIsCompressingParentPhoto] = useState(false);
+  const [isParentCameraModalOpen, setIsParentCameraModalOpen] = useState(false);
+  const parentFileInputRef = useRef<HTMLInputElement>(null);
 
   // Academic Information
   const [passingYear, setPassingYear] = useState(() => draft?.passingYear || '2015'); // Mandatory for former
@@ -156,7 +163,14 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     setParentName('');
     setParentAge('');
     setParentPhone('');
-    setParentRelation('Father');
+    setParentRelation('Guardian');
+    setParentPhotoUrl('');
+    setParentPhotoSizeKb(null);
+    setIsCompressingParentPhoto(false);
+    setIsParentCameraModalOpen(false);
+    if (parentFileInputRef.current) {
+      parentFileInputRef.current.value = '';
+    }
     setPassingYear('2015');
     setLastClassAttended('SSC');
     setCurrentClass('Class 10');
@@ -213,6 +227,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           parentAge,
           parentPhone,
           parentRelation,
+          parentPhotoUrl,
           passingYear,
           lastClassAttended,
           currentClass,
@@ -243,6 +258,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     parentAge,
     parentPhone,
     parentRelation,
+    parentPhotoUrl,
     passingYear,
     lastClassAttended,
     currentClass,
@@ -274,7 +290,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     if (initialData.parentName !== undefined) setParentName(initialData.parentName || '');
     if (initialData.parentAge !== undefined) setParentAge(initialData.parentAge !== undefined && initialData.parentAge !== null ? Number(initialData.parentAge) : '');
     if (initialData.parentPhone !== undefined) setParentPhone(initialData.parentPhone || '');
-    if (initialData.parentRelation !== undefined) setParentRelation(initialData.parentRelation || 'Father');
+    if (initialData.parentRelation !== undefined) setParentRelation(initialData.parentRelation || 'Guardian');
+    if (initialData.parentPhotoUrl !== undefined) setParentPhotoUrl(initialData.parentPhotoUrl || '');
     if (initialData.passingYear !== undefined) setPassingYear(initialData.passingYear || '2015');
     if (initialData.lastClassAttended !== undefined) setLastClassAttended(initialData.lastClassAttended || 'SSC');
     if (initialData.currentClass !== undefined) setCurrentClass(initialData.currentClass || 'Class 10');
@@ -395,10 +412,56 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     parentAge: effectiveHasParent && parentAge ? Number(parentAge) : undefined,
     parentPhone: effectiveHasParent ? parentPhone.trim() : undefined,
     parentRelation: effectiveHasParent ? parentRelation : undefined,
+    parentPhotoUrl: effectiveHasParent ? parentPhotoUrl : undefined,
     cardDimensions: '54x86mm',
     version: 1,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+  };
+
+  // Handle Parent Photo File Upload
+  const handleParentPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCompressingParentPhoto(true);
+    try {
+      const validDataUrl = await readValidatedImage(file);
+      const compressed = await compressImageTo200KB(validDataUrl);
+      setParentPhotoUrl(compressed.dataUrl);
+      setParentPhotoSizeKb(compressed.sizeKb);
+      clearValidationError('parentPhotoUrl');
+    } catch (error: any) {
+      e.target.value = '';
+      const message =
+        error instanceof Error ? error.message : 'Unable to validate the selected guardian image.';
+      setValidationErrors((current) => ({
+        ...current,
+        parentPhotoUrl: {
+          en: message,
+          bn: message,
+        },
+      }));
+    } finally {
+      setIsCompressingParentPhoto(false);
+    }
+  };
+
+  // Callback when user captures parent photo in CameraCaptureModal
+  const handleParentPhotoCaptured = async (imageDataUrl: string) => {
+    setIsCompressingParentPhoto(true);
+    try {
+      const compressed = await compressImageTo200KB(imageDataUrl);
+      setParentPhotoUrl(compressed.dataUrl);
+      setParentPhotoSizeKb(compressed.sizeKb);
+      clearValidationError('parentPhotoUrl');
+    } catch (err: any) {
+      setParentPhotoUrl(imageDataUrl);
+      setParentPhotoSizeKb(Math.round(imageDataUrl.length / 1024));
+    } finally {
+      setIsCompressingParentPhoto(false);
+      setIsParentCameraModalOpen(false);
+    }
   };
 
   // Student ID Verification Handler
@@ -452,6 +515,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
       parentAge: effectiveHasParent && parentAge ? Number(parentAge) : undefined,
       parentPhone: effectiveHasParent ? parentPhone.trim() : undefined,
       parentRelation: effectiveHasParent ? parentRelation : undefined,
+      parentPhotoUrl: effectiveHasParent ? parentPhotoUrl : undefined,
       category,
       studentId: category === 'current' ? studentId.trim() : undefined,
       passingYear: category === 'former' ? passingYear : undefined,
@@ -1118,6 +1182,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   setHasParent(e.target.checked);
                   if (!e.target.checked) {
                     clearValidationError('parentName');
+                    clearValidationError('parentPhotoUrl');
                     clearValidationError('parentAge');
                     clearValidationError('parentPhone');
                     clearValidationError('parentRelation');
@@ -1141,54 +1206,187 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
             {/* Parent Form Fields */}
             {hasParent && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-amber-200/60">
-                {/* Parent Name */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    {language === 'bn' ? 'অভিভাবকের পূর্ণ নাম' : 'Parent / Guardian Full Name'} <span className="text-rose-600">*</span>
-                  </label>
-                  <input
-                    name="parentName"
-                    type="text"
-                    value={parentName}
-                    onChange={(e) => {
-                      setParentName(e.target.value);
-                      clearValidationError('parentName');
-                    }}
-                    placeholder={language === 'bn' ? 'অভিভাবকের নাম লিখুন' : "Enter parent's full name"}
-                    className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
-                      validationErrors.parentName
-                        ? 'border-rose-500 bg-rose-50/30'
-                        : 'border-slate-300 bg-white focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20'
-                    }`}
-                  />
-                  {validationErrors.parentName && (
-                    <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">
-                      <AlertCircle className="w-3.5 h-3.5" />
-                      <span>{validationErrors.parentName[language]}</span>
-                    </p>
-                  )}
+              <div className="space-y-4 pt-2 border-t border-amber-200/60">
+                {/* T-Shirt Notice for Guardian */}
+                <div className="p-3 rounded-xl bg-amber-100/70 border border-amber-300 text-xs text-amber-900 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block">
+                      {language === 'bn' ? '⚠️ টি-শার্ট সুবিধা সংক্রান্ত নিয়ম:' : '⚠️ T-Shirt Distribution Notice:'}
+                    </span>
+                    <span>
+                      {language === 'bn'
+                        ? 'পুনর্মিলনী টি-শার্ট শুধুমাত্র মূল নিবন্ধিত শিক্ষার্থীর জন্য প্রযোজ্য। অভিভাবক বা গার্ডিয়ানের জন্য কোনো টি-শার্ট বরাদ্দ নেই (অভিভাবক পাস দিয়ে ভেন্যুতে প্রবেশ ও খাবার গ্রহণ করা যাবে)।'
+                        : 'Reunion T-shirt is exclusively for the registered student. Accompanying parents/guardians are NOT eligible for T-shirts (Guardian pass grants entry & food access only).'}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Relation with student */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    {language === 'bn' ? 'শিক্ষার্থীর সাথে সম্পর্ক' : 'Relation with Student'} <span className="text-rose-600">*</span>
-                  </label>
-                  <select
-                    name="parentRelation"
-                    value={parentRelation}
-                    onChange={(e) => {
-                      setParentRelation(e.target.value);
-                      clearValidationError('parentRelation');
-                    }}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 focus:outline-hidden"
-                  >
-                    <option value="Father">{language === 'bn' ? 'পিতা (Father)' : 'Father'}</option>
-                    <option value="Mother">{language === 'bn' ? 'মাতা (Mother)' : 'Mother'}</option>
-                    <option value="Guardian">{language === 'bn' ? 'বৈধ অভিভাবক (Guardian)' : 'Guardian'}</option>
-                  </select>
-                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Parent Name */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      {language === 'bn' ? 'অভিভাবকের পূর্ণ নাম' : 'Parent / Guardian Full Name'} <span className="text-rose-600">*</span>
+                    </label>
+                    <input
+                      name="parentName"
+                      type="text"
+                      value={parentName}
+                      onChange={(e) => {
+                        setParentName(e.target.value);
+                        clearValidationError('parentName');
+                      }}
+                      placeholder={language === 'bn' ? 'অভিভাবকের নাম লিখুন' : "Enter parent's full name"}
+                      className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
+                        validationErrors.parentName
+                          ? 'border-rose-500 bg-rose-50/30'
+                          : 'border-slate-300 bg-white focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20'
+                      }`}
+                    />
+                    {validationErrors.parentName && (
+                      <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        <span>{validationErrors.parentName[language]}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Relation with student: default is Guardian; options: Guardian, Father, Mother, Sister, Brother */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      {language === 'bn' ? 'শিক্ষার্থীর সাথে সম্পর্ক' : 'Relation with Student'} <span className="text-rose-600">*</span>
+                    </label>
+                    <select
+                      name="parentRelation"
+                      value={parentRelation}
+                      onChange={(e) => {
+                        setParentRelation(e.target.value);
+                        clearValidationError('parentRelation');
+                      }}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 focus:outline-hidden"
+                    >
+                      <option value="Guardian">{language === 'bn' ? 'বৈধ অভিভাবক (Guardian)' : 'Guardian'}</option>
+                      <option value="Father">{language === 'bn' ? 'পিতা (Father)' : 'Father'}</option>
+                      <option value="Mother">{language === 'bn' ? 'মাতা (Mother)' : 'Mother'}</option>
+                      <option value="Sister">{language === 'bn' ? 'বোন (Sister)' : 'Sister'}</option>
+                      <option value="Brother">{language === 'bn' ? 'ভাই (Brother)' : 'Brother'}</option>
+                    </select>
+                  </div>
+
+                  {/* Parent Photo Upload & Camera Capture */}
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+                      <span>
+                        {language === 'bn' ? 'অভিভাবকের পাসপোর্ট সাইজ ছবি' : 'Parent / Guardian Photo'} <span className="text-rose-600">*</span>
+                      </span>
+                      <span className="text-[10px] text-amber-800 font-medium bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                        {language === 'bn' ? 'সর্বোচ্চ ২০০ কেবি' : 'Auto-compressed to ≤ 200 KB'}
+                      </span>
+                    </label>
+
+                    <div
+                      data-validation-field="parentPhotoUrl"
+                      aria-invalid={Boolean(validationErrors.parentPhotoUrl)}
+                      tabIndex={-1}
+                      className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-xl border-2 border-dashed border-amber-300 bg-white shadow-2xs"
+                    >
+                      {parentPhotoUrl ? (
+                        <div className="relative shrink-0 text-center">
+                          <img
+                            src={parentPhotoUrl}
+                            alt="Guardian preview"
+                            className="w-20 h-24 rounded-xl object-cover border-2 border-amber-600 shadow-sm mx-auto"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setParentPhotoUrl('');
+                              setParentPhotoSizeKb(null);
+                              if (parentFileInputRef.current) {
+                                parentFileInputRef.current.value = '';
+                              }
+                            }}
+                            className="absolute -top-2 -right-2 bg-rose-600 text-white rounded-full p-1 text-[10px] cursor-pointer hover:bg-rose-700 shadow-xs"
+                            title="Remove guardian photo"
+                          >
+                            ✕
+                          </button>
+                          {parentPhotoSizeKb !== null && (
+                            <span className="inline-block mt-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded">
+                              ✓ {parentPhotoSizeKb} KB
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="w-20 h-24 rounded-xl bg-amber-100/70 border border-amber-200 flex flex-col items-center justify-center text-amber-800 shrink-0">
+                          <Users className="w-6 h-6" />
+                          <span className="text-[9px] mt-1 font-bold">
+                            {language === 'bn' ? 'ছবি নেই' : 'No Photo'}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex-1 space-y-2 text-center sm:text-left w-full">
+                        <p className="text-xs text-slate-600">
+                          {language === 'bn'
+                            ? 'অভিভাবকের পরিষ্কার পাসপোর্ট সাইজ ছবি ক্যামেরা দিয়ে তুলুন অথবা ফাইল থেকে আপলোড করুন।'
+                            : 'Capture guardian portrait photo directly using camera or upload from your device.'}
+                        </p>
+
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsParentCameraModalOpen(true)}
+                            className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs cursor-pointer transition-colors inline-flex items-center gap-1.5"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>{language === 'bn' ? '📷 ক্যামেরা দিয়ে ছবি তুলুন' : '📷 Take Photo'}</span>
+                          </button>
+
+                          <label className="px-3.5 py-1.5 rounded-lg bg-amber-800 hover:bg-amber-900 text-white text-xs font-semibold shadow-xs cursor-pointer transition-colors inline-flex items-center gap-1.5">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>{language === 'bn' ? '📁 ফাইল আপলোড' : '📁 Upload Photo'}</span>
+                            <input
+                              ref={parentFileInputRef}
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              onChange={handleParentPhotoUpload}
+                              className="hidden"
+                            />
+                          </label>
+
+                          {/* Quick sample avatars */}
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500 ml-auto">
+                            <span className="text-[10px] font-medium hidden md:inline">
+                              {language === 'bn' ? 'নমুনা:' : 'Sample:'}
+                            </span>
+                            {SAMPLE_AVATARS.map((avatar, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => {
+                                  setParentPhotoUrl(avatar);
+                                  setParentPhotoSizeKb(48);
+                                  clearValidationError('parentPhotoUrl');
+                                }}
+                                className="w-6 h-6 rounded-full overflow-hidden border border-amber-300 hover:scale-110 transition cursor-pointer"
+                                title={`Select sample avatar ${idx + 1}`}
+                              >
+                                <img src={avatar} alt="Sample" className="w-full h-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {validationErrors.parentPhotoUrl && (
+                          <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            <span>{validationErrors.parentPhotoUrl[language]}</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
                 {/* Parent Age */}
                 <div>
@@ -1253,7 +1451,21 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   )}
                 </div>
               </div>
-            )}
+
+              {/* Camera Capture Modal for Parent */}
+              <CameraCaptureModal
+                isOpen={isParentCameraModalOpen}
+                onClose={() => setIsParentCameraModalOpen(false)}
+                onCapture={handleParentPhotoCaptured}
+                title={language === 'bn' ? 'অভিভাবকের ছবি তুলুন' : 'Capture Guardian Portrait Photo'}
+                instructions={
+                  language === 'bn'
+                    ? 'ক্যামেরার ফ্রেমের মধ্যে অভিভাবকের মুখমণ্ডল সোজা রাখুন।'
+                    : 'Position the accompanying parent/guardian clearly within the frame.'
+                }
+              />
+            </div>
+          )}
           </div>
         ) : (
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-500 flex items-center gap-2">

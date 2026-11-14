@@ -895,6 +895,7 @@ export class PayStationService {
       parentAge: formData.parentAge || undefined,
       parentPhone: formData.parentPhone || undefined,
       parentRelation: formData.parentRelation || undefined,
+      parentPhotoUrl: formData.parentPhotoUrl || undefined,
       parentFee: fees.parentFee || 0,
       gatewayCharge: fees.gatewayCharge || 0,
       category: formData.category,
@@ -995,6 +996,7 @@ export class PayStationService {
       parentAge: formData.parentAge || undefined,
       parentPhone: formData.parentPhone || undefined,
       parentRelation: formData.parentRelation || undefined,
+      parentPhotoUrl: formData.parentPhotoUrl || undefined,
       parentFee: parentFee,
       category: formData.category,
       studentId: formData.studentId

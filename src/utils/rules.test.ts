@@ -321,25 +321,52 @@ test('Accompanying Parent / Guardian validation & fee calculation rules', () => 
     hasParent: true,
   };
 
-  // Missing parent fields
+  // Missing parent fields (including photo)
   const resMissingParent = validateRegistrationData(baseStudent);
   assert.equal(resMissingParent.isValid, false);
   assert.ok(resMissingParent.errors.parentName);
+  assert.ok(resMissingParent.errors.parentPhotoUrl);
   assert.ok(resMissingParent.errors.parentAge);
   assert.ok(resMissingParent.errors.parentPhone);
   assert.ok(resMissingParent.errors.parentRelation);
 
-  // Valid parent fields provided
-  const resValidParent = validateRegistrationData({
+  // Invalid parent relation (only Guardian, Father, Mother, Sister, Brother allowed)
+  const resInvalidRelation = validateRegistrationData({
     ...baseStudent,
     parentName: 'Abdul Malek',
+    parentPhotoUrl: 'https://example.com/parent.jpg',
     parentAge: 52,
     parentPhone: '01700000000',
-    parentRelation: 'Father',
+    parentRelation: 'Cousin',
   });
-  assert.equal(resValidParent.isValid, true);
-  assert.equal(resValidParent.errors.parentName, undefined);
-  assert.equal(resValidParent.errors.parentPhone, undefined);
+  assert.equal(resInvalidRelation.isValid, false);
+  assert.ok(resInvalidRelation.errors.parentRelation);
+
+  // Valid parent fields provided with Guardian default
+  const resValidGuardian = validateRegistrationData({
+    ...baseStudent,
+    parentName: 'Abdul Malek',
+    parentPhotoUrl: 'https://example.com/parent.jpg',
+    parentAge: 52,
+    parentPhone: '01700000000',
+    parentRelation: 'Guardian',
+  });
+  assert.equal(resValidGuardian.isValid, true);
+  assert.equal(resValidGuardian.errors.parentName, undefined);
+  assert.equal(resValidGuardian.errors.parentPhotoUrl, undefined);
+  assert.equal(resValidGuardian.errors.parentPhone, undefined);
+  assert.equal(resValidGuardian.errors.parentRelation, undefined);
+
+  // Valid with Sister
+  const resValidSister = validateRegistrationData({
+    ...baseStudent,
+    parentName: 'Fatema Begum',
+    parentPhotoUrl: 'https://example.com/sister.jpg',
+    parentAge: 24,
+    parentPhone: '01700000000',
+    parentRelation: 'Sister',
+  });
+  assert.equal(resValidSister.isValid, true);
 });
 
 test('Dynamic Payment Gateway Service Charges: bKash 1.85%, Other MFS 1.50%, Card 2.10%, Amex 3.10%', () => {

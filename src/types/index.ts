@@ -45,6 +45,7 @@ export interface RegistrationRecord {
   parentPhone?: string;
   parentRelation?: string;
   parentFee?: number;
+  parentPhotoUrl?: string;
   gatewayCharge?: number;
   notes?: string;
   year?: number;

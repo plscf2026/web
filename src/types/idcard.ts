@@ -70,6 +70,8 @@ export interface StudentIdCardRecord {
   parentAge?: number | string;
   parentPhone?: string;
   parentRelation?: string;
+  parentFee?: number;
+  parentPhotoUrl?: string;
   cardDimensions: '54x86mm';
   version: number;
   generatedAt?: string;

@@ -262,6 +262,7 @@ export class IdCardStore {
       parentAge: reg.parentAge,
       parentPhone: reg.parentPhone,
       parentRelation: reg.parentRelation,
+      parentPhotoUrl: reg.parentPhotoUrl,
       pdfStoragePath: `STUDENT_ID_CARDS/Batch_${batchYear || 'REVIEW'}/Individual_Cards/Student_${safeId.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
       cardDimensions: '54x86mm',
       version: 1,

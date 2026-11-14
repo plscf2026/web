@@ -99,17 +99,31 @@ export function formatSafeQrPayload(token: string, studentId: string): string {
  * - Safe JSON QR payload: '{"token":"A7K9M2","id":"PLSCF-2026-F1001"}'
  * - Query string or full URL: "https://plscf.org/?token=A7K9M2" or "?id=PLSCF-2026-F1001"
  */
-export function parseScannedInput(input: string): { token?: string; id?: string; raw: string } {
+export function parseScannedInput(input: string): {
+  token?: string;
+  id?: string;
+  isGuardianPass?: boolean;
+  raw: string;
+} {
   if (!input) return { raw: '' };
   const trimmed = input.trim();
+  const isGuardianPass =
+    trimmed.toUpperCase().startsWith('PAR-') ||
+    trimmed.toLowerCase().includes('verify-parent-pass') ||
+    trimmed.toUpperCase().startsWith('P-');
 
   // 1. JSON payload
   if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
     try {
       const parsed = JSON.parse(trimmed);
+      let t = parsed.token ? String(parsed.token).trim().toUpperCase() : undefined;
+      let rawId = parsed.id ? String(parsed.id).trim().toUpperCase() : undefined;
+      if (rawId && rawId.startsWith('PAR-')) rawId = rawId.replace(/^PAR-/i, '');
+      if (t && t.startsWith('P-') && t.length === 8) t = t.replace(/^P-/i, '');
       return {
-        token: parsed.token ? String(parsed.token).trim().toUpperCase() : undefined,
-        id: parsed.id ? String(parsed.id).trim().toUpperCase() : undefined,
+        token: t,
+        id: rawId,
+        isGuardianPass: isGuardianPass || Boolean(parsed.isGuardianPass),
         raw: trimmed.toUpperCase(),
       };
     } catch {}
@@ -119,7 +133,7 @@ export function parseScannedInput(input: string): { token?: string; id?: string;
   if (trimmed.includes('?') || trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     try {
       const url = new URL(trimmed.startsWith('http') ? trimmed : `https://plscf.org/${trimmed.startsWith('/') ? '' : '/'}${trimmed}`);
-      const t =
+      let t =
         url.searchParams.get('token') ||
         url.searchParams.get('TOKEN') ||
         url.searchParams.get('qr_token') ||
@@ -127,10 +141,11 @@ export function parseScannedInput(input: string): { token?: string; id?: string;
         url.searchParams.get('VERIFY') ||
         url.searchParams.get('t') ||
         url.searchParams.get('T');
-      const id =
+      let id =
+        url.searchParams.get('studentId') ||
+        url.searchParams.get('student_id') ||
         url.searchParams.get('id') ||
         url.searchParams.get('ID') ||
-        url.searchParams.get('student_id') ||
         url.searchParams.get('reg_id') ||
         url.searchParams.get('registration_id');
 
@@ -144,12 +159,21 @@ export function parseScannedInput(input: string): { token?: string; id?: string;
         }
       }
 
-      const effectiveId = id ? id.trim().toUpperCase() : pathId;
+      let effectiveId = id ? id.trim().toUpperCase() : pathId;
+      if (effectiveId && effectiveId.startsWith('PAR-')) {
+        effectiveId = effectiveId.replace(/^PAR-/i, '');
+      }
 
-      if (t || effectiveId) {
+      let effectiveToken = t ? t.trim().toUpperCase() : undefined;
+      if (effectiveToken && effectiveToken.startsWith('P-') && effectiveToken.length === 8) {
+        effectiveToken = effectiveToken.replace(/^P-/i, '');
+      }
+
+      if (effectiveToken || effectiveId) {
         return {
-          token: t ? t.trim().toUpperCase() : undefined,
+          token: effectiveToken,
           id: effectiveId,
+          isGuardianPass,
           raw: trimmed.toUpperCase(),
         };
       }
@@ -158,9 +182,20 @@ export function parseScannedInput(input: string): { token?: string; id?: string;
 
   // 3. Direct alphanumeric token or ID
   const upper = trimmed.toUpperCase();
+  let cleanId = upper;
+  if (cleanId.startsWith('PAR-')) {
+    cleanId = cleanId.replace(/^PAR-/i, '');
+  }
+
+  let cleanToken = upper;
+  if (cleanToken.startsWith('P-') && cleanToken.length === 8) {
+    cleanToken = cleanToken.replace(/^P-/i, '');
+  }
+
   return {
-    token: upper.length === 6 && /^[A-Z0-9]{6}$/.test(upper) ? upper : undefined,
-    id: upper,
+    token: cleanToken.length === 6 && /^[A-Z0-9]{6}$/.test(cleanToken) ? cleanToken : undefined,
+    id: cleanId,
+    isGuardianPass,
     raw: upper,
   };
 }

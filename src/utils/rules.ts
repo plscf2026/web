@@ -54,6 +54,7 @@ export interface RegistrationFormData {
   parentPhone?: string;
   parentRelation?: string;
   parentFee?: number;
+  parentPhotoUrl?: string;
   gatewayCharge?: number;
   category: StudentCategory;
   studentId?: string; // Mandatory for current students
@@ -118,6 +119,12 @@ export function validateRegistrationData(data: RegistrationFormData): Validation
         bn: 'অভিভাবকের পূর্ণ নাম আবশ্যক (কমপক্ষে ২ অক্ষর)',
       };
     }
+    if (!data.parentPhotoUrl || data.parentPhotoUrl.trim().length === 0) {
+      errors.parentPhotoUrl = {
+        en: 'Parent / Guardian portrait photograph is required',
+        bn: 'অভিভাবকের ছবি আপলোড করা আবশ্যক',
+      };
+    }
     if (!data.parentAge || String(data.parentAge).trim().length === 0) {
       errors.parentAge = {
         en: 'Parent / Guardian age is required',
@@ -130,10 +137,14 @@ export function validateRegistrationData(data: RegistrationFormData): Validation
         bn: 'অভিভাবকের জন্য সঠিক ১১ ডিজিটের মোবাইল নম্বর প্রদান করুন',
       };
     }
-    if (!data.parentRelation || data.parentRelation.trim().length === 0) {
+    const ALLOWED_PARENT_RELATIONS = ['guardian', 'father', 'mother', 'sister', 'brother'];
+    if (
+      !data.parentRelation ||
+      !ALLOWED_PARENT_RELATIONS.includes(data.parentRelation.trim().toLowerCase())
+    ) {
       errors.parentRelation = {
-        en: 'Please select relation with student (Father, Mother, or Guardian)',
-        bn: 'শিক্ষার্থীর সাথে সম্পর্ক নির্বাচন করুন (পিতা, মাতা বা অভিভাবক)',
+        en: 'Please select relation with student (Guardian, Father, Mother, Sister, or Brother)',
+        bn: 'শিক্ষার্থীর সাথে সম্পর্ক নির্বাচন করুন (অভিভাবক, পিতা, মাতা, বোন, বা ভাই)',
       };
     }
   }
