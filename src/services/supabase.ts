@@ -244,10 +244,10 @@ export async function runSupabaseDiagnostic(): Promise<{
   const summary = allGood
     ? '✅ Supabase connection healthy — read & write both working'
     : canRead && canWritePending && !canWritePaid
-    ? '⚠️ Read & pending-write OK, but PAID status update blocked by RLS. Grant anon UPDATE on registrations_2027.'
-    : canRead && !canWritePending
-    ? '❌ Read OK but INSERT blocked by RLS. Check registration_insert_pending_2027 policy.'
-    : '❌ Cannot reach Supabase. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local.';
+      ? '⚠️ Read & pending-write OK, but PAID status update blocked by RLS. Grant anon UPDATE on registrations_2027.'
+      : canRead && !canWritePending
+        ? '❌ Read OK but INSERT blocked by RLS. Check registration_insert_pending_2027 policy.'
+        : '❌ Cannot reach Supabase. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local.';
 
   return {
     url: SUPABASE_URL,
@@ -1132,7 +1132,7 @@ export const SupabaseService = {
           student: data.student,
         };
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Fallback: Use direct RPC verification
     const rpcRes = await this.verifyStudentTicket(id, token);
@@ -1175,7 +1175,7 @@ export const SupabaseService = {
       try {
         const saved = localStorage.getItem('plscf_test_admin_session');
         if (saved) return { isClaimed: true, account: JSON.parse(saved) };
-      } catch (_) {}
+      } catch (_) { }
     }
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -1370,7 +1370,7 @@ export const SupabaseService = {
             return parsed;
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -1400,7 +1400,7 @@ export const SupabaseService = {
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('plscf_test_admin_session');
-      } catch (_) {}
+      } catch (_) { }
     }
     const { error } = await supabase.auth.signOut();
     if (error) console.warn('Supabase logout:', error);
@@ -1505,7 +1505,7 @@ export const SupabaseService = {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_AUDIT_LOGS);
       if (raw) return JSON.parse(raw);
-    } catch {}
+    } catch { }
     return [];
   },
 
