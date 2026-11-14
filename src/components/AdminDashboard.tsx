@@ -105,11 +105,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [loginError, setLoginError] = useState('');
   const [isSubmittingLogin, setIsSubmittingLogin] = useState(false);
 
-  // Check session on mount
+  // Check session on mount and handle RBAC prefill / auto-login
   useEffect(() => {
     let isMounted = true;
     async function checkSession() {
       try {
+        // Check for RBAC role-selection handoff from Footer
+        const prefillUser = sessionStorage.getItem('plscf_admin_prefill_user');
+        const targetTab = sessionStorage.getItem('plscf_admin_active_tab');
+        const autoLogin = sessionStorage.getItem('plscf_admin_auto_login');
+
+        if (targetTab) {
+          setActiveTab(targetTab as any);
+          sessionStorage.removeItem('plscf_admin_active_tab');
+        }
+
+        if (prefillUser) {
+          setLoginUsername(prefillUser);
+          setLoginPassword('admin@123');
+          sessionStorage.removeItem('plscf_admin_prefill_user');
+
+          if (isDevBypass && autoLogin === 'true') {
+            sessionStorage.removeItem('plscf_admin_auto_login');
+            const res = await SupabaseService.loginAdmin(prefillUser, 'admin@123');
+            if (res.success && res.account && isMounted) {
+              setAdminSession(res.account);
+              return;
+            }
+          }
+        }
+
         const session = await SupabaseService.getActiveAdminSession();
         if (isMounted) setAdminSession(session);
       } catch (err) {
@@ -120,7 +145,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isDevBypass]);
 
   // Handle Admin Login
   const handleAdminLogin = async (e: React.FormEvent) => {

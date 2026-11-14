@@ -72,9 +72,38 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
 
   useEffect(() => {
     let active = true;
+
+    // Check for RBAC role-selection handoff from Footer
+    const targetModule = sessionStorage.getItem('plscf_scanner_module');
+    if (targetModule) {
+      setActiveAdminModule(targetModule);
+      sessionStorage.removeItem('plscf_scanner_module');
+    }
+
+    const prefillUser = sessionStorage.getItem('plscf_scanner_prefill_user');
+    const autoLogin = sessionStorage.getItem('plscf_scanner_auto_login');
+    if (prefillUser) {
+      setUsernameInput(prefillUser);
+      setPasswordInput('admin@123');
+      sessionStorage.removeItem('plscf_scanner_prefill_user');
+
+      if (isDevMode && autoLogin === 'true') {
+        sessionStorage.removeItem('plscf_scanner_auto_login');
+        EventStore.authenticateStaff(prefillUser, 'admin@123')
+          .then((res) => {
+            if (res.success && res.staff && active) {
+              setCurrentStaff(res.staff);
+            }
+          })
+          .catch((error) => {
+            console.error('Auto-login staff authentication error:', error);
+          });
+      }
+    }
+
     EventStore.getActiveStaffSession()
       .then((staff) => {
-        if (active) setCurrentStaff(staff);
+        if (active && !prefillUser) setCurrentStaff(staff);
       })
       .catch((error) => {
         console.error('Unable to restore staff session:', error);
@@ -84,7 +113,7 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
     return () => {
       active = false;
     };
-  }, []);
+  }, [isDevMode]);
 
   useEffect(() => {
     if (currentStaff?.role !== 'BREAKFAST_STAFF') return;

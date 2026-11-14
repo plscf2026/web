@@ -1026,15 +1026,44 @@ export const SupabaseService = {
     // Testing credentials support restricted strictly to dev environment
     if (
       isDevTestBypassAllowed() &&
-      (normalizedEmail === 'admin@gmail.com' || normalizedEmail === 'admin') &&
-      password === 'admin@123'
+      password === 'admin@123' &&
+      (
+        normalizedEmail === 'admin@gmail.com' ||
+        normalizedEmail === 'admin' ||
+        normalizedEmail === 'registration@gmail.com' ||
+        normalizedEmail === 'finance@gmail.com' ||
+        normalizedEmail === 'idcard.staff@gmail.com' ||
+        normalizedEmail === 'supervisor@gmail.com'
+      )
     ) {
+      let role: AdminAccount['role'] = 'super_admin';
+      let fullName = 'System Administrator (Testing)';
+      let id = 'admin-master-001';
+
+      if (normalizedEmail === 'registration@gmail.com') {
+        role = 'registration_officer';
+        fullName = 'Dr. Nusrat Jahan (Registration Lead)';
+        id = 'admin-reg-001';
+      } else if (normalizedEmail === 'finance@gmail.com') {
+        role = 'finance_manager';
+        fullName = 'Md. Shafiqul Alam (Finance Secretary)';
+        id = 'admin-fin-001';
+      } else if (normalizedEmail === 'idcard.staff@gmail.com') {
+        role = 'super_admin';
+        fullName = 'Kamrul Hasan (ID Card Coordinator)';
+        id = 'admin-idc-001';
+      } else if (normalizedEmail === 'supervisor@gmail.com') {
+        role = 'super_admin';
+        fullName = 'Engr. Moniruzzaman (Floor Supervisor)';
+        id = 'admin-sup-001';
+      }
+
       const testAccount: AdminAccount & { expiresAt: number } = {
-        id: 'admin-master-001',
-        username: 'admin@gmail.com',
-        fullName: 'System Administrator (Testing)',
-        email: 'admin@gmail.com',
-        role: 'super_admin',
+        id,
+        username: normalizedEmail,
+        fullName,
+        email: normalizedEmail === 'admin' ? 'admin@gmail.com' : normalizedEmail,
+        role,
         createdAt: new Date().toISOString(),
         expiresAt: Date.now() + ADMIN_SESSION_TTL_MS,
       };

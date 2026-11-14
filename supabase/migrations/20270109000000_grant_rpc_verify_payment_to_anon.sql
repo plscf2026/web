@@ -67,4 +67,3 @@ BEGIN
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO anon, authenticated, service_role', func_record.func_sig);
   END LOOP;
 END $$;
-
