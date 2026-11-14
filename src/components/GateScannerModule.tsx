@@ -531,7 +531,9 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
             No gate entry or exit events recorded yet.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Desktop table */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
@@ -600,6 +602,43 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Mobile cards */}
+          <div className="sm:hidden space-y-2.5">
+            {paginate(gateEvents, logPage, logPageSize).map((evt) => (
+              <div key={evt.id} className="rounded-xl border border-slate-200 bg-white p-3 space-y-2 shadow-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="font-mono font-bold text-slate-900 text-xs">{evt.registrationId}</p>
+                    <p className="text-xs font-semibold text-slate-700">{evt.studentName}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${evt.eventType === 'ENTRY' ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'}`}>
+                      {evt.eventType}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${evt.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                      {evt.status}
+                    </span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-1 text-[10px] text-slate-500">
+                  <div><span className="uppercase tracking-wider block">Gate</span><p className="text-slate-700 font-semibold">{evt.gateId}</p></div>
+                  <div><span className="uppercase tracking-wider block">Staff</span><p className="text-slate-700 font-semibold">{evt.staffName}</p></div>
+                  <div><span className="uppercase tracking-wider block">Time</span><p className="text-slate-700 font-mono">{new Date(evt.timestamp).toLocaleTimeString()}</p></div>
+                </div>
+                {isSuperAdmin && (
+                  <button
+                    onClick={() => { setSelectedEventForCorrection(evt); setNewCorrectionStatus(evt.status === 'APPROVED' ? 'DENIED' : 'APPROVED'); }}
+                    className="w-full py-2.5 rounded-lg border border-indigo-200 text-indigo-600 text-xs font-bold flex items-center justify-center gap-1.5 min-h-[44px]"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    Correct Status
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          </>
         )}
 
         {/* Global Pagination */}

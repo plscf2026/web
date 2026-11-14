@@ -1221,8 +1221,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </select>
           </div>
 
-          {/* Bookings Table */}
-          <div className="overflow-x-auto">
+          {/* Bookings Table: Desktop Responsive View (>= 640px) */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase text-[11px]">
@@ -1309,9 +1309,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </td>
 
                       <td className="py-3 px-3">
-                        <div className="font-black text-slate-900">৳{reg.totalPaid}</div>
+                        <div className="font-black text-slate-900 whitespace-nowrap inline-block tabular-nums">৳{reg.totalPaid}</div>
                         {reg.donationAmount > 0 && (
-                          <div className="text-[10px] text-rose-600 font-semibold">
+                          <div className="text-[10px] text-rose-600 font-semibold whitespace-nowrap">
                             (+৳{reg.donationAmount} Donation)
                           </div>
                         )}
@@ -1369,6 +1369,162 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Bookings Table: Mobile Responsive Cards (< 640px) */}
+          <div className="sm:hidden space-y-3.5">
+            {filteredRegistrations.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
+                No bookings found for year {selectedYear} matching your criteria.
+              </div>
+            ) : (
+              paginate(filteredRegistrations, regPage, regPageSize).map((reg) => (
+                <div
+                  key={`mobile-reg-${reg.id}`}
+                  className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3"
+                >
+                  {/* Card Header: Photo, Name, ID, Category & Payment Status */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={reg.photoUrl}
+                        alt={reg.fullName}
+                        className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-900 block text-sm truncate">
+                          {reg.fullName}
+                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <span className="font-mono text-xs text-emerald-700 font-bold">
+                            {reg.id}
+                          </span>
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                              reg.category === 'former'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-teal-100 text-teal-800'
+                            }`}
+                          >
+                            {reg.category}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 ${
+                        reg.paymentStatus === 'paid'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : reg.paymentStatus === 'pending'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-rose-100 text-rose-800'
+                      }`}
+                    >
+                      {reg.paymentStatus}
+                    </span>
+                  </div>
+
+                  {/* Card Body Grid: Key Info with Clear Labels */}
+                  <div className="grid grid-cols-2 gap-2.5 text-xs pt-2 border-t border-slate-100">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        Batch
+                      </span>
+                      <span className="font-semibold text-slate-800 block truncate">
+                        {reg.batchName}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        Amount Paid
+                      </span>
+                      <span className="font-black text-slate-900 whitespace-nowrap inline-block tabular-nums text-sm">
+                        ৳{reg.totalPaid}
+                      </span>
+                      {reg.donationAmount > 0 && (
+                        <span className="text-[10px] text-rose-600 font-semibold block whitespace-nowrap">
+                          (+৳{reg.donationAmount} Don.)
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        Contact Phone
+                      </span>
+                      <a
+                        href={`tel:${reg.mobileNumber}`}
+                        className="font-mono text-emerald-700 font-semibold hover:underline block truncate"
+                      >
+                        {reg.mobileNumber}
+                      </a>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        T-Shirt & Kit
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleTShirtCollected(reg.id, reg.isTShirtCollected)}
+                        className={`mt-0.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors w-full text-center cursor-pointer min-h-[38px] ${
+                          reg.isTShirtCollected
+                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                            : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                        }`}
+                      >
+                        {reg.tShirtSize} • {reg.isTShirtCollected ? 'Delivered' : 'Pending'}
+                      </button>
+                    </div>
+
+                    {reg.transactionId && (
+                      <div className="col-span-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex items-center justify-between text-xs">
+                        <span className="text-slate-500 font-mono">
+                          Tx: <strong className="text-slate-800">{reg.transactionId}</strong>
+                        </span>
+                        <span className="uppercase font-bold text-slate-600 text-[10px] px-2 py-0.5 bg-white rounded border border-slate-200">
+                          {reg.paymentMethod}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card Actions: 44px Minimum Touch Targets & Generous Spacing */}
+                  <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => onSelectTicket && onSelectTicket(reg)}
+                      className="flex-1 min-h-[44px] px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <QrCode className="w-4 h-4" />
+                      <span>View Ticket</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowEditStudentModal(reg)}
+                      className="min-h-[44px] min-w-[44px] p-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 rounded-xl transition-colors flex items-center justify-center cursor-pointer"
+                      title="Edit Student Info"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBookingToDelete(reg);
+                        setDeleteReason('');
+                      }}
+                      className="min-h-[44px] min-w-[44px] p-2 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-600 rounded-xl transition-colors flex items-center justify-center cursor-pointer"
+                      title={language === 'bn' ? 'বুকিং মুছে ফেলুন' : 'Delete Registration'}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Registrations Global Pagination */}
@@ -1831,7 +1987,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Payments Table: Desktop View (>= 640px) */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
@@ -1853,7 +2010,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <td className="py-2.5 px-3 uppercase font-semibold text-slate-600">
                       {r.paymentMethod}
                     </td>
-                    <td className="py-2.5 px-3 font-bold text-emerald-700">৳{r.totalPaid}</td>
+                    <td className="py-2.5 px-3 font-bold text-emerald-700 whitespace-nowrap inline-block tabular-nums">৳{r.totalPaid}</td>
                     <td className="py-2.5 px-3">
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
                         {r.paymentStatus}
@@ -1866,6 +2023,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Payments Table: Mobile Responsive Cards (< 640px) */}
+          <div className="sm:hidden space-y-3">
+            {paginate(registrations, payPage, payPageSize).map((r) => (
+              <div key={`mobile-pay-${r.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="font-bold text-slate-900 block text-sm truncate">{r.fullName}</span>
+                    <span className="font-mono text-xs text-slate-500 font-bold block truncate">{r.transactionId || 'No TxID'}</span>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 shrink-0">
+                    {r.paymentStatus}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+                  <span className="font-semibold text-slate-600 uppercase text-[10px] bg-slate-100 px-2 py-0.5 rounded">
+                    {r.paymentMethod}
+                  </span>
+                  <span className="font-black text-emerald-700 whitespace-nowrap inline-block tabular-nums text-sm">
+                    ৳{r.totalPaid}
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    {new Date(r.registeredAt).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Payments Global Pagination */}
@@ -1899,7 +2084,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Donations Table: Desktop View (>= 640px) */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
@@ -1919,7 +2105,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <span className="text-[10px] text-slate-400">{d.mobileNumber}</span>
                     </td>
                     <td className="py-2.5 px-3 text-slate-600">{d.purpose}</td>
-                    <td className="py-2.5 px-3 font-bold text-emerald-700">৳{d.amount.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 font-bold text-emerald-700 whitespace-nowrap inline-block tabular-nums">৳{d.amount.toLocaleString()}</td>
                     <td className="py-2.5 px-3 uppercase text-slate-600">{d.paymentMethod}</td>
                     <td className="py-2.5 px-3 font-mono text-[10px] text-slate-500">{d.transactionId}</td>
                     <td className="py-2.5 px-3 text-slate-400">{d.date}</td>
@@ -1927,6 +2113,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Donations Table: Mobile Responsive Cards (< 640px) */}
+          <div className="sm:hidden space-y-3">
+            {paginate(donations, donationsPage, donationsPageSize).map((d) => (
+              <div key={`mobile-don-${d.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="font-bold text-slate-900 block text-sm truncate">{d.donorName}</span>
+                    <a href={`tel:${d.mobileNumber}`} className="text-xs text-slate-500 font-mono hover:underline">{d.mobileNumber}</a>
+                  </div>
+                  <span className="font-black text-emerald-700 whitespace-nowrap inline-block tabular-nums text-sm">
+                    ৳{d.amount.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+                  <span className="text-slate-600 font-medium truncate max-w-[180px]">{d.purpose}</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                    {d.paymentMethod}
+                  </span>
+                  <span className="text-[11px] text-slate-400">{d.date}</span>
+                </div>
+                {d.transactionId && (
+                  <div className="text-[11px] text-slate-400 font-mono">
+                    Tx: <strong className="text-slate-700">{d.transactionId}</strong>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
 
           {/* Donations Global Pagination */}
@@ -1961,7 +2176,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             ))}
           </div>
 
-          <div className="overflow-x-auto">
+          {/* T-Shirt Table: Desktop View (>= 640px) */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
@@ -1993,6 +2209,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* T-Shirt Table: Mobile Responsive Cards (< 640px) */}
+          <div className="sm:hidden space-y-3">
+            {paginate(registrations, tshirtPage, tshirtPageSize).map((reg) => (
+              <div key={`mobile-tshirt-${reg.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="font-bold text-slate-900 block text-sm truncate">{reg.fullName}</span>
+                    <span className="font-mono text-xs text-slate-500 block">{reg.id}</span>
+                  </div>
+                  <span className="px-3 py-1 rounded-lg bg-slate-100 text-slate-900 font-black text-xs shrink-0">
+                    Size {reg.tShirtSize}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggleTShirtCollected(reg.id, reg.isTShirtCollected)}
+                  className={`w-full min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-2 ${
+                    reg.isTShirtCollected
+                      ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                      : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                  }`}
+                >
+                  {reg.isTShirtCollected ? '✓ Handed Over / Delivered' : '⏳ Pending Collection (Tap to Hand Over)'}
+                </button>
+              </div>
+            ))}
           </div>
 
           {/* T-Shirt Global Pagination */}
@@ -2070,7 +2314,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </p>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Staff Table: Desktop View (>= 640px) */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
@@ -2091,6 +2336,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Staff Table: Mobile Responsive Cards (< 640px) */}
+          <div className="sm:hidden space-y-3">
+            {paginate(INITIAL_STAFF_USERS, staffPage, staffPageSize).map((st) => (
+              <div key={`mobile-stf-${st.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="font-bold text-slate-900 block text-sm">{st.fullName}</span>
+                    <span className="font-mono text-xs text-slate-500 font-semibold">{st.username}</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 shrink-0">
+                    {st.role}
+                  </span>
+                </div>
+                <div className="text-xs text-slate-600 pt-2 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Assigned Station</span>
+                  <span className="font-medium text-slate-800">{st.gateAssigned}</span>
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Staff Global Pagination */}
@@ -2124,7 +2390,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Finances Table: Desktop View (>= 640px) */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
@@ -2143,12 +2410,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <td className="py-2.5 px-3 font-semibold text-slate-700">{exp.category}</td>
                     <td className="py-2.5 px-3 text-slate-600">{exp.reason}</td>
                     <td className="py-2.5 px-3 text-slate-500">{exp.responsiblePerson}</td>
-                    <td className="py-2.5 px-3 font-bold text-rose-600">৳{exp.amount.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 font-bold text-rose-600 whitespace-nowrap inline-block tabular-nums">৳{exp.amount.toLocaleString()}</td>
                     <td className="py-2.5 px-3 text-slate-400">{exp.date}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Finances Table: Mobile Responsive Cards (< 640px) */}
+          <div className="sm:hidden space-y-3">
+            {paginate(expenses, expensesPage, expensesPageSize).map((exp) => (
+              <div key={`mobile-exp-${exp.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="font-mono text-xs font-bold text-slate-800 block truncate">{exp.receiptRef}</span>
+                    <span className="font-semibold text-slate-700 text-xs block">{exp.category}</span>
+                  </div>
+                  <span className="font-black text-rose-600 whitespace-nowrap inline-block tabular-nums text-sm shrink-0">
+                    ৳{exp.amount.toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                  {exp.reason}
+                </p>
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 text-slate-500">
+                  <span>Officer: <strong className="text-slate-700">{exp.responsiblePerson}</strong></span>
+                  <span className="text-[11px] text-slate-400">{exp.date}</span>
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Finances Global Pagination */}

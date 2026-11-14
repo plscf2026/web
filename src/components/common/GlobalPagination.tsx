@@ -82,7 +82,7 @@ export const GlobalPagination: React.FC<GlobalPaginationProps> = ({
               id="pagination-page-size"
               value={meta.pageSize}
               onChange={handlePageSizeSelect}
-              className={`rounded-lg px-2 py-1 text-xs font-semibold focus:outline-hidden transition-all cursor-pointer ${
+              className={`rounded-lg px-2 py-1 text-base sm:text-xs min-h-[44px] sm:min-h-0 font-semibold focus:outline-hidden transition-all cursor-pointer ${
                 isDark
                   ? 'bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-600 focus:border-[#0284C7]'
                   : 'bg-white text-[#0F172A] border border-[#E2EEF8] hover:border-[#0284C7]/40 focus:border-[#0284C7] shadow-2xs'
@@ -111,7 +111,7 @@ export const GlobalPagination: React.FC<GlobalPaginationProps> = ({
           onClick={() => onPageChange(1)}
           disabled={!meta.hasPrevPage}
           title={language === 'bn' ? 'প্রথম পৃষ্ঠা' : 'First Page'}
-          className={`flex items-center justify-center w-8 h-8 rounded-lg border transition-all ${
+          className={`flex items-center justify-center min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] sm:w-8 sm:h-8 pagination-touch-btn rounded-lg border transition-all ${
             meta.hasPrevPage
               ? isDark
                 ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-white cursor-pointer active:scale-95'
@@ -130,7 +130,7 @@ export const GlobalPagination: React.FC<GlobalPaginationProps> = ({
           onClick={() => onPageChange(meta.currentPage - 1)}
           disabled={!meta.hasPrevPage}
           title={language === 'bn' ? 'পূর্ববর্তী' : 'Previous'}
-          className={`flex items-center justify-center px-2.5 h-8 gap-1 rounded-lg border font-medium transition-all ${
+          className={`flex items-center justify-center min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-[32px] px-3 sm:px-2.5 sm:h-8 pagination-touch-btn gap-1 rounded-lg border font-medium transition-all ${
             meta.hasPrevPage
               ? isDark
                 ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-white cursor-pointer active:scale-95'
@@ -140,7 +140,7 @@ export const GlobalPagination: React.FC<GlobalPaginationProps> = ({
               : 'bg-slate-50 border-slate-200 text-slate-300 opacity-40 cursor-not-allowed'
           }`}
         >
-          <ChevronLeft className="w-3.5 h-3.5" />
+          <ChevronLeft className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
           <span className="hidden md:inline">{language === 'bn' ? 'পূর্ববর্তী' : 'Prev'}</span>
         </button>
 
@@ -188,7 +188,7 @@ export const GlobalPagination: React.FC<GlobalPaginationProps> = ({
           onClick={() => onPageChange(meta.currentPage + 1)}
           disabled={!meta.hasNextPage}
           title={language === 'bn' ? 'পরবর্তী' : 'Next'}
-          className={`flex items-center justify-center px-2.5 h-8 gap-1 rounded-lg border font-medium transition-all ${
+          className={`flex items-center justify-center min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-[32px] px-3 sm:px-2.5 sm:h-8 pagination-touch-btn gap-1 rounded-lg border font-medium transition-all ${
             meta.hasNextPage
               ? isDark
                 ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-white cursor-pointer active:scale-95'
@@ -199,7 +199,7 @@ export const GlobalPagination: React.FC<GlobalPaginationProps> = ({
           }`}
         >
           <span className="hidden md:inline">{language === 'bn' ? 'পরবর্তী' : 'Next'}</span>
-          <ChevronRight className="w-3.5 h-3.5" />
+          <ChevronRight className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
         </button>
 
         {/* Last Page Button */}
@@ -208,7 +208,7 @@ export const GlobalPagination: React.FC<GlobalPaginationProps> = ({
           onClick={() => onPageChange(meta.totalPages)}
           disabled={!meta.hasNextPage}
           title={language === 'bn' ? 'সর্বশেষ পৃষ্ঠা' : 'Last Page'}
-          className={`flex items-center justify-center w-8 h-8 rounded-lg border transition-all ${
+          className={`flex items-center justify-center min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] sm:w-8 sm:h-8 pagination-touch-btn rounded-lg border transition-all ${
             meta.hasNextPage
               ? isDark
                 ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-white cursor-pointer active:scale-95'

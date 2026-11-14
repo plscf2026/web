@@ -467,7 +467,8 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
 
       {/* Main Student IDs Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View (>= 640px) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-xs text-left border-collapse">
             <thead>
               <tr className="bg-[#172554] text-white uppercase text-[11px] tracking-wider">
@@ -614,6 +615,114 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Responsive Cards (< 640px) */}
+        <div className="sm:hidden space-y-3">
+          {filteredList.length === 0 ? (
+            <div className="p-6 text-center text-slate-500 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
+              <AlertTriangle className="w-6 h-6 text-amber-500 mx-auto mb-2" />
+              <div>{language === 'bn' ? 'কোনো স্টুডেন্ট আইডি পাওয়া যায়নি।' : 'No Student ID records match your criteria.'}</div>
+            </div>
+          ) : (
+            paginate(filteredList, currentPage, pageSize).map((item) => (
+              <div key={`mobile-id-${item.studentId}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="font-mono font-bold text-slate-900 block text-sm">{item.studentId}</span>
+                    <span className="font-semibold text-slate-800 text-xs block">
+                      {item.studentName || <span className="text-slate-400 italic">Name Not set</span>}
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        item.status === 'ACTIVE'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {item.status}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        item.verificationStatus === 'USED'
+                          ? 'bg-purple-100 text-purple-800'
+                          : item.verificationStatus === 'RESERVED'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      {item.verificationStatus}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Class</span>
+                    <span className="font-semibold text-slate-800">{item.className}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Academic Year</span>
+                    <span className="font-mono text-slate-700">{item.academicYear}</span>
+                  </div>
+                  {item.usedRegistrationId && (
+                    <div className="col-span-2 bg-blue-50/60 p-2 rounded-lg border border-blue-100 text-xs">
+                      <span className="text-[10px] uppercase font-bold text-blue-700 block">Linked Booking</span>
+                      <span className="font-mono font-bold text-[#172554]">{item.usedRegistrationId}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Mobile Touch Action Buttons (>= 44px) */}
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuditModalAction({
+                        type: 'TOGGLE_STATUS',
+                        record: item,
+                      });
+                    }}
+                    className={`flex-1 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 border ${
+                      item.status === 'ACTIVE'
+                        ? 'border-amber-300 bg-amber-50 text-amber-800 active:bg-amber-100'
+                        : 'border-emerald-300 bg-emerald-50 text-emerald-800 active:bg-emerald-100'
+                    }`}
+                  >
+                    <Power className="w-4 h-4" />
+                    <span>{item.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditingRecord({ ...item })}
+                    className="min-h-[44px] min-w-[44px] p-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 active:bg-slate-200 flex items-center justify-center cursor-pointer"
+                    title="Edit Record"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+
+                  {item.verificationStatus !== 'USED' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuditModalAction({
+                          type: 'DELETE',
+                          record: item,
+                        });
+                      }}
+                      className="min-h-[44px] min-w-[44px] p-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 active:bg-rose-100 flex items-center justify-center cursor-pointer"
+                      title="Delete ID Record"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Global Pagination */}

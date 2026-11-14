@@ -183,7 +183,8 @@ export const AuditHistoryTab: React.FC = () => {
 
       {/* Audit Log Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View (>= 640px) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
@@ -273,6 +274,63 @@ export const AuditHistoryTab: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Responsive Cards (< 640px) */}
+        <div className="sm:hidden space-y-3 p-3">
+          {filteredHistory.length === 0 ? (
+            <div className="p-6 text-center text-slate-400 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
+              <FileText className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+              No audit records found matching your filters.
+            </div>
+          ) : (
+            paginate(filteredHistory, currentPage, pageSize).map((item) => {
+              const dhakaTime = new Date(item.timestamp).toLocaleString('en-US', {
+                timeZone: 'Asia/Dhaka',
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              });
+              return (
+                <div key={`mobile-audit-${item.id}`} className="bg-slate-50/70 rounded-2xl p-4 border border-slate-200 shadow-xs space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {getEntityBadge(item.entityType)}
+                      <span className="font-mono text-xs font-bold text-slate-800">{item.action}</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-400">{dhakaTime}</span>
+                  </div>
+
+                  <div className="text-xs text-slate-600 flex items-center justify-between">
+                    <span>Officer: <strong className="text-slate-900">{item.adminName}</strong></span>
+                    <span className="font-mono text-[10px] text-slate-400">ID: {item.entityId}</span>
+                  </div>
+
+                  {(item.previousValue || item.newValue) && (
+                    <div className="text-xs bg-white p-2 rounded-xl border border-slate-200 flex items-center gap-1.5 flex-wrap">
+                      {item.previousValue && (
+                        <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-mono text-[11px]">
+                          {item.previousValue}
+                        </span>
+                      )}
+                      {item.previousValue && item.newValue && (
+                        <ArrowRight className="w-3 h-3 text-slate-400 shrink-0" />
+                      )}
+                      {item.newValue && (
+                        <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-medium text-[11px]">
+                          {item.newValue}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="text-xs bg-white p-2.5 rounded-xl border border-slate-200 text-slate-700">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Audit Reason</span>
+                    {item.reason}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Global Pagination */}

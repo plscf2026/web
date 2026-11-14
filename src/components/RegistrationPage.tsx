@@ -674,6 +674,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   name="mobileNumber"
                   aria-invalid={Boolean(validationErrors.mobileNumber)}
                   type="tel"
+                  inputMode="tel"
                   value={mobileNumber}
                   onChange={(e) => {
                     const cleaned = e.target.value.replace(/[^\d]/g, '').slice(0, 11);
@@ -721,6 +722,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   name="email"
                   aria-invalid={Boolean(validationErrors.email)}
                   type="email"
+                  inputMode="email"
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -1151,6 +1153,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold text-sm">৳</span>
             <input
               type="number"
+              inputMode="numeric"
               min="0"
               value={donationInput}
               onChange={(e) => {

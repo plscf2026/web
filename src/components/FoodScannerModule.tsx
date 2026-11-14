@@ -587,7 +587,9 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
             No {mealType} distributions recorded yet.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Desktop table */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
@@ -648,6 +650,42 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Mobile cards */}
+          <div className="sm:hidden space-y-2.5">
+            {paginate(
+              distributions.filter((d) => d.mealType === mealType),
+              logPage,
+              logPageSize
+            ).map((record) => (
+              <div key={record.id} className="rounded-xl border border-slate-200 bg-white p-3 space-y-2 shadow-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="font-mono font-bold text-slate-900 text-xs">{record.registrationId}</p>
+                    <p className="text-xs font-semibold text-slate-700">{record.studentName}</p>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${record.status === 'COLLECTED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                    {record.status}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1 text-[10px] text-slate-500">
+                  <div><span className="uppercase tracking-wider block">Batch</span><p className="text-slate-700 font-semibold">{record.batchName}</p></div>
+                  <div><span className="uppercase tracking-wider block">Staff</span><p className="text-slate-700 font-semibold">{record.staffName}</p></div>
+                  <div><span className="uppercase tracking-wider block">Time</span><p className="text-slate-700 font-mono">{new Date(record.collectedAt).toLocaleTimeString()}</p></div>
+                </div>
+                {isSuperAdmin && (
+                  <button
+                    onClick={() => { setSelectedRecordForCorrection(record); setNewCorrectionStatus(record.status === 'COLLECTED' ? 'CANCELLED' : 'COLLECTED'); }}
+                    className="w-full py-2.5 rounded-lg border border-indigo-200 text-indigo-600 text-xs font-bold flex items-center justify-center gap-1.5 min-h-[44px]"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    Correct Status
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          </>
         )}
 
         {/* Global Pagination */}

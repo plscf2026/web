@@ -438,7 +438,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
                         key={amt}
                         type="button"
                         onClick={() => handleSelectPreset(amt)}
-                        className={`py-2.5 px-2 rounded-xl text-xs font-black transition-all cursor-pointer border text-center ${
+                        className={`min-h-[44px] py-2.5 px-2 rounded-xl text-xs font-black transition-all cursor-pointer border text-center flex items-center justify-center whitespace-nowrap tabular-nums ${
                           isSelected
                             ? 'bg-slate-900 text-amber-300 border-slate-900 shadow-md ring-2 ring-amber-400/30'
                             : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
@@ -506,6 +506,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
                     </label>
                     <input
                       type="tel"
+                      inputMode="tel"
                       required
                       placeholder="017XXXXXXXX"
                       value={mobileNumber}

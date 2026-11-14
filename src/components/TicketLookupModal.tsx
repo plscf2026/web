@@ -106,6 +106,7 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
             </label>
             <input
               type="tel"
+              inputMode="tel"
               id="ticket-mobile-number"
               autoComplete="tel"
               value={mobileNumber}
@@ -126,7 +127,7 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
           <button
             type="submit"
             disabled={isSearching}
-            className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold text-sm rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+            className="w-full min-h-[44px] py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold text-sm rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
           >
             <span>{isSearching ? (language === 'bn' ? 'খোঁজা হচ্ছে...' : 'Searching...') : t.btnSearchTicket}</span>
             <ArrowRight className="w-4 h-4" />

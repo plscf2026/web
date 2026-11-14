@@ -449,7 +449,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     <span>{isBangla ? 'পেমেন্ট রসিদ বিবরণ' : 'Payment Receipt & Telemetry'}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-emerald-700 font-bold">
+                    <span className="font-mono text-emerald-700 font-bold whitespace-nowrap inline-block tabular-nums">
                       ৳ {transactionSummary.amount.toLocaleString()} BDT
                     </span>
                     <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
@@ -484,7 +484,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   )}
                   <div className="flex justify-between items-center border-t border-slate-200 pt-1.5 font-bold text-slate-900">
                     <span>{isBangla ? 'পরিশোধিত পরিমাণ' : 'Total Paid'}:</span>
-                    <span className="text-emerald-700">৳ {transactionSummary.amount.toLocaleString()} BDT</span>
+                    <span className="text-emerald-700 whitespace-nowrap inline-block tabular-nums">৳ {transactionSummary.amount.toLocaleString()} BDT</span>
                   </div>
                 </div>
               </details>
@@ -676,17 +676,17 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>{isBangla ? 'রেজিস্ট্রেশন ফি' : 'Registration Fee'}:</span>
-                <span className="font-semibold">৳ {registrationFee.toLocaleString()}</span>
+                <span className="font-semibold whitespace-nowrap inline-block tabular-nums">৳ {registrationFee.toLocaleString()}</span>
               </div>
               {donationAmount > 0 && (
                 <div className="flex justify-between text-slate-600">
                   <span>{isBangla ? 'অনুদান' : 'Donation'}:</span>
-                  <span className="font-semibold">+ ৳ {donationAmount.toLocaleString()}</span>
+                  <span className="font-semibold whitespace-nowrap inline-block tabular-nums">+ ৳ {donationAmount.toLocaleString()}</span>
                 </div>
               )}
               <div className="flex justify-between border-t border-sky-200 pt-2 text-sm font-black text-sky-950">
                 <span>{isBangla ? 'সর্বমোট প্রদেয়' : 'Total Payable'}:</span>
-                <span className="text-[#0284C7] text-base">৳ {totalPayable.toLocaleString()} BDT</span>
+                <span className="text-[#0284C7] text-base whitespace-nowrap inline-block tabular-nums">৳ {totalPayable.toLocaleString()} BDT</span>
               </div>
             </div>
 
@@ -707,7 +707,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     key={item.id}
                     type="button"
                     onClick={() => setSelectedMethod(item.id)}
-                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1 relative ${
+                    className={`min-h-[48px] py-2.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1 relative ${
                       selectedMethod === item.id
                         ? `${item.color} bg-white shadow-sm ring-2 ring-sky-500`
                         : `border-slate-200 text-slate-600 hover:border-slate-400 ${item.bg}`

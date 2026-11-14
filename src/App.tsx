@@ -14,6 +14,7 @@ import { StudentIdService } from './services/studentIdStore';
 import { findRegistrationByTokenOrId } from './utils/tokenGenerator';
 import { PayStationService } from './services/paystation';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { MobileBottomNav } from './components/common/MobileBottomNav';
 import type { ModalStep } from './components/PaymentModal';
 
 // Route-level code-splitting: heavy pages and portals are loaded on-demand
@@ -298,7 +299,7 @@ export default function App() {
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1">
+      <main className="flex-1 main-content">
         <ErrorBoundary
           fallbackTitle={language === 'bn' ? 'পৃষ্ঠা লোড করতে ত্রুটি হয়েছে' : 'Page Load Notice'}
           fallbackMessage={
@@ -396,6 +397,22 @@ export default function App() {
         <Footer
           language={language}
           onNavigate={(view) => {
+            setActiveView(view);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      </div>
+
+      {/* Mobile Fixed Bottom Navigation (iOS Safe Area Compliant, hidden on sm+) */}
+      <div className="no-print">
+        <MobileBottomNav
+          language={language}
+          activeView={activeView}
+          onNavigate={(view) => {
+            if (view === 'register' && activeView === 'ticket') {
+              handleStartNewRegistration();
+              return;
+            }
             setActiveView(view);
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}

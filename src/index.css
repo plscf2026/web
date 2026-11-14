@@ -138,6 +138,116 @@
   line-height: 1.45rem !important;
 }
 
+/* =========================================================================
+   1. MOBILE INPUT FIELDS & SAFARI ZOOM FIX (< 768px)
+   iOS Safari automatically zooms when inputs have font-size < 16px.
+   Ensure all form controls evaluate to >= 16px on mobile viewports.
+   ========================================================================= */
+@media (max-width: 767.98px) {
+  input,
+  select,
+  textarea,
+  input.text-xs,
+  input.text-sm,
+  input.text-\[9px\],
+  input.text-\[10px\],
+  input.text-\[11px\],
+  select.text-xs,
+  select.text-sm,
+  textarea.text-xs,
+  textarea.text-sm {
+    font-size: 16px !important;
+    line-height: 1.45 !important;
+  }
+}
+
+/* =========================================================================
+   2. AMOUNTS & LARGE NUMBERS NON-BREAKING & CLAMPING RULES
+   Prevents currency symbols (+, ৳, $, etc.) and amounts from line-wrapping.
+   ========================================================================= */
+.currency-amount,
+.amount-nowrap,
+.numeric-nowrap {
+  white-space: nowrap !important;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  word-break: keep-all;
+}
+
+/* Fluid responsive large numeric clamps */
+.stat-number-clamp {
+  font-size: clamp(1.25rem, 4vw, 2.25rem);
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.hero-amount-clamp {
+  font-size: clamp(1.5rem, 5.5vw, 3rem);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+/* =========================================================================
+   3. TOUCH-FRIENDLY CONTROLS (Coarse Pointer / Touch Devices)
+   Ensures minimum 44px × 44px touch targets on touchscreens (Apple HIG & WCAG).
+   ========================================================================= */
+@media (hover: none) and (pointer: coarse) {
+  .touch-target,
+  button.touch-target,
+  a.touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .pagination-touch-btn {
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+
+  .mobile-table-action-btn {
+    min-height: 44px;
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* =========================================================================
+   4. FIXED BOTTOM NAVIGATION & IPHONE SAFE AREA INSETS
+   Respects iOS home indicator with env(safe-area-inset-bottom).
+   ========================================================================= */
+:root {
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-top: env(safe-area-inset-top, 0px);
+}
+
+.fixed-bottom-navigation {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 45;
+  background-color: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid rgba(226, 238, 248, 0.15);
+  padding-top: 8px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.35);
+}
+
+.main-content {
+  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 640px) {
+  .main-content {
+    padding-bottom: 0px;
+  }
+}
+
 /* Animated Square QR Laser Scanning Beam (GPU 3D Accelerated - Zero Layout Reflow) */
 @keyframes qrLaserScan {
   0% {

@@ -312,7 +312,8 @@ export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentA
 
       {/* Staff Accounts Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View (>= 640px) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
@@ -368,7 +369,7 @@ export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentA
                       <div className="inline-flex items-center gap-1">
                         <button
                           onClick={() => handleToggleStatus(staff)}
-                          className={`p-1.5 rounded-lg transition-colors ${
+                          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                             staff.status === 'ACTIVE'
                               ? 'text-slate-500 hover:text-amber-600 hover:bg-amber-50'
                               : 'text-slate-500 hover:text-emerald-600 hover:bg-emerald-50'
@@ -384,7 +385,7 @@ export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentA
                         {staff.role !== 'SUPER_ADMIN' && (
                           <button
                             onClick={() => handleDeleteStaff(staff)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                             title="Delete Staff"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -397,6 +398,88 @@ export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentA
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Responsive Cards (< 640px) */}
+        <div className="sm:hidden space-y-3">
+          {filteredStaff.length === 0 ? (
+            <div className="p-6 text-center text-slate-400 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
+              No staff accounts found matching your query.
+            </div>
+          ) : (
+            paginate(filteredStaff, currentPage, pageSize).map((staff) => (
+              <div key={`mobile-stf-${staff.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="font-bold text-slate-900 block text-sm">{staff.fullName}</span>
+                    <span className="font-mono text-xs text-indigo-700 font-semibold">@{staff.username}</span>
+                  </div>
+                  {staff.status === 'ACTIVE' ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Active
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
+                      <XCircle className="w-3.5 h-3.5" />
+                      Disabled
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-1.5 text-xs pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Role</span>
+                    <span>{getRoleBadge(staff.role)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Assigned Station</span>
+                    <span className="font-medium text-slate-800">{staff.assignedGate || 'Central Command'}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-500 font-mono text-[11px]">
+                    <span>Email</span>
+                    <span>{staff.email}</span>
+                  </div>
+                </div>
+
+                {/* Mobile Touch Action Buttons (>= 44px) */}
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleStatus(staff)}
+                    className={`flex-1 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-2 border ${
+                      staff.status === 'ACTIVE'
+                        ? 'border-amber-300 bg-amber-50 text-amber-800 active:bg-amber-100'
+                        : 'border-emerald-300 bg-emerald-50 text-emerald-800 active:bg-emerald-100'
+                    }`}
+                  >
+                    {staff.status === 'ACTIVE' ? (
+                      <>
+                        <Lock className="w-4 h-4 text-amber-700" />
+                        <span>Deactivate Account</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                        <span>Activate Account</span>
+                      </>
+                    )}
+                  </button>
+
+                  {staff.role !== 'SUPER_ADMIN' && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteStaff(staff)}
+                      className="min-h-[44px] min-w-[44px] p-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 active:bg-rose-100 flex items-center justify-center cursor-pointer"
+                      title="Delete Staff"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Staff Global Pagination */}

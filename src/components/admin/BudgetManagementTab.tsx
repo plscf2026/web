@@ -445,7 +445,8 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Desktop Table View (>= 640px) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
@@ -477,13 +478,13 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
                         {stf.role}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap inline-block tabular-nums">
                       BDT {sSummary.totalAllocated.toLocaleString()}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-amber-700 font-semibold">
+                    <td className="py-2.5 px-3 text-right font-mono text-amber-700 font-semibold whitespace-nowrap inline-block tabular-nums">
                       BDT {(sSummary.totalSubmittedExpenses + sSummary.totalApprovedExpenses).toLocaleString()}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-700">
+                    <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-700 whitespace-nowrap inline-block tabular-nums">
                       BDT {sSummary.remainingSpendableBalance.toLocaleString()}
                     </td>
                     <td className="py-2.5 px-3 text-center">
@@ -511,6 +512,67 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Responsive Cards (< 640px) */}
+        <div className="sm:hidden space-y-3">
+          {paginate(staffList, staffPage, staffPageSize).map((stf) => {
+            const sSummary = calculateStaffFinancialSummary(
+              stf.id,
+              stf.fullName,
+              allocations,
+              expenses,
+              ledger
+            );
+            return (
+              <div key={`mobile-stf-budget-${stf.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="font-bold text-slate-900 block text-sm">{stf.fullName}</span>
+                    <span className="font-mono text-xs text-slate-500 font-bold">{stf.id}</span>
+                  </div>
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase shrink-0 ${
+                      stf.status === 'ACTIVE'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {stf.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Allocated</span>
+                    <span className="font-mono font-bold text-slate-900 text-xs whitespace-nowrap inline-block tabular-nums">
+                      BDT {sSummary.totalAllocated.toLocaleString()}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Recorded Spent</span>
+                    <span className="font-mono text-amber-700 font-semibold text-xs whitespace-nowrap inline-block tabular-nums">
+                      BDT {(sSummary.totalSubmittedExpenses + sSummary.totalApprovedExpenses).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="col-span-2 bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-100 flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-emerald-900 uppercase">Remaining Spendable</span>
+                    <span className="font-mono font-black text-emerald-700 text-sm whitespace-nowrap inline-block tabular-nums">
+                      BDT {sSummary.remainingSpendableBalance.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleCloseStaffAccount(stf.id, stf.fullName)}
+                  className="w-full min-h-[44px] px-3 py-2 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center border border-rose-200"
+                >
+                  Close Account & Reconcile
+                </button>
+              </div>
+            );
+          })}
         </div>
 
         {/* Staff Allocations Global Pagination */}
@@ -560,103 +622,196 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
             No expenses found matching the criteria.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
-                  <th className="py-2.5 px-3">Date</th>
-                  <th className="py-2.5 px-3">Staff Incharge</th>
-                  <th className="py-2.5 px-3">Category</th>
-                  <th className="py-2.5 px-3">Description</th>
-                  <th className="py-2.5 px-3 text-right">Amount (BDT)</th>
-                  <th className="py-2.5 px-3 text-center">Receipt</th>
-                  <th className="py-2.5 px-3 text-center">Status</th>
-                  <th className="py-2.5 px-3 text-right">Super Admin Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {paginate(filteredExpenses, expensePage, expensePageSize).map((exp) => (
-                  <tr key={exp.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 whitespace-nowrap">
-                      {exp.expenseDate}
-                    </td>
-                    <td className="py-2.5 px-3 font-semibold text-slate-900">{exp.staffName}</td>
-                    <td className="py-2.5 px-3 text-slate-700">{exp.category}</td>
-                    <td className="py-2.5 px-3 text-slate-600 max-w-xs truncate">{exp.description}</td>
-                    <td className="py-2.5 px-3 text-right font-mono font-black text-slate-900">
+          <>
+            {/* Desktop Table View (>= 640px) */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
+                    <th className="py-2.5 px-3">Date</th>
+                    <th className="py-2.5 px-3">Staff Incharge</th>
+                    <th className="py-2.5 px-3">Category</th>
+                    <th className="py-2.5 px-3">Description</th>
+                    <th className="py-2.5 px-3 text-right">Amount (BDT)</th>
+                    <th className="py-2.5 px-3 text-center">Receipt</th>
+                    <th className="py-2.5 px-3 text-center">Status</th>
+                    <th className="py-2.5 px-3 text-right">Super Admin Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paginate(filteredExpenses, expensePage, expensePageSize).map((exp) => (
+                    <tr key={exp.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                        {exp.expenseDate}
+                      </td>
+                      <td className="py-2.5 px-3 font-semibold text-slate-900">{exp.staffName}</td>
+                      <td className="py-2.5 px-3 text-slate-700">{exp.category}</td>
+                      <td className="py-2.5 px-3 text-slate-600 max-w-xs truncate">{exp.description}</td>
+                      <td className="py-2.5 px-3 text-right font-mono font-black text-slate-900 whitespace-nowrap inline-block tabular-nums">
+                        BDT {exp.amount.toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        {exp.receiptUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => setViewingVoucherExpense(exp)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition border border-indigo-200 cursor-pointer shadow-2xs"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>View Voucher</span>
+                          </button>
+                        ) : (
+                          <span className="text-slate-400 font-mono text-[11px]">—</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            exp.status === 'APPROVED'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : exp.status === 'SUBMITTED'
+                              ? 'bg-amber-100 text-amber-800'
+                              : exp.status === 'REJECTED'
+                              ? 'bg-rose-100 text-rose-800'
+                              : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {exp.status}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {exp.status === 'SUBMITTED' && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setSelectedExpenseForReview(exp);
+                                  setReviewAction('APPROVE');
+                                }}
+                                className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] cursor-pointer"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedExpenseForReview(exp);
+                                  setReviewAction('REJECT');
+                                }}
+                                className="px-2 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] cursor-pointer"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                          {exp.status === 'APPROVED' && (
+                            <button
+                              onClick={() => {
+                                setSelectedExpenseForReview(exp);
+                                setReviewAction('VOID');
+                              }}
+                              className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-900 text-slate-200 font-bold text-[10px] cursor-pointer"
+                            >
+                              Void
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Responsive Cards (< 640px) */}
+            <div className="sm:hidden space-y-3">
+              {paginate(filteredExpenses, expensePage, expensePageSize).map((exp) => (
+                <div key={`mobile-exp-vouch-${exp.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-bold text-slate-900 block text-sm">{exp.staffName}</span>
+                      <span className="text-[11px] text-slate-500 font-mono">{exp.expenseDate} • {exp.category}</span>
+                    </div>
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                        exp.status === 'APPROVED'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : exp.status === 'SUBMITTED'
+                          ? 'bg-amber-100 text-amber-800'
+                          : exp.status === 'REJECTED'
+                          ? 'bg-rose-100 text-rose-800'
+                          : 'bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {exp.status}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    {exp.description}
+                  </p>
+
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Amount</span>
+                    <span className="font-mono font-black text-slate-900 text-sm whitespace-nowrap inline-block tabular-nums">
                       BDT {exp.amount.toLocaleString()}
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      {exp.receiptUrl ? (
+                    </span>
+                  </div>
+
+                  {/* Actions for Mobile with >= 44px touch targets */}
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+                    {exp.receiptUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setViewingVoucherExpense(exp)}
+                        className="flex-1 min-h-[44px] px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition border border-indigo-200 cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <Eye className="w-4 h-4 text-indigo-600" />
+                        <span>View Voucher</span>
+                      </button>
+                    )}
+
+                    {exp.status === 'SUBMITTED' && (
+                      <>
                         <button
                           type="button"
-                          onClick={() => setViewingVoucherExpense(exp)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition border border-indigo-200 cursor-pointer shadow-2xs"
+                          onClick={() => {
+                            setSelectedExpenseForReview(exp);
+                            setReviewAction('APPROVE');
+                          }}
+                          className="flex-1 min-h-[44px] px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs transition cursor-pointer flex items-center justify-center"
                         >
-                          <Eye className="w-3.5 h-3.5 text-indigo-600" />
-                          <span>View Voucher</span>
+                          Approve
                         </button>
-                      ) : (
-                        <span className="text-slate-400 font-mono text-[11px]">—</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          exp.status === 'APPROVED'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : exp.status === 'SUBMITTED'
-                            ? 'bg-amber-100 text-amber-800'
-                            : exp.status === 'REJECTED'
-                            ? 'bg-rose-100 text-rose-800'
-                            : 'bg-slate-200 text-slate-700'
-                        }`}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedExpenseForReview(exp);
+                            setReviewAction('REJECT');
+                          }}
+                          className="flex-1 min-h-[44px] px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold text-xs transition cursor-pointer flex items-center justify-center"
+                        >
+                          Reject
+                        </button>
+                      </>
+                    )}
+
+                    {exp.status === 'APPROVED' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedExpenseForReview(exp);
+                          setReviewAction('VOID');
+                        }}
+                        className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-slate-200 font-bold text-xs transition cursor-pointer flex items-center justify-center"
                       >
-                        {exp.status}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {exp.status === 'SUBMITTED' && (
-                          <>
-                            <button
-                              onClick={() => {
-                                setSelectedExpenseForReview(exp);
-                                setReviewAction('APPROVE');
-                              }}
-                              className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] cursor-pointer"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => {
-                                setSelectedExpenseForReview(exp);
-                                setReviewAction('REJECT');
-                              }}
-                              className="px-2 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] cursor-pointer"
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-                        {exp.status === 'APPROVED' && (
-                          <button
-                            onClick={() => {
-                              setSelectedExpenseForReview(exp);
-                              setReviewAction('VOID');
-                            }}
-                            className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-900 text-slate-200 font-bold text-[10px] cursor-pointer"
-                          >
-                            Void
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        Void Approval
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
         {/* Expenses Global Pagination */}

@@ -478,8 +478,8 @@ export const DailyAnalyticsTab: React.FC<DailyAnalyticsTabProps> = ({
           </div>
         </div>
 
-        {/* Records Table */}
-        <div className="overflow-x-auto pt-2">
+        {/* Desktop Table View (>= 640px) */}
+        <div className="hidden sm:block overflow-x-auto pt-2">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
@@ -504,7 +504,7 @@ export const DailyAnalyticsTab: React.FC<DailyAnalyticsTabProps> = ({
                     {getDhakaDateString(r.registeredAt)}
                   </td>
                   <td className="py-2 px-3 font-mono font-bold text-slate-700">{r.tShirtSize}</td>
-                  <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">
+                  <td className="py-2 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap inline-block tabular-nums">
                     BDT {r.totalPaid.toLocaleString()}
                   </td>
                   <td className="py-2 px-3 text-center">
@@ -522,6 +522,52 @@ export const DailyAnalyticsTab: React.FC<DailyAnalyticsTabProps> = ({
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Responsive Cards (< 640px) */}
+        <div className="sm:hidden space-y-3 pt-2">
+          {paginate(filteredRegistrations, currentPage, pageSize).map((r) => (
+            <div key={`mobile-daily-${r.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="font-bold text-slate-900 block text-sm truncate">{r.fullName}</span>
+                  <span className="font-mono text-xs text-slate-500 font-semibold">{r.id}</span>
+                </div>
+                <span
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase shrink-0 ${
+                    r.paymentStatus === 'paid'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}
+                >
+                  {r.paymentStatus}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Year / Class</span>
+                  <span className="font-medium text-slate-700">
+                    {r.passingYear || (r.category === 'current' ? 'Current Enrolled' : '—')}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">T-Shirt</span>
+                  <span className="font-mono font-bold text-slate-800">Size {r.tShirtSize}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Registration Date</span>
+                  <span className="font-mono text-slate-500 text-[11px]">{getDhakaDateString(r.registeredAt)}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Fee Paid</span>
+                  <span className="font-mono font-black text-slate-900 text-sm whitespace-nowrap inline-block tabular-nums">
+                    BDT {r.totalPaid.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Global Pagination */}
