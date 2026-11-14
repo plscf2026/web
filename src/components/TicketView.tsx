@@ -17,6 +17,7 @@ import { RegistrationRecord, Language } from '../types';
 import { translations } from '../i18n/translations';
 import { formatSafeQrPayload } from '../utils/tokenGenerator';
 import { StudentIdCardBadge } from './idcard/StudentIdCardBadge';
+import { ParentIdCardBadge } from './idcard/ParentIdCardBadge';
 import { IdCardStore } from '../services/idCardStore';
 
 interface TicketViewProps {
@@ -126,30 +127,65 @@ export const TicketView: React.FC<TicketViewProps> = ({
 
       {/* Official Student ID Card Section */}
       {isPaid ? (
-        <div className="no-print mb-8 bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 rounded-3xl p-6 text-white shadow-xl border border-sky-800/40">
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-            <div className="text-center lg:text-left space-y-2 max-w-md">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 text-xs font-bold border border-sky-400/30">
-                <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
-                <span>{language === 'bn' ? 'অফিসিয়াল স্টুডেন্ট আইডি কার্ড' : 'Official Student ID Card'}</span>
-              </span>
-              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                {language === 'bn' ? 'আইডি কার্ড প্রিন্ট বা ডাউনলোড করুন' : 'Print or Download Your Student ID Card'}
-              </h2>
-              <p className="text-xs text-sky-200/80 leading-relaxed">
-                {language === 'bn'
-                  ? 'ইভেন্টে প্রবেশের জন্য অফিসিয়াল আইডি কার্ডের ছবি সরাসরি প্রিন্ট করুন অথবা উচ্চমানের PDF ও Photo ডাউনলোড করুন।'
-                  : 'Print your official ID card photo directly, or download print-ready PDF and photo image for your mobile gallery.'}
-              </p>
-            </div>
-            <div className="flex-shrink-0">
-              <StudentIdCardBadge
-                student={IdCardStore.getOrBuildCardForRegistration(registration)}
-                language={language}
-              />
+        <>
+          <div className="no-print mb-8 bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 rounded-3xl p-6 text-white shadow-xl border border-sky-800/40">
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+              <div className="text-center lg:text-left space-y-2 max-w-md">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 text-xs font-bold border border-sky-400/30">
+                  <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
+                  <span>{language === 'bn' ? 'অফিসিয়াল স্টুডেন্ট আইডি কার্ড' : 'Official Student ID Card'}</span>
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  {language === 'bn' ? 'আইডি কার্ড প্রিন্ট বা ডাউনলোড করুন' : 'Print or Download Your Student ID Card'}
+                </h2>
+                <p className="text-xs text-sky-200/80 leading-relaxed">
+                  {language === 'bn'
+                    ? 'ইভেন্টে প্রবেশের জন্য অফিসিয়াল আইডি কার্ডের ছবি সরাসরি প্রিন্ট করুন অথবা উচ্চমানের PDF ও Photo ডাউনলোড করুন।'
+                    : 'Print your official ID card photo directly, or download print-ready PDF and photo image for your mobile gallery.'}
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                <StudentIdCardBadge
+                  student={IdCardStore.getOrBuildCardForRegistration(registration)}
+                  language={language}
+                />
+              </div>
             </div>
           </div>
-        </div>
+
+          {/* Parent / Guardian Entry Pass Card Section (If registered with parent) */}
+          {registration.hasParent && (
+            <div className="no-print mb-8 bg-gradient-to-br from-[#24040F] via-[#450A1A] to-[#24040F] rounded-3xl p-6 text-white shadow-xl border border-amber-500/40">
+              <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+                <div className="text-center lg:text-left space-y-2 max-w-md">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-400/30">
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{language === 'bn' ? 'অফিসিয়াল অভিভাবক পাস' : 'Official Parent / Guardian Pass'}</span>
+                  </span>
+                  <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                    {language === 'bn' ? 'অভিভাবক প্রবেশ পাস কার্ড' : 'Parent / Guardian Entry Pass'}
+                  </h2>
+                  <p className="text-xs text-amber-200/80 leading-relaxed">
+                    {language === 'bn'
+                      ? 'শিক্ষার্থীর সাথে ১ জন অভিভাবক প্রবেশের জন্য এই পাসটি ব্যবহার করুন। কার্ডের ছবি প্রিন্ট অথবা ডাউনলোড করুন।'
+                      : 'Use this dedicated pass for ONE accompanying parent/guardian. Print or download the pass below.'}
+                  </p>
+                  <div className="pt-2 text-xs text-amber-300/90 font-mono space-y-1">
+                    <div>অভিভাবক / Parent: <span className="font-bold text-white">{registration.parentName || 'N/A'}</span></div>
+                    <div>সম্পর্ক / Relation: <span className="font-bold text-white">{registration.parentRelation || 'Guardian'}</span></div>
+                    <div>মোবাইল / Phone: <span className="font-bold text-white">{registration.parentPhone || 'N/A'}</span></div>
+                  </div>
+                </div>
+                <div className="flex-shrink-0">
+                  <ParentIdCardBadge
+                    student={IdCardStore.getOrBuildCardForRegistration(registration)}
+                    language={language}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       ) : (
         <div className="no-print mb-8 bg-amber-50 rounded-3xl p-6 border-2 border-amber-300 text-center space-y-3">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-bold">

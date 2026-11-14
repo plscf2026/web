@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Utensils,
   Coffee,
@@ -80,6 +80,19 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
   const refreshDistributions = () => {
     setDistributions(EventStore.getFoodDistributions());
   };
+
+  useEffect(() => {
+    EventStore.initRealtimeSync();
+    EventStore.syncDistributionsWithSupabase().then(refreshDistributions);
+
+    const onSync = () => refreshDistributions();
+    window.addEventListener('plscf_food_sync', onSync);
+    window.addEventListener('plscf_all_stations_synced', onSync);
+    return () => {
+      window.removeEventListener('plscf_food_sync', onSync);
+      window.removeEventListener('plscf_all_stations_synced', onSync);
+    };
+  }, []);
 
   // Handle QR Camera scan or manual Registration ID + QR Token verification
   const handleProcessScan = async (codeToSearch: string, tokenParam?: string) => {

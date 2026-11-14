@@ -2,7 +2,7 @@ export type StudentCategory = 'former' | 'current';
 
 export type TShirtSize = 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'XXXL' | 'Oversize 50';
 
-export type PaymentMethod = 'bkash' | 'nagad' | 'rocket' | 'card';
+export type PaymentMethod = 'bkash' | 'nagad' | 'rocket' | 'card' | 'amex';
 
 export type PaymentStatus = 'paid' | 'pending' | 'failed' | 'refunded';
 
@@ -36,6 +36,16 @@ export interface RegistrationRecord {
   registeredAt: string;
   qrToken: string;
   isTShirtCollected: boolean;
+  isCheckedIn?: boolean;
+  gender?: 'male' | 'female';
+  bloodGroup?: string;
+  hasParent?: boolean;
+  parentName?: string;
+  parentAge?: number | string;
+  parentPhone?: string;
+  parentRelation?: string;
+  parentFee?: number;
+  gatewayCharge?: number;
   notes?: string;
   year?: number;
   isDemo?: boolean;

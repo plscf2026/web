@@ -58,6 +58,8 @@ test('Registration validation with optional email for Alumni and Current student
     mobileNumber: '01712345678',
     email: '', // Empty email allowed
     address: 'Faridpur',
+    gender: 'male',
+    bloodGroup: 'O+',
     category: 'former',
     passingYear: '2005',
     lastClassAttended: 'SSC',
@@ -164,6 +166,8 @@ test('Current Student registration requires verified student ID', () => {
     photoUrl: 'data:image/png;base64,sample',
     mobileNumber: '01811223344',
     address: 'Faridpur',
+    gender: 'male',
+    bloodGroup: 'A+',
     category: 'current',
     currentClass: 'Class 10',
     batchName: 'Class 10 Section A',

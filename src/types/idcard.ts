@@ -63,6 +63,13 @@ export interface StudentIdCardRecord {
   pdfDataUri?: string; // Cached client-side data URI
   pdfFileSizeBytes?: number;
   pdfChecksum?: string;
+  gender?: 'male' | 'female';
+  bloodGroup?: string;
+  hasParent?: boolean;
+  parentName?: string;
+  parentAge?: number | string;
+  parentPhone?: string;
+  parentRelation?: string;
   cardDimensions: '54x86mm';
   version: number;
   generatedAt?: string;

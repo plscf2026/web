@@ -7,6 +7,8 @@ import {
   calculateTotalFee,
   verifyGateScan,
   calculateFinancialSummary,
+  getGatewayChargeRate,
+  calculateGatewayCharge,
   RegistrationFormData,
 } from './rules';
 import { RegistrationRecord, DonationRecord, ExpenseRecord, FeeSettings } from '../types';
@@ -41,6 +43,8 @@ test('validateRegistrationData for former and current students', () => {
     mobileNumber: '01711223344',
     email: 'rahim@example.com',
     address: 'Faridpur Sadar',
+    gender: 'male',
+    bloodGroup: 'B+',
     category: 'former',
     passingYear: '2010',
     batchName: 'SSC 2010',
@@ -251,4 +255,111 @@ test('calculateFinancialSummary correctly aggregates numbers', () => {
   assert.equal(summary.totalIncome, 12500); // 2000 + 10500
   assert.equal(summary.totalExpenses, 4000);
   assert.equal(summary.remainingBalance, 8500);
+});
+
+test('Blood Group validation in registration rules', () => {
+  const baseData: RegistrationFormData = {
+    fullName: 'Ananya Sen',
+    photoUrl: 'data:image/png;base64,sample',
+    mobileNumber: '01711223344',
+    address: 'Faridpur',
+    gender: 'female',
+    category: 'former',
+    passingYear: '2015',
+    batchName: 'SSC 2015',
+    tShirtSize: 'M',
+    donationAmount: 0,
+    termsAccepted: true,
+  };
+
+  // Missing blood group: fails
+  const resNoBlood = validateRegistrationData({ ...baseData, bloodGroup: '' });
+  assert.equal(resNoBlood.isValid, false);
+  assert.ok(resNoBlood.errors.bloodGroup);
+
+  // Valid blood group: passes
+  const resValidBlood = validateRegistrationData({ ...baseData, bloodGroup: 'AB+' });
+  assert.equal(resValidBlood.isValid, true);
+  assert.equal(resValidBlood.errors.bloodGroup, undefined);
+});
+
+test('Accompanying Parent / Guardian validation & fee calculation rules', () => {
+  const feeSettings = {
+    formerStudentFee: 1500,
+    currentStudentFee: 1000,
+    registrationOpen: true,
+  };
+
+  // 1. Fee calculation without parent
+  const feesWithoutParent = calculateTotalFee('former', feeSettings, 500, false);
+  assert.equal(feesWithoutParent.registrationFee, 1500);
+  assert.equal(feesWithoutParent.parentFee, 0);
+  assert.equal(feesWithoutParent.donationAmount, 500);
+  assert.equal(feesWithoutParent.totalPayable, 2000);
+
+  // 2. Fee calculation WITH accompanying parent (+৳1,500)
+  const feesWithParent = calculateTotalFee('former', feeSettings, 500, true);
+  assert.equal(feesWithParent.registrationFee, 1500);
+  assert.equal(feesWithParent.parentFee, 1500);
+  assert.equal(feesWithParent.donationAmount, 500);
+  assert.equal(feesWithParent.totalPayable, 3500); // 1500 + 1500 + 500
+
+  // 3. Parent field validation when hasParent is true
+  const baseStudent: RegistrationFormData = {
+    fullName: 'Fatema Begum',
+    photoUrl: 'data:image/png;base64,sample',
+    mobileNumber: '01811223344',
+    address: 'Faridpur',
+    gender: 'female',
+    bloodGroup: 'O+',
+    category: 'former',
+    passingYear: '2018',
+    batchName: 'SSC 2018',
+    tShirtSize: 'S',
+    donationAmount: 0,
+    termsAccepted: true,
+    hasParent: true,
+  };
+
+  // Missing parent fields
+  const resMissingParent = validateRegistrationData(baseStudent);
+  assert.equal(resMissingParent.isValid, false);
+  assert.ok(resMissingParent.errors.parentName);
+  assert.ok(resMissingParent.errors.parentAge);
+  assert.ok(resMissingParent.errors.parentPhone);
+  assert.ok(resMissingParent.errors.parentRelation);
+
+  // Valid parent fields provided
+  const resValidParent = validateRegistrationData({
+    ...baseStudent,
+    parentName: 'Abdul Malek',
+    parentAge: 52,
+    parentPhone: '01700000000',
+    parentRelation: 'Father',
+  });
+  assert.equal(resValidParent.isValid, true);
+  assert.equal(resValidParent.errors.parentName, undefined);
+  assert.equal(resValidParent.errors.parentPhone, undefined);
+});
+
+test('Dynamic Payment Gateway Service Charges: bKash 1.85%, Other MFS 1.50%, Card 2.10%, Amex 3.10%', () => {
+  // 1. Rate lookups
+  assert.equal(getGatewayChargeRate('bkash'), 0.0185);
+  assert.equal(getGatewayChargeRate('nagad'), 0.0150);
+  assert.equal(getGatewayChargeRate('rocket'), 0.0150);
+  assert.equal(getGatewayChargeRate('card'), 0.0210);
+  assert.equal(getGatewayChargeRate('amex'), 0.0310);
+
+  // 2. Exact charge calculation on ৳1,500 base amount
+  assert.equal(calculateGatewayCharge(1500, 'bkash'), 27.75); // 1500 * 1.85%
+  assert.equal(calculateGatewayCharge(1500, 'nagad'), 22.5);  // 1500 * 1.50%
+  assert.equal(calculateGatewayCharge(1500, 'rocket'), 22.5); // 1500 * 1.50%
+  assert.equal(calculateGatewayCharge(1500, 'card'), 31.5);   // 1500 * 2.10%
+  assert.equal(calculateGatewayCharge(1500, 'amex'), 46.5);   // 1500 * 3.10%
+
+  // 3. Exact charge calculation on ৳3,000 (Student + Parent: 1500 + 1500)
+  assert.equal(calculateGatewayCharge(3000, 'bkash'), 55.5);
+  assert.equal(calculateGatewayCharge(3000, 'nagad'), 45.0);
+  assert.equal(calculateGatewayCharge(3000, 'card'), 63.0);
+  assert.equal(calculateGatewayCharge(3000, 'amex'), 93.0);
 });

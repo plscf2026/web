@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ShieldCheck,
   Search,
@@ -64,6 +64,19 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
   const refreshEvents = () => {
     setGateEvents(EventStore.getGateEvents());
   };
+
+  useEffect(() => {
+    EventStore.initRealtimeSync();
+    EventStore.syncDistributionsWithSupabase().then(refreshEvents);
+
+    const onSync = () => refreshEvents();
+    window.addEventListener('plscf_gate_sync', onSync);
+    window.addEventListener('plscf_all_stations_synced', onSync);
+    return () => {
+      window.removeEventListener('plscf_gate_sync', onSync);
+      window.removeEventListener('plscf_all_stations_synced', onSync);
+    };
+  }, []);
 
   // Handle QR Camera scan or manual Registration ID + QR Token verification
   const handleProcessScan = async (codeToSearch: string, tokenParam?: string) => {

@@ -1448,15 +1448,30 @@ export class AppStore {
     });
   }
 
-  static updateRegistration(id: string, updates: Partial<RegistrationRecord>, year: number = 2026): RegistrationRecord | null {
+  static updateRegistration(id: string, updates: Partial<RegistrationRecord>, year: number = 2027): RegistrationRecord | null {
     const list = this.getRegistrations();
     const index = list.findIndex((r) => r.id === id);
     if (index === -1) return null;
     list[index] = { ...list[index], ...updates };
     this.saveRegistrations(list);
 
-    // Sync updated record to Supabase
-    SupabaseService.saveRegistration(list[index], year).catch(() => { });
+    // Sync updated fields directly to Supabase cloud table registrations_2027
+    const yearTableName = `registrations_${year || 2027}`;
+    const dbUpdates: any = {};
+    if (updates.isTShirtCollected !== undefined) dbUpdates.is_tshirt_collected = updates.isTShirtCollected;
+    if (updates.isCheckedIn !== undefined) dbUpdates.is_checked_in = updates.isCheckedIn;
+    if (updates.paymentStatus !== undefined) dbUpdates.payment_status = updates.paymentStatus;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+
+    if (Object.keys(dbUpdates).length > 0) {
+      supabase.from(yearTableName).update(dbUpdates).eq('id', id).then(undefined, () => {});
+      supabase.from('registrations_2027').update(dbUpdates).eq('id', id).then(undefined, () => {});
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('plscf_registration_updated', { detail: list[index] }));
+    }
+
     return list[index];
   }
 

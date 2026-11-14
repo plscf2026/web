@@ -19,9 +19,10 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { Language, PaymentMethod, RegistrationRecord } from '../types';
-import { RegistrationFormData } from '../utils/rules';
+import { RegistrationFormData, calculateGatewayCharge, getGatewayChargeRate } from '../utils/rules';
 import { PayStationService, PayStationPaymentResult } from '../services/paystation';
 import { StudentIdCardBadge } from './idcard/StudentIdCardBadge';
+import { ParentIdCardBadge } from './idcard/ParentIdCardBadge';
 import { IdCardStore } from '../services/idCardStore';
 import { AppStore } from '../services/store';
 
@@ -53,11 +54,12 @@ const POLL_INTERVAL_MS = 5000;
 /** Max number of poll attempts before giving up */
 const MAX_POLL_ATTEMPTS = 24;   // 24 × 5 s = 2 min
 
-const PAYMENT_METHODS: { id: PaymentMethod; name: string; color: string; bg: string }[] = [
-  { id: 'bkash',  name: 'bKash',   color: 'border-pink-500 text-pink-600',   bg: 'hover:bg-pink-50' },
-  { id: 'nagad',  name: 'Nagad',   color: 'border-orange-500 text-orange-600', bg: 'hover:bg-orange-50' },
-  { id: 'rocket', name: 'Rocket',  color: 'border-purple-500 text-purple-600', bg: 'hover:bg-purple-50' },
-  { id: 'card',   name: 'Cards',   color: 'border-blue-600 text-blue-700',    bg: 'hover:bg-blue-50' },
+const PAYMENT_METHODS: { id: PaymentMethod; name: string; chargeRate: string; color: string; bg: string }[] = [
+  { id: 'bkash',  name: 'bKash',                    chargeRate: '1.85%', color: 'border-pink-500 text-pink-600',     bg: 'hover:bg-pink-50' },
+  { id: 'nagad',  name: 'Nagad',                    chargeRate: '1.50%', color: 'border-orange-500 text-orange-600', bg: 'hover:bg-orange-50' },
+  { id: 'rocket', name: 'Rocket (Other MFS)',       chargeRate: '1.50%', color: 'border-purple-500 text-purple-600', bg: 'hover:bg-purple-50' },
+  { id: 'card',   name: 'Card (VISA / Master)',     chargeRate: '2.10%', color: 'border-blue-600 text-blue-700',      bg: 'hover:bg-blue-50' },
+  { id: 'amex',   name: 'Amex Card',                chargeRate: '3.10%', color: 'border-indigo-600 text-indigo-700', bg: 'hover:bg-indigo-50' },
 ];
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({
@@ -67,7 +69,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   language,
   registrationFee,
   donationAmount,
-  totalPayable,
+  totalPayable: _totalPayable,
   studentName,
   registrationData,
   initialStep,
@@ -85,8 +87,20 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [errorMessage, setErrorMessage] = useState(() => initialErrorMessage || '');
   const [completedTicket, setCompletedTicket] = useState<RegistrationRecord | null>(null);
   const [transactionSummary, setTransactionSummary] = useState<PayStationPaymentResult | null>(null);
+  const [activeCardTab, setActiveCardTab] = useState<'student' | 'parent'>('student');
   const [pollCount, setPollCount] = useState(0);
   const [copiedField, setCopiedField] = useState('');
+
+  // Dynamic fee, parent pass, and gateway charge calculation
+  // Official gateway charges:
+  // - bKash: 1.85%
+  // - Nagad / Rocket / Other MFS: 1.50%
+  // - Card (VISA / Master): 2.10%
+  // - Amex: 3.10%
+  const parentFee = registrationData?.hasParent ? 1500 : 0;
+  const subtotal = registrationFee + parentFee + donationAmount;
+  const gatewayCharge = calculateGatewayCharge(subtotal, selectedMethod);
+  const finalTotalPayable = Math.round((subtotal + gatewayCharge) * 100) / 100;
 
   // Persist invoice & amount across renders so the polling closure uses fresh values
   const pendingSession = PayStationService.getPendingSession();
@@ -98,7 +112,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     `PLSCF27-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
   const initialAmt =
-    (isVerifying && pendingSession?.amount) ? pendingSession.amount : totalPayable;
+    (isVerifying && pendingSession?.amount) ? pendingSession.amount : finalTotalPayable;
 
   const invoiceRef = useRef(initialInv);
   const amountRef = useRef(initialAmt);
@@ -113,10 +127,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   useEffect(() => {
     if (isVerifying && pendingSession?.amount) {
       amountRef.current = pendingSession.amount;
-    } else if (totalPayable > 0) {
-      amountRef.current = totalPayable;
+    } else {
+      amountRef.current = finalTotalPayable;
     }
-  }, [totalPayable, isVerifying, pendingSession?.amount]);
+  }, [finalTotalPayable, isVerifying, pendingSession?.amount]);
 
   // ── Finalize after confirmed payment ────────────────────────────────────
 
@@ -127,10 +141,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     try {
       // Synchronize donationAmount so totalPaid matches actual payment.amount
       const effectiveBaseFee = registrationData.category === 'current' ? 1000 : 1500;
-      const effectiveFee = Math.min(payment.amount, effectiveBaseFee);
-      const effectiveDonation = Math.max(0, payment.amount - effectiveFee);
+      const currentParentFee = registrationData.hasParent ? 1500 : 0;
+      const currentSubtotal = effectiveBaseFee + currentParentFee;
+      const effectiveCharge = calculateGatewayCharge(currentSubtotal, payment.method);
+      const effectiveDonation = Math.max(0, payment.amount - currentSubtotal - effectiveCharge);
       const synchronizedFormData: RegistrationFormData = {
         ...registrationData,
+        parentFee: currentParentFee,
+        gatewayCharge: effectiveCharge,
         donationAmount: effectiveDonation,
       };
 
@@ -257,7 +275,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setStep('processing');
     setErrorMessage('');
     const methodTitle =
-      method === 'nagad' ? 'Nagad' : method === 'rocket' ? 'Rocket' : method === 'card' ? 'Card' : 'bKash';
+      method === 'nagad'
+        ? 'Nagad'
+        : method === 'rocket'
+        ? 'Rocket'
+        : method === 'card'
+        ? 'Card'
+        : method === 'amex'
+        ? 'Amex Card'
+        : 'bKash';
     setProcessingStep(
       isBangla
         ? `${methodTitle} পেমেন্ট সম্পন্ন করা হচ্ছে...`
@@ -266,12 +292,23 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
     try {
       // 1. Authoritatively create or update pending registration in Supabase (payment_status='pending', total_paid=0)
+      const currentCharge = calculateGatewayCharge(subtotal, method);
+      const chargeAmount = Math.round((subtotal + currentCharge) * 100) / 100;
+
+      const enrichedFormData: RegistrationFormData = {
+        ...registrationData,
+        parentFee,
+        gatewayCharge: currentCharge,
+      };
+
       await PayStationService.createPendingRegistration(
-        registrationData,
+        enrichedFormData,
         {
           registrationFee,
           donationAmount,
-          totalPayable,
+          parentFee,
+          gatewayCharge: currentCharge,
+          totalPayable: chargeAmount,
         },
         invoiceRef.current,
         pendingSession?.registrationId
@@ -279,14 +316,22 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
       // 2. Build verified transaction result with channel-specific prefix
       const prefix =
-        method === 'nagad' ? 'NGD' : method === 'rocket' ? 'RKT' : method === 'card' ? 'CRD' : 'BKS';
+        method === 'nagad'
+          ? 'NGD'
+          : method === 'rocket'
+          ? 'RKT'
+          : method === 'card'
+          ? 'CRD'
+          : method === 'amex'
+          ? 'AMX'
+          : 'BKS';
       const simTrxId = `${prefix}-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
       const paymentResult: PayStationPaymentResult = {
         invoiceNumber: invoiceRef.current,
         trxId: simTrxId,
         status: 'Success',
-        amount: totalPayable,
+        amount: chargeAmount,
         method: method,
         payerMobile: registrationData.mobileNumber,
         timestamp: new Date().toISOString(),
@@ -307,9 +352,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       return;
     }
 
-    // In sandbox mode, PayStation's demo sandbox account (104-1653730183) server disables Nagad, Rocket, and Card
+    // In sandbox mode, PayStation's demo sandbox account (104-1653730183) server disables Nagad, Rocket, Card, and Amex
     // (rendering them disabled-gateway / blurred-wrapper on paystation.com.bd).
-    // When Nagad, Rocket, or Card is selected in Sandbox, immediately process via our full sandbox verification
+    // When Nagad, Rocket, Card, or Amex is selected in Sandbox, immediately process via our full sandbox verification
     // unless the user explicitly requested the raw external hosted link.
     if (config.isSandbox && selectedMethod !== 'bkash' && !forceHostedExternal) {
       await handleInstantSandboxPayment(selectedMethod);
@@ -321,13 +366,25 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setProcessingStep(isBangla ? 'PayStation পেমেন্ট সেশন তৈরি হচ্ছে...' : 'Creating PayStation payment session...');
 
     try {
+      const currentCharge = calculateGatewayCharge(subtotal, selectedMethod);
+      const chargeAmount = Math.round((subtotal + currentCharge) * 100) / 100;
+      amountRef.current = chargeAmount;
+
+      const enrichedFormData: RegistrationFormData = {
+        ...registrationData,
+        parentFee,
+        gatewayCharge: currentCharge,
+      };
+
       // 1. Authoritatively create or update pending registration in Supabase (payment_status='pending', total_paid=0)
       const pendingRecord = await PayStationService.createPendingRegistration(
-        registrationData,
+        enrichedFormData,
         {
           registrationFee,
           donationAmount,
-          totalPayable,
+          parentFee,
+          gatewayCharge: currentCharge,
+          totalPayable: chargeAmount,
         },
         invoiceRef.current,
         pendingSession?.registrationId
@@ -336,13 +393,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       const callbackUrl = PayStationService.buildCallbackUrl({
         type: 'registration',
         invoiceNumber: invoiceRef.current,
-        amount: totalPayable,
+        amount: chargeAmount,
       });
 
       const createRes = await PayStationService.createPayment({
         invoice_number: invoiceRef.current,
         currency: 'BDT',
-        payment_amount: totalPayable,
+        payment_amount: chargeAmount,
         pay_with_charge: 0,   // Merchant absorbs gateway charge
         reference: registrationData.category === 'current'
           ? (registrationData.studentId || 'CURRENT')
@@ -358,6 +415,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           batch: registrationData.batchName,
           tshirt: registrationData.tShirtSize,
           regId: pendingRecord.id,
+          hasParent: registrationData.hasParent,
+          charge: currentCharge,
         }),
         opt_a: registrationData.category,
         opt_b: registrationData.batchName || '',
@@ -376,12 +435,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       PayStationService.savePendingSession({
         type: 'registration',
         invoiceNumber: invoiceRef.current,
-        amount: totalPayable,
-        formData: registrationData,
+        amount: chargeAmount,
+        formData: enrichedFormData,
         fees: {
           registrationFee,
           donationAmount,
-          totalPayable,
+          parentFee,
+          gatewayCharge: currentCharge,
+          totalPayable: chargeAmount,
         },
         createdAt: new Date().toISOString(),
       });
@@ -431,7 +492,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <span>{isBangla ? 'পেমেন্ট সফলভাবে সম্পন্ন হয়েছে!' : 'Payment Verified & Confirmed!'}</span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                  {isBangla ? 'আপনার স্টুডেন্ট আইডি কার্ড' : 'Your Official Student ID Card'}
+                  {completedTicket.hasParent
+                    ? (activeCardTab === 'parent'
+                        ? (isBangla ? 'আপনার অভিভাবক প্রবেশ পাস' : 'Official Parent / Guardian Pass')
+                        : (isBangla ? 'আপনার স্টুডেন্ট আইডি কার্ড' : 'Your Official Student ID Card'))
+                    : (isBangla ? 'আপনার স্টুডেন্ট আইডি কার্ড' : 'Your Official Student ID Card')}
                 </h2>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto">
                   {isBangla
@@ -440,12 +505,47 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </p>
               </div>
 
-              {/* Official Student ID Card Badge with Live Preview, Direct Print, and Download Actions */}
+              {/* Tab selector if student registered with an accompanying parent */}
+              {completedTicket.hasParent && (
+                <div className="flex items-center justify-center gap-2 p-1 bg-slate-100 rounded-2xl max-w-xs mx-auto border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setActiveCardTab('student')}
+                    className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      activeCardTab === 'student'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    🎓 {isBangla ? 'স্টুডেন্ট কার্ড' : 'Student Card'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveCardTab('parent')}
+                    className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      activeCardTab === 'parent'
+                        ? 'bg-gradient-to-r from-rose-900 to-amber-900 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    👨‍👩‍👧 {isBangla ? 'অভিভাবক পাস' : 'Parent Pass'}
+                  </button>
+                </div>
+              )}
+
+              {/* Official ID Card Badge with Live Preview, Direct Print, and Download Actions */}
               <div className="py-2 flex flex-col items-center justify-center bg-slate-50/80 p-3 sm:p-4 rounded-3xl border border-slate-200">
-                <StudentIdCardBadge
-                  student={IdCardStore.getOrBuildCardForRegistration(completedTicket)}
-                  language={language}
-                />
+                {activeCardTab === 'parent' && completedTicket.hasParent ? (
+                  <ParentIdCardBadge
+                    student={IdCardStore.getOrBuildCardForRegistration(completedTicket)}
+                    language={language}
+                  />
+                ) : (
+                  <StudentIdCardBadge
+                    student={IdCardStore.getOrBuildCardForRegistration(completedTicket)}
+                    language={language}
+                  />
+                )}
               </div>
 
               {/* Receipt Summary — Compact & Clean */}
@@ -702,15 +802,34 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <span>{isBangla ? 'রেজিস্ট্রেশন ফি' : 'Registration Fee'}:</span>
                 <span className="font-semibold whitespace-nowrap inline-block tabular-nums">৳ {registrationFee.toLocaleString()}</span>
               </div>
+              {parentFee > 0 && (
+                <div className="flex justify-between text-amber-800 font-semibold">
+                  <span>{isBangla ? 'অভিভাবক পাস (১ জন)' : 'Accompanying Parent Pass (1 Person)'}:</span>
+                  <span className="whitespace-nowrap inline-block tabular-nums">+ ৳ {parentFee.toLocaleString()}</span>
+                </div>
+              )}
               {donationAmount > 0 && (
                 <div className="flex justify-between text-slate-600">
                   <span>{isBangla ? 'অনুদান' : 'Donation'}:</span>
                   <span className="font-semibold whitespace-nowrap inline-block tabular-nums">+ ৳ {donationAmount.toLocaleString()}</span>
                 </div>
               )}
-              <div className="flex justify-between border-t border-sky-200 pt-2 text-sm font-black text-sky-950">
+              <div className="flex justify-between text-slate-600 border-t border-sky-200/70 pt-1.5 font-medium">
+                <span>{isBangla ? 'উপমোট (Subtotal)' : 'Subtotal'}:</span>
+                <span className="font-bold whitespace-nowrap inline-block tabular-nums">৳ {subtotal.toLocaleString()} BDT</span>
+              </div>
+              <div className="flex justify-between text-indigo-700 font-medium">
+                <span className="flex items-center gap-1">
+                  <span>{isBangla ? 'গেটওয়ে চার্জ' : 'Gateway Charge'}</span>
+                  <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded font-bold">
+                    {(getGatewayChargeRate(selectedMethod) * 100).toFixed(2)}%
+                  </span>
+                </span>
+                <span className="font-semibold whitespace-nowrap inline-block tabular-nums">+ ৳ {gatewayCharge.toLocaleString()} BDT</span>
+              </div>
+              <div className="flex justify-between border-t border-sky-300 pt-2 text-sm font-black text-sky-950">
                 <span>{isBangla ? 'সর্বমোট প্রদেয়' : 'Total Payable'}:</span>
-                <span className="text-[#0284C7] text-base whitespace-nowrap inline-block tabular-nums">৳ {totalPayable.toLocaleString()} BDT</span>
+                <span className="text-[#0284C7] text-base whitespace-nowrap inline-block tabular-nums">৳ {finalTotalPayable.toLocaleString()} BDT</span>
               </div>
             </div>
 
@@ -725,29 +844,29 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   {isBangla ? 'সব চ্যানেল সক্রিয়' : 'All Channels Active'}
                 </span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                 {PAYMENT_METHODS.map((item) => (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => setSelectedMethod(item.id)}
-                    className={`min-h-[48px] py-2.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1 relative ${
+                    className={`min-h-[56px] py-2 px-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 relative ${
                       selectedMethod === item.id
                         ? `${item.color} bg-white shadow-sm ring-2 ring-sky-500`
                         : `border-slate-200 text-slate-600 hover:border-slate-400 ${item.bg}`
                     }`}
                   >
-                    <span>{item.name}</span>
-                    <span className="text-[9px] px-1.5 py-0.2 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      {isBangla ? 'সক্রিয়' : 'Active'}
+                    <span className="truncate leading-tight text-center">{item.name}</span>
+                    <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 px-1 py-0.2 rounded border border-indigo-200">
+                      +{item.chargeRate}
                     </span>
                   </button>
                 ))}
               </div>
               <p className="text-[10px] text-slate-500 mt-1.5">
                 {isBangla
-                  ? 'বিকাশ, নগদ, রকেট এবং কার্ড — সব মোবাইল ব্যাংকিং চ্যানেল কার্যকর রয়েছে।'
-                  : 'bKash, Nagad, Rocket and Cards — all mobile banking channels are enabled.'}
+                  ? 'বিকাশ, নগদ, রকেট, কার্ড এবং আমেরিকান এক্সপ্রেস (Amex) — সব গেটওয়ে চ্যানেল সক্রিয় রয়েছে।'
+                  : 'bKash, Nagad, Rocket, Cards (VISA/Master), and Amex Card are all enabled.'}
               </p>
             </div>
 
@@ -988,6 +1107,43 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     </div>
                   </>
                 )}
+
+                {selectedMethod === 'amex' && (
+                  <>
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                      {isBangla ? (
+                        <>
+                          <strong>আমেরিকান এক্সপ্রেস (Amex) সক্রিয়:</strong> Amex Card টেস্ট চ্যানেল কার্যকর রয়েছে (সার্ভিস চার্জ ৩.১০%):
+                        </>
+                      ) : (
+                        <>
+                          <strong>Amex Active:</strong> American Express sandbox channel is enabled (3.10% service charge):
+                        </>
+                      )}
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5 font-mono text-[11px]">
+                      <div className="bg-white p-2.5 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs">
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-indigo-600 tracking-wider block font-sans">
+                            Test Amex Card
+                          </span>
+                          <span className="font-bold text-slate-900 text-xs">3782 •••••• 00005</span>
+                        </div>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-sans font-semibold border border-indigo-200">
+                          Ready
+                        </span>
+                      </div>
+
+                      <div className="bg-white p-2 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs text-[11px]">
+                        <span className="text-[10px] text-slate-500 font-sans font-semibold">Exp / CID:</span>
+                        <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                          10/28 • 1234
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -1011,8 +1167,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <Lock className="w-4 h-4 text-pink-200" />
                   <span>
                     {isBangla
-                      ? `বিকাশ (PayStation)-এ ৳${totalPayable.toLocaleString()} পে করুন`
-                      : `Pay ৳${totalPayable.toLocaleString()} via bKash (PayStation)`}
+                      ? `বিকাশ (PayStation)-এ ৳${finalTotalPayable.toLocaleString()} পে করুন`
+                      : `Pay ৳${finalTotalPayable.toLocaleString()} via bKash (PayStation)`}
                   </span>
                   <ExternalLink className="w-3.5 h-3.5 opacity-70" />
                 </button>
@@ -1025,8 +1181,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <Lock className="w-4 h-4 text-orange-200" />
                   <span>
                     {isBangla
-                      ? `নগদ-এ ৳${totalPayable.toLocaleString()} পে করুন (নিশ্চিত ও টিকিট তৈরি)`
-                      : `Pay ৳${totalPayable.toLocaleString()} via Nagad (Confirm & Ticket)`}
+                      ? `নগদ-এ ৳${finalTotalPayable.toLocaleString()} পে করুন (নিশ্চিত ও টিকিট তৈরি)`
+                      : `Pay ৳${finalTotalPayable.toLocaleString()} via Nagad (Confirm & Ticket)`}
                   </span>
                   <ArrowRight className="w-3.5 h-3.5 opacity-80" />
                 </button>
@@ -1039,8 +1195,22 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <Lock className="w-4 h-4 text-purple-200" />
                   <span>
                     {isBangla
-                      ? `রকেট-এ ৳${totalPayable.toLocaleString()} পে করুন (নিশ্চিত ও টিকিট তৈরি)`
-                      : `Pay ৳${totalPayable.toLocaleString()} via Rocket (Confirm & Ticket)`}
+                      ? `রকেট-এ ৳${finalTotalPayable.toLocaleString()} পে করুন (নিশ্চিত ও টিকিট তৈরি)`
+                      : `Pay ৳${finalTotalPayable.toLocaleString()} via Rocket (Confirm & Ticket)`}
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5 opacity-80" />
+                </button>
+              ) : selectedMethod === 'amex' ? (
+                <button
+                  type="button"
+                  onClick={() => handlePayStationHostedCheckout(false)}
+                  className="w-full py-4 rounded-2xl bg-[#4338CA] hover:bg-[#3730A3] text-white font-bold text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <CreditCard className="w-4 h-4 text-indigo-200" />
+                  <span>
+                    {isBangla
+                      ? `Amex Card-এ ৳${finalTotalPayable.toLocaleString()} পে করুন (নিশ্চিত ও টিকিট তৈরি)`
+                      : `Pay ৳${finalTotalPayable.toLocaleString()} via Amex Card (Confirm & Ticket)`}
                   </span>
                   <ArrowRight className="w-3.5 h-3.5 opacity-80" />
                 </button>
@@ -1053,8 +1223,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <CreditCard className="w-4 h-4 text-sky-400" />
                   <span>
                     {isBangla
-                      ? `কার্ড-এ ৳${totalPayable.toLocaleString()} পে করুন (নিশ্চিত ও টিকিট তৈরি)`
-                      : `Pay ৳${totalPayable.toLocaleString()} via Card (Confirm & Ticket)`}
+                      ? `কার্ড (ভিসা/মাস্টার)-এ ৳${finalTotalPayable.toLocaleString()} পে করুন (নিশ্চিত ও টিকিট তৈরি)`
+                      : `Pay ৳${finalTotalPayable.toLocaleString()} via Card (Confirm & Ticket)`}
                   </span>
                   <ArrowRight className="w-3.5 h-3.5 opacity-80" />
                 </button>
@@ -1106,7 +1276,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <div className="text-center text-[10px] text-slate-400 flex items-center justify-center gap-2 pt-1 border-t border-slate-100 flex-wrap">
               <span>Merchant ID: {config.merchantId}</span>
               <span>•</span>
-              <span className="text-emerald-600 font-semibold">bKash (Active) · Nagad (Active) · Rocket (Active) · Cards (Active)</span>
+              <span className="text-emerald-600 font-semibold">bKash (Active) · Nagad (Active) · Rocket (Active) · Cards (Active) · Amex (Active)</span>
             </div>
           </div>
         )}

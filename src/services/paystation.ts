@@ -155,7 +155,7 @@ export interface PendingPaymentSession {
   invoiceNumber: string;
   amount: number;
   formData?: RegistrationFormData;
-  fees?: { registrationFee: number; donationAmount: number; totalPayable: number };
+  fees?: { registrationFee: number; donationAmount: number; totalPayable: number; parentFee?: number; gatewayCharge?: number };
   donationData?: {
     donorName: string;
     mobileNumber: string;
@@ -174,6 +174,7 @@ export interface PendingPaymentSession {
 /** Convert PayStation payment_method string to our internal PaymentMethod type */
 function normalizePaymentMethod(raw: string): PaymentMethod {
   const m = (raw || '').toLowerCase();
+  if (m.includes('amex')) return 'amex';
   if (m.includes('nagad')) return 'nagad';
   if (m.includes('rocket')) return 'rocket';
   if (m.includes('card') || m.includes('visa') || m.includes('master')) return 'card';
@@ -861,7 +862,7 @@ export class PayStationService {
    */
   static async createPendingRegistration(
     formData: RegistrationFormData,
-    fees: { registrationFee: number; donationAmount: number; totalPayable: number },
+    fees: { registrationFee: number; parentFee?: number; donationAmount: number; totalPayable: number; gatewayCharge?: number },
     invoiceNumber: string,
     existingRegId?: string
   ): Promise<RegistrationRecord> {
@@ -887,6 +888,15 @@ export class PayStationService {
       mobileNumber: sanitizeInput(formData.mobileNumber),
       email: formData.email ? sanitizeInput(formData.email) : null,
       address: sanitizeInput(formData.address),
+      gender: formData.gender || 'male',
+      bloodGroup: formData.bloodGroup || undefined,
+      hasParent: Boolean(formData.hasParent),
+      parentName: formData.parentName || undefined,
+      parentAge: formData.parentAge || undefined,
+      parentPhone: formData.parentPhone || undefined,
+      parentRelation: formData.parentRelation || undefined,
+      parentFee: fees.parentFee || 0,
+      gatewayCharge: fees.gatewayCharge || 0,
       category: formData.category,
       studentId: formData.studentId
         ? sanitizeInput(formData.studentId).toUpperCase()
@@ -964,6 +974,12 @@ export class PayStationService {
 
     const signature = generateServerPaymentSignature(regId, payment.trxId, payment.amount);
 
+    const hasParent = Boolean(formData.hasParent);
+    const parentFee = hasParent ? 1500 : 0;
+    const baseFee = formData.category === 'current' ? 1000 : 1500;
+    const totalBaseWithParent = baseFee + parentFee;
+    const donation = Math.max(0, payment.amount - totalBaseWithParent);
+
     const record: RegistrationRecord = {
       id: regId,
       fullName: sanitizeInput(formData.fullName),
@@ -972,6 +988,14 @@ export class PayStationService {
       mobileNumber: sanitizeInput(formData.mobileNumber),
       email: formData.email ? sanitizeInput(formData.email) : null,
       address: sanitizeInput(formData.address),
+      gender: formData.gender || 'male',
+      bloodGroup: formData.bloodGroup || undefined,
+      hasParent: hasParent,
+      parentName: formData.parentName || undefined,
+      parentAge: formData.parentAge || undefined,
+      parentPhone: formData.parentPhone || undefined,
+      parentRelation: formData.parentRelation || undefined,
+      parentFee: parentFee,
       category: formData.category,
       studentId: formData.studentId
         ? sanitizeInput(formData.studentId).toUpperCase()
@@ -983,8 +1007,8 @@ export class PayStationService {
       groupOrSection: formData.groupOrSection || null,
       rollNumber: formData.rollNumber || undefined,
       tShirtSize: formData.tShirtSize as any,
-      registrationFee: Math.min(payment.amount, formData.category === 'current' ? 1000 : 1500),
-      donationAmount: Math.max(0, payment.amount - Math.min(payment.amount, formData.category === 'current' ? 1000 : 1500)),
+      registrationFee: baseFee,
+      donationAmount: donation,
       totalPaid: payment.amount,
       paymentStatus: 'paid',
       transactionId: sanitizeInput(payment.trxId),

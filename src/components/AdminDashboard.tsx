@@ -354,6 +354,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     fetchSupabaseRegistrationsForYear(selectedYear);
   }, [selectedYear]);
 
+  // Real-time bidirectional synchronization for staff stations (Food, Dress, Gate, Check-in)
+  useEffect(() => {
+    EventStore.initRealtimeSync();
+    EventStore.syncDistributionsWithSupabase();
+
+    const handleSync = () => {
+      refreshAll();
+    };
+
+    window.addEventListener('plscf_all_stations_synced', handleSync);
+    window.addEventListener('plscf_food_sync', handleSync);
+    window.addEventListener('plscf_dress_sync', handleSync);
+    window.addEventListener('plscf_gate_sync', handleSync);
+    window.addEventListener('plscf_registration_updated', handleSync);
+
+    return () => {
+      window.removeEventListener('plscf_all_stations_synced', handleSync);
+      window.removeEventListener('plscf_food_sync', handleSync);
+      window.removeEventListener('plscf_dress_sync', handleSync);
+      window.removeEventListener('plscf_gate_sync', handleSync);
+      window.removeEventListener('plscf_registration_updated', handleSync);
+    };
+  }, []);
+
   // Refresh all state
   const refreshAll = () => {
     const freshRegs = AppStore.getRegistrations();

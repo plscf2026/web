@@ -18,6 +18,9 @@ import {
   School,
   X,
   RefreshCw,
+  Users,
+  Droplet,
+  HeartHandshake,
 } from 'lucide-react';
 import {
   StudentCategory,
@@ -96,6 +99,15 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   const [email, setEmail] = useState(() => draft?.email || ''); // OPTIONAL
   const [address, setAddress] = useState(() => draft?.address || '');
   const [category, setCategory] = useState<StudentCategory>(() => draft?.category || 'former');
+  const [gender, setGender] = useState<'male' | 'female'>(() => draft?.gender || 'male');
+  const [bloodGroup, setBloodGroup] = useState(() => draft?.bloodGroup || '');
+
+  // Accompanying Parent / Guardian State (Allowed for females or current students below Class 6, max 1 parent, ৳1,500)
+  const [hasParent, setHasParent] = useState(() => Boolean(draft?.hasParent));
+  const [parentName, setParentName] = useState(() => draft?.parentName || '');
+  const [parentAge, setParentAge] = useState<number | ''>(() => (typeof draft?.parentAge === 'number' ? draft.parentAge : ''));
+  const [parentPhone, setParentPhone] = useState(() => draft?.parentPhone || '');
+  const [parentRelation, setParentRelation] = useState(() => draft?.parentRelation || 'Father');
 
   // Academic Information
   const [passingYear, setPassingYear] = useState(() => draft?.passingYear || '2015'); // Mandatory for former
@@ -138,6 +150,13 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     setEmail('');
     setAddress('');
     setCategory('former');
+    setGender('male');
+    setBloodGroup('');
+    setHasParent(false);
+    setParentName('');
+    setParentAge('');
+    setParentPhone('');
+    setParentRelation('Father');
     setPassingYear('2015');
     setLastClassAttended('SSC');
     setCurrentClass('Class 10');
@@ -187,6 +206,13 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           email,
           address,
           category,
+          gender,
+          bloodGroup,
+          hasParent,
+          parentName,
+          parentAge,
+          parentPhone,
+          parentRelation,
           passingYear,
           lastClassAttended,
           currentClass,
@@ -210,6 +236,13 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     email,
     address,
     category,
+    gender,
+    bloodGroup,
+    hasParent,
+    parentName,
+    parentAge,
+    parentPhone,
+    parentRelation,
     passingYear,
     lastClassAttended,
     currentClass,
@@ -235,6 +268,13 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     if (initialData.email !== undefined) setEmail(initialData.email || '');
     if (initialData.address !== undefined) setAddress(initialData.address || '');
     if (initialData.category !== undefined) setCategory(initialData.category || 'former');
+    if (initialData.gender !== undefined) setGender(initialData.gender || 'male');
+    if (initialData.bloodGroup !== undefined) setBloodGroup(initialData.bloodGroup || '');
+    if (initialData.hasParent !== undefined) setHasParent(Boolean(initialData.hasParent));
+    if (initialData.parentName !== undefined) setParentName(initialData.parentName || '');
+    if (initialData.parentAge !== undefined) setParentAge(initialData.parentAge !== undefined && initialData.parentAge !== null ? Number(initialData.parentAge) : '');
+    if (initialData.parentPhone !== undefined) setParentPhone(initialData.parentPhone || '');
+    if (initialData.parentRelation !== undefined) setParentRelation(initialData.parentRelation || 'Father');
     if (initialData.passingYear !== undefined) setPassingYear(initialData.passingYear || '2015');
     if (initialData.lastClassAttended !== undefined) setLastClassAttended(initialData.lastClassAttended || 'SSC');
     if (initialData.currentClass !== undefined) setCurrentClass(initialData.currentClass || 'Class 10');
@@ -268,8 +308,18 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     });
   };
 
+  // Accompanying Parent Eligibility Rule:
+  // Eligible if female (any category/class), OR if current student below Class 6 (male or female)
+  const isBelowClass6 =
+    category === 'current' &&
+    ['play', 'nursery', 'kg', 'class 1', 'class 2', 'class 3', 'class 4', 'class 5'].includes(
+      (currentClass || '').toLowerCase().trim()
+    );
+  const isParentEligible = gender === 'female' || isBelowClass6;
+  const effectiveHasParent = isParentEligible && hasParent;
+
   const donationAmount = typeof donationInput === 'number' ? donationInput : 0;
-  const fees = calculateTotalFee(category, feeSettings, donationAmount);
+  const fees = calculateTotalFee(category, feeSettings, donationAmount, effectiveHasParent);
 
   // Auto-generate batch suggestion if empty
   const getComputedBatch = () => {
@@ -338,6 +388,13 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     qrToken: 'XXXXXX',
     verificationUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/ticket-verification?token=PREVIEW`,
     cardStatus: 'ELIGIBLE',
+    gender,
+    bloodGroup,
+    hasParent: effectiveHasParent,
+    parentName: effectiveHasParent ? parentName.trim() : undefined,
+    parentAge: effectiveHasParent && parentAge ? Number(parentAge) : undefined,
+    parentPhone: effectiveHasParent ? parentPhone.trim() : undefined,
+    parentRelation: effectiveHasParent ? parentRelation : undefined,
     cardDimensions: '54x86mm',
     version: 1,
     createdAt: new Date().toISOString(),
@@ -388,6 +445,13 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
       mobileNumber,
       email: email.trim() || undefined,
       address,
+      gender,
+      bloodGroup,
+      hasParent: effectiveHasParent,
+      parentName: effectiveHasParent ? parentName.trim() : undefined,
+      parentAge: effectiveHasParent && parentAge ? Number(parentAge) : undefined,
+      parentPhone: effectiveHasParent ? parentPhone.trim() : undefined,
+      parentRelation: effectiveHasParent ? parentRelation : undefined,
       category,
       studentId: category === 'current' ? studentId.trim() : undefined,
       passingYear: category === 'former' ? passingYear : undefined,
@@ -461,6 +525,14 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   }
 
   const currentClasses = [
+    'Play',
+    'Nursery',
+    'KG',
+    'Class 1',
+    'Class 2',
+    'Class 3',
+    'Class 4',
+    'Class 5',
     'Class 6',
     'Class 7',
     'Class 8',
@@ -469,6 +541,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     'Class 11 (HSC)',
     'Class 12 (HSC)',
   ];
+
+  const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -650,6 +724,76 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                 <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">
                   <AlertCircle className="w-3.5 h-3.5" />
                   <span>{validationErrors.fullName[language]}</span>
+                </p>
+              )}
+            </div>
+
+            {/* Gender Selection */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                {language === 'bn' ? 'লিঙ্গ / Gender' : 'Gender'} <span className="text-rose-600">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setGender('male')}
+                  className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    gender === 'male'
+                      ? 'border-[#172554] bg-[#172554] text-white shadow-xs'
+                      : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <span>👨</span>
+                  <span>{language === 'bn' ? 'পুরুষ (Male)' : 'Male'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGender('female')}
+                  className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    gender === 'female'
+                      ? 'border-pink-600 bg-pink-600 text-white shadow-xs'
+                      : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <span>👩</span>
+                  <span>{language === 'bn' ? 'নারী (Female)' : 'Female'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Blood Group Selection */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                {language === 'bn' ? 'রক্তের গ্রুপ (Blood Group)' : 'Blood Group'} <span className="text-rose-600">*</span>
+              </label>
+              <div className="relative">
+                <Droplet className="w-4 h-4 text-rose-500 absolute left-3.5 top-3" />
+                <select
+                  name="bloodGroup"
+                  aria-invalid={Boolean(validationErrors.bloodGroup)}
+                  value={bloodGroup}
+                  onChange={(e) => {
+                    setBloodGroup(e.target.value);
+                    clearValidationError('bloodGroup');
+                  }}
+                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
+                    validationErrors.bloodGroup
+                      ? 'border-rose-500 bg-rose-50/30'
+                      : 'border-slate-300 focus:border-[#172554] focus:ring-2 focus:ring-[#172554]/20'
+                  }`}
+                >
+                  <option value="">{language === 'bn' ? 'রক্তের গ্রুপ নির্বাচন করুন' : 'Select Blood Group'}</option>
+                  {BLOOD_GROUPS.map((bg) => (
+                    <option key={bg} value={bg}>
+                      {bg}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {validationErrors.bloodGroup && (
+                <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  <span>{validationErrors.bloodGroup[language]}</span>
                 </p>
               )}
             </div>
@@ -926,8 +1070,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               <div className="relative">
                 <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
-                  name="studentId"
-                  aria-invalid={Boolean(validationErrors.studentId)}
+                  name="address"
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
@@ -938,6 +1081,190 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Accompanying Parent / Guardian Section (Eligibility: Female or Current Student below Class 6, max 1 parent, ৳1,500) */}
+        {isParentEligible ? (
+          <div className="bg-gradient-to-br from-amber-50/80 via-white to-amber-50/40 rounded-2xl p-6 sm:p-8 shadow-sm border-2 border-amber-300 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <span>{language === 'bn' ? 'অভিভাবক সহ অংশগ্রহণ' : 'Accompanying Parent / Guardian'}</span>
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                      ১ জন মাত্র / 1 Person Only
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    {language === 'bn'
+                      ? 'নারী শিক্ষার্থী অথবা ৬ষ্ঠ শ্রেণির নিচের বর্তমান শিক্ষার্থীরা কেবল ১ জন অভিভাবক সঙ্গে আনতে পারবেন।'
+                      : 'Eligible for female students or current students below Class 6 (Strictly 1 Parent/Guardian).'}
+                  </p>
+                </div>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-amber-600 text-white font-black text-xs shrink-0 self-start sm:self-auto shadow-2xs">
+                + ৳ 1,500 BDT
+              </span>
+            </div>
+
+            {/* Checkbox toggle */}
+            <label className="flex items-start gap-3 p-3.5 rounded-xl bg-white border border-amber-200 hover:border-amber-400 transition cursor-pointer select-none shadow-2xs">
+              <input
+                type="checkbox"
+                checked={hasParent}
+                onChange={(e) => {
+                  setHasParent(e.target.checked);
+                  if (!e.target.checked) {
+                    clearValidationError('parentName');
+                    clearValidationError('parentAge');
+                    clearValidationError('parentPhone');
+                    clearValidationError('parentRelation');
+                  }
+                }}
+                className="mt-0.5 w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+              />
+              <div className="text-xs">
+                <span className="font-bold text-slate-900 block">
+                  {language === 'bn'
+                    ? 'হ্যাঁ, আমি ১ জন অভিভাবক সহ অংশগ্রহণ করব (+৳১,৫০০ ফি প্রযোজ্য)'
+                    : 'Yes, I will attend with 1 parent/guardian (+৳1,500 fee applies)'}
+                </span>
+                <span className="text-slate-500 mt-0.5 block">
+                  {language === 'bn'
+                    ? 'অভিভাবকের জন্য আলাদা স্পেশাল এন্ট্রি কার্ড ও ফুড কুপন প্রদান করা হবে।'
+                    : 'A dedicated official Guardian Entry Pass and food access will be issued.'}
+                </span>
+              </div>
+            </label>
+
+            {/* Parent Form Fields */}
+            {hasParent && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-amber-200/60">
+                {/* Parent Name */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    {language === 'bn' ? 'অভিভাবকের পূর্ণ নাম' : 'Parent / Guardian Full Name'} <span className="text-rose-600">*</span>
+                  </label>
+                  <input
+                    name="parentName"
+                    type="text"
+                    value={parentName}
+                    onChange={(e) => {
+                      setParentName(e.target.value);
+                      clearValidationError('parentName');
+                    }}
+                    placeholder={language === 'bn' ? 'অভিভাবকের নাম লিখুন' : "Enter parent's full name"}
+                    className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
+                      validationErrors.parentName
+                        ? 'border-rose-500 bg-rose-50/30'
+                        : 'border-slate-300 bg-white focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20'
+                    }`}
+                  />
+                  {validationErrors.parentName && (
+                    <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>{validationErrors.parentName[language]}</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* Relation with student */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    {language === 'bn' ? 'শিক্ষার্থীর সাথে সম্পর্ক' : 'Relation with Student'} <span className="text-rose-600">*</span>
+                  </label>
+                  <select
+                    name="parentRelation"
+                    value={parentRelation}
+                    onChange={(e) => {
+                      setParentRelation(e.target.value);
+                      clearValidationError('parentRelation');
+                    }}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 focus:outline-hidden"
+                  >
+                    <option value="Father">{language === 'bn' ? 'পিতা (Father)' : 'Father'}</option>
+                    <option value="Mother">{language === 'bn' ? 'মাতা (Mother)' : 'Mother'}</option>
+                    <option value="Guardian">{language === 'bn' ? 'বৈধ অভিভাবক (Guardian)' : 'Guardian'}</option>
+                  </select>
+                </div>
+
+                {/* Parent Age */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    {language === 'bn' ? 'অভিভাবকের বয়স' : 'Parent / Guardian Age'} <span className="text-rose-600">*</span>
+                  </label>
+                  <input
+                    name="parentAge"
+                    type="number"
+                    inputMode="numeric"
+                    min="18"
+                    max="100"
+                    value={parentAge}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 0);
+                      setParentAge(val);
+                      clearValidationError('parentAge');
+                    }}
+                    placeholder="e.g. 45"
+                    className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
+                      validationErrors.parentAge
+                        ? 'border-rose-500 bg-rose-50/30'
+                        : 'border-slate-300 bg-white focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20'
+                    }`}
+                  />
+                  {validationErrors.parentAge && (
+                    <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>{validationErrors.parentAge[language]}</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* Parent Phone */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    {language === 'bn' ? 'অভিভাবকের মোবাইল নম্বর' : 'Parent Mobile Number'} <span className="text-rose-600">*</span>
+                  </label>
+                  <input
+                    name="parentPhone"
+                    type="tel"
+                    inputMode="tel"
+                    value={parentPhone}
+                    onChange={(e) => {
+                      const cleaned = e.target.value.replace(/[^\d]/g, '').slice(0, 11);
+                      setParentPhone(cleaned);
+                      clearValidationError('parentPhone');
+                    }}
+                    placeholder="01XXXXXXXXX"
+                    maxLength={11}
+                    className={`w-full px-4 py-2.5 rounded-xl border text-sm font-mono transition-all focus:outline-hidden ${
+                      validationErrors.parentPhone
+                        ? 'border-rose-500 bg-rose-50/30'
+                        : 'border-slate-300 bg-white focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20'
+                    }`}
+                  />
+                  {validationErrors.parentPhone && (
+                    <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>{validationErrors.parentPhone[language]}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-500 flex items-center gap-2">
+            <HeartHandshake className="w-4 h-4 text-slate-400 shrink-0" />
+            <span>
+              {language === 'bn'
+                ? 'অভিভাবক নিবন্ধন কেবল নারী শিক্ষার্থী অথবা ৬ষ্ঠ শ্রেণির নিচের বর্তমান শিক্ষার্থীদের জন্য প্রযোজ্য (সর্বোচ্চ ১ জন, ফি ৳১,৫০০)।'
+                : 'Accompanying parent pass is reserved for female students and current students below Class 6 (Max 1 Person, ৳1,500).'}
+            </span>
+          </div>
+        )}
 
         {/* Section 2: Academic Information & Current Student ID Verification */}
         <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
@@ -1354,6 +1681,12 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               <span>{t.regFeeSummary}</span>
               <span className="font-semibold text-white">৳ {fees.registrationFee}</span>
             </div>
+            {fees.parentFee > 0 && (
+              <div className="flex justify-between text-amber-300">
+                <span>{language === 'bn' ? 'অভিভাবক ফি (১ জন)' : 'Accompanying Parent Fee (1 Person)'}</span>
+                <span className="font-semibold">+ ৳ {fees.parentFee}</span>
+              </div>
+            )}
             {fees.donationAmount > 0 && (
               <div className="flex justify-between text-[#C5A45D]">
                 <span>{t.donationSummary}</span>

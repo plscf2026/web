@@ -315,9 +315,16 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
             <h3 className="text-[14px] font-bold text-[#FFFCF5] leading-tight line-clamp-2">
               {student.studentName || 'Student Name'}
             </h3>
-            <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[8px] font-semibold tracking-wider text-[#8ED9F5] bg-sky-950/70 border border-sky-400/40">
-              {isCurrentStudent ? 'CURRENT STUDENT' : 'ALUMNI MEMBER'}
-            </span>
+            <div className="flex items-center gap-1 mt-1 flex-wrap">
+              <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-semibold tracking-wider text-[#8ED9F5] bg-sky-950/70 border border-sky-400/40">
+                {isCurrentStudent ? 'CURRENT STUDENT' : 'ALUMNI MEMBER'}
+              </span>
+              {student.bloodGroup && (
+                <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-black tracking-wider text-rose-300 bg-rose-950/80 border border-rose-400/50">
+                  {student.bloodGroup}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -356,6 +363,16 @@ export const StudentIdCardBadge: React.FC<StudentIdCardBadgeProps> = ({
                 {displayContact}
               </span>
             </div>
+
+            {/* Blood Group */}
+            {student.bloodGroup && (
+              <div className="border-b border-slate-300/80 pb-0.5 flex items-center justify-between">
+                <span className="text-[9px] font-bold text-[#10203A] shrink-0">Blood:</span>
+                <span className="text-[9px] font-extrabold text-rose-700 font-mono">
+                  {student.bloodGroup}
+                </span>
+              </div>
+            )}
 
             {/* 6-Character QR Token */}
             <div className="pt-0.5 flex items-center justify-between">

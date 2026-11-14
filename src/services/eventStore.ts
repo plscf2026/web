@@ -1630,8 +1630,25 @@ export class EventStore {
     const updated = [newRecord, ...existing];
     this.saveFoodDistributions(updated);
 
-    // Sync to Supabase
-    supabase.from('food_distributions').insert(newRecord).then(undefined, () => { });
+    // Sync to Supabase with snake_case columns
+    supabase.from('food_distributions').insert({
+      id: newRecord.id,
+      registration_id: newRecord.registrationId,
+      student_name: newRecord.studentName,
+      batch_name: newRecord.batchName,
+      meal_type: newRecord.mealType,
+      status: newRecord.status,
+      collected_at: newRecord.collectedAt,
+      staff_id: newRecord.staffId,
+      staff_name: newRecord.staffName,
+      notes: newRecord.notes || null,
+    }).then(undefined, (err) => {
+      console.warn('[EventStore] Supabase food distribution insert notice:', err);
+    });
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('plscf_food_sync', { detail: newRecord }));
+    }
 
     return { success: true, record: newRecord };
   }
@@ -1664,7 +1681,13 @@ export class EventStore {
       corrected_by: adminName,
       correction_reason: reason,
       corrected_at: item.correctedAt,
-    }).eq('id', distributionId).then(undefined, () => { });
+    }).eq('id', distributionId).then(undefined, (err) => {
+      console.warn('[EventStore] Supabase food update notice:', err);
+    });
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('plscf_food_sync', { detail: item }));
+    }
 
     this.recordAuditHistory({
       adminId,
@@ -1756,8 +1779,31 @@ export class EventStore {
     const updated = [newEvent, ...existing];
     this.saveGateEvents(updated);
 
-    // Sync to Supabase
-    supabase.from('gate_events').insert(newEvent).then(undefined, () => { });
+    // Sync to Supabase gate_events table with snake_case columns
+    supabase.from('gate_events').insert({
+      id: newEvent.id,
+      registration_id: newEvent.registrationId,
+      student_name: newEvent.studentName,
+      batch_name: newEvent.batchName,
+      photo_url: newEvent.photoUrl || null,
+      event_type: newEvent.eventType,
+      gate_id: newEvent.gateId,
+      scanner_id: newEvent.scannerId || null,
+      staff_id: newEvent.staffId,
+      staff_name: newEvent.staffName,
+      timestamp: newEvent.timestamp,
+      status: newEvent.status,
+    }).then(undefined, (err) => {
+      console.warn('[EventStore] Supabase gate event insert notice:', err);
+    });
+
+    // Atomically synchronize attendance check-in status on student registration
+    const isInside = newEvent.eventType === 'ENTRY';
+    AppStore.updateRegistration(registrationId, { isCheckedIn: isInside }, 2027);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('plscf_gate_sync', { detail: newEvent }));
+    }
 
     return { success: true, event: newEvent };
   }
@@ -1781,13 +1827,24 @@ export class EventStore {
 
     this.saveGateEvents(list);
 
+    // If entry is denied or rejected, reset attendance flag so student can be scanned again!
+    if (item.eventType === 'ENTRY' && newStatus === 'DENIED') {
+      AppStore.updateRegistration(item.registrationId, { isCheckedIn: false }, 2027);
+    }
+
     // Sync to Supabase
     supabase.from('gate_events').update({
       status: newStatus,
       corrected_by: adminName,
       correction_reason: reason,
       corrected_at: item.correctedAt,
-    }).eq('id', eventId).then(undefined, () => { });
+    }).eq('id', eventId).then(undefined, (err) => {
+      console.warn('[EventStore] Supabase gate update notice:', err);
+    });
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('plscf_gate_sync', { detail: item }));
+    }
 
     this.recordAuditHistory({
       adminId,
@@ -1871,8 +1928,28 @@ export class EventStore {
     const updated = [newRecord, ...existing];
     this.saveDressDistributions(updated);
 
-    // Sync to Supabase
-    supabase.from('dress_distributions').insert(newRecord).then(undefined, () => { });
+    // Sync to Supabase dress_distributions table with snake_case columns
+    supabase.from('dress_distributions').insert({
+      id: newRecord.id,
+      registration_id: newRecord.registrationId,
+      student_name: newRecord.studentName,
+      item_type: newRecord.itemType,
+      registered_size: newRecord.registeredSize,
+      status: newRecord.status,
+      received_at: newRecord.receivedAt,
+      staff_id: newRecord.staffId,
+      staff_name: newRecord.staffName,
+      notes: newRecord.notes || null,
+    }).then(undefined, (err) => {
+      console.warn('[EventStore] Supabase dress insert notice:', err);
+    });
+
+    // Atomically update student registration in AppStore and registrations_2027
+    AppStore.updateRegistration(registrationId, { isTShirtCollected: true }, 2027);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('plscf_dress_sync', { detail: newRecord }));
+    }
 
     return { success: true, record: newRecord };
   }
@@ -1898,6 +1975,10 @@ export class EventStore {
 
     this.saveDressDistributions(list);
 
+    // If marked as RETURNED or CANCELLED, reset isTShirtCollected flag so student can be scanned again!
+    const isCollected = newStatus === 'RECEIVED';
+    AppStore.updateRegistration(item.registrationId, { isTShirtCollected: isCollected }, 2027);
+
     // Sync to Supabase
     supabase.from('dress_distributions').update({
       status: newStatus,
@@ -1905,7 +1986,13 @@ export class EventStore {
       corrected_by: adminName,
       correction_reason: reason,
       corrected_at: item.correctedAt,
-    }).eq('id', distributionId).then(undefined, () => { });
+    }).eq('id', distributionId).then(undefined, (err) => {
+      console.warn('[EventStore] Supabase dress update notice:', err);
+    });
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('plscf_dress_sync', { detail: item }));
+    }
 
     this.recordAuditHistory({
       adminId,
@@ -2306,5 +2393,117 @@ export class EventStore {
     saveData(KEY_AUDIT_HISTORY, updated);
     supabase.from('admin_audit_history').insert(newEntry).then(undefined, () => { });
     return newEntry;
+  }
+
+  // ==========================================
+  // 7. REAL-TIME MULTI-STATION SYNCHRONIZATION
+  // ==========================================
+
+  private static realtimeChannel: any = null;
+
+  /**
+   * Authoritative Cloud Distribution Sync
+   * Fetches latest food distributions, dress distributions, and gate events from Supabase
+   * and merges them into local memory and localStorage.
+   */
+  static async syncDistributionsWithSupabase(): Promise<void> {
+    try {
+      const [foodRes, dressRes, gateRes] = await Promise.all([
+        supabase.from('food_distributions').select('*').order('collected_at', { ascending: false }).limit(2000),
+        supabase.from('dress_distributions').select('*').order('received_at', { ascending: false }).limit(2000),
+        supabase.from('gate_events').select('*').order('timestamp', { ascending: false }).limit(2000),
+      ]);
+
+      if (foodRes.data && foodRes.data.length > 0) {
+        const mappedFood: FoodDistributionRecord[] = foodRes.data.map((r: any) => ({
+          id: r.id,
+          registrationId: r.registration_id,
+          studentName: r.student_name,
+          batchName: r.batch_name,
+          mealType: r.meal_type,
+          status: r.status,
+          collectedAt: r.collected_at,
+          staffId: r.staff_id,
+          staffName: r.staff_name,
+          notes: r.notes || undefined,
+          correctedBy: r.corrected_by || undefined,
+          correctionReason: r.correction_reason || undefined,
+          correctedAt: r.corrected_at || undefined,
+        }));
+        this.saveFoodDistributions(mappedFood);
+      }
+
+      if (dressRes.data && dressRes.data.length > 0) {
+        const mappedDress: DressDistributionRecord[] = dressRes.data.map((r: any) => ({
+          id: r.id,
+          registrationId: r.registration_id,
+          studentName: r.student_name,
+          itemType: r.item_type,
+          registeredSize: r.registered_size,
+          status: r.status,
+          receivedAt: r.received_at,
+          staffId: r.staff_id,
+          staffName: r.staff_name,
+          notes: r.notes || undefined,
+          correctedBy: r.corrected_by || undefined,
+          correctionReason: r.correction_reason || undefined,
+          correctedAt: r.corrected_at || undefined,
+        }));
+        this.saveDressDistributions(mappedDress);
+      }
+
+      if (gateRes.data && gateRes.data.length > 0) {
+        const mappedGate: GateEventRecord[] = gateRes.data.map((r: any) => ({
+          id: r.id,
+          registrationId: r.registration_id,
+          studentName: r.student_name,
+          batchName: r.batch_name,
+          photoUrl: r.photo_url || undefined,
+          eventType: r.event_type,
+          gateId: r.gate_id,
+          scannerId: r.scanner_id || undefined,
+          staffId: r.staff_id,
+          staffName: r.staff_name,
+          timestamp: r.timestamp,
+          status: r.status,
+          correctedBy: r.corrected_by || undefined,
+          correctionReason: r.correction_reason || undefined,
+          correctedAt: r.corrected_at || undefined,
+        }));
+        this.saveGateEvents(mappedGate);
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('plscf_all_stations_synced'));
+      }
+    } catch (e) {
+      console.warn('[EventStore] syncDistributionsWithSupabase notice:', e);
+    }
+  }
+
+  /**
+   * Initializes Supabase Realtime broadcast listener for all stations
+   */
+  static initRealtimeSync(): void {
+    if (typeof window === 'undefined' || this.realtimeChannel) return;
+    try {
+      this.realtimeChannel = supabase
+        .channel('plscf_realtime_stations')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'food_distributions' }, () => {
+          this.syncDistributionsWithSupabase();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'dress_distributions' }, () => {
+          this.syncDistributionsWithSupabase();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'gate_events' }, () => {
+          this.syncDistributionsWithSupabase();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'registrations_2027' }, () => {
+          AppStore.syncWithSupabase(2027);
+        })
+        .subscribe();
+    } catch (err) {
+      console.warn('[EventStore] Realtime channel subscription notice:', err);
+    }
   }
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   QrCode,
   ShieldCheck,
@@ -73,6 +73,23 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
     setFoodDistributions(EventStore.getFoodDistributions());
     setDressDistributions(EventStore.getDressDistributions());
   };
+
+  useEffect(() => {
+    EventStore.initRealtimeSync();
+    EventStore.syncDistributionsWithSupabase().then(refreshAllState);
+
+    const onSync = () => refreshAllState();
+    window.addEventListener('plscf_all_stations_synced', onSync);
+    window.addEventListener('plscf_food_sync', onSync);
+    window.addEventListener('plscf_dress_sync', onSync);
+    window.addEventListener('plscf_gate_sync', onSync);
+    return () => {
+      window.removeEventListener('plscf_all_stations_synced', onSync);
+      window.removeEventListener('plscf_food_sync', onSync);
+      window.removeEventListener('plscf_dress_sync', onSync);
+      window.removeEventListener('plscf_gate_sync', onSync);
+    };
+  }, []);
 
   // Process QR Camera scan or manual Registration ID + QR Token lookup
   const handleProcessScan = async (codeToSearch: string, tokenParam?: string) => {

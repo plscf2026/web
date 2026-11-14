@@ -46,6 +46,15 @@ export interface RegistrationFormData {
   mobileNumber: string;
   email?: string; // Optional: users can register without an email address
   address: string;
+  gender?: 'male' | 'female';
+  bloodGroup?: string;
+  hasParent?: boolean;
+  parentName?: string;
+  parentAge?: number | string;
+  parentPhone?: string;
+  parentRelation?: string;
+  parentFee?: number;
+  gatewayCharge?: number;
   category: StudentCategory;
   studentId?: string; // Mandatory for current students
   passingYear?: string; // Mandatory for former students (Graduation / Last Attended Year)
@@ -89,6 +98,42 @@ export function validateRegistrationData(data: RegistrationFormData): Validation
       errors.email = {
         en: 'Please enter a valid email address (e.g. name@example.com) or leave blank',
         bn: 'অনুগ্রহ করে একটি সঠিক ইমেইল ঠিকানা দিন অথবা ফাঁকা রাখুন',
+      };
+    }
+  }
+
+  // Blood group validation
+  if (!data.bloodGroup || data.bloodGroup.trim().length === 0) {
+    errors.bloodGroup = {
+      en: 'Please select your blood group',
+      bn: 'অনুগ্রহ করে আপনার রক্তের গ্রুপ নির্বাচন করুন',
+    };
+  }
+
+  // Accompanying Parent validation (if enabled)
+  if (data.hasParent) {
+    if (!data.parentName || data.parentName.trim().length < 2) {
+      errors.parentName = {
+        en: 'Parent / Guardian full name is required (minimum 2 characters)',
+        bn: 'অভিভাবকের পূর্ণ নাম আবশ্যক (কমপক্ষে ২ অক্ষর)',
+      };
+    }
+    if (!data.parentAge || String(data.parentAge).trim().length === 0) {
+      errors.parentAge = {
+        en: 'Parent / Guardian age is required',
+        bn: 'অভিভাবকের বয়স উল্লেখ করা আবশ্যক',
+      };
+    }
+    if (!data.parentPhone || !isValidBangladeshiMobile(data.parentPhone)) {
+      errors.parentPhone = {
+        en: 'Please enter a valid 11-digit mobile number for parent/guardian',
+        bn: 'অভিভাবকের জন্য সঠিক ১১ ডিজিটের মোবাইল নম্বর প্রদান করুন',
+      };
+    }
+    if (!data.parentRelation || data.parentRelation.trim().length === 0) {
+      errors.parentRelation = {
+        en: 'Please select relation with student (Father, Mother, or Guardian)',
+        bn: 'শিক্ষার্থীর সাথে সম্পর্ক নির্বাচন করুন (পিতা, মাতা বা অভিভাবক)',
       };
     }
   }
@@ -208,15 +253,39 @@ export function verifyStudentIdAgainstRecords(
 export function calculateTotalFee(
   category: StudentCategory,
   feeSettings: FeeSettings,
-  donationAmount: number = 0
-): { registrationFee: number; donationAmount: number; totalPayable: number } {
+  donationAmount: number = 0,
+  hasParent: boolean = false
+): { registrationFee: number; parentFee: number; donationAmount: number; totalPayable: number } {
   const baseFee = category === 'former' ? feeSettings.formerStudentFee : feeSettings.currentStudentFee;
   const validDonation = Math.max(0, Number(donationAmount) || 0);
+  const parentFee = hasParent ? 1500 : 0;
   return {
     registrationFee: baseFee,
+    parentFee,
     donationAmount: validDonation,
-    totalPayable: baseFee + validDonation,
+    totalPayable: baseFee + parentFee + validDonation,
   };
+}
+
+/**
+ * Official Payment Gateway Service Charges:
+ * - MFS bKash: 1.85%
+ * - Other MFS & Internet Banking (Nagad, Rocket, Upay): 1.50%
+ * - Card (VISA, MasterCard): 2.10%
+ * - Amex Card: 3.10%
+ */
+export function getGatewayChargeRate(method: string): number {
+  const m = (method || '').toLowerCase().trim();
+  if (m === 'bkash') return 0.0185;
+  if (m === 'nagad' || m === 'rocket' || m === 'upay' || m.includes('mfs')) return 0.0150;
+  if (m === 'amex') return 0.0310;
+  if (m === 'card' || m === 'visa' || m === 'master' || m === 'mastercard') return 0.0210;
+  return 0.0185;
+}
+
+export function calculateGatewayCharge(amount: number, method: string): number {
+  const rate = getGatewayChargeRate(method);
+  return Math.round(amount * rate * 100) / 100;
 }
 
 export interface GateScanValidationResult {
