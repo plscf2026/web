@@ -6,7 +6,6 @@ import {
   Lock,
   Gift,
   Award,
-  Sparkles,
   AlertCircle,
   Printer,
   CreditCard,
@@ -52,14 +51,6 @@ const DONATION_CAUSES: DonationCause[] = [
     descEn: 'Upgrading campus greenery, science laboratory facilities, and the central library.',
     descBn: 'বিদ্যালয়ের চত্বরের সৌন্দর্যবর্ধন, বিজ্ঞানাগার ও ডিজিটাল লাইব্রেরি আধুনিকায়ন।',
     icon: Landmark,
-  },
-  {
-    id: 'gala_dinner',
-    titleEn: 'Reunion Gala Dinner & Cultural Events',
-    titleBn: 'পুনর্মিলনী ও জমকালো সাংস্কৃতিক অনুষ্ঠান',
-    descEn: 'Grand banquet, guest hospitality, souvenirs, and historic reunion celebrations.',
-    descBn: 'ঐতিহাসিক মিলনমেলা, সাংস্কৃতিক সন্ধ্যা ও সম্মানিত অতিথিদের আপ্যায়ন।',
-    icon: Sparkles,
   },
   {
     id: 'medical_welfare',
