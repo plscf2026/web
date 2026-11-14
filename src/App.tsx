@@ -96,6 +96,11 @@ export default function App() {
     setFeeSettings(AppStore.getFeeSettings());
   }, [activeView]);
 
+  // Synchronize registrations bidirectionally with Supabase on startup
+  useEffect(() => {
+    AppStore.syncWithSupabase(2027).catch(() => {});
+  }, []);
+
   // Deep-link routing: auto-handle QR scans, verification URLs, and PayStation payment returns
   useEffect(() => {
     if (typeof window === 'undefined') return;

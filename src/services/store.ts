@@ -1501,6 +1501,18 @@ export class AppStore {
 
       const merged = Array.from(map.values());
       this.saveRegistrations(merged);
+
+      // Bidirectional sync: Push any genuine paid local registrations up to Supabase
+      const cloudIds = new Set(fetched.map((r) => r.id));
+      for (const localReg of existing) {
+        if (localReg.paymentStatus === 'paid' && !cloudIds.has(localReg.id) && !localReg.isDemo) {
+          console.log(`[AppStore] Auto-pushing unsynced paid registration ${localReg.id} to Supabase...`);
+          SupabaseService.saveRegistration(localReg, targetYear).catch((err) => {
+            console.warn(`[AppStore] Sync error for ${localReg.id}:`, err);
+          });
+        }
+      }
+
       return { count: merged.length };
     } catch (err: any) {
       console.warn('[AppStore] Supabase sync notice:', err);

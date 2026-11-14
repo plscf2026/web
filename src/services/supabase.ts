@@ -301,10 +301,6 @@ function toRegistrationDbRow(reg: RegistrationRecord, year: number = 2027) {
     is_checked_in: false,
     notes: sanitizeInput(reg.notes || ''),
     year: year || 2027,
-    is_demo: reg.isDemo ?? false,
-    is_legacy: reg.isLegacy ?? false,
-    migration_source: reg.migrationSource ?? null,
-    legacy_source_year: reg.legacySourceYear ?? null,
   };
 }
 

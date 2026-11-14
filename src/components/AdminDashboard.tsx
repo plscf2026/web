@@ -332,6 +332,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const mergedArray = Array.from(mergedMap.values());
         setRegistrations(mergedArray);
         AppStore.saveRegistrations(mergedArray);
+
+        // Auto-push any genuine paid local registrations that were not yet in Supabase
+        const cloudIds = new Set(res.data.map((r) => r.id));
+        for (const localReg of localList) {
+          if (localReg.paymentStatus === 'paid' && !cloudIds.has(localReg.id) && !localReg.isDemo) {
+            console.log(`[AdminSync] Auto-pushing unsynced paid registration ${localReg.id} to Supabase...`);
+            SupabaseService.saveRegistration(localReg, year).catch(console.warn);
+          }
+        }
       }
     } catch (err) {
       console.warn('Error fetching registrations from Supabase:', err);
