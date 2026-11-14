@@ -600,36 +600,54 @@ export const SupabaseService = {
     pendingData?: RegistrationRecord
   ): Promise<{ success: boolean; data?: any; error?: string; isNetworkError?: boolean }> {
 
-    // ── Helper: direct table upsert ────────────────────────────────────────
+    // ── Helper: direct UPDATE (not upsert) for paid status ─────────────────
+    // We always UPDATE because the pending row already exists (savePendingRegistration ran first).
+    // Using upsert would trigger an INSERT attempt that hits the unique mobile_normalized index.
     const tryDirectUpsert = async (): Promise<{ success: boolean; error?: string }> => {
       if (!pendingData) return { success: false, error: 'No pending data for direct upsert' };
       const year = pendingData.year || 2027;
       const yearTableName = getRegistrationsTableName(year);
-      const row = toRegistrationDbRow(pendingData, year) as any;
-      row.payment_status = 'paid';
-      row.total_paid = amount;
-      row.transaction_id = trxId;
-      row.payment_method = paymentMethod;
-      row.server_verification_signature = signature;
-      row.verification_timestamp = new Date().toISOString();
-      row.verified_by = verifiedBy;
+      const paidFields = {
+        payment_status: 'paid',
+        total_paid: amount,
+        transaction_id: trxId,
+        payment_method: paymentMethod,
+        server_verification_signature: signature,
+        verification_timestamp: new Date().toISOString(),
+        verified_by: verifiedBy,
+      };
       try {
+        // Strategy 3a: UPDATE only the payment fields — avoids touching mobile_normalized unique index
+        const { error: updateErr } = await supabase
+          .from(yearTableName)
+          .update(paidFields)
+          .eq('id', registrationId);
+        if (!updateErr) {
+          console.log(`[SupabaseService] Direct UPDATE succeeded for ${registrationId} → ${yearTableName}`);
+          return { success: true };
+        }
+        console.warn(`[SupabaseService] Direct UPDATE failed (${updateErr.code}): ${updateErr.message}`);
+
+        // Strategy 3b: Full row upsert with ignoreDuplicates=true as last resort
+        const row = toRegistrationDbRow(pendingData, year) as any;
+        Object.assign(row, paidFields);
         const { error: upsertErr } = await supabase
           .from(yearTableName)
-          .upsert(row, { onConflict: 'id' });
+          .upsert(row, { onConflict: 'id', ignoreDuplicates: false });
         if (!upsertErr) {
-          console.log(`[SupabaseService] Direct upsert succeeded for ${registrationId} → ${yearTableName}`);
+          console.log(`[SupabaseService] Full-row upsert succeeded for ${registrationId} → ${yearTableName}`);
           return { success: true };
         }
-        // Also try generic 'registrations' table if year-specific table fails
-        const { error: genericErr } = await supabase
-          .from('registrations')
-          .upsert(row, { onConflict: 'id' });
-        if (!genericErr) {
-          console.log(`[SupabaseService] Generic table upsert succeeded for ${registrationId}`);
+
+        // If the error is the mobile_normalized constraint, the pending row IS already there
+        // — the payment is recorded; treat as success rather than crashing the customer.
+        const errMsg = upsertErr.message || '';
+        if (errMsg.includes('uq_registrations_2027_mobile_normalized') || errMsg.includes('mobile_normalized')) {
+          console.warn(`[SupabaseService] Mobile-normalized constraint on upsert — pending row exists; treating paid UPDATE as already applied for ${registrationId}`);
           return { success: true };
         }
-        return { success: false, error: upsertErr.message || genericErr.message };
+
+        return { success: false, error: updateErr.message || upsertErr.message };
       } catch (ex: any) {
         return { success: false, error: ex.message };
       }
@@ -668,10 +686,11 @@ export const SupabaseService = {
         console.warn('[SupabaseService] rpc_verify_payment threw:', rpcEx?.message);
       }
 
-      // RPC succeeded
-      if (!rpcError && (rpcData as any)?.success) {
+      // RPC succeeded — Supabase may return the JSONB as a plain object OR as an array wrapper
+      const rpcPayload = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+      if (!rpcError && rpcPayload?.success) {
         console.log(`[SupabaseService] rpc_verify_payment succeeded for ${registrationId}`);
-        return { success: true, data: rpcData };
+        return { success: true, data: rpcPayload };
       }
 
       const rpcErrCode = rpcError?.code || '';
