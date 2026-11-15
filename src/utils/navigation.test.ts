@@ -5,6 +5,7 @@ import {
   getUrlForView,
   syncRouteHistory,
   VALID_VIEWS,
+  ROUTE_ALIASES,
   STORAGE_KEY_CURRENT_VIEW,
 } from './navigation';
 
@@ -15,11 +16,13 @@ test('1. Navigation: getUrlForView formats URLs correctly', () => {
   assert.equal(getUrlForView('portal'), '/portal');
   assert.equal(getUrlForView('register'), '/register');
   assert.equal(getUrlForView('donate'), '/donate');
+  assert.equal(getUrlForView('login'), '/login');
+  assert.equal(getUrlForView('dashboard'), '/dashboard');
+  assert.equal(getUrlForView('profile'), '/profile');
   assert.equal(getUrlForView('admin', { tab: 'allBookings' }), '/admin?tab=allBookings');
 });
 
-test('2. Navigation: resolveRouteFromLocation resolves from pathname', () => {
-  // Mock window and location
+test('2. Navigation: resolveRouteFromLocation resolves from standard pathnames', () => {
   const originalWindow = globalThis.window;
   const mockStorage: Record<string, string> = {};
 
@@ -55,12 +58,145 @@ test('2. Navigation: resolveRouteFromLocation resolves from pathname', () => {
 
     (globalThis as any).window.location.pathname = '/donate';
     assert.equal(resolveRouteFromLocation().view, 'donate');
+
+    (globalThis as any).window.location.pathname = '/notices';
+    assert.equal(resolveRouteFromLocation().view, 'notices');
+
+    (globalThis as any).window.location.pathname = '/gallery';
+    assert.equal(resolveRouteFromLocation().view, 'gallery');
+
+    (globalThis as any).window.location.pathname = '/about';
+    assert.equal(resolveRouteFromLocation().view, 'about');
   } finally {
     globalThis.window = originalWindow;
   }
 });
 
-test('3. Navigation: resolveRouteFromLocation falls back to query param and sessionStorage', () => {
+test('3. Navigation: resolveRouteFromLocation handles route aliases (login, dashboard, profile, contact)', () => {
+  const originalWindow = globalThis.window;
+  const mockStorage: Record<string, string> = {};
+
+  (globalThis as any).window = {
+    location: {
+      pathname: '/login',
+      search: '',
+      hash: '',
+    },
+    history: {
+      pushState: () => {},
+      replaceState: () => {},
+    },
+  };
+  (globalThis as any).sessionStorage = {
+    getItem: (k: string) => mockStorage[k] || null,
+    setItem: (k: string, v: string) => { mockStorage[k] = v; },
+    removeItem: (k: string) => { delete mockStorage[k]; },
+  };
+
+  try {
+    assert.equal(resolveRouteFromLocation().view, 'login');
+
+    (globalThis as any).window.location.pathname = '/dashboard';
+    assert.equal(resolveRouteFromLocation().view, 'dashboard');
+
+    (globalThis as any).window.location.pathname = '/profile';
+    assert.equal(resolveRouteFromLocation().view, 'profile');
+
+    (globalThis as any).window.location.pathname = '/contact';
+    assert.equal(resolveRouteFromLocation().view, 'about');
+
+    assert.equal(ROUTE_ALIASES['registration'], 'register');
+    assert.equal(ROUTE_ALIASES['donation'], 'donate');
+  } finally {
+    globalThis.window = originalWindow;
+  }
+});
+
+test('4. Navigation: resolveRouteFromLocation resolves nested routes & dynamic parameters', () => {
+  const originalWindow = globalThis.window;
+  const mockStorage: Record<string, string> = {};
+
+  (globalThis as any).window = {
+    location: {
+      pathname: '/admin/reports',
+      search: '',
+      hash: '',
+    },
+    history: {
+      pushState: () => {},
+      replaceState: () => {},
+    },
+  };
+  (globalThis as any).sessionStorage = {
+    getItem: (k: string) => mockStorage[k] || null,
+    setItem: (k: string, v: string) => { mockStorage[k] = v; },
+    removeItem: (k: string) => { delete mockStorage[k]; },
+  };
+
+  try {
+    // Nested admin route
+    const adminReports = resolveRouteFromLocation();
+    assert.equal(adminReports.view, 'admin');
+    assert.equal(adminReports.tab, 'reports');
+
+    // Nested scanner route
+    (globalThis as any).window.location.pathname = '/scanner/food';
+    const scannerFood = resolveRouteFromLocation();
+    assert.equal(scannerFood.view, 'scanner');
+    assert.equal(scannerFood.tab, 'food');
+
+    // Nested portal route
+    (globalThis as any).window.location.pathname = '/portal/tasks';
+    const portalTasks = resolveRouteFromLocation();
+    assert.equal(portalTasks.view, 'portal');
+    assert.equal(portalTasks.tab, 'tasks');
+
+    // Dynamic ticket route
+    (globalThis as any).window.location.pathname = '/ticket/PLSCF-2027-F1001';
+    const dynamicTicket = resolveRouteFromLocation();
+    assert.equal(dynamicTicket.view, 'ticket');
+    assert.equal(dynamicTicket.ticketQuery, 'PLSCF-2027-F1001');
+  } finally {
+    globalThis.window = originalWindow;
+  }
+});
+
+test('5. Navigation: Invalid routes correctly return 404 instead of silent home redirect', () => {
+  const originalWindow = globalThis.window;
+  const mockStorage: Record<string, string> = {};
+
+  (globalThis as any).window = {
+    location: {
+      pathname: '/random-non-existent-page',
+      search: '',
+      hash: '',
+    },
+    history: {
+      pushState: () => {},
+      replaceState: () => {},
+    },
+  };
+  (globalThis as any).sessionStorage = {
+    getItem: (k: string) => mockStorage[k] || null,
+    setItem: (k: string, v: string) => { mockStorage[k] = v; },
+    removeItem: (k: string) => { delete mockStorage[k]; },
+  };
+
+  try {
+    const notFoundRes = resolveRouteFromLocation();
+    assert.equal(notFoundRes.view, '404');
+    assert.equal(notFoundRes.notFoundPath, '/random-non-existent-page');
+
+    (globalThis as any).window.location.pathname = '/foo/bar/baz';
+    const deepNotFound = resolveRouteFromLocation();
+    assert.equal(deepNotFound.view, '404');
+    assert.equal(deepNotFound.notFoundPath, '/foo/bar/baz');
+  } finally {
+    globalThis.window = originalWindow;
+  }
+});
+
+test('6. Navigation: resolveRouteFromLocation falls back to query param and sessionStorage', () => {
   const originalWindow = globalThis.window;
   const mockStorage: Record<string, string> = {};
 
@@ -99,6 +235,10 @@ test('3. Navigation: resolveRouteFromLocation falls back to query param and sess
     assert.ok(VALID_VIEWS.includes('admin'));
     assert.ok(VALID_VIEWS.includes('scanner'));
     assert.ok(VALID_VIEWS.includes('home'));
+    assert.ok(VALID_VIEWS.includes('login'));
+    assert.ok(VALID_VIEWS.includes('dashboard'));
+    assert.ok(VALID_VIEWS.includes('profile'));
+    assert.ok(VALID_VIEWS.includes('404'));
 
     // Test syncRouteHistory
     let pushedUrl = '';

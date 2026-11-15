@@ -29,6 +29,7 @@ const AboutContactPage = lazy(() => import('./components/AboutContactPage').then
 const ScannerPortal = lazy(() => import('./components/ScannerPortal').then((m) => ({ default: m.ScannerPortal })));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard').then((m) => ({ default: m.AdminDashboard })));
 const RmsManagementPortal = lazy(() => import('./components/rms/RmsManagementPortal').then((m) => ({ default: m.RmsManagementPortal })));
+const NotFoundPage = lazy(() => import('./components/common/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
 const PageLoadingFallback = () => (
   <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center" role="status" aria-label="Loading page">
@@ -62,6 +63,10 @@ export default function App() {
     return resolveRouteFromLocation().view;
   });
 
+  const [notFoundPath, setNotFoundPath] = useState<string>(() => {
+    return resolveRouteFromLocation().notFoundPath || '';
+  });
+
   // Unified router navigation handler: updates state, syncs HTML5 history and persists session
   const handleNavigate = (view: string, replace = false, extraParams?: Record<string, string>) => {
     if (view === 'register' && activeView === 'ticket') {
@@ -78,6 +83,9 @@ export default function App() {
     const handlePopState = () => {
       const resolved = resolveRouteFromLocation();
       setActiveView(resolved.view);
+      if (resolved.notFoundPath) {
+        setNotFoundPath(resolved.notFoundPath);
+      }
       if (resolved.ticketQuery) {
         const local = findRegistrationByTokenOrId(AppStore.getRegistrations(), resolved.ticketQuery);
         if (local) {
@@ -215,17 +223,21 @@ export default function App() {
       }
 
       // ── Standard deep-link handling ──────────────────────────────────────
-      if (query) {
-        const local = findRegistrationByTokenOrId(AppStore.getRegistrations(), query);
+      const resolved = resolveRouteFromLocation();
+      if (query || resolved.ticketQuery) {
+        const ticketIdOrToken = query || resolved.ticketQuery;
+        const local = findRegistrationByTokenOrId(AppStore.getRegistrations(), ticketIdOrToken!);
         if (local) {
           setActiveTicket(local);
-          handleNavigate('ticket', true, { id: query });
+          handleNavigate('ticket', true, { id: ticketIdOrToken! });
         } else {
           handleNavigate('find-ticket', true);
         }
+      } else if (resolved.view === '404') {
+        setNotFoundPath(resolved.notFoundPath || (typeof window !== 'undefined' ? window.location.pathname : ''));
+        setActiveView('404');
       } else {
-        const resolved = resolveRouteFromLocation();
-        syncRouteHistory(resolved.view, true);
+        syncRouteHistory(resolved.view, true, resolved.tab ? { tab: resolved.tab } : undefined);
       }
     } catch (e) {
       console.warn('URL deep-link parsing notice:', e);
@@ -373,13 +385,24 @@ export default function App() {
             />
           )}
 
-          {activeView === 'ticket' && activeTicket && (
-            <TicketView
-              registration={activeTicket}
-              language={language}
-              onNavigateHome={() => handleNavigate('home')}
-              onRegisterAnother={handleStartNewRegistration}
-            />
+          {(activeView === 'ticket' || activeView === 'profile') && (
+            activeTicket ? (
+              <TicketView
+                registration={activeTicket}
+                language={language}
+                onNavigateHome={() => handleNavigate('home')}
+                onRegisterAnother={handleStartNewRegistration}
+              />
+            ) : (
+              <TicketLookupModal
+                language={language}
+                onSelectRegistration={(registration) => {
+                  setActiveTicket(registration);
+                  handleNavigate('ticket');
+                }}
+                onNavigateRegister={handleStartNewRegistration}
+              />
+            )
           )}
 
           {activeView === 'donate' && <DonationPage language={language} />}
@@ -392,13 +415,21 @@ export default function App() {
 
           {activeView === 'scanner' && <ScannerPortal language={language} />}
 
-          {activeView === 'admin' && (
+          {(activeView === 'admin' || activeView === 'login' || activeView === 'dashboard') && (
             <AdminDashboard
               language={language}
               onSelectTicket={(reg) => {
                 setActiveTicket(reg);
                 handleNavigate('ticket');
               }}
+            />
+          )}
+
+          {activeView === '404' && (
+            <NotFoundPage
+              language={language}
+              notFoundPath={notFoundPath || (typeof window !== 'undefined' ? window.location.pathname : '')}
+              onNavigate={handleNavigate}
             />
           )}
         </Suspense>

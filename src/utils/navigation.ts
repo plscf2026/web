@@ -1,6 +1,6 @@
 /**
  * Navigation & Route Management Utility
- * Preserves active views and handles in-place page refreshes across the entire application.
+ * Preserves active views, handles nested routes, and provides reliable in-place page refreshes across the entire application.
  */
 
 export const VALID_VIEWS = [
@@ -15,6 +15,10 @@ export const VALID_VIEWS = [
   'scanner',
   'admin',
   'portal',
+  'login',
+  'dashboard',
+  'profile',
+  '404',
 ] as const;
 
 export type AppView = (typeof VALID_VIEWS)[number];
@@ -24,13 +28,27 @@ export interface ResolvedRoute {
   tab?: string;
   ticketQuery?: string;
   isPaymentReturn?: boolean;
+  notFoundPath?: string;
 }
 
 export const STORAGE_KEY_CURRENT_VIEW = 'plscf_current_view';
 
 /**
- * Resolves current route from window.location (pathname, query parameters, hash)
- * and falls back to session storage on refresh.
+ * Route aliases mapping common friendly paths to existing application views
+ */
+export const ROUTE_ALIASES: Record<string, AppView> = {
+  'contact': 'about',
+  'registration': 'register',
+  'donation': 'donate',
+  'lookup': 'find-ticket',
+  'login': 'login',
+  'dashboard': 'dashboard',
+  'profile': 'profile',
+};
+
+/**
+ * Resolves current route from window.location (pathname, nested path, query parameters, hash)
+ * and falls back to session storage on refresh. Invalid routes return a 404 view.
  */
 export function resolveRouteFromLocation(): ResolvedRoute {
   if (typeof window === 'undefined') {
@@ -38,7 +56,7 @@ export function resolveRouteFromLocation(): ResolvedRoute {
   }
 
   try {
-    const rawPath = window.location.pathname.toLowerCase().replace(/\/+$/, '');
+    const rawPath = window.location.pathname.replace(/\/+$/, '');
     const searchParams = new URLSearchParams(window.location.search);
     const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
 
@@ -57,27 +75,120 @@ export function resolveRouteFromLocation(): ResolvedRoute {
       };
     }
 
-    // 2. Ticket verification deep-link (?token=... or ?id=...)
+    // 2. Ticket verification deep-link via query parameter (?token=... or ?id=...)
     const idParam = searchParams.get('id') || searchParams.get('verify') || searchParams.get('ticket');
     const tokenParam = searchParams.get('token');
     const ticketQuery = tokenParam || idParam;
     if (ticketQuery) {
       return {
         view: 'ticket',
-        ticketQuery,
+        ticketQuery: ticketQuery.trim().toUpperCase(),
       };
     }
 
-    // 3. Exact pathname match (HTML5 pushState / clean URLs)
+    // 3. Root URL access
+    if (!rawPath || rawPath === '' || rawPath === '/') {
+      // Check query param fallbacks (?admin=true, ?view=scanner, etc.)
+      const viewParam = searchParams.get('view')?.toLowerCase();
+      if (viewParam && (VALID_VIEWS as readonly string[]).includes(viewParam)) {
+        return {
+          view: viewParam as AppView,
+          tab: searchParams.get('tab') || undefined,
+        };
+      }
+
+      for (const v of VALID_VIEWS) {
+        if (searchParams.get(v) === 'true') {
+          return {
+            view: v,
+            tab: searchParams.get('tab') || undefined,
+          };
+        }
+      }
+
+      // Hash match (#admin, #scanner, etc.)
+      const cleanHash = hash.split('?')[0];
+      if (cleanHash && (VALID_VIEWS as readonly string[]).includes(cleanHash)) {
+        return {
+          view: cleanHash as AppView,
+        };
+      }
+
+      // Session route preservation on root URL reload
+      const savedRoute = sessionStorage.getItem(STORAGE_KEY_CURRENT_VIEW);
+      if (savedRoute && savedRoute !== '404' && (VALID_VIEWS as readonly string[]).includes(savedRoute)) {
+        return {
+          view: savedRoute as AppView,
+        };
+      }
+
+      return { view: 'home' };
+    }
+
+    // 4. Nested pathname resolution (e.g. /ticket/PLSCF-2027-F1001, /admin/reports, /scanner/food)
     const cleanPath = rawPath.replace(/^\//, '');
-    if (cleanPath && (VALID_VIEWS as readonly string[]).includes(cleanPath)) {
+    const segments = cleanPath.split('/').filter(Boolean);
+    const primarySegment = segments[0]?.toLowerCase() || '';
+    const subSegment = segments[1] || '';
+    const cleanPathLower = cleanPath.toLowerCase();
+
+    // Dynamic ticket route: /ticket/:idOrToken
+    if (primarySegment === 'ticket') {
+      const dynamicId = subSegment || searchParams.get('id') || undefined;
       return {
-        view: cleanPath as AppView,
+        view: 'ticket',
+        ticketQuery: dynamicId ? dynamicId.trim().toUpperCase() : undefined,
+      };
+    }
+
+    // Nested admin route: /admin/:tab
+    if (primarySegment === 'admin') {
+      return {
+        view: 'admin',
+        tab: subSegment || searchParams.get('tab') || undefined,
+      };
+    }
+
+    // Nested scanner route: /scanner/:module
+    if (primarySegment === 'scanner') {
+      return {
+        view: 'scanner',
+        tab: subSegment || searchParams.get('tab') || undefined,
+      };
+    }
+
+    // Nested portal route: /portal/:tab
+    if (primarySegment === 'portal') {
+      return {
+        view: 'portal',
+        tab: subSegment || searchParams.get('tab') || undefined,
+      };
+    }
+
+    // Direct match against valid views
+    if ((VALID_VIEWS as readonly string[]).includes(cleanPathLower)) {
+      return {
+        view: cleanPathLower as AppView,
         tab: searchParams.get('tab') || undefined,
       };
     }
 
-    // 4. Query param (?admin=true, ?view=scanner, etc.)
+    // Route alias match (e.g. /contact -> about, /registration -> register)
+    if (ROUTE_ALIASES[cleanPathLower]) {
+      return {
+        view: ROUTE_ALIASES[cleanPathLower],
+        tab: searchParams.get('tab') || undefined,
+      };
+    }
+
+    if (ROUTE_ALIASES[primarySegment]) {
+      return {
+        view: ROUTE_ALIASES[primarySegment],
+        tab: subSegment || searchParams.get('tab') || undefined,
+      };
+    }
+
+    // 5. Query param override if present on non-matching path
     const viewParam = searchParams.get('view')?.toLowerCase();
     if (viewParam && (VALID_VIEWS as readonly string[]).includes(viewParam)) {
       return {
@@ -86,30 +197,19 @@ export function resolveRouteFromLocation(): ResolvedRoute {
       };
     }
 
-    for (const v of VALID_VIEWS) {
-      if (searchParams.get(v) === 'true') {
-        return {
-          view: v,
-          tab: searchParams.get('tab') || undefined,
-        };
-      }
-    }
-
-    // 5. Hash match (#admin, #scanner, etc.)
-    const cleanHash = hash.split('?')[0];
-    if (cleanHash && (VALID_VIEWS as readonly string[]).includes(cleanHash)) {
-      return {
-        view: cleanHash as AppView,
-      };
-    }
-
-    // 6. Session route preservation (restores page on refresh if URL was at root or rewritten)
+    // 6. Session route fallback (only if URL was rewritten to root or ambiguous)
     const savedRoute = sessionStorage.getItem(STORAGE_KEY_CURRENT_VIEW);
-    if (savedRoute && (VALID_VIEWS as readonly string[]).includes(savedRoute)) {
+    if (savedRoute && savedRoute !== '404' && (VALID_VIEWS as readonly string[]).includes(savedRoute) && rawPath === '/') {
       return {
         view: savedRoute as AppView,
       };
     }
+
+    // 7. Route does not exist: return 404 view while preserving requested URL
+    return {
+      view: '404',
+      notFoundPath: window.location.pathname,
+    };
   } catch (err) {
     console.warn('[Navigation] Error resolving route:', err);
   }
@@ -121,6 +221,13 @@ export function resolveRouteFromLocation(): ResolvedRoute {
  * Returns formatted URL for target view.
  */
 export function getUrlForView(view: string, extraParams?: Record<string, string>): string {
+  if (view === '404') {
+    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+      return window.location.pathname + window.location.search;
+    }
+    return '/404';
+  }
+
   const basePath = view === 'home' ? '/' : `/${view}`;
   if (extraParams && Object.keys(extraParams).length > 0) {
     const sp = new URLSearchParams(extraParams);
@@ -137,6 +244,10 @@ export function syncRouteHistory(view: string, replace = false, extraParams?: Re
 
   try {
     sessionStorage.setItem(STORAGE_KEY_CURRENT_VIEW, view);
+
+    // If currently rendering 404, preserve the original invalid pathname so user sees what failed
+    if (view === '404') return;
+
     const targetUrl = getUrlForView(view, extraParams);
     const currentUrl = window.location.pathname + window.location.search;
 
