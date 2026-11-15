@@ -1020,7 +1020,9 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   inputMode="tel"
                   value={mobileNumber}
                   onChange={(e) => {
-                    const cleaned = e.target.value.replace(/[^\d]/g, '').slice(0, 11);
+                    const raw = e.target.value;
+                    const normalized = normalizeBangladeshiMobileNumber(raw);
+                    const cleaned = (normalized.length >= 10 ? normalized : raw.replace(/[^\d]/g, '')).slice(0, 11);
                     setMobileNumber(cleaned);
 
                     // Real-time inline feedback while typing
@@ -1437,7 +1439,9 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                     inputMode="tel"
                     value={parentPhone}
                     onChange={(e) => {
-                      const cleaned = e.target.value.replace(/[^\d]/g, '').slice(0, 11);
+                      const raw = e.target.value;
+                      const normalized = normalizeBangladeshiMobileNumber(raw);
+                      const cleaned = (normalized.length >= 10 ? normalized : raw.replace(/[^\d]/g, '')).slice(0, 11);
                       setParentPhone(cleaned);
                       clearValidationError('parentPhone');
                     }}

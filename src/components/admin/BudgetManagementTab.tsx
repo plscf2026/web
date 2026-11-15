@@ -412,6 +412,68 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
             <span className="text-[9px] text-emerald-800 block">Reserve liquidity</span>
           </div>
         </div>
+
+        {/* REVENUE FORECAST & BUDGET SANITY ANALYSIS (Pre-Event Financial Feasibility) */}
+        {(() => {
+          const totalInflow = ledger
+            .filter((l) => l.transactionType === 'REGISTRATION_INFLOW' || l.transactionType === 'MANUAL_CASH_DEPOSIT')
+            .reduce((sum, l) => sum + (l.amount || 0), 0);
+          const masterBudget = overview.totalCentralBudget || 6100000;
+          const targetAttendees = Math.ceil(masterBudget / 1500);
+          const paidAlumni = AppStore.getRegistrations().filter((r) => r.paymentStatus === 'paid').length;
+          const fundingPct = Math.min(100, Math.round((totalInflow / masterBudget) * 100));
+          const deficit = Math.max(0, masterBudget - totalInflow);
+
+          return (
+            <div className="mt-4 p-4 rounded-2xl bg-slate-900 text-white border border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span className="font-bold text-xs uppercase tracking-wider text-slate-200">
+                    Financial Feasibility & Budget Sanity Forecast (12 Sub-Committees)
+                  </span>
+                </div>
+                <span className="text-[11px] font-mono font-bold text-amber-400">
+                  Target: {targetAttendees.toLocaleString()} Alumni @ ৳1,500 = ৳{masterBudget.toLocaleString()} BDT
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700">
+                  <span className="text-[10px] text-slate-400 block">Total Inflow Collected</span>
+                  <span className="font-mono font-bold text-emerald-400 text-sm">৳{totalInflow.toLocaleString()} BDT</span>
+                  <span className="text-[9px] text-slate-400 block mt-0.5">{paidAlumni} Paid Attendees</span>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700">
+                  <span className="text-[10px] text-slate-400 block">Funding Progress</span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="flex-1 h-2 rounded-full bg-slate-700 overflow-hidden">
+                      <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${fundingPct}%` }} />
+                    </div>
+                    <span className="font-mono font-bold text-amber-300 text-xs">{fundingPct}%</span>
+                  </div>
+                  <span className="text-[9px] text-slate-400 block mt-1">of Master ৳{masterBudget.toLocaleString()}</span>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700">
+                  <span className="text-[10px] text-slate-400 block">Remaining Funding Gap</span>
+                  <span className="font-mono font-bold text-rose-400 text-sm">৳{deficit.toLocaleString()} BDT</span>
+                  <span className="text-[9px] text-slate-400 block mt-0.5">Need {Math.ceil(deficit / 1500)} more tickets or sponsors</span>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700">
+                  <span className="text-[10px] text-slate-400 block">Recommended Action</span>
+                  <span className="text-[11px] font-medium text-slate-200 block mt-0.5 leading-tight">
+                    {deficit > 0
+                      ? 'Accelerate alumni outreach & corporate sponsorships to cover sub-committee allocations.'
+                      : 'Event is fully funded! Surplus can be assigned to student welfare fund.'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {feedbackNotice && (

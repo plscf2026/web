@@ -484,6 +484,15 @@ export const ROLE_PERMISSIONS: Record<string, SecurityPermission[]> = {
     'VERIFY_PAYMENT',
     'EXPORT_DATABASE_BACKUP',
   ],
+  treasurer: [
+    'VIEW_ALL_BOOKINGS',
+    'VIEW_FINANCIAL_REPORTS',
+    'VERIFY_PAYMENT',
+  ],
+  audit_viewer: [
+    'VIEW_ALL_BOOKINGS',
+    'VIEW_FINANCIAL_REPORTS',
+  ],
 };
 
 export function hasRolePermission(

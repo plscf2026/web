@@ -22,8 +22,15 @@ export function isValidBangladeshiMobile(phone: string): boolean {
 }
 
 export function normalizeBangladeshiMobileNumber(phone: string): string {
+  if (!phone) return '';
   const digits = phone.replace(/\D/g, '');
-  return digits.startsWith('880') ? `0${digits.slice(3)}` : digits;
+  if (digits.startsWith('880')) {
+    return `0${digits.slice(3)}`;
+  }
+  if (digits.length === 10 && digits.startsWith('1')) {
+    return `0${digits}`;
+  }
+  return digits;
 }
 
 /**

@@ -1228,6 +1228,78 @@ export class EventStore {
     return { success: true, event: newEvent };
   }
 
+  /**
+   * Concurrency-safe database-enforced Gate Scan
+   * Executes atomic rpc_confirm_gate_event with FOR UPDATE row-locking in PostgreSQL,
+   * preventing duplicate entries across multiple turnstiles and scanners.
+   * Seamlessly falls back to local cached store if venue internet is temporarily degraded.
+   */
+  static async confirmGateScanAsync(
+    registrationId: string,
+    studentName: string,
+    batchName: string,
+    photoUrl: string | undefined,
+    eventType: 'ENTRY' | 'EXIT',
+    gateId: string,
+    scannerId: string | undefined,
+    staffId: string,
+    staffName: string,
+    staffUser?: StaffAccount
+  ): Promise<{ success: boolean; event?: GateEventRecord; error?: string }> {
+    try {
+      const { data, error } = await supabase.rpc('rpc_confirm_gate_event', {
+        p_registration_id: registrationId,
+        p_event_type: eventType,
+        p_gate_id: gateId,
+        p_staff_id: staffId,
+        p_staff_name: staffName,
+      });
+
+      if (!error && data?.success) {
+        const newEvent: GateEventRecord = {
+          id: data.event_id || `GATE-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          registrationId,
+          studentName,
+          batchName,
+          photoUrl,
+          eventType,
+          gateId,
+          scannerId,
+          staffId,
+          staffName,
+          timestamp: new Date().toISOString(),
+          status: 'APPROVED',
+        };
+        const existing = this.getGateEvents();
+        this.saveGateEvents([newEvent, ...existing]);
+        AppStore.updateRegistration(registrationId, { isCheckedIn: eventType === 'ENTRY' }, 2027);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('plscf_gate_sync', { detail: newEvent }));
+        }
+        return { success: true, event: newEvent };
+      }
+
+      if (data && !data.success) {
+        return { success: false, error: data.message || data.error };
+      }
+    } catch (e) {
+      console.warn('[EventStore] Offline fallback for gate scan:', e);
+    }
+
+    return this.confirmGateScan(
+      registrationId,
+      studentName,
+      batchName,
+      photoUrl,
+      eventType,
+      gateId,
+      scannerId,
+      staffId,
+      staffName,
+      staffUser
+    );
+  }
+
   static adminCorrectGateEvent(
     eventId: string,
     newStatus: 'APPROVED' | 'DENIED' | 'REVISED',

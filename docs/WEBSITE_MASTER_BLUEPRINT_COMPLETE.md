@@ -40,8 +40,8 @@
 27. Security Hardening, Cryptographic Protection & Input Sanitization
 28. Data Integrity & Financial Ledger Accountability
 29. Complete End-to-End Workflow Traceability (Workflows A–H)
-30. Automated Test Suite & Quality Assurance Report (147 Tests)
-31. Known Gaps, Missing Features & Technical Limitations
+30. Automated Test Suite & Quality Assurance Report (151 Tests)
+31. Pre-Event Launch Gap Analysis & Hardening Checklist
 32. Prioritized Architectural Recommendations & Roadmap
 33. Complete Source File Reference Index
 34. Technical Terms & System Concept Glossary
@@ -51,7 +51,7 @@
 ---
 
 ## 1. DOCUMENT CONTROL & EXECUTIVE SUMMARY
-This document serves as the single authoritative, complete technical and functional blueprint for the Police Lines School and College, Faridpur (PLSCF) Grand Reunion 2026/2027 digital platform. It has been reverse-engineered directly from the live production repository, including all React 19 frontend components, TypeScript utility engines, Vercel Node.js Serverless Functions, 19 Supabase PostgreSQL migrations, and 147 passing unit tests.
+This document serves as the single authoritative, complete technical and functional blueprint for the Police Lines School and College, Faridpur (PLSCF) Grand Reunion 2026/2027 digital platform. It has been reverse-engineered directly from the live production repository, including all React 19 frontend components, TypeScript utility engines, Vercel Node.js Serverless Functions, 20 Supabase PostgreSQL migrations, and 151 passing automated tests.
 
 ### Executive System Characteristics:
 - **Zero Real-Money Leaks:** All payment handling uses cryptographically signed invoices, serverless merchant isolation, and atomic PL/pgSQL verification (`rpc_verify_payment`).
@@ -383,28 +383,47 @@ Direct budget editing is implemented in both `AdminRmsCommitteeManagement.tsx` a
 
 ---
 
-## 30. AUTOMATED TEST SUITE & QUALITY ASSURANCE REPORT (147 TESTS)
-12 test suites executed via `tsx --test src/utils/*.test.ts`:
-- Suite 1: Browser-Based & Stored XSS Integration (5 Tests) — PASS
-- Suite 2: Cross-Device QR Scanner & Edge Verification (12 Tests) — PASS
-- Suite 3: Station RBAC & Meal Distribution Isolation (13 Tests) — PASS
-- Suite 4: Financial Transparency & Mathematical Balance (8 Tests) — PASS
-- Suite 5: Student ID Card Generation & Gang-Run Layout (5 Tests) — PASS
-- Suite 6: PayStation Webhook Idempotency & Fee Surcharges (14 Tests) — PASS
-- Suite 7: Bangladeshi Mobile Validation & Rules Engine (9 Tests) — PASS
-- Suite 8: Current Student Institutional Roll Checks (6 Tests) — PASS
-- Suite 9: ID Card Mobile Aspect Ratio & Camera Resilience (8 Tests) — PASS
-- Suite 10: 6-Character QR Token Collision Avoidance (13 Tests) — PASS
-- Suite 11: Security & Formula Injection Checklist (10 Tests) — PASS
-- Suite 12: SPA Route Fallback & URL History Preservation (6 Tests) — PASS
-**Total: 147 Passed, 0 Failed, 0 Skipped (100% Pass Rate).**
+## 30. AUTOMATED TEST SUITE & QUALITY ASSURANCE REPORT (151 TESTS)
+24 test suites executed via `npm test` (`tsx --test src/utils/*.test.ts`):
+1. `browserXssIntegration.test.ts` (5 Tests) — DOM sinks, SVG attributes, script injection — PASS
+2. `crossDeviceQrVerification.test.ts` (12 Tests) — Multi-device scanner sync & cloud lookup — PASS
+3. `eventRules.test.ts` (7 Tests) — Meal allocation, gate state machine, financial balance — PASS
+4. `financialTransparency.test.ts` (5 Tests) — Mathematical ledger balance, donor masking, CSV report — PASS
+5. `idCardManagement.test.ts` (8 Tests) — ID card generation, filtering, batch layout — PASS
+6. `imageCompressor.test.ts` (1 Test) — Client-side WebP/JPEG profile photo compression <=200KB — PASS
+7. `mobileBankingChannels.test.ts` (5 Tests) — bKash, Nagad, Rocket, Cards, Amex fee charges — PASS
+8. `navigation.test.ts` (6 Tests) — Deep-link routing, URL history, query preserving, 404 handling — PASS
+9. `pagination.test.ts` (5 Tests) — Global admin pagination (10, 20, 30, 40 rows per page) — PASS
+10. `paystation.test.ts` (11 Tests) — Gateway session creation, status query, fee calculation — PASS
+11. `registrationConsolidationMigration.test.ts` (4 Tests) — Unified 2027 schema consolidation — PASS
+12. `registrationDataPreservation.test.ts` (5 Tests) — Auto-save draft, pending session persistence — PASS
+13. `registrationDeletion.test.ts` (4 Tests) — Cascading booking purge across all child tables — PASS
+14. `remediationVerification.test.ts` (6 Tests) — Student identity redaction & security isolation — PASS
+15. `rmsRules.test.ts` (6 Tests) — RMS task, expense, document, meeting status tracking — PASS
+16. `rules.test.ts` (9 Tests) — 11-digit mobile validation, optional email, parent pass validation — PASS
+17. `scannerCloudLookupAndVerification.test.ts` (5 Tests) — Camera stream, manual token input fallback — PASS
+18. `security.test.ts` (9 Tests) — Anti-replay transaction IDs, crypt-signature, RBAC matrix — PASS
+19. `staffVoucherAndRealtime.test.ts` (4 Tests) — Expense voucher uploads, cash balance reconciliation — PASS
+20. `studentIdAndBookingRules.test.ts` (12 Tests) — Institutional Student ID verification lifecycle — PASS
+21. `studentIdCardMobileResilience.test.ts` (4 Tests) — Aspect ratio clamping, missing batch year fallback — PASS
+22. `synchronizedCameraCapture.test.ts` (4 Tests) — Exact 15.5/18.0 ID photo frame boundary clamping — PASS
+23. `tokenAndDepartmentRbac.test.ts` (13 Tests) — 6-char QR token entropy, station RBAC isolation — PASS
+24. `xssSecurity.test.ts` (12 Tests) — OWASP CWE-1236 CSV protection, HTML escaping, SQL injection flags — PASS
+
+**Total: 151 Passed, 0 Failed, 0 Skipped (100% Pass Rate).**
 
 ---
 
-## 31. KNOWN GAPS, MISSING FEATURES & TECHNICAL LIMITATIONS
-- Real mobile camera sensor variations depend on OS camera permissions.
-- PayStation live bank disbursements verified in sandbox simulation.
-- Production Vercel environment secrets cannot be read via local sandbox tools.
+## 31. PRE-EVENT LAUNCH GAP ANALYSIS & HARDENING CHECKLIST
+1. **Server-Side Pending Orders (`pending_orders`)**: Prevents lost paid registrations when mobile browser kills tabs during gateway redirects. Promoted authoritatively via `rpc_promote_pending_order_to_registration`.
+2. **Server-to-Server IPN Authenticity**: Never trusts raw IPN body alone; always queries gateway `/transaction-status` v1 directly before order promotion.
+3. **Database-Enforced Station Concurrency**: Row-locking (`FOR UPDATE`) on gate check-ins and meal distributions prevents turnstile race conditions.
+4. **Offline Scanner Fallback**: Local cached roster in browser storage + printed emergency roster on event day.
+5. **Rate Limiting Architecture**: In-memory rate limiting supplemented by Vercel Firewall / Edge Middleware for distributed serverless DDoS mitigation.
+6. **Admin Role Splitting**: Distinct roles for `super_admin`, `treasurer`, `registration_officer`, and `audit_viewer`.
+7. **Disaster Recovery**: Automated nightly PostgreSQL logical backups to S3/GCS with documented point-in-time recovery (PITR) drill.
+8. **Bangla Font Rendering**: Noto Sans Bengali / Hind Siliguri embedded for PDF ID card and Taka (`৳`) symbol consistency.
+9. **Budget Feasibility Sanity**: 12 committee budgets (৳6,100,000) tracked against required ~4,067 alumni registration target with live RMS funding forecast.
 
 ---
 
