@@ -1333,6 +1333,13 @@ export const SupabaseService = {
       createdAt: data.created_at || new Date().toISOString(),
     };
 
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(
+        'plscf_test_admin_session',
+        JSON.stringify({ ...account, expiresAt: Date.now() + ADMIN_SESSION_TTL_MS })
+      );
+    }
+
     try {
       await this.recordAuditLog({
         adminId: account.id,
@@ -1355,7 +1362,7 @@ export const SupabaseService = {
   },
 
   /**
-   * Get active logged in admin session with expiration check
+   * Get active logged in admin session with Supabase getSession & cache restoration
    */
   async getActiveAdminSession(): Promise<AdminAccount | null> {
     if (typeof window !== 'undefined') {
@@ -1374,24 +1381,49 @@ export const SupabaseService = {
       } catch (_) { }
     }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return null;
+    try {
+      // 1. Authoritative check with getSession (fast local token check)
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      let user = session?.user;
 
-    const { data, error } = await supabase
-      .from('admin_accounts')
-      .select('id, username, full_name, email, role, created_at')
-      .eq('auth_user_id', user.id)
-      .maybeSingle();
+      // 2. If token expired or not in memory, fallback to getUser
+      if (!user && !sessionError) {
+        const { data: userData, error: authError } = await supabase.auth.getUser();
+        if (!authError && userData?.user) {
+          user = userData.user;
+        }
+      }
 
-    if (error || !data) return null;
-    return {
-      id: data.id,
-      username: data.username,
-      fullName: data.full_name || 'Administrator',
-      email: data.email || user.email || '',
-      role: data.role || 'super_admin',
-      createdAt: data.created_at || new Date().toISOString(),
-    };
+      if (!user) return null;
+
+      const { data, error } = await supabase
+        .from('admin_accounts')
+        .select('id, username, full_name, email, role, created_at')
+        .eq('auth_user_id', user.id)
+        .maybeSingle();
+
+      if (error || !data) return null;
+      const account: AdminAccount = {
+        id: data.id,
+        username: data.username,
+        fullName: data.full_name || 'Administrator',
+        email: data.email || user.email || '',
+        role: data.role || 'super_admin',
+        createdAt: data.created_at || new Date().toISOString(),
+      };
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(
+          'plscf_test_admin_session',
+          JSON.stringify({ ...account, expiresAt: Date.now() + ADMIN_SESSION_TTL_MS })
+        );
+      }
+
+      return account;
+    } catch (err) {
+      console.warn('[Supabase] Failed to restore admin session:', err);
+      return null;
+    }
   },
 
   /**
@@ -1401,6 +1433,8 @@ export const SupabaseService = {
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('plscf_test_admin_session');
+        sessionStorage.removeItem('plscf_admin_active_tab');
+        sessionStorage.removeItem('plscf_admin_prefill_user');
       } catch (_) { }
     }
     const { error } = await supabase.auth.signOut();

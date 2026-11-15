@@ -15,7 +15,7 @@ import {
 import { StaffAccount, Language } from '../types';
 import { EventStore } from '../services/eventStore';
 import { AppStore } from '../services/store';
-import { isDevTestBypassAllowed } from '../services/supabase';
+import { isDevTestBypassAllowed, supabase } from '../services/supabase';
 import { isBreakfastCollectionOpen } from '../utils/eventRules';
 import { FoodScannerModule } from './FoodScannerModule';
 import { DressScannerModule } from './DressScannerModule';
@@ -38,7 +38,22 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Active module tab if Super Admin - default to Multi-Station Desk
-  const [activeAdminModule, setActiveAdminModule] = useState<string>('multi_station');
+  const [activeAdminModule, setActiveAdminModule] = useState<string>(() => {
+    try {
+      return sessionStorage.getItem('plscf_scanner_module') || 'multi_station';
+    } catch {
+      return 'multi_station';
+    }
+  });
+
+  const handleAdminModuleChange = (mod: string) => {
+    setActiveAdminModule(mod);
+    try {
+      sessionStorage.setItem('plscf_scanner_module', mod);
+    } catch (_) {}
+  };
+
+  const [isLoadingSession, setIsLoadingSession] = useState<boolean>(true);
 
   // Cloud sync state
   const [isSyncingDb, setIsSyncingDb] = useState(false);
@@ -72,12 +87,12 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
 
   useEffect(() => {
     let active = true;
+    setIsLoadingSession(true);
 
     // Check for RBAC role-selection handoff from Footer
     const targetModule = sessionStorage.getItem('plscf_scanner_module');
     if (targetModule) {
       setActiveAdminModule(targetModule);
-      sessionStorage.removeItem('plscf_scanner_module');
     }
 
     const prefillUser = sessionStorage.getItem('plscf_scanner_prefill_user');
@@ -93,25 +108,53 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
           .then((res) => {
             if (res.success && res.staff && active) {
               setCurrentStaff(res.staff);
+              setIsLoadingSession(false);
             }
           })
           .catch((error) => {
             console.error('Auto-login staff authentication error:', error);
+            if (active) setIsLoadingSession(false);
           });
+        return;
       }
     }
 
     EventStore.getActiveStaffSession()
       .then((staff) => {
-        if (active && !prefillUser) setCurrentStaff(staff);
+        if (active) {
+          setCurrentStaff(staff);
+          setIsLoadingSession(false);
+        }
       })
       .catch((error) => {
         console.error('Unable to restore staff session:', error);
-        if (active) setLoginError('Unable to verify staff session. Please sign in again.');
+        if (active) {
+          setLoginError('Unable to verify staff session. Please sign in again.');
+          setIsLoadingSession(false);
+        }
       });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, authSession) => {
+      if (!active) return;
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        if (authSession?.user) {
+          const staff = await EventStore.getActiveStaffSession();
+          if (active && staff) {
+            setCurrentStaff(staff);
+            setIsLoadingSession(false);
+          }
+        }
+      } else if (event === 'SIGNED_OUT') {
+        if (active) {
+          setCurrentStaff(null);
+          setIsLoadingSession(false);
+        }
+      }
+    });
 
     return () => {
       active = false;
+      subscription?.unsubscribe();
     };
   }, [isDevMode]);
 
@@ -242,6 +285,21 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
       />
     );
   };
+
+  // 0. Staff Session Restoring State
+  if (isLoadingSession) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-8 text-center" role="status" aria-label="Loading Staff Session">
+        <div className="w-12 h-12 rounded-full border-4 border-sky-100 border-t-sky-600 animate-spin mb-4 shadow-xs" />
+        <p className="text-sm font-semibold text-slate-700 animate-pulse tracking-wide">
+          {language === 'bn' ? 'কর্মী সেশন যাচাই করা হচ্ছে...' : 'Restoring staff session...'}
+        </p>
+        <p className="text-xs text-slate-400 mt-1">
+          {language === 'bn' ? 'অনুগ্রহ করে অপেক্ষা করুন' : 'Verifying credentials with secure server'}
+        </p>
+      </div>
+    );
+  }
 
   // 1. Staff Login Screen (if not logged in)
   if (!currentStaff) {
@@ -449,7 +507,7 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveAdminModule(tab.id)}
+                  onClick={() => handleAdminModuleChange(tab.id)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
                     active
                       ? 'bg-amber-400 text-slate-950 shadow-xs'

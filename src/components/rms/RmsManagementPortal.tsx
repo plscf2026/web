@@ -59,7 +59,28 @@ interface Props {
 
 export const RmsManagementPortal: React.FC<Props> = ({ onBackToPublic }) => {
   const [currentUser, setCurrentUser] = useState<RmsUser>(() => RmsStore.getCurrentUser());
-  const [activeTab, setActiveTab] = useState<RmsTab>('overview');
+  const [activeTab, setActiveTab] = useState<RmsTab>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const sp = new URLSearchParams(window.location.search);
+        const tab = sp.get('tab');
+        if (tab) return tab as RmsTab;
+        const saved = sessionStorage.getItem('plscf_rms_active_tab');
+        if (saved) return saved as RmsTab;
+      } catch (_) {}
+    }
+    return 'overview';
+  });
+
+  const handleTabChange = (tab: RmsTab) => {
+    setActiveTab(tab);
+    try {
+      sessionStorage.setItem('plscf_rms_active_tab', tab);
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', tab);
+      window.history.replaceState({ ...window.history.state, tab }, '', url.toString());
+    } catch (_) {}
+  };
   const [language, setLanguage] = useState<Language>('en');
   const [isPersonaMenuOpen, setIsPersonaMenuOpen] = useState(false);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
@@ -266,7 +287,7 @@ export const RmsManagementPortal: React.FC<Props> = ({ onBackToPublic }) => {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => handleTabChange(item.id)}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
                     isActive
                       ? 'bg-slate-900 text-white shadow-md'
@@ -321,7 +342,7 @@ export const RmsManagementPortal: React.FC<Props> = ({ onBackToPublic }) => {
                     <button
                       key={item.id}
                       onClick={() => {
-                        setActiveTab(item.id);
+                        handleTabChange(item.id);
                         setIsMobileDrawerOpen(false);
                       }}
                       className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
@@ -363,7 +384,7 @@ export const RmsManagementPortal: React.FC<Props> = ({ onBackToPublic }) => {
           </div>
 
           {activeTab === 'overview' && (
-            <RmsExecutiveOverview language={language} onNavigateTab={(tab) => setActiveTab(tab as RmsTab)} />
+            <RmsExecutiveOverview language={language} onNavigateTab={(tab) => handleTabChange(tab as RmsTab)} />
           )}
 
           {activeTab === 'committees' && (

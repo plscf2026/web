@@ -16,6 +16,7 @@ import { PayStationService } from './services/paystation';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
 import type { ModalStep } from './components/PaymentModal';
+import { resolveRouteFromLocation, syncRouteHistory } from './utils/navigation';
 
 // Route-level code-splitting: heavy pages and portals are loaded on-demand
 const RegistrationPage = lazy(() => import('./components/RegistrationPage').then((m) => ({ default: m.RegistrationPage })));
@@ -56,8 +57,37 @@ export default function App() {
     }
   };
 
-  // Navigation State
-  const [activeView, setActiveView] = useState<string>('home');
+  // Navigation State - initialized synchronously from current browser location/route
+  const [activeView, setActiveView] = useState<string>(() => {
+    return resolveRouteFromLocation().view;
+  });
+
+  // Unified router navigation handler: updates state, syncs HTML5 history and persists session
+  const handleNavigate = (view: string, replace = false, extraParams?: Record<string, string>) => {
+    if (view === 'register' && activeView === 'ticket') {
+      handleStartNewRegistration();
+      return;
+    }
+    setActiveView(view);
+    syncRouteHistory(view, replace, extraParams);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Listen to browser Back/Forward navigation buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const resolved = resolveRouteFromLocation();
+      setActiveView(resolved.view);
+      if (resolved.ticketQuery) {
+        const local = findRegistrationByTokenOrId(AppStore.getRegistrations(), resolved.ticketQuery);
+        if (local) {
+          setActiveTicket(local);
+        }
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Active Ticket to display
   const [activeTicket, setActiveTicket] = useState<RegistrationRecord | null>(null);
@@ -111,7 +141,6 @@ export default function App() {
       const query = tokenParam || idParam;
 
       // ── PayStation payment return callback handling ───────────────────────
-      // Triggers when customer completes checkout, fails, or clicks "GO BACK" on PayStation
       const isPaymentReturn =
         params.get('payment_return') === '1' ||
         params.has('invoice_number') ||
@@ -130,7 +159,7 @@ export default function App() {
         const pendingSession = PayStationService.getPendingSession();
 
         if (pendingSession && pendingSession.type === 'registration' && pendingSession.formData) {
-          setActiveView('register');
+          handleNavigate('register', true);
           setPendingRegistrationData(pendingSession.formData);
           setPreservedRegistrationData(pendingSession.formData);
 
@@ -178,9 +207,9 @@ export default function App() {
           }
           setIsPaymentModalOpen(true);
         } else if (payType === 'donation' || (pendingSession && pendingSession.type === 'donation')) {
-          setActiveView('donate');
+          handleNavigate('donate', true);
         } else {
-          setActiveView('register');
+          handleNavigate('register', true);
         }
         return;
       }
@@ -190,18 +219,13 @@ export default function App() {
         const local = findRegistrationByTokenOrId(AppStore.getRegistrations(), query);
         if (local) {
           setActiveTicket(local);
-          setActiveView('ticket');
+          handleNavigate('ticket', true, { id: query });
         } else {
-          setActiveView('find-ticket');
+          handleNavigate('find-ticket', true);
         }
-      } else if (params.get('admin') === 'true') {
-        setActiveView('admin');
-      } else if (params.get('scanner') === 'true') {
-        setActiveView('scanner');
-      } else if (params.get('donate') === 'true') {
-        setActiveView('donate');
-      } else if (params.get('register') === 'true') {
-        setActiveView('register');
+      } else {
+        const resolved = resolveRouteFromLocation();
+        syncRouteHistory(resolved.view, true);
       }
     } catch (e) {
       console.warn('URL deep-link parsing notice:', e);
@@ -241,7 +265,7 @@ export default function App() {
     setPaymentModalError('');
     setPaymentModalInvoice('');
     setPaymentModalStep('select');
-    setActiveView('register');
+    handleNavigate('register');
   };
 
   // Start fresh registration (clears saved form data to register a new student)
@@ -255,7 +279,7 @@ export default function App() {
     PayStationService.clearPendingSession();
     setRegistrationFormKey((prev) => prev + 1);
     setActiveTicket(null);
-    setActiveView('register');
+    handleNavigate('register');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -269,17 +293,11 @@ export default function App() {
             : 'An unexpected issue occurred while rendering the RMS portal. Please try again or return home.'
         }
         showHomeButton
-        onNavigateHome={() => {
-          setActiveView('home');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
+        onNavigateHome={() => handleNavigate('home')}
       >
         <Suspense fallback={<PageLoadingFallback />}>
           <RmsManagementPortal
-            onBackToPublic={() => {
-              setActiveView('home');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
+            onBackToPublic={() => handleNavigate('home')}
           />
         </Suspense>
       </ErrorBoundary>
@@ -294,14 +312,7 @@ export default function App() {
           language={language}
           onLanguageChange={handleLanguageChange}
           activeView={activeView}
-          onNavigate={(view) => {
-            if (view === 'register' && activeView === 'ticket') {
-              handleStartNewRegistration();
-              return;
-            }
-            setActiveView(view);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
+          onNavigate={handleNavigate}
         />
       </div>
 
@@ -315,24 +326,17 @@ export default function App() {
               : 'An unexpected issue occurred while rendering this view. Please try again or return home.'
           }
           showHomeButton
-          onNavigateHome={() => {
-            setActiveView('home');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
+          onNavigateHome={() => handleNavigate('home')}
         >
           <Suspense fallback={<PageLoadingFallback />}>
           {activeView === 'home' && (
             <HomePage
               language={language}
               feeSettings={feeSettings}
-              onNavigate={(view) => {
-                setActiveView(view);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
+              onNavigate={handleNavigate}
               onSelectTicket={(reg) => {
                 setActiveTicket(reg);
-                setActiveView('ticket');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                handleNavigate('ticket');
               }}
             />
           )}
@@ -345,17 +349,13 @@ export default function App() {
               initialData={preservedRegistrationData}
               isProcessingPayment={isPaymentModalOpen}
               onInitiatePayment={handleInitiatePayment}
-              onNavigate={(view) => {
-                setActiveView(view);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
+              onNavigate={handleNavigate}
               lastRegisteredName={lastRegisteredName}
               onViewLastTicket={
                 activeTicket && lastRegisteredName
                   ? () => {
                       setLastRegisteredName('');
-                      setActiveView('ticket');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      handleNavigate('ticket');
                     }
                   : undefined
               }
@@ -367,8 +367,7 @@ export default function App() {
               language={language}
               onSelectRegistration={(registration) => {
                 setActiveTicket(registration);
-                setActiveView('ticket');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                handleNavigate('ticket');
               }}
               onNavigateRegister={handleStartNewRegistration}
             />
@@ -378,10 +377,7 @@ export default function App() {
             <TicketView
               registration={activeTicket}
               language={language}
-              onNavigateHome={() => {
-                setActiveView('home');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
+              onNavigateHome={() => handleNavigate('home')}
               onRegisterAnother={handleStartNewRegistration}
             />
           )}
@@ -401,8 +397,7 @@ export default function App() {
               language={language}
               onSelectTicket={(reg) => {
                 setActiveTicket(reg);
-                setActiveView('ticket');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                handleNavigate('ticket');
               }}
             />
           )}
@@ -414,10 +409,7 @@ export default function App() {
       <div className="no-print">
         <Footer
           language={language}
-          onNavigate={(view) => {
-            setActiveView(view);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
+          onNavigate={handleNavigate}
         />
       </div>
 
@@ -426,14 +418,7 @@ export default function App() {
         <MobileBottomNav
           language={language}
           activeView={activeView}
-          onNavigate={(view) => {
-            if (view === 'register' && activeView === 'ticket') {
-              handleStartNewRegistration();
-              return;
-            }
-            setActiveView(view);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
+          onNavigate={handleNavigate}
         />
       </div>
 
@@ -461,8 +446,7 @@ export default function App() {
               // Reset the registration form with a fresh key so it is blank & ready for the next student
               setRegistrationFormKey((prev) => prev + 1);
               // Navigate to the target view (defaults to 'register' to keep user on Registration Page)
-              setActiveView(targetView);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
+              handleNavigate(targetView);
             }}
             language={language}
             registrationFee={pendingFees.registrationFee}

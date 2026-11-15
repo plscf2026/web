@@ -54,6 +54,7 @@ import {
   getRegistrationsTableName,
   getDonationsTableName,
   isDevTestBypassAllowed,
+  supabase,
 } from '../services/supabase';
 import { MasterEventOverview } from './admin/MasterEventOverview';
 import { BudgetManagementTab } from './admin/BudgetManagementTab';
@@ -98,6 +99,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // SINGLE-SLOT ADMIN AUTHENTICATION STATE
   // ==========================================
   const [adminSession, setAdminSession] = useState<AdminAccount | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState<boolean>(true);
 
   // Login form state - dev bypass enabled only in local development
   const isDevBypass = isDevTestBypassAllowed();
@@ -111,6 +113,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     let isMounted = true;
     async function checkSession() {
       try {
+        setIsLoadingSession(true);
         // Check for RBAC role-selection handoff from Footer
         const prefillUser = sessionStorage.getItem('plscf_admin_prefill_user');
         const targetTab = sessionStorage.getItem('plscf_admin_active_tab');
@@ -118,7 +121,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         if (targetTab) {
           setActiveTab(targetTab as any);
-          sessionStorage.removeItem('plscf_admin_active_tab');
         }
 
         if (prefillUser) {
@@ -131,20 +133,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             const res = await SupabaseService.loginAdmin(prefillUser, 'admin@123');
             if (res.success && res.account && isMounted) {
               setAdminSession(res.account);
+              setIsLoadingSession(false);
               return;
             }
           }
         }
 
         const session = await SupabaseService.getActiveAdminSession();
-        if (isMounted) setAdminSession(session);
+        if (isMounted) {
+          setAdminSession(session);
+        }
       } catch (err) {
         console.error('Error checking admin session:', err);
+      } finally {
+        if (isMounted) {
+          setIsLoadingSession(false);
+        }
       }
     }
+
     checkSession();
+
+    // Supabase reactive auth state listener to restore session on token refresh or sign-in
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, authSession) => {
+      if (!isMounted) return;
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        if (authSession?.user) {
+          const session = await SupabaseService.getActiveAdminSession();
+          if (isMounted && session) {
+            setAdminSession(session);
+            setIsLoadingSession(false);
+          }
+        }
+      } else if (event === 'SIGNED_OUT') {
+        if (isMounted) {
+          setAdminSession(null);
+          setIsLoadingSession(false);
+        }
+      }
+    });
+
     return () => {
       isMounted = false;
+      subscription?.unsubscribe();
     };
   }, [isDevBypass]);
 
@@ -186,7 +217,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // ==========================================
   // DASHBOARD DATA STATE
   // ==========================================
-  const [activeTab, setActiveTab] = useState<
+  type AdminTab =
     | 'reunionManagement'
     | 'idCardManagement'
     | 'masterOverview'
@@ -207,8 +238,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'staff'
     | 'finances'
     | 'notices'
-    | 'reports'
-  >('reunionManagement');
+    | 'reports';
+
+  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const sp = new URLSearchParams(window.location.search);
+        const tabParam = sp.get('tab');
+        if (tabParam) return tabParam as AdminTab;
+        const saved = sessionStorage.getItem('plscf_admin_active_tab');
+        if (saved) return saved as AdminTab;
+      } catch (_) {}
+    }
+    return 'reunionManagement';
+  });
+
+  const handleTabChange = (tabId: AdminTab) => {
+    setActiveTab(tabId);
+    try {
+      sessionStorage.setItem('plscf_admin_active_tab', tabId);
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', tabId);
+      window.history.replaceState({ ...window.history.state, tab: tabId }, '', url.toString());
+    } catch (_) {}
+  };
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
   // Delete Booking Confirmation State (pop-up with mandatory reason)
@@ -647,6 +700,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // ==========================================
+  // VIEW 0: AUTHENTICATION LOADING STATE (Supabase session restoring)
+  // ==========================================
+  if (isLoadingSession) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-8 text-center" role="status" aria-label="Loading Admin Session">
+        <div className="w-12 h-12 rounded-full border-4 border-sky-100 border-t-sky-600 animate-spin mb-4 shadow-xs" />
+        <p className="text-sm font-semibold text-slate-700 animate-pulse tracking-wide">
+          {language === 'bn' ? 'অ্যাডমিন সেশন যাচাই করা হচ্ছে...' : 'Restoring admin session...'}
+        </p>
+        <p className="text-xs text-slate-400 mt-1">
+          {language === 'bn' ? 'অনুগ্রহ করে অপেক্ষা করুন' : 'Verifying credentials with secure server'}
+        </p>
+      </div>
+    );
+  }
+
+  // ==========================================
   // VIEW 1: AUTHENTICATION GATE (SINGLE SLOT / LOGIN)
   // ==========================================
   if (!adminSession) {
@@ -916,7 +986,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => handleTabChange(tab.id as any)}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
                     isActive
                       ? 'bg-[#172554] text-white shadow-md'
@@ -1004,7 +1074,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       key={tab.id}
                       type="button"
                       onClick={() => {
-                        setActiveTab(tab.id as any);
+                        handleTabChange(tab.id as any);
                         setIsMobileDrawerOpen(false);
                       }}
                       className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
@@ -1115,9 +1185,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           registrations={registrations}
           onNavigateTab={(tab) => {
             if (tab === 'dailyRegAnalytics' || tab === 'dailyPayAnalytics') {
-              setActiveTab('dailyAnalytics');
+              handleTabChange('dailyAnalytics');
             } else {
-              setActiveTab(tab as any);
+              handleTabChange(tab as any);
             }
           }}
         />

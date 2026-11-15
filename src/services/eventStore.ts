@@ -578,31 +578,55 @@ export class EventStore {
       } catch (_) { }
     }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return null;
+    try {
+      // 1. Authoritative check with getSession (fast local token check)
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      let user = session?.user;
 
-    const { data, error } = await supabase
-      .from('staff_accounts')
-      .select('id, auth_user_id, full_name, username, email, role, status, assigned_gate, created_at, created_by')
-      .eq('auth_user_id', user.id)
-      .maybeSingle();
+      // 2. If token expired or not in memory, fallback to getUser
+      if (!user && !sessionError) {
+        const { data: userData, error: authError } = await supabase.auth.getUser();
+        if (!authError && userData?.user) {
+          user = userData.user;
+        }
+      }
 
-    if (error || !data || data.status !== 'ACTIVE') return null;
-    const staff: StaffAccount = {
-      id: data.id,
-      authUserId: data.auth_user_id,
-      fullName: data.full_name,
-      username: data.username,
-      email: data.email,
-      role: data.role,
-      department: ((data as any).department as DepartmentType) || getDefaultDepartment(data.role),
-      permissions: ((data as any).permissions as StaffPermissionAction[]) || getDefaultPermissions(data.role),
-      status: data.status,
-      assignedGate: data.assigned_gate || undefined,
-      createdAt: data.created_at,
-      createdBy: data.created_by || undefined,
-    };
-    return staff;
+      if (!user) return null;
+
+      const { data, error } = await supabase
+        .from('staff_accounts')
+        .select('id, auth_user_id, full_name, username, email, role, status, assigned_gate, created_at, created_by')
+        .eq('auth_user_id', user.id)
+        .maybeSingle();
+
+      if (error || !data || data.status !== 'ACTIVE') return null;
+      const staff: StaffAccount = {
+        id: data.id,
+        authUserId: data.auth_user_id,
+        fullName: data.full_name,
+        username: data.username,
+        email: data.email,
+        role: data.role,
+        department: ((data as any).department as DepartmentType) || getDefaultDepartment(data.role),
+        permissions: ((data as any).permissions as StaffPermissionAction[]) || getDefaultPermissions(data.role),
+        status: data.status,
+        assignedGate: data.assigned_gate || undefined,
+        createdAt: data.created_at,
+        createdBy: data.created_by || undefined,
+      };
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(
+          'plscf_test_staff_session',
+          JSON.stringify({ ...staff, expiresAt: Date.now() + STAFF_SESSION_TTL_MS })
+        );
+      }
+
+      return staff;
+    } catch (err) {
+      console.warn('[Supabase] Failed to restore staff session:', err);
+      return null;
+    }
   }
 
   /**
@@ -686,6 +710,14 @@ export class EventStore {
       createdAt: data.created_at,
       createdBy: data.created_by || undefined,
     };
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(
+        'plscf_test_staff_session',
+        JSON.stringify({ ...staff, expiresAt: Date.now() + STAFF_SESSION_TTL_MS })
+      );
+    }
+
     return { success: true, staff };
   }
 
@@ -693,6 +725,8 @@ export class EventStore {
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('plscf_test_staff_session');
+        sessionStorage.removeItem('plscf_scanner_module');
+        sessionStorage.removeItem('plscf_scanner_prefill_user');
       } catch (_) { }
     }
     const { error } = await supabase.auth.signOut();
