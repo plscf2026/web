@@ -6,6 +6,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { IdCardStore } from '../services/idCardStore';
+import { AppStore } from '../services/store';
+import { RegistrationRecord } from '../types';
 import {
   generateIndividualIdCardPdf,
   generateBatchCombinedA4Pdf,
@@ -15,6 +17,63 @@ import {
 } from './idCardGenerator';
 import { ID_CARD_DIMENSIONS } from './idCardTemplateAssets';
 import { StudentIdCardRecord } from '../types/idcard';
+
+// Initialize test fixture registrations for isolated testing
+const fixtureRegistrations: RegistrationRecord[] = [
+  {
+    id: 'PLSCF-2026-F1001',
+    fullName: 'Tanvir Ahmed',
+    fullNameBn: 'তানভীর আহমেদ',
+    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+    mobileNumber: '01711223344',
+    email: 'tanvir.ahmed@example.com',
+    address: 'House 14, Road 3, Faridpur Sadar, Faridpur',
+    category: 'former',
+    passingYear: '1998',
+    batchName: 'SSC 1998',
+    tShirtSize: 'XL',
+    registrationFee: 1500,
+    donationAmount: 500,
+    totalPaid: 2000,
+    paymentStatus: 'paid',
+    transactionId: 'PST-BK-8821901',
+    paymentMethod: 'bkash',
+    registeredAt: '2026-01-16T10:30:00Z',
+    qrToken: 'A7K9M2',
+    isTShirtCollected: false,
+    serverVerificationSignature: 'SIG_V2_7A82910F11223344',
+    verificationTimestamp: '2026-01-16T10:32:15Z',
+    verifiedBy: 'PAYSTATION_GATEWAY',
+    year: 2026,
+  },
+  {
+    id: 'PLSCF-2026-F1002',
+    fullName: 'Dr. Nusrat Jahan',
+    fullNameBn: 'ডা. নুসরাত জাহান',
+    photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
+    mobileNumber: '01819887766',
+    email: 'dr.nusrat@example.com',
+    address: 'Medical College Road, Faridpur',
+    category: 'former',
+    passingYear: '2005',
+    batchName: 'SSC 2005',
+    tShirtSize: 'M',
+    registrationFee: 1500,
+    donationAmount: 1000,
+    totalPaid: 2500,
+    paymentStatus: 'paid',
+    transactionId: 'PST-CRD-9948201',
+    paymentMethod: 'card',
+    registeredAt: '2026-01-18T14:15:00Z',
+    qrToken: 'R8W3N5',
+    isTShirtCollected: true,
+    serverVerificationSignature: 'SIG_V2_5B91024D9948201',
+    verificationTimestamp: '2026-01-18T14:16:30Z',
+    verifiedBy: 'PAYSTATION_GATEWAY',
+    year: 2026,
+  },
+];
+AppStore.saveRegistrations(fixtureRegistrations);
 
 test('ID Card 1: Retrieves only paid & eligible students and flags missing data for review', () => {
   const cards = IdCardStore.syncWithRegistrations();

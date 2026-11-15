@@ -20,8 +20,7 @@ export const INITIAL_STUDENT_IDS: CurrentStudentIdRecord[] = [
     "className": "Class 10",
     "academicYear": "2026",
     "status": "ACTIVE",
-    "verificationStatus": "USED",
-    "usedRegistrationId": "PLSCF-2026-C2001",
+    "verificationStatus": "AVAILABLE",
     "createdAt": "2026-01-01T00:00:00Z",
     "updatedAt": "2026-01-25T10:00:00Z"
   },
@@ -32,8 +31,7 @@ export const INITIAL_STUDENT_IDS: CurrentStudentIdRecord[] = [
     "className": "Class 10",
     "academicYear": "2026",
     "status": "ACTIVE",
-    "verificationStatus": "USED",
-    "usedRegistrationId": "PLSCF-2026-C2004",
+    "verificationStatus": "AVAILABLE",
     "createdAt": "2026-01-01T00:00:00Z",
     "updatedAt": "2026-01-25T10:00:00Z"
   },
@@ -44,8 +42,7 @@ export const INITIAL_STUDENT_IDS: CurrentStudentIdRecord[] = [
     "className": "Class 10",
     "academicYear": "2026",
     "status": "ACTIVE",
-    "verificationStatus": "USED",
-    "usedRegistrationId": "PLSCF-2026-C2005",
+    "verificationStatus": "AVAILABLE",
     "createdAt": "2026-01-01T00:00:00Z",
     "updatedAt": "2026-01-25T10:00:00Z"
   },
@@ -56,8 +53,7 @@ export const INITIAL_STUDENT_IDS: CurrentStudentIdRecord[] = [
     "className": "Class 12",
     "academicYear": "2026",
     "status": "ACTIVE",
-    "verificationStatus": "USED",
-    "usedRegistrationId": "PLSCF-2026-C2002",
+    "verificationStatus": "AVAILABLE",
     "createdAt": "2026-01-01T00:00:00Z",
     "updatedAt": "2026-01-25T10:00:00Z"
   },
@@ -79,8 +75,7 @@ export const INITIAL_STUDENT_IDS: CurrentStudentIdRecord[] = [
     "className": "Class 11",
     "academicYear": "2026",
     "status": "ACTIVE",
-    "verificationStatus": "USED",
-    "usedRegistrationId": "PLSCF-2026-C2006",
+    "verificationStatus": "AVAILABLE",
     "createdAt": "2026-01-01T00:00:00Z",
     "updatedAt": "2026-01-25T10:00:00Z"
   },
@@ -91,8 +86,7 @@ export const INITIAL_STUDENT_IDS: CurrentStudentIdRecord[] = [
     "className": "Class 11",
     "academicYear": "2026",
     "status": "ACTIVE",
-    "verificationStatus": "USED",
-    "usedRegistrationId": "PLSCF-2026-C2007",
+    "verificationStatus": "AVAILABLE",
     "createdAt": "2026-01-01T00:00:00Z",
     "updatedAt": "2026-01-25T10:00:00Z"
   },
@@ -103,8 +97,7 @@ export const INITIAL_STUDENT_IDS: CurrentStudentIdRecord[] = [
     "className": "Class 12",
     "academicYear": "2026",
     "status": "ACTIVE",
-    "verificationStatus": "USED",
-    "usedRegistrationId": "PLSCF-2026-C2008",
+    "verificationStatus": "AVAILABLE",
     "createdAt": "2026-01-01T00:00:00Z",
     "updatedAt": "2026-01-25T10:00:00Z"
   },
@@ -115,8 +108,7 @@ export const INITIAL_STUDENT_IDS: CurrentStudentIdRecord[] = [
     "className": "Class 8",
     "academicYear": "2026",
     "status": "ACTIVE",
-    "verificationStatus": "USED",
-    "usedRegistrationId": "PLSCF-2026-C2009",
+    "verificationStatus": "AVAILABLE",
     "createdAt": "2026-01-01T00:00:00Z",
     "updatedAt": "2026-01-25T10:00:00Z"
   },
@@ -127,8 +119,7 @@ export const INITIAL_STUDENT_IDS: CurrentStudentIdRecord[] = [
     "className": "Class 8",
     "academicYear": "2026",
     "status": "ACTIVE",
-    "verificationStatus": "USED",
-    "usedRegistrationId": "PLSCF-2026-C2010",
+    "verificationStatus": "AVAILABLE",
     "createdAt": "2026-01-01T00:00:00Z",
     "updatedAt": "2026-01-25T10:00:00Z"
   },
@@ -139,8 +130,7 @@ export const INITIAL_STUDENT_IDS: CurrentStudentIdRecord[] = [
     "className": "Class 7",
     "academicYear": "2026",
     "status": "ACTIVE",
-    "verificationStatus": "USED",
-    "usedRegistrationId": "PLSCF-2026-C2011",
+    "verificationStatus": "AVAILABLE",
     "createdAt": "2026-01-01T00:00:00Z",
     "updatedAt": "2026-01-25T10:00:00Z"
   },
@@ -151,8 +141,7 @@ export const INITIAL_STUDENT_IDS: CurrentStudentIdRecord[] = [
     "className": "Class 7",
     "academicYear": "2026",
     "status": "ACTIVE",
-    "verificationStatus": "USED",
-    "usedRegistrationId": "PLSCF-2026-C2012",
+    "verificationStatus": "AVAILABLE",
     "createdAt": "2026-01-01T00:00:00Z",
     "updatedAt": "2026-01-25T10:00:00Z"
   },
@@ -163,8 +152,7 @@ export const INITIAL_STUDENT_IDS: CurrentStudentIdRecord[] = [
     "className": "Class 6",
     "academicYear": "2026",
     "status": "ACTIVE",
-    "verificationStatus": "USED",
-    "usedRegistrationId": "PLSCF-2026-C2013",
+    "verificationStatus": "AVAILABLE",
     "createdAt": "2026-01-01T00:00:00Z",
     "updatedAt": "2026-01-25T10:00:00Z"
   },
@@ -175,8 +163,7 @@ export const INITIAL_STUDENT_IDS: CurrentStudentIdRecord[] = [
     "className": "Class 6",
     "academicYear": "2026",
     "status": "ACTIVE",
-    "verificationStatus": "USED",
-    "usedRegistrationId": "PLSCF-2026-C2014",
+    "verificationStatus": "AVAILABLE",
     "createdAt": "2026-01-01T00:00:00Z",
     "updatedAt": "2026-01-25T10:00:00Z"
   },
