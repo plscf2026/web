@@ -79,15 +79,19 @@ export const AdminRmsContainer: React.FC<Props> = ({
   const handleNavigateFromDashboard = (tabId: string) => {
     const mapping: Record<string, RmsModuleId> = {
       batches: 'batch-management',
+      batchManagement: 'batch-management',
       committees: 'committee-management',
+      committeeManagement: 'committee-management',
       members: 'member-management',
       tasks: 'task-management',
+      taskManagement: 'task-management',
       events: 'event-management',
       finance: 'finance-management',
       documents: 'document-management',
       checkin: 'qr-checkin',
       reports: 'reports-analytics',
       logs: 'activity-logs',
+      activityLogs: 'activity-logs',
       settings: 'settings',
     };
     if (mapping[tabId]) {
