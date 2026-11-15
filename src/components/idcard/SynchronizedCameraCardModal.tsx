@@ -13,7 +13,8 @@ import {
 } from 'lucide-react';
 import { StudentIdCardRecord } from '../../types/idcard';
 import { Language } from '../../types';
-import { StudentIdCardBadge } from './StudentIdCardBadge';
+import { OfficialCardBadge } from './OfficialCardBadge';
+import { CardType } from '../../utils/officialCardTemplates';
 import { compressImageTo200KB } from '../../utils/imageCompressor';
 
 // Standard Physical ID Card Photo Area: 15.5 mm x 18.0 mm (Aspect Ratio: 31 / 36 = 0.861111)
@@ -28,6 +29,8 @@ export interface SynchronizedCameraCardModalProps {
   studentPreview: StudentIdCardRecord;
   language: Language;
   initialImageUrl?: string | null;
+  isParentPass?: boolean;
+  cardType?: CardType;
 }
 
 export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalProps> = ({
@@ -37,6 +40,8 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
   studentPreview,
   language = 'en',
   initialImageUrl = null,
+  isParentPass = false,
+  cardType,
 }) => {
   const isBangla = language === 'bn';
 
@@ -333,8 +338,16 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
             <div>
               <h2 className="text-sm sm:text-base font-extrabold tracking-tight">
                 {isBangla
-                  ? 'লাইভ ক্যামেরা ও স্টুডেন্ট আইডি কার্ড প্রিভিউ'
-                  : 'Synchronized Camera Capture & Live ID Card Preview'}
+                  ? isParentPass
+                    ? 'লাইভ ক্যামেরা ও অভিভাবক পাস প্রিভিউ'
+                    : cardType === 'alumni' || studentPreview?.category === 'former'
+                    ? 'লাইভ ক্যামেরা ও অ্যালুমনাই কার্ড প্রিভিউ'
+                    : 'লাইভ ক্যামেরা ও স্টুডেন্ট আইডি কার্ড প্রিভিউ'
+                  : isParentPass
+                  ? 'Synchronized Camera Capture & Live Parent Pass Preview'
+                  : cardType === 'alumni' || studentPreview?.category === 'former'
+                  ? 'Synchronized Camera Capture & Live Alumni Card Preview'
+                  : 'Synchronized Camera Capture & Live Student ID Card Preview'}
               </h2>
               <p className="text-[11px] text-amber-200/90 font-medium">
                 {isBangla ? 'রিয়েল-টাইম ফেস পজিশনিং ও স্বয়ংক্রিয় সিঙ্ক' : 'Real-time face positioning & live sync'}
@@ -661,8 +674,10 @@ export const SynchronizedCameraCardModal: React.FC<SynchronizedCameraCardModalPr
 
               {/* ID Card Badge Container */}
               <div className="p-3 bg-slate-50/90 rounded-3xl border border-slate-200 flex flex-col items-center justify-center w-full shadow-xs">
-                <StudentIdCardBadge
+                <OfficialCardBadge
                   student={activeStudentRecord}
+                  isParentPass={isParentPass}
+                  cardType={cardType}
                   language={language}
                   showActions={false}
                   isPreview={true}

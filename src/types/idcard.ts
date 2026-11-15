@@ -58,6 +58,7 @@ export interface StudentIdCardRecord {
   qrToken: string; // Secure unique verification token
   verificationUrl: string;
   cardStatus: StudentIdCardStatus;
+  category?: 'current' | 'former';
   reviewReason?: string; // If flagged for review
   pdfStoragePath?: string; // Relative storage path
   pdfDataUri?: string; // Cached client-side data URI

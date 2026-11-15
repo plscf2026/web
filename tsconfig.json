@@ -26,5 +26,5 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "exclude": ["dist", "supabase"]
+  "exclude": ["dist", "supabase", "e2e"]
 }

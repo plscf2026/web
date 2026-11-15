@@ -16,6 +16,7 @@ import {
   Language,
 } from '../../types';
 import { EventStore } from '../../services/eventStore';
+import { AppStore } from '../../services/store';
 import {
   calculateCentralBudgetOverview,
   calculateStaffFinancialSummary,
@@ -416,11 +417,11 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
         {/* REVENUE FORECAST & BUDGET SANITY ANALYSIS (Pre-Event Financial Feasibility) */}
         {(() => {
           const totalInflow = ledger
-            .filter((l) => l.transactionType === 'REGISTRATION_INFLOW' || l.transactionType === 'MANUAL_CASH_DEPOSIT')
+            .filter((l) => l.transactionType === 'REGISTRATION_INFLOW' || (l.transactionType as string) === 'MANUAL_CASH_DEPOSIT')
             .reduce((sum, l) => sum + (l.amount || 0), 0);
           const masterBudget = overview.totalCentralBudget || 6100000;
           const targetAttendees = Math.ceil(masterBudget / 1500);
-          const paidAlumni = AppStore.getRegistrations().filter((r) => r.paymentStatus === 'paid').length;
+          const paidAlumni = AppStore.getRegistrations().filter((r: any) => r.paymentStatus === 'paid').length;
           const fundingPct = Math.min(100, Math.round((totalInflow / masterBudget) * 100));
           const deficit = Math.max(0, masterBudget - totalInflow);
 

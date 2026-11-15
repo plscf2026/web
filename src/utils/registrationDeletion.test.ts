@@ -20,6 +20,11 @@ test('1. Registration Deletion: AppStore deletes and tombstones registration', (
     batchName: 'SSC 2010',
     qrToken: 'DEL001',
     photoUrl: 'data:image/png;base64,sample',
+    donationAmount: 0,
+    transactionId: 'TRX_DEL01',
+    paymentMethod: 'bkash',
+    registeredAt: new Date().toISOString(),
+    isTShirtCollected: false,
   };
 
   // Add registration
@@ -59,6 +64,11 @@ test('2. Registration Deletion: Tombstoned registration is never resurrected dur
       batchName: 'SSC 2012',
       qrToken: 'ZMB001',
       photoUrl: 'data:image/png;base64,sample',
+      donationAmount: 0,
+      transactionId: 'TRX_ZMB01',
+      paymentMethod: 'bkash',
+      registeredAt: new Date().toISOString(),
+      isTShirtCollected: false,
     },
   ]);
 

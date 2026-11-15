@@ -4,7 +4,6 @@ import {
   X,
   ShieldCheck,
   CreditCard,
-  ExternalLink,
   CheckCircle2,
   Lock,
   ArrowRight,
@@ -510,10 +509,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <span>{isBangla ? 'পেমেন্ট সফলভাবে সম্পন্ন হয়েছে!' : 'Payment Verified & Confirmed!'}</span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                  {completedTicket.hasParent
-                    ? (activeCardTab === 'parent'
-                        ? (isBangla ? 'আপনার অভিভাবক প্রবেশ পাস' : 'Official Parent / Guardian Pass')
-                        : (isBangla ? 'আপনার স্টুডেন্ট আইডি কার্ড' : 'Your Official Student ID Card'))
+                  {activeCardTab === 'parent' && completedTicket.hasParent
+                    ? (isBangla ? 'আপনার অভিভাবক প্রবেশ পাস' : 'Official Parent / Guardian Pass')
+                    : completedTicket.category === 'former'
+                    ? (isBangla ? 'আপনার অ্যালুমনাই মেম্বার আইডি কার্ড' : 'Your Official Alumni ID Card')
                     : (isBangla ? 'আপনার স্টুডেন্ট আইডি কার্ড' : 'Your Official Student ID Card')}
                 </h2>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto">
@@ -535,14 +534,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    🎓 {isBangla ? 'স্টুডেন্ট কার্ড' : 'Student Card'}
+                    🎓 {completedTicket.category === 'former'
+                      ? (isBangla ? 'অ্যালুমনাই কার্ড' : 'Alumni Card')
+                      : (isBangla ? 'স্টুডেন্ট কার্ড' : 'Student Card')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveCardTab('parent')}
                     className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       activeCardTab === 'parent'
-                        ? 'bg-gradient-to-r from-rose-900 to-amber-900 text-white shadow-xs'
+                        ? 'bg-gradient-to-r from-emerald-900 to-teal-900 text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >

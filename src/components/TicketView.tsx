@@ -133,10 +133,24 @@ export const TicketView: React.FC<TicketViewProps> = ({
               <div className="text-center lg:text-left space-y-2 max-w-md">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 text-xs font-bold border border-sky-400/30">
                   <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
-                  <span>{language === 'bn' ? 'অফিসিয়াল স্টুডেন্ট আইডি কার্ড' : 'Official Student ID Card'}</span>
+                  <span>
+                    {registration.category === 'former'
+                      ? language === 'bn'
+                        ? 'অফিসিয়াল অ্যালুমনাই মেম্বার আইডি কার্ড'
+                        : 'Official Alumni Member ID Card'
+                      : language === 'bn'
+                      ? 'অফিসিয়াল স্টুডেন্ট আইডি কার্ড'
+                      : 'Official Student ID Card'}
+                  </span>
                 </span>
                 <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                  {language === 'bn' ? 'আইডি কার্ড প্রিন্ট বা ডাউনলোড করুন' : 'Print or Download Your Student ID Card'}
+                  {registration.category === 'former'
+                    ? language === 'bn'
+                      ? 'অ্যালুমনাই কার্ড প্রিন্ট বা ডাউনলোড করুন'
+                      : 'Print or Download Your Alumni ID Card'
+                    : language === 'bn'
+                    ? 'আইডি কার্ড প্রিন্ট বা ডাউনলোড করুন'
+                    : 'Print or Download Your Student ID Card'}
                 </h2>
                 <p className="text-xs text-sky-200/80 leading-relaxed">
                   {language === 'bn'

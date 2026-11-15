@@ -254,6 +254,7 @@ export class IdCardStore {
       qrToken: safeToken,
       verificationUrl,
       cardStatus: isFlagged ? 'FLAGGED_REVIEW' : 'ELIGIBLE',
+      category: reg.category,
       reviewReason: isFlagged ? reviewReason : undefined,
       gender: reg.gender,
       bloodGroup: reg.bloodGroup,

@@ -1286,7 +1286,7 @@ export class EventStore {
       console.warn('[EventStore] Offline fallback for gate scan:', e);
     }
 
-    return this.confirmGateScan(
+    return this.recordGateEvent(
       registrationId,
       studentName,
       batchName,
