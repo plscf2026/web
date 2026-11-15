@@ -64,6 +64,7 @@ import { AuditHistoryTab } from './admin/AuditHistoryTab';
 import { StudentIdManagementTab } from './admin/StudentIdManagementTab';
 import { StudentIdService } from '../services/studentIdStore';
 import { EventStore } from '../services/eventStore';
+import { IdCardStore } from '../services/idCardStore';
 import { FinancialService } from '../services/financialService';
 import { GlobalPagination } from './common/GlobalPagination';
 import { paginate } from '../utils/pagination';
@@ -377,20 +378,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       const res = await SupabaseService.fetchRegistrations(year);
       setSupabaseTableUsed(res.tableUsed);
-      if (res.data && res.data.length > 0) {
-        // Merge with existing state
+      const deletedIds = AppStore.getDeletedRegistrationIds();
+
+      if (res.data) {
+        // Filter out any deleted/tombstoned bookings
+        const validCloudData = res.data.filter((r) => !deletedIds.has(r.id));
         const localList = AppStore.getRegistrations();
         const mergedMap = new Map<string, RegistrationRecord>();
-        localList.forEach((r) => mergedMap.set(r.id, r));
-        res.data.forEach((r) => mergedMap.set(r.id, r));
+
+        localList.forEach((r) => {
+          if (!deletedIds.has(r.id)) {
+            mergedMap.set(r.id, r);
+          }
+        });
+
+        validCloudData.forEach((r) => {
+          if (!deletedIds.has(r.id)) {
+            mergedMap.set(r.id, r);
+          }
+        });
+
         const mergedArray = Array.from(mergedMap.values());
         setRegistrations(mergedArray);
         AppStore.saveRegistrations(mergedArray);
 
-        // Auto-push any genuine paid local registrations that were not yet in Supabase
-        const cloudIds = new Set(res.data.map((r) => r.id));
+        // Auto-push any genuine paid local registrations that were not yet in Supabase (excluding deleted ones)
+        const cloudIds = new Set(validCloudData.map((r) => r.id));
         for (const localReg of localList) {
-          if (localReg.paymentStatus === 'paid' && !cloudIds.has(localReg.id) && !localReg.isDemo) {
+          if (
+            localReg.paymentStatus === 'paid' &&
+            !cloudIds.has(localReg.id) &&
+            !localReg.isDemo &&
+            !deletedIds.has(localReg.id)
+          ) {
             console.log(`[AdminSync] Auto-pushing unsynced paid registration ${localReg.id} to Supabase...`);
             SupabaseService.saveRegistration(localReg, year).catch(console.warn);
           }
@@ -644,36 +664,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setIsDeletingBooking(true);
 
     try {
-      // 1. If student ID was used or reserved, release/reset it
-      if (bookingToDelete.studentId) {
-        StudentIdService.releaseReservation(bookingToDelete.studentId);
+      const regId = bookingToDelete.id;
+      const studentId = bookingToDelete.studentId;
+
+      // 1. Mark as tombstoned and delete from local storage immediately
+      AppStore.markRegistrationDeleted(regId);
+      AppStore.deleteRegistration(regId, selectedYear);
+
+      // 2. Immediately remove from React state so UI updates without delay
+      setRegistrations((prev) => prev.filter((r) => r.id !== regId));
+
+      // 3. Clean up ID Card cache
+      IdCardStore.removeCardByRegistrationId(regId);
+
+      // 4. If student ID was used or reserved, release/reset it back to AVAILABLE
+      if (studentId) {
+        StudentIdService.releaseReservation(studentId);
       }
 
-      // 2. Remove registration from AppStore
-      AppStore.deleteRegistration(bookingToDelete.id, selectedYear);
+      // 5. Authoritatively delete from Supabase Database (both RPC & direct delete)
+      await SupabaseService.deleteRegistration(
+        regId,
+        deleteReason.trim(),
+        adminSession,
+        selectedYear
+      );
 
-      // 3. Record audit trail in EventStore
+      // 6. Record audit trail in EventStore
       EventStore.recordAuditHistory({
         adminId: adminSession?.id || 'SUPER_ADMIN',
         adminName: adminSession?.fullName || adminSession?.username || 'Super Administrator',
         entityType: 'REGISTRATION',
-        entityId: bookingToDelete.id,
+        entityId: regId,
         action: 'DELETE_REGISTRATION',
         reason: deleteReason.trim(),
       });
-
-      // 4. Record audit log in SupabaseService
-      if (adminSession) {
-        await SupabaseService.recordAuditLog({
-          adminId: adminSession.id,
-          adminUsername: adminSession.username,
-          adminRole: adminSession.role,
-          action: 'STUDENT_RECORD_DELETE',
-          targetType: 'registration',
-          targetId: bookingToDelete.id,
-          details: `Booking ${bookingToDelete.id} (${bookingToDelete.fullName}) deleted. Reason: ${deleteReason.trim()}`,
-        });
-      }
     } catch (err) {
       console.warn('Error deleting booking:', err);
     } finally {

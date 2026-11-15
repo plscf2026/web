@@ -595,17 +595,23 @@ export class StudentIdService {
     if (index === -1) return false;
     const item = list[index];
 
-    if (item.verificationStatus === 'RESERVED') {
+    if (
+      item.verificationStatus === 'RESERVED' ||
+      item.verificationStatus === 'USED' ||
+      (item.verificationStatus as any) === 'ALREADY_USED'
+    ) {
       list[index] = {
         ...item,
         verificationStatus: 'AVAILABLE',
         reservedUntil: null,
+        usedRegistrationId: undefined,
         updatedAt: new Date().toISOString(),
       };
       persistList(list);
       supabase.from('current_student_ids').update({
         verification_status: 'AVAILABLE',
         reserved_until: null,
+        used_registration_id: null,
         updated_at: new Date().toISOString(),
       }).eq('student_id', cleanId).then(undefined, () => {});
       return true;

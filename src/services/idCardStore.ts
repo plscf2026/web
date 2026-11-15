@@ -404,6 +404,12 @@ export class IdCardStore {
     safeSetItem(KEY_ID_CARD_RECORDS, JSON.stringify(cards));
   }
 
+  static removeCardByRegistrationId(registrationId: string): void {
+    const list = this.getIdCards();
+    const updated = list.filter((c) => c.registrationId !== registrationId);
+    this.saveIdCards(updated);
+  }
+
   static markCardGenerated(
     registrationId: string,
     data: {

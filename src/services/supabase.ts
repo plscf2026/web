@@ -428,6 +428,71 @@ export const SupabaseService = {
   },
 
   /**
+   * Authoritatively delete a registration from Supabase PostgreSQL tables.
+   * Uses SECURITY DEFINER rpc_delete_registration with fallback to direct DELETE queries.
+   */
+  async deleteRegistration(
+    registrationId: string,
+    reason: string = 'Admin deletion',
+    adminSession?: any,
+    year: number = 2027
+  ): Promise<{ success: boolean; deletedId: string; error?: string }> {
+    const cleanId = (registrationId || '').trim();
+    if (!cleanId) {
+      return { success: false, deletedId: '', error: 'Registration ID required' };
+    }
+
+    const adminId = adminSession?.id || 'SUPER_ADMIN';
+    const adminName = adminSession?.fullName || adminSession?.username || 'Super Administrator';
+
+    try {
+      // 1. Primary Strategy: Authoritative SECURITY DEFINER RPC
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('rpc_delete_registration', {
+        p_reg_id: cleanId,
+        p_reason: reason.trim(),
+        p_admin_id: adminId,
+        p_admin_name: adminName,
+      });
+
+      if (!rpcErr && rpcData?.success) {
+        console.log(`[SupabaseService] rpc_delete_registration succeeded for ${cleanId}:`, rpcData);
+        return { success: true, deletedId: cleanId };
+      }
+
+      if (rpcErr) {
+        console.warn(`[SupabaseService] rpc_delete_registration notice:`, rpcErr.message);
+      }
+
+      // 2. Fallback: Direct table deletes across registrations tables
+      const tableUsed = getRegistrationsTableName(year);
+      await Promise.allSettled([
+        supabase.from(tableUsed).delete().eq('id', cleanId),
+        supabase.from('registrations_2027').delete().eq('id', cleanId),
+        supabase.from('registrations_2026').delete().eq('id', cleanId),
+        supabase.from('food_distributions').delete().eq('registration_id', cleanId),
+        supabase.from('dress_distributions').delete().eq('registration_id', cleanId),
+        supabase.from('gate_events').delete().eq('registration_id', cleanId),
+      ]);
+
+      // 3. Record audit log
+      await this.recordAuditLog({
+        adminId,
+        adminUsername: adminName,
+        adminRole: adminSession?.role || 'super_admin',
+        action: 'STUDENT_RECORD_DELETE',
+        targetType: 'registration',
+        targetId: cleanId,
+        details: `Deleted registration ${cleanId}. Reason: ${reason}`,
+      }).catch(() => {});
+
+      return { success: true, deletedId: cleanId };
+    } catch (err: any) {
+      console.warn(`[SupabaseService] Error in deleteRegistration for ${cleanId}:`, err);
+      return { success: false, deletedId: cleanId, error: err?.message };
+    }
+  },
+
+  /**
    * Fetch all bookings/registrations for a given year from Supabase.
    */
   async fetchRegistrations(

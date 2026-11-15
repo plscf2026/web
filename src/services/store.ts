@@ -12,6 +12,7 @@ import { SupabaseService, supabase } from './supabase';
 import { isValidSixCharToken, generateUniqueSixCharToken, findRegistrationByTokenOrId, parseScannedInput } from '../utils/tokenGenerator';
 
 const STORAGE_KEY_REGISTRATIONS = 'plscf_reunion_registrations_v1';
+const STORAGE_KEY_DELETED_REGISTRATIONS = 'plscf_deleted_registrations_v1';
 const STORAGE_KEY_DONATIONS = 'plscf_reunion_donations_v1';
 const STORAGE_KEY_NOTICES = 'plscf_reunion_notices_v1';
 const STORAGE_KEY_EXPENSES = 'plscf_reunion_expenses_v1';
@@ -254,14 +255,38 @@ function setStored<T>(key: string, value: T): void {
 }
 
 export class AppStore {
+  static getDeletedRegistrationIds(): Set<string> {
+    const arr = getStored<string[]>(STORAGE_KEY_DELETED_REGISTRATIONS, []);
+    return new Set(Array.isArray(arr) ? arr : []);
+  }
+
+  static markRegistrationDeleted(id: string): void {
+    const cleanId = (id || '').trim();
+    if (!cleanId) return;
+    const current = this.getDeletedRegistrationIds();
+    current.add(cleanId);
+    setStored(STORAGE_KEY_DELETED_REGISTRATIONS, Array.from(current));
+  }
+
+  static isRegistrationDeleted(id: string): boolean {
+    if (!id) return false;
+    return this.getDeletedRegistrationIds().has(id.trim());
+  }
+
   static getRegistrations(): RegistrationRecord[] {
     const rawList = getStored<RegistrationRecord[]>(STORAGE_KEY_REGISTRATIONS, []);
+    const deletedIds = this.getDeletedRegistrationIds();
     const map = new Map<string, RegistrationRecord>();
+
     for (const r of INITIAL_REGISTRATIONS) {
-      map.set(r.id, r);
+      if (!deletedIds.has(r.id)) {
+        map.set(r.id, r);
+      }
     }
     for (const r of rawList) {
-      map.set(r.id, r);
+      if (!deletedIds.has(r.id)) {
+        map.set(r.id, r);
+      }
     }
     const list = Array.from(map.values());
     let modified = false;
@@ -288,7 +313,9 @@ export class AppStore {
   }
 
   static saveRegistrations(items: RegistrationRecord[]): void {
-    setStored(STORAGE_KEY_REGISTRATIONS, items);
+    const deletedIds = this.getDeletedRegistrationIds();
+    const cleanItems = items.filter((r) => !deletedIds.has(r.id));
+    setStored(STORAGE_KEY_REGISTRATIONS, cleanItems);
   }
 
   static addRegistration(record: RegistrationRecord, year: number = 2026): void {
@@ -335,16 +362,34 @@ export class AppStore {
     return list[index];
   }
 
-  static deleteRegistration(id: string, year: number = 2026): boolean {
+  static deleteRegistration(id: string, year: number = 2027): boolean {
+    const cleanId = (id || '').trim();
+    if (!cleanId) return false;
+
+    // 1. Mark as tombstoned to prevent re-addition during background cloud sync
+    this.markRegistrationDeleted(cleanId);
+
+    // 2. Remove registration from local storage
     const list = this.getRegistrations();
-    const updated = list.filter((r) => r.id !== id);
-    if (updated.length === list.length) return false;
+    const updated = list.filter((r) => r.id !== cleanId);
     this.saveRegistrations(updated);
 
-    // Asynchronously delete from Supabase if table exists
-    const yearTableName = `registrations_${year}`;
-    supabase.from(yearTableName).delete().eq('id', id).then(undefined, () => { });
-    supabase.from('registrations').delete().eq('id', id).then(undefined, () => { });
+    // 3. Dispatch delete event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('plscf_registration_deleted', { detail: { id: cleanId } }));
+    }
+
+    // 4. Asynchronously and authoritatively delete from Supabase PostgreSQL tables
+    SupabaseService.deleteRegistration(cleanId, 'Admin Panel Deletion', undefined, year).then((res) => {
+      if (res.success) {
+        console.log(`[Supabase] Successfully deleted registration ${cleanId} from cloud database`);
+      } else {
+        console.warn(`[Supabase] Cloud delete notice for ${cleanId}:`, res.error);
+      }
+    }).catch((err) => {
+      console.warn('[Supabase] Background delete error:', err);
+    });
+
     return true;
   }
 
@@ -357,6 +402,7 @@ export class AppStore {
       const targetYear = preferredYear || 2027;
       const res = await SupabaseService.fetchRegistrations(targetYear);
       const fetched: RegistrationRecord[] = res.data && res.data.length > 0 ? res.data : [];
+      const deletedIds = this.getDeletedRegistrationIds();
 
       if (fetched.length === 0) {
         return { count: this.getRegistrations().length };
@@ -367,11 +413,15 @@ export class AppStore {
 
       // Keep existing local records
       for (const r of existing) {
-        map.set(r.id, r);
+        if (!deletedIds.has(r.id)) {
+          map.set(r.id, r);
+        }
       }
-      // Authoritative update from cloud
+      // Authoritative update from cloud (filtering out any locally deleted/tombstoned IDs)
       for (const r of fetched) {
-        map.set(r.id, r);
+        if (!deletedIds.has(r.id)) {
+          map.set(r.id, r);
+        }
       }
 
       const merged = Array.from(map.values());
@@ -380,7 +430,12 @@ export class AppStore {
       // Bidirectional sync: Push any genuine paid local registrations up to Supabase
       const cloudIds = new Set(fetched.map((r) => r.id));
       for (const localReg of existing) {
-        if (localReg.paymentStatus === 'paid' && !cloudIds.has(localReg.id) && !localReg.isDemo) {
+        if (
+          localReg.paymentStatus === 'paid' &&
+          !cloudIds.has(localReg.id) &&
+          !localReg.isDemo &&
+          !deletedIds.has(localReg.id)
+        ) {
           console.log(`[AppStore] Auto-pushing unsynced paid registration ${localReg.id} to Supabase...`);
           SupabaseService.saveRegistration(localReg, targetYear).catch((err) => {
             console.warn(`[AppStore] Sync error for ${localReg.id}:`, err);
