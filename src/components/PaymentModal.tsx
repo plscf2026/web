@@ -116,6 +116,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const invoiceRef = useRef(initialInv);
   const amountRef = useRef(initialAmt);
+  const isFinalizingRef = useRef(false);
 
   // Keep refs synchronized when props or sessions change
   useEffect(() => {
@@ -136,7 +137,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const finalizeRegistration = async (payment: PayStationPaymentResult) => {
     if (!registrationData) return;
-    setStep('verifying');
+    if (isFinalizingRef.current || completedTicket) {
+      console.log('[PaymentModal] Finalization already in progress or completed, ignoring re-entrant call.');
+      return;
+    }
+    isFinalizingRef.current = true;
+    setStep('processing');
     setProcessingStep(isBangla ? 'ডিজিটাল টিকিট তৈরি হচ্ছে...' : 'Generating secure digital ticket...');
     try {
       // Synchronize donationAmount so totalPaid matches actual payment.amount
@@ -188,12 +194,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           : `Database confirmation failed: ${err?.message || 'Please contact support or retry.'}`
       );
       setStep('failed');
+    } finally {
+      isFinalizingRef.current = false;
     }
   };
 
   // ── Manual or automatic verification ─────────────────────────────────────
 
   const handleManualVerify = async () => {
+    if (isFinalizingRef.current || completedTicket) return;
     setStep('verifying');
     setProcessingStep(isBangla ? 'পেমেন্ট স্ট্যাটাস যাচাই করা হচ্ছে...' : 'Verifying payment status...');
     try {
@@ -221,7 +230,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   // ── Auto-verify on mount / step change ─────────────────────────────────────
 
   useEffect(() => {
-    if (step === 'verifying' && !completedTicket) {
+    if (step === 'verifying' && !completedTicket && !isFinalizingRef.current) {
       handleManualVerify();
     }
   }, [step]);
@@ -233,6 +242,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
     let attempts = 0;
     const interval = setInterval(async () => {
+      if (isFinalizingRef.current || completedTicket) {
+        clearInterval(interval);
+        return;
+      }
       attempts++;
       setPollCount(attempts);
 
@@ -271,6 +284,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       setErrorMessage(isBangla ? 'নিবন্ধন ডেটা অনুপস্থিত।' : 'Registration data missing.');
       return;
     }
+    if (isFinalizingRef.current || completedTicket) return;
 
     setStep('processing');
     setErrorMessage('');
@@ -314,7 +328,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         pendingSession?.registrationId
       );
 
-      // 2. Build verified transaction result with channel-specific prefix
+      // 2. Build verified transaction result with deterministic channel-specific prefix
       const prefix =
         method === 'nagad'
           ? 'NGD'
@@ -325,7 +339,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           : method === 'amex'
           ? 'AMX'
           : 'BKS';
-      const simTrxId = `${prefix}-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const cleanInvoice = (invoiceRef.current || '').replace(/[^A-Za-z0-9]/g, '').slice(-8).toUpperCase();
+      const simTrxId = `${prefix}-SBX-${cleanInvoice || 'VALID'}`;
 
       const paymentResult: PayStationPaymentResult = {
         invoiceNumber: invoiceRef.current,
@@ -351,6 +366,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       setErrorMessage(isBangla ? 'নিবন্ধন ডেটা অনুপস্থিত।' : 'Registration data missing.');
       return;
     }
+    if (isFinalizingRef.current || completedTicket) return;
 
     // In sandbox mode, PayStation's public demo account (104-1653730183) disabled Nagad, Rocket, Card, and Amex
     // and its bKash upstream callback execution fails with "Sorry! Payment Failed Please contact with Merchant".

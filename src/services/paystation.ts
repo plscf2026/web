@@ -445,13 +445,17 @@ export class PayStationService {
     if (config.isSandbox) {
       const pendingSession = this.getPendingSession();
       const dynamicAmount = pendingSession?.amount ? String(pendingSession.amount) : '1500';
+      const invoiceHash = invoiceNumber
+        ? invoiceNumber.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase()
+        : 'SBX';
+      const simTrxId = `PST-SIM-${invoiceHash || 'SANDBOX'}`;
       return {
         success: true,
         status: 'success',
         data: {
           invoice_number: invoiceNumber,
           trx_status: 'Success',
-          trx_id: `PST-SIM-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+          trx_id: simTrxId,
           payment_amount: dynamicAmount,
           order_date_time: new Date().toISOString().replace('T', ' ').substring(0, 19),
           payer_mobile_no: pendingSession?.formData?.mobileNumber || '',
@@ -957,6 +961,18 @@ export class PayStationService {
     const pendingSession = this.getPendingSession();
     let regId = pendingSession?.registrationId;
     let qrToken = pendingSession?.qrToken;
+
+    // 0. Idempotent fast-path: If this exact transaction or invoice is already finalized as paid, return it immediately
+    const existingList = AppStore.getRegistrations();
+    const alreadyCompleted = existingList.find(
+      (r) =>
+        (payment.trxId && r.transactionId === payment.trxId) ||
+        (payment.invoiceNumber && r.gatewayInvoiceNumber === payment.invoiceNumber && r.paymentStatus === 'paid')
+    );
+    if (alreadyCompleted && alreadyCompleted.paymentStatus === 'paid') {
+      console.log(`[PayStation] Registration ${alreadyCompleted.id} already completed and paid. Returning existing record.`);
+      return alreadyCompleted;
+    }
 
     if (!regId) {
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);

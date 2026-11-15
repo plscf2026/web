@@ -320,7 +320,16 @@ export class AppStore {
 
   static addRegistration(record: RegistrationRecord, year: number = 2026): void {
     const list = this.getRegistrations();
-    const updated = [record, ...list];
+    const existingIndex = list.findIndex(
+      (r) => r.id === record.id || (record.gatewayInvoiceNumber && r.gatewayInvoiceNumber === record.gatewayInvoiceNumber)
+    );
+    let updated: RegistrationRecord[];
+    if (existingIndex >= 0) {
+      updated = [...list];
+      updated[existingIndex] = { ...updated[existingIndex], ...record };
+    } else {
+      updated = [record, ...list];
+    }
     this.saveRegistrations(updated);
 
     // Asynchronously sync with Supabase backend tables (e.g. registrations_2026)
