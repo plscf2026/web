@@ -44,14 +44,184 @@ export interface PublicDonationItem {
   id: string;
   donor_name: string;
   masked_registration_id?: string;
+  masked_mobile?: string;
+  raw_mobile?: string;
+  raw_registration_id?: string;
   batch_name?: string;
   passing_year?: string;
   amount: number;
+  donation_count?: number;
   purpose?: string;
   payment_method?: string;
   donation_date: string;
   is_anonymous?: boolean;
   created_at?: string;
+}
+
+export interface AggregatedDonorItem {
+  id: string;
+  rank?: number;
+  donor_key: string;
+  donor_name: string;
+  masked_registration_id?: string;
+  masked_mobile?: string;
+  batch_name?: string;
+  passing_year?: string;
+  amount: number;
+  donation_count: number;
+  purpose?: string;
+  payment_methods: string[];
+  donation_date: string;
+  is_anonymous: boolean;
+}
+
+/**
+ * Safely masks a mobile number for public display (e.g. 01712345678 -> 017****5678).
+ */
+export function maskPhone(phone?: string | null): string {
+  if (!phone) return '••••••';
+  let digits = String(phone).replace(/\D/g, '');
+  if (digits.startsWith('880') && digits.length >= 13) {
+    digits = '0' + digits.slice(3);
+  }
+  if (digits.length < 7) return '••••••';
+  const start = digits.slice(0, 3);
+  const end = digits.slice(-4);
+  return `${start}****${end}`;
+}
+
+/**
+ * Safely masks a registration ID for public transparency (e.g. PLSCF-2027-F1001 -> PLSCF-2027-****).
+ */
+export function maskRegistrationId(id?: string | null): string {
+  if (!id) return '••••••';
+  const clean = id.trim();
+  if (clean.length <= 6) return clean;
+  return `${clean.slice(0, -4)}****`;
+}
+
+/**
+ * Aggregates donations by donor identity (mobile number, registration ID, or donor name).
+ * If a donor contributes multiple times (e.g. 3 or 5 times with the same number/identity),
+ * their donations are combined into a single authoritative record with cumulative sum.
+ * Returns the records sorted descending by total donated amount, sliced to limit (default 10).
+ */
+export function aggregateTopDonors(
+  donations: PublicDonationItem[],
+  limit: number = 10
+): AggregatedDonorItem[] {
+  if (!Array.isArray(donations) || donations.length === 0) {
+    return [];
+  }
+
+  const map = new Map<string, AggregatedDonorItem>();
+
+  for (const don of donations) {
+    if (!don) continue;
+    const amount = Number(don.amount) || 0;
+    if (amount <= 0) continue;
+
+    // Determine unique donor key
+    let key = '';
+
+    // 1. Raw mobile number (matching by last 10 digits handles +880 and 01 prefix)
+    const rawMobile = don.raw_mobile || (don as any).mobile_number || (don as any).mobileNumber;
+    if (rawMobile) {
+      const digits = String(rawMobile).replace(/\D/g, '');
+      if (digits.length >= 10) {
+        key = `phone:${digits.slice(-10)}`;
+      }
+    }
+
+    // 2. Masked mobile if present and raw mobile was absent
+    if (!key && don.masked_mobile && don.masked_mobile.includes('*')) {
+      key = `mphone:${don.masked_mobile.trim()}`;
+    }
+
+    // 3. Raw registration ID
+    const rawRegId = don.raw_registration_id || (don as any).registration_id || (don as any).registrationId;
+    if (!key && rawRegId) {
+      key = `reg:${String(rawRegId).trim().toUpperCase()}`;
+    }
+
+    // 4. Masked registration ID (combined with donor name for safety against collisions)
+    if (!key && don.masked_registration_id && !don.masked_registration_id.startsWith('••••')) {
+      const cleanMasked = don.masked_registration_id.trim().toUpperCase();
+      key = `mreg:${cleanMasked}_${(don.donor_name || '').trim().toLowerCase()}`;
+    }
+
+    // 5. Fallback to Donor Name + Batch / Passing Year
+    if (!key) {
+      const cleanName = (don.donor_name || 'Anonymous').trim().toLowerCase();
+      const cleanBatch = (don.batch_name || '').trim().toLowerCase();
+      const cleanYear = (don.passing_year || '').trim();
+      key = `name:${cleanName}_${cleanBatch}_${cleanYear}`;
+    }
+
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, {
+        id: don.id || `AGG-${map.size + 1}`,
+        donor_key: key,
+        donor_name: don.donor_name || 'Anonymous Donor',
+        masked_registration_id: don.masked_registration_id || (rawRegId ? maskRegistrationId(rawRegId) : undefined),
+        masked_mobile: don.masked_mobile || (rawMobile ? maskPhone(rawMobile) : undefined),
+        batch_name: don.batch_name,
+        passing_year: don.passing_year,
+        amount,
+        donation_count: don.donation_count || 1,
+        purpose: don.purpose || 'Reunion Fund',
+        payment_methods: don.payment_method ? [don.payment_method] : [],
+        donation_date: don.donation_date || new Date().toISOString().split('T')[0],
+        is_anonymous: Boolean(don.is_anonymous),
+      });
+    } else {
+      // Accumulate total amount (sum of all donations from this number/identity)
+      existing.amount += amount;
+      existing.donation_count += (don.donation_count || 1);
+
+      // Keep latest donation date
+      if (don.donation_date && don.donation_date > existing.donation_date) {
+        existing.donation_date = don.donation_date;
+      }
+
+      // Record payment method
+      if (don.payment_method && !existing.payment_methods.includes(don.payment_method)) {
+        existing.payment_methods.push(don.payment_method);
+      }
+
+      // Enrich donor metadata if available
+      if ((!existing.donor_name || existing.donor_name.includes('Anonymous')) && don.donor_name && !don.donor_name.includes('Anonymous')) {
+        existing.donor_name = don.donor_name;
+        existing.is_anonymous = false;
+      }
+      if (!existing.batch_name && don.batch_name) {
+        existing.batch_name = don.batch_name;
+      }
+      if (!existing.passing_year && don.passing_year) {
+        existing.passing_year = don.passing_year;
+      }
+      if (!existing.masked_registration_id && (don.masked_registration_id || rawRegId)) {
+        existing.masked_registration_id = don.masked_registration_id || maskRegistrationId(rawRegId);
+      }
+      if (!existing.masked_mobile && (don.masked_mobile || rawMobile)) {
+        existing.masked_mobile = don.masked_mobile || maskPhone(rawMobile);
+      }
+    }
+  }
+
+  // Sort descending by total cumulative donation
+  const sorted = Array.from(map.values()).sort((a, b) => b.amount - a.amount);
+
+  // Assign 1-based ranks
+  sorted.forEach((item, index) => {
+    item.rank = index + 1;
+  });
+
+  if (typeof limit === 'number' && limit > 0) {
+    return sorted.slice(0, limit);
+  }
+  return sorted;
 }
 
 export interface FinancialTransparencySummary {
@@ -475,19 +645,59 @@ export class FinancialService {
       status: 'approved',
     }));
 
-    const recentDonations: PublicDonationItem[] = registrations
+    // Collect raw donations from paid registrations
+    const regDonationsList: PublicDonationItem[] = registrations
       .filter((r) => (r.donationAmount || 0) > 0)
       .map((r) => ({
-        id: `DON-${r.id}`,
+        id: `DON-REG-${r.id}`,
         donor_name: r.fullName,
-        masked_registration_id: r.id.length > 6 ? `${r.id.slice(0, -4)}****` : r.id,
+        raw_registration_id: r.id,
+        masked_registration_id: maskRegistrationId(r.id),
+        raw_mobile: r.mobileNumber,
+        masked_mobile: maskPhone(r.mobileNumber),
         batch_name: r.batchName,
         passing_year: r.passingYear,
-        amount: r.donationAmount || 0,
+        amount: Number(r.donationAmount) || 0,
         purpose: 'Reunion Registration Donation',
         payment_method: r.paymentMethod,
         donation_date: r.registeredAt ? r.registeredAt.split('T')[0] : '2026-02-01',
       }));
+
+    // Collect raw donations from standalone donations
+    const standaloneDonationsList: PublicDonationItem[] = localDonations
+      .filter((d) => (d.amount || 0) > 0 && d.paymentStatus !== 'failed')
+      .map((d, idx) => ({
+        id: d.id || `DON-STD-${idx}`,
+        donor_name: d.donorName,
+        raw_mobile: d.mobileNumber,
+        masked_mobile: maskPhone(d.mobileNumber),
+        amount: Number(d.amount) || 0,
+        purpose: d.purpose || 'General Reunion Fund',
+        payment_method: d.paymentMethod,
+        donation_date: d.date || (d.createdAt ? d.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]),
+        is_anonymous: d.donorName.includes('Anonymous'),
+      }));
+
+    const allRawDonations = [...regDonationsList, ...standaloneDonationsList];
+
+    // Authoritative aggregation: combine multi-donations by same mobile/ID/name
+    const allUniqueAggregated = aggregateTopDonors(allRawDonations, 0);
+
+    // Public ledger strictly shows the Top 10 donors
+    const top10Donors: PublicDonationItem[] = allUniqueAggregated.slice(0, 10).map((agg) => ({
+      id: agg.id,
+      donor_name: agg.donor_name,
+      masked_registration_id: agg.masked_registration_id,
+      masked_mobile: agg.masked_mobile,
+      batch_name: agg.batch_name,
+      passing_year: agg.passing_year,
+      amount: agg.amount,
+      donation_count: agg.donation_count,
+      purpose: agg.purpose,
+      payment_method: agg.payment_methods[0] || 'bkash',
+      donation_date: agg.donation_date,
+      is_anonymous: agg.is_anonymous,
+    }));
 
     return {
       total_collected: totalCollected,
@@ -496,10 +706,10 @@ export class FinancialService {
       total_expenses: totalExpenses,
       remaining_balance: remainingBalance,
       paid_student_count: registrations.length,
-      donor_count: recentDonations.length,
+      donor_count: allUniqueAggregated.length,
       categories: defaultCategories,
       recent_expenses: recentExpenses,
-      recent_donations: recentDonations,
+      recent_donations: top10Donors,
       updated_at: new Date().toISOString(),
     };
   }

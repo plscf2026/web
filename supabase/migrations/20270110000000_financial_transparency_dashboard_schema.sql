@@ -275,33 +275,45 @@ BEGIN
         LIMIT 50
     ) exp_row;
 
-    -- Recent donations (privacy-masked registration IDs)
+    -- Top 10 Donors Ledger (Aggregated by donor phone/registration ID/name, sum of all contributions)
     SELECT COALESCE(jsonb_agg(don_row), '[]'::jsonb)
     INTO v_recent_donations
     FROM (
         SELECT 
-            d.id,
+            MIN(d.id) AS id,
             CASE 
-                WHEN d.is_anonymous THEN 'Anonymous Donor'
-                ELSE d.donor_name 
+                WHEN bool_and(d.is_anonymous) THEN 'Anonymous Donor'
+                ELSE MAX(d.donor_name) 
             END AS donor_name,
             CASE 
-                WHEN d.registration_id IS NOT NULL AND length(d.registration_id) > 6 
-                THEN substring(d.registration_id from 1 for length(d.registration_id) - 4) || '****'
+                WHEN MAX(d.registration_id) IS NOT NULL AND length(MAX(d.registration_id)) > 6 
+                THEN substring(MAX(d.registration_id) from 1 for length(MAX(d.registration_id)) - 4) || '****'
                 ELSE NULL 
             END AS masked_registration_id,
-            d.batch_name,
-            d.passing_year,
-            d.amount,
-            d.purpose,
-            d.payment_method,
-            d.donation_date,
-            d.is_anonymous,
-            d.created_at
+            CASE 
+                WHEN MAX(d.mobile_number) IS NOT NULL AND length(MAX(d.mobile_number)) >= 8
+                THEN substring(MAX(d.mobile_number) from 1 for 3) || '****' || substring(MAX(d.mobile_number) from length(MAX(d.mobile_number)) - 3 for 4)
+                ELSE NULL
+            END AS masked_mobile,
+            MAX(d.batch_name) AS batch_name,
+            MAX(d.passing_year) AS passing_year,
+            SUM(d.amount) AS amount,
+            COUNT(*) AS donation_count,
+            COALESCE(MAX(d.purpose), 'Reunion Contribution') AS purpose,
+            MAX(d.payment_method) AS payment_method,
+            MAX(d.donation_date) AS donation_date,
+            bool_and(d.is_anonymous) AS is_anonymous,
+            MAX(d.created_at) AS created_at
         FROM public.donations d
         WHERE d.payment_status = 'paid'
-        ORDER BY d.donation_date DESC, d.created_at DESC
-        LIMIT 100
+        GROUP BY 
+            COALESCE(
+                NULLIF(regexp_replace(d.mobile_number, '\D', '', 'g'), ''),
+                NULLIF(upper(trim(d.registration_id)), ''),
+                lower(trim(d.donor_name))
+            )
+        ORDER BY SUM(d.amount) DESC
+        LIMIT 10
     ) don_row;
 
     RETURN jsonb_build_object(
@@ -311,7 +323,15 @@ BEGIN
         'total_expenses', v_total_expenses,
         'remaining_balance', v_remaining_balance,
         'paid_student_count', v_paid_student_count,
-        'donor_count', v_donor_count + (SELECT COUNT(*) FROM public.registrations_2027 WHERE payment_status = 'paid' AND donation_amount > 0),
+        'donor_count', (
+            SELECT COUNT(DISTINCT COALESCE(
+                NULLIF(regexp_replace(d.mobile_number, '\D', '', 'g'), ''),
+                NULLIF(upper(trim(d.registration_id)), ''),
+                lower(trim(d.donor_name))
+            ))
+            FROM public.donations d
+            WHERE d.payment_status = 'paid'
+        ),
         'categories', v_categories,
         'recent_expenses', v_recent_expenses,
         'recent_donations', v_recent_donations,

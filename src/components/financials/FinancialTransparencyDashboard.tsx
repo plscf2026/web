@@ -22,6 +22,10 @@ import {
   AlertCircle,
   X,
   UserCheck,
+  Trophy,
+  Award,
+  Crown,
+  Sparkles,
 } from 'lucide-react';
 import { Language } from '../../types';
 import {
@@ -29,6 +33,8 @@ import {
   FinancialTransparencySummary,
   TransparencyExpenseItem,
   PersonalDonationHistoryResult,
+  aggregateTopDonors,
+  AggregatedDonorItem,
 } from '../../services/financialService';
 
 interface FinancialTransparencyDashboardProps {
@@ -109,20 +115,47 @@ export const FinancialTransparencyDashboard: React.FC<FinancialTransparencyDashb
     });
   }, [summary?.recent_expenses, selectedCategoryId, expenseSearch]);
 
-  // ── Filtered Donations ──────────────────────────────────────────────────────
-  const filteredDonations = useMemo(() => {
+  // ── Aggregated Top 10 Donors Ledger ─────────────────────────────────────────
+  // Unifies multiple donations from the same number/ID into one cumulative sum
+  // ("calculate through one, number must be all sum, strictly Top 10").
+  const allAggregatedDonors = useMemo<AggregatedDonorItem[]>(() => {
     if (!summary?.recent_donations) return [];
+    return aggregateTopDonors(summary.recent_donations, 0); // all aggregated, sorted DESC
+  }, [summary?.recent_donations]);
+
+  const top10Donors = useMemo<AggregatedDonorItem[]>(() => {
+    return allAggregatedDonors.slice(0, 10);
+  }, [allAggregatedDonors]);
+
+  const filteredDonations = useMemo<AggregatedDonorItem[]>(() => {
     const q = donationSearch.toLowerCase().trim();
-    if (!q) return summary.recent_donations;
-    return summary.recent_donations.filter((don) => {
-      return (
-        don.donor_name.toLowerCase().includes(q) ||
-        (don.batch_name && don.batch_name.toLowerCase().includes(q)) ||
-        (don.passing_year && don.passing_year.includes(q)) ||
-        (don.masked_registration_id && don.masked_registration_id.toLowerCase().includes(q))
-      );
-    });
-  }, [summary?.recent_donations, donationSearch]);
+    if (!q) {
+      // By default, strictly show the Top 10 Donors
+      return top10Donors;
+    }
+    // When searching, match across all aggregated donors and return up to 10
+    return allAggregatedDonors
+      .filter((don) => {
+        return (
+          don.donor_name.toLowerCase().includes(q) ||
+          (don.batch_name && don.batch_name.toLowerCase().includes(q)) ||
+          (don.passing_year && don.passing_year.includes(q)) ||
+          (don.masked_registration_id && don.masked_registration_id.toLowerCase().includes(q)) ||
+          (don.masked_mobile && don.masked_mobile.toLowerCase().includes(q))
+        );
+      })
+      .slice(0, 10);
+  }, [allAggregatedDonors, top10Donors, donationSearch]);
+
+  const top3Podium = useMemo<AggregatedDonorItem[]>(() => {
+    // Only display top 3 podium highlights when no search filter is active
+    if (donationSearch.trim()) return [];
+    return top10Donors.slice(0, 3);
+  }, [top10Donors, donationSearch]);
+
+  const top10TotalSum = useMemo<number>(() => {
+    return top10Donors.reduce((acc, d) => acc + (d.amount || 0), 0);
+  }, [top10Donors]);
 
   // ── Personal Lookup Handler ─────────────────────────────────────────────────
   const handleVerifyPersonalDonations = async (e: React.FormEvent) => {
@@ -574,87 +607,267 @@ export const FinancialTransparencyDashboard: React.FC<FinancialTransparencyDashb
           </div>
         )}
 
-        {/* ── TAB 2: PUBLIC DONATION TRANSPARENCY LEDGER ── */}
+        {/* ── TAB 2: PUBLIC DONATION TRANSPARENCY LEDGER (TOP 10 DONORS) ── */}
         {activeTab === 'donations' && (
           <div className="space-y-6">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-              <div className="space-y-0.5">
-                <h4 className="text-sm font-bold text-slate-900">
-                  {isBangla ? 'স্বচ্ছ অনুদান রেজিস্টার (গোপনীয়তা সংরক্ষিত)' : 'Public Contributor Ledger (Privacy Preserved)'}
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-2xs flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                    <Trophy className="w-3 h-3 text-amber-600" />
+                    <span>{isBangla ? 'শীর্ষ ১০ সম্মাননা' : 'Top 10 Leaderboard'}</span>
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                    {isBangla ? 'সম্মিলিত হিসাব' : 'Cumulative Sum'}
+                  </span>
+                </div>
+                <h4 className="text-base sm:text-lg font-black text-slate-900">
+                  {isBangla ? 'শীর্ষ ১০ অনুদানকারী ও স্বচ্ছ অনুদান রেজিস্টার' : 'Top 10 Contributors Ledger & Transparency'}
                 </h4>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 max-w-2xl leading-relaxed">
                   {isBangla
-                    ? 'ব্যক্তিগত মোবাইল ও পূর্ণ আইডি গোপন রেখে কেবল নাম, ব্যাচ ও অনুদানের পরিমাণ প্রকাশ করা হয়।'
-                    : 'Protects personal phone and email while honoring alumni contributors and transparency.'}
+                    ? 'সর্বাধিক অবদানকারী শীর্ষ ১০ জন শুভানুধ্যায়ীর সম্মিলিত অনুদান তালিকা। একই নম্বর বা আইডি থেকে একাধিকবার দেওয়া অনুদান স্বয়ংক্রিয়ভাবে একত্র করে মোট হিসাব প্রদর্শন করা হয়েছে।'
+                    : 'Honoring our Top 10 alumni contributors. Multiple contributions from the same mobile number or ID are unified into one authoritative cumulative total.'}
                 </p>
               </div>
 
-              <div className="relative min-w-[260px]">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
-                <input
-                  type="text"
-                  value={donationSearch}
-                  onChange={(e) => setDonationSearch(e.target.value)}
-                  placeholder={isBangla ? 'নাম বা ব্যাচ দিয়ে খুঁজুন...' : 'Search by name or batch...'}
-                  className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs border border-slate-200 bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-slate-900/10"
-                />
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="relative min-w-[240px]">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
+                  <input
+                    type="text"
+                    value={donationSearch}
+                    onChange={(e) => setDonationSearch(e.target.value)}
+                    placeholder={isBangla ? 'নাম, ব্যাচ বা নম্বর দিয়ে খুঁজুন...' : 'Search by name, batch or ID...'}
+                    className="w-full pl-8 pr-3 py-2 rounded-xl text-xs border border-slate-200 bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-slate-900/10"
+                  />
+                </div>
+
+                <div className="px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 whitespace-nowrap">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>
+                    {isBangla ? 'শীর্ষ ১০ জনের মোট: ' : 'Top 10 Total: '}
+                    ৳{top10TotalSum.toLocaleString()}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Donation Records Grid */}
+            {/* Top 3 Podium Cards */}
+            {top3Podium.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {top3Podium.map((podiumDonor, idx) => {
+                  const isFirst = idx === 0;
+                  const isSecond = idx === 1;
+                  const isThird = idx === 2;
+
+                  return (
+                    <div
+                      key={podiumDonor.id || `podium-${idx}`}
+                      className={`rounded-3xl p-5 border-2 transition-all relative overflow-hidden group ${
+                        isFirst
+                          ? 'bg-gradient-to-b from-amber-50/80 via-white to-amber-50/30 border-amber-300 shadow-sm md:-translate-y-1'
+                          : isSecond
+                          ? 'bg-gradient-to-b from-slate-100/70 via-white to-slate-50/30 border-slate-300 shadow-2xs'
+                          : 'bg-gradient-to-b from-orange-50/70 via-white to-orange-50/30 border-amber-600/30 shadow-2xs'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-xs font-black flex items-center gap-1.5 ${
+                            isFirst
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                              : isSecond
+                              ? 'bg-slate-200/80 text-slate-800 border border-slate-300'
+                              : 'bg-orange-100 text-amber-900 border border-amber-600/30'
+                          }`}
+                        >
+                          {isFirst && <Crown className="w-3.5 h-3.5 text-amber-600" />}
+                          {isSecond && <Trophy className="w-3.5 h-3.5 text-slate-600" />}
+                          {isThird && <Award className="w-3.5 h-3.5 text-amber-700" />}
+                          <span>
+                            {isFirst
+                              ? (isBangla ? '🥇 ১ম স্থান (শীর্ষ অনুদানকারী)' : '🥇 Rank #1 (Top Donor)')
+                              : isSecond
+                              ? (isBangla ? '🥈 ২য় স্থান' : '🥈 Rank #2')
+                              : (isBangla ? '🥉 ৩য় স্থান' : '🥉 Rank #3')}
+                          </span>
+                        </span>
+
+                        {podiumDonor.donation_count > 1 && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            ✨ {isBangla ? `${podiumDonor.donation_count}টি অনুদান যোগকৃত` : `${podiumDonor.donation_count} gifts summed`}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <h5 className="text-base sm:text-lg font-black text-slate-900 truncate">
+                          {podiumDonor.donor_name}
+                        </h5>
+                        <p className="text-xs text-slate-600 font-medium">
+                          {podiumDonor.batch_name || podiumDonor.passing_year
+                            ? `${podiumDonor.batch_name || ''} ${podiumDonor.passing_year ? `(${podiumDonor.passing_year})` : ''}`
+                            : 'Alumni Patron'}
+                        </p>
+                        <p className="text-[11px] font-mono font-bold text-slate-400">
+                          {podiumDonor.masked_registration_id || podiumDonor.masked_mobile || '••••••'}
+                        </p>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                        <span className="text-xs text-slate-500 font-bold">
+                          {isBangla ? 'সম্মিলিত সর্বমোট অনুদান' : 'Total Contributed'}
+                        </span>
+                        <span className="text-lg sm:text-xl font-black text-emerald-700 tabular-nums">
+                          ৳{podiumDonor.amount.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Donation Records Grid (Strictly Top 10 by cumulative sum) */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 font-bold">
-                      <th className="py-3 px-4">{isBangla ? 'অনুদানকারী শিক্ষার্থী / শুভানুধ্যায়ী' : 'Contributor / Student'}</th>
-                      <th className="py-3 px-4">{isBangla ? 'ব্যাচ / পাসের সাল' : 'Batch / Passing Year'}</th>
-                      <th className="py-3 px-4">{isBangla ? 'নিবন্ধন আইডি (মাস্কড)' : 'Registration ID (Masked)'}</th>
-                      <th className="py-3 px-4">{isBangla ? 'উদ্দেশ্য' : 'Purpose'}</th>
-                      <th className="py-3 px-4">{isBangla ? 'পদ্ধতি' : 'Method'}</th>
-                      <th className="py-3 px-4">{isBangla ? 'তারিখ' : 'Date'}</th>
-                      <th className="py-3 px-4 text-right">{isBangla ? 'অনুদানের পরিমাণ' : 'Amount'}</th>
+                      <th className="py-3.5 px-4 w-14 text-center">{isBangla ? 'স্থান' : '#'}</th>
+                      <th className="py-3.5 px-4">{isBangla ? 'অনুদানকারী শিক্ষার্থী / শুভানুধ্যায়ী' : 'Contributor / Student'}</th>
+                      <th className="py-3.5 px-4">{isBangla ? 'ব্যাচ / পাসের সাল' : 'Batch / Passing Year'}</th>
+                      <th className="py-3.5 px-4">{isBangla ? 'আইডি / মোবাইল (মাস্কড)' : 'Masked ID / Phone'}</th>
+                      <th className="py-3.5 px-4 text-center">{isBangla ? 'অনুদানের সংখ্যা' : 'Contributions'}</th>
+                      <th className="py-3.5 px-4">{isBangla ? 'পদ্ধতি' : 'Method'}</th>
+                      <th className="py-3.5 px-4">{isBangla ? 'সর্বশেষ তারিখ' : 'Latest Date'}</th>
+                      <th className="py-3.5 px-4 text-right">{isBangla ? 'সর্বমোট অনুদান' : 'Total Amount'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredDonations.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">
+                        <td colSpan={8} className="py-12 text-center text-slate-400 text-xs">
                           {isBangla ? 'কোনো অনুদান রেকর্ড পাওয়া যায়নি।' : 'No contribution records found.'}
                         </td>
                       </tr>
                     ) : (
-                      filteredDonations.map((don) => (
-                        <tr key={don.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="py-3 px-4 font-bold text-slate-900 flex items-center gap-2">
-                            <span className="w-7 h-7 rounded-full bg-pink-100 text-pink-700 flex items-center justify-center text-xs font-bold shrink-0">
-                              {don.donor_name.charAt(0)}
-                            </span>
-                            <span>{don.donor_name}</span>
-                          </td>
-                          <td className="py-3 px-4 font-medium text-slate-700">
-                            {don.batch_name || don.passing_year ? `${don.batch_name || ''} ${don.passing_year ? `(${don.passing_year})` : ''}` : 'Alumni'}
-                          </td>
-                          <td className="py-3 px-4 font-mono font-bold text-slate-500">
-                            {don.masked_registration_id || '••••••'}
-                          </td>
-                          <td className="py-3 px-4 text-slate-600 max-w-[200px] truncate">
-                            {don.purpose || 'Reunion Fund'}
-                          </td>
-                          <td className="py-3 px-4 font-semibold text-slate-600 uppercase text-[10px]">
-                            {don.payment_method || 'bKash'}
-                          </td>
-                          <td className="py-3 px-4 text-slate-400 whitespace-nowrap">
-                            {don.donation_date}
-                          </td>
-                          <td className="py-3 px-4 text-right font-black text-emerald-700 whitespace-nowrap tabular-nums text-sm">
-                            ৳{don.amount.toLocaleString()}
-                          </td>
-                        </tr>
-                      ))
+                      filteredDonations.map((don, index) => {
+                        const rankNumber = don.rank || index + 1;
+                        const isTop1 = rankNumber === 1;
+                        const isTop2 = rankNumber === 2;
+                        const isTop3 = rankNumber === 3;
+
+                        return (
+                          <tr key={don.id || don.donor_key || `don-${index}`} className="hover:bg-slate-50/80 transition-colors">
+                            {/* Rank Column */}
+                            <td className="py-3 px-4 text-center">
+                              {isTop1 ? (
+                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-black text-[11px]">
+                                  🥇 #1
+                                </span>
+                              ) : isTop2 ? (
+                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-300 font-black text-[11px]">
+                                  🥈 #2
+                                </span>
+                              ) : isTop3 ? (
+                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-orange-100 text-amber-900 border border-amber-600/30 font-black text-[11px]">
+                                  🥉 #3
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-600 font-bold text-[11px]">
+                                  #{rankNumber}
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Contributor Name */}
+                            <td className="py-3 px-4 font-bold text-slate-900">
+                              <div className="flex items-center gap-2">
+                                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                                  isTop1
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : isTop2
+                                    ? 'bg-slate-200 text-slate-800'
+                                    : isTop3
+                                    ? 'bg-orange-100 text-amber-900'
+                                    : 'bg-pink-100 text-pink-700'
+                                }`}>
+                                  {don.donor_name.charAt(0)}
+                                </span>
+                                <div>
+                                  <span className="font-extrabold text-slate-900">{don.donor_name}</span>
+                                  {don.donation_count > 1 && (
+                                    <span className="block text-[10px] text-emerald-700 font-bold">
+                                      ✨ {isBangla ? `${don.donation_count}টি অনুদান সম্মিলিত যোগফল` : `${don.donation_count} donations combined`}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Batch / Year */}
+                            <td className="py-3 px-4 font-medium text-slate-700">
+                              {don.batch_name || don.passing_year
+                                ? `${don.batch_name || ''} ${don.passing_year ? `(${don.passing_year})` : ''}`
+                                : 'Alumni'}
+                            </td>
+
+                            {/* Masked ID / Phone */}
+                            <td className="py-3 px-4 font-mono font-bold text-slate-500">
+                              {don.masked_registration_id || don.masked_mobile || '••••••'}
+                            </td>
+
+                            {/* Contributions Count */}
+                            <td className="py-3 px-4 text-center">
+                              <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                don.donation_count > 1
+                                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                  : 'bg-slate-100 text-slate-600'
+                              }`}>
+                                {isBangla
+                                  ? `${don.donation_count}টি অনুদান`
+                                  : `${don.donation_count} ${don.donation_count > 1 ? 'donations' : 'donation'}`}
+                              </span>
+                            </td>
+
+                            {/* Payment Method */}
+                            <td className="py-3 px-4 font-semibold text-slate-600 uppercase text-[10px]">
+                              {don.payment_methods?.join(', ') || 'bKash'}
+                            </td>
+
+                            {/* Latest Date */}
+                            <td className="py-3 px-4 text-slate-400 whitespace-nowrap">
+                              {don.donation_date}
+                            </td>
+
+                            {/* Cumulative Sum Amount */}
+                            <td className="py-3 px-4 text-right font-black text-emerald-700 whitespace-nowrap tabular-nums text-sm sm:text-base">
+                              ৳{don.amount.toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Table Footer with Summary & Privacy Guarantee */}
+              <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>
+                    {isBangla
+                      ? '🛡️ গোপনীয়তা সংরক্ষিত: মোবাইল ও রেজিস্ট্রেশন আইডির মধ্যবর্তী অংশ মাস্ক করা হয়েছে। একই ব্যক্তির একাধিক অনুদান স্বয়ংক্রিয়ভাবে একত্রিত করে মোট হিসাব প্রদর্শিত হচ্ছে।'
+                      : '🛡️ Privacy preserved: Masked numbers protect identity. All contributions from the same donor/number are unified into one cumulative total.'}
+                  </span>
+                </div>
+                <div className="font-extrabold text-slate-900 whitespace-nowrap">
+                  {isBangla ? 'শীর্ষ ১০ জনের মোট: ' : 'Top 10 Sum: '}
+                  <span className="text-emerald-700 font-black">৳{top10TotalSum.toLocaleString()}</span>
+                </div>
               </div>
             </div>
           </div>
