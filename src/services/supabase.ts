@@ -267,11 +267,31 @@ export async function runSupabaseDiagnostic(): Promise<{
  * Transform application RegistrationRecord into database row with sanitization
  */
 function toRegistrationDbRow(reg: RegistrationRecord, year: number = 2027) {
+  // Prevent Base64 strings from polluting PostgreSQL database rows
+  let photoUrl = reg.photoUrl;
+  if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image/')) {
+    if (reg.photoStoragePath) {
+      photoUrl = `${SUPABASE_URL}/storage/v1/object/public/student-photos/${reg.photoStoragePath.replace(/^\/+/, '')}`;
+    } else {
+      photoUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
+    }
+  }
+
+  let parentPhotoUrl = reg.parentPhotoUrl;
+  if (parentPhotoUrl && typeof parentPhotoUrl === 'string' && parentPhotoUrl.startsWith('data:image/')) {
+    if (reg.parentPhotoStoragePath) {
+      parentPhotoUrl = `${SUPABASE_URL}/storage/v1/object/public/student-photos/${reg.parentPhotoStoragePath.replace(/^\/+/, '')}`;
+    } else {
+      parentPhotoUrl = undefined;
+    }
+  }
+
   return {
     id: reg.id,
     full_name: sanitizeInput(reg.fullName),
     full_name_bn: sanitizeInput(reg.fullNameBn || ''),
-    photo_url: reg.photoUrl,
+    photo_url: photoUrl,
+    photo_storage_path: reg.photoStoragePath || null,
     mobile_number: sanitizeInput(reg.mobileNumber),
     email: sanitizeInput(reg.email),
     address: sanitizeInput(reg.address || ''),
@@ -306,7 +326,10 @@ function toRegistrationDbRow(reg: RegistrationRecord, year: number = 2027) {
     parent_age: reg.parentAge ? String(reg.parentAge) : null,
     parent_phone: reg.parentPhone ? sanitizeInput(reg.parentPhone) : null,
     parent_relation: reg.parentRelation ? sanitizeInput(reg.parentRelation) : null,
-    parent_photo_url: reg.parentPhotoUrl || null,
+    parent_photo_url: parentPhotoUrl || null,
+    parent_photo_storage_path: reg.parentPhotoStoragePath || null,
+    photo_updated_at: reg.photoUpdatedAt || null,
+    photo_updated_by: reg.photoUpdatedBy ? sanitizeInput(reg.photoUpdatedBy) : null,
     parent_fee: reg.parentFee || 0,
     gateway_charge: reg.gatewayCharge || 0,
     notes: sanitizeInput(reg.notes || ''),
@@ -342,11 +365,33 @@ function toRegistrationDbRow(reg: RegistrationRecord, year: number = 2027) {
  * Normalize database row into application RegistrationRecord
  */
 function fromRegistrationDbRow(row: any): RegistrationRecord {
+  const photoStoragePath = row.photo_storage_path || row.photoStoragePath || null;
+  const parentPhotoStoragePath = row.parent_photo_storage_path || row.parentPhotoStoragePath || null;
+
+  // Resolve photo URL: If storage path exists, use Supabase CDN; otherwise use valid HTTP url or fallback
+  let resolvedPhotoUrl = row.photo_url || row.photoUrl;
+  if (photoStoragePath) {
+    resolvedPhotoUrl = `${SUPABASE_URL}/storage/v1/object/public/student-photos/${photoStoragePath.replace(/^\/+/, '')}`;
+  } else if (!resolvedPhotoUrl || (typeof resolvedPhotoUrl === 'string' && resolvedPhotoUrl.startsWith('data:image/'))) {
+    resolvedPhotoUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
+  }
+
+  let resolvedParentPhotoUrl = row.parent_photo_url || row.parentPhotoUrl;
+  if (parentPhotoStoragePath) {
+    resolvedParentPhotoUrl = `${SUPABASE_URL}/storage/v1/object/public/student-photos/${parentPhotoStoragePath.replace(/^\/+/, '')}`;
+  } else if (resolvedParentPhotoUrl && typeof resolvedParentPhotoUrl === 'string' && resolvedParentPhotoUrl.startsWith('data:image/')) {
+    resolvedParentPhotoUrl = undefined;
+  }
+
   return {
     id: row.id,
     fullName: row.full_name || row.fullName || 'Student',
     fullNameBn: row.full_name_bn || row.fullNameBn || undefined,
-    photoUrl: row.photo_url || row.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    photoUrl: resolvedPhotoUrl,
+    photoStoragePath,
+    parentPhotoStoragePath,
+    photoUpdatedAt: row.photo_updated_at || row.photoUpdatedAt || undefined,
+    photoUpdatedBy: row.photo_updated_by || row.photoUpdatedBy || undefined,
     mobileNumber: row.mobile_number || row.mobileNumber || '',
     email: row.email || '',
     address: row.address || '',
@@ -357,7 +402,7 @@ function fromRegistrationDbRow(row: any): RegistrationRecord {
     parentAge: row.parent_age || row.parentAge || undefined,
     parentPhone: row.parent_phone || row.parentPhone || undefined,
     parentRelation: row.parent_relation || row.parentRelation || undefined,
-    parentPhotoUrl: row.parent_photo_url || row.parentPhotoUrl || undefined,
+    parentPhotoUrl: resolvedParentPhotoUrl || undefined,
     parentFee: Number(row.parent_fee ?? row.parentFee ?? 0),
     gatewayCharge: Number(row.gateway_charge ?? row.gatewayCharge ?? 0),
     category: (row.category === 'current' ? 'current' : 'former'),

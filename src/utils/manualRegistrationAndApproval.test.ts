@@ -52,7 +52,7 @@ const foodStaff: StaffAccount = {
   email: 'food@plscf.edu.bd',
   role: 'SUPER_ADMIN',
   department: 'ALL_SERVICES',
-  permissions: ['VIEW', 'VERIFY', 'APPROVE', 'DISTRIBUTE'],
+  permissions: ['VIEW', 'VERIFY', 'APPROVE', 'MANAGE'],
   status: 'ACTIVE',
   assignedGate: 'Dining Hall A',
   createdAt: '2026-01-01T00:00:00Z',
@@ -67,7 +67,7 @@ const dressStaff: StaffAccount = {
   email: 'kit@plscf.edu.bd',
   role: 'SUPER_ADMIN',
   department: 'ALL_SERVICES',
-  permissions: ['VIEW', 'VERIFY', 'APPROVE', 'DISTRIBUTE'],
+  permissions: ['VIEW', 'VERIFY', 'APPROVE', 'MANAGE'],
   status: 'ACTIVE',
   assignedGate: 'Counter 02',
   createdAt: '2026-01-01T00:00:00Z',
@@ -190,7 +190,7 @@ test('Master Prompt Verification: 14 Scenarios for Manual Registration & Super A
   // --------------------------------------------------------------------------
   await t.test('Scenario 3: QR code remains inactive before approval (all facility access denied)', () => {
     // 3a. Scanner inspection
-    const scanResult = EventStore.verifyStudentTokenForDepartment(student1QrToken, 'GATE_ENTRY', gateStaff);
+    const scanResult = EventStore.verifyStudentTokenForDepartment(student1QrToken, 'GATE', gateStaff);
     assert.equal(scanResult.valid, false, 'Scanner must deny unapproved manual registration');
     assert.equal(scanResult.status, 'NOT_ELIGIBLE', 'Status must be NOT_ELIGIBLE');
     assert.match(
@@ -264,7 +264,7 @@ test('Master Prompt Verification: 14 Scenarios for Manual Registration & Super A
   // Scenario 5: QR code becomes active
   // --------------------------------------------------------------------------
   await t.test('Scenario 5: QR code becomes active after approval', () => {
-    const scanResult = EventStore.verifyStudentTokenForDepartment(student1QrToken, 'GATE_ENTRY', gateStaff);
+    const scanResult = EventStore.verifyStudentTokenForDepartment(student1QrToken, 'GATE', gateStaff);
     assert.equal(scanResult.valid, true, 'QR scanner must authorize approved student');
     assert.equal(scanResult.status, 'AUTHORIZED', 'Status must be AUTHORIZED');
     assert.equal(scanResult.student?.id, student1RegId);
@@ -349,6 +349,7 @@ test('Master Prompt Verification: 14 Scenarios for Manual Registration & Super A
 
     student2RegId = res.registration.id;
     student2QrToken = res.registration.qrToken;
+    assert.equal(student2QrToken.length, 6);
   });
 
   // --------------------------------------------------------------------------
@@ -425,6 +426,7 @@ test('Master Prompt Verification: 14 Scenarios for Manual Registration & Super A
     assert.equal(res.success, true);
     student3RegId = res.registration!.id;
     student3QrToken = res.registration!.qrToken;
+    assert.equal(student3QrToken.length, 6);
 
     // Approve financial amount
     const finApprove = await ManualRegistrationService.approveFinancial(
@@ -491,7 +493,7 @@ test('Master Prompt Verification: 14 Scenarios for Manual Registration & Super A
     assert.equal(rejectRes.registration?.registrationApprovalStatus, 'rejected');
 
     // Scanner verification must reject
-    const scanResult = EventStore.verifyStudentTokenForDepartment(student4QrToken, 'GATE_ENTRY', gateStaff);
+    const scanResult = EventStore.verifyStudentTokenForDepartment(student4QrToken, 'GATE', gateStaff);
     assert.equal(scanResult.valid, false, 'Rejected registration must be invalid');
     assert.match(scanResult.message, /REGISTRATION_REJECTED/i);
 
@@ -532,7 +534,7 @@ test('Master Prompt Verification: 14 Scenarios for Manual Registration & Super A
     // Verification must pass directly without needing manual approval
     const scanResult = EventStore.verifyStudentTokenForDepartment(
       onlineStudent!.qrToken,
-      'GATE_ENTRY',
+      'GATE',
       gateStaff
     );
     assert.equal(scanResult.valid, true, 'Online paid student QR code must be valid and verified');

@@ -11,6 +11,7 @@ import { generateUniqueSixCharToken, isValidSixCharToken } from '../utils/tokenG
 import { sanitizeInput } from '../utils/security';
 import { isValidBangladeshiMobile, normalizeBangladeshiMobileNumber } from '../utils/rules';
 import { FinancialService } from './financialService';
+import { StudentPhotoStorageService, isBase64DataUrl } from './studentPhotoStorageService';
 
 export interface ManualRegistrationResult {
   success: boolean;
@@ -120,14 +121,38 @@ export class ManualRegistrationService {
 
       const defaultFee = input.category === 'current' ? 500 : 1500;
 
+      // 4b. Upload student photo to dedicated Supabase Storage bucket 'student-photos'
+      let photoStoragePath: string | null = input.photoStoragePath || null;
+      let finalPhotoUrl =
+        input.photoUrl ||
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
+
+      if (input.photoUrl && isBase64DataUrl(input.photoUrl)) {
+        try {
+          const uploadRes = await StudentPhotoStorageService.uploadStudentPhoto({
+            fileOrDataUrl: input.photoUrl,
+            registrationId: regId,
+            batchYear: input.passingYear,
+            category: input.category,
+            currentClass: input.currentClass,
+            isParent: false,
+          });
+          if (uploadRes.success && uploadRes.storagePath) {
+            photoStoragePath = uploadRes.storagePath;
+            finalPhotoUrl = uploadRes.publicUrl;
+          }
+        } catch (uploadErr) {
+          console.warn('[ManualRegistration] Student photo upload warning:', uploadErr);
+        }
+      }
+
       // 5. Construct Record
       const newRecord: RegistrationRecord = {
         id: regId,
         fullName: cleanName,
         fullNameBn: input.fullNameBn ? sanitizeInput(input.fullNameBn).trim() : undefined,
-        photoUrl:
-          input.photoUrl ||
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+        photoUrl: finalPhotoUrl,
+        photoStoragePath: photoStoragePath || undefined,
         mobileNumber: normalizedMobile,
         email: input.email ? sanitizeInput(input.email).trim() : null,
         address: sanitizeInput(input.address || 'Faridpur'),

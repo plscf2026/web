@@ -25,6 +25,7 @@ import { SupabaseService, supabase } from './supabase';
 import { EventStore } from './eventStore';
 import { StudentIdService } from './studentIdStore';
 import { IdCardStore } from './idCardStore';
+import { StudentPhotoStorageService, isBase64DataUrl } from './studentPhotoStorageService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1045,11 +1046,58 @@ export class PayStationService {
     const totalBaseWithParent = baseFee + parentFee;
     const donation = Math.max(0, payment.amount - totalBaseWithParent);
 
+    // Upload student photo to dedicated 'student-photos' bucket if Base64
+    let photoStoragePath: string | null = null;
+    let finalPhotoUrl = formData.photoUrl;
+
+    if (formData.photoUrl && isBase64DataUrl(formData.photoUrl)) {
+      try {
+        const uploadRes = await StudentPhotoStorageService.uploadStudentPhoto({
+          fileOrDataUrl: formData.photoUrl,
+          registrationId: regId,
+          batchYear: formData.passingYear,
+          category: formData.category,
+          currentClass: formData.currentClass,
+          isParent: false,
+        });
+        if (uploadRes.success && uploadRes.storagePath) {
+          photoStoragePath = uploadRes.storagePath;
+          finalPhotoUrl = uploadRes.publicUrl;
+        }
+      } catch (uploadErr) {
+        console.warn('[PayStation] Student photo upload warning:', uploadErr);
+      }
+    }
+
+    // Upload parent photo to dedicated 'student-photos' bucket if present and Base64
+    let parentPhotoStoragePath: string | null = null;
+    let finalParentPhotoUrl = formData.parentPhotoUrl;
+
+    if (formData.parentPhotoUrl && isBase64DataUrl(formData.parentPhotoUrl)) {
+      try {
+        const uploadRes = await StudentPhotoStorageService.uploadStudentPhoto({
+          fileOrDataUrl: formData.parentPhotoUrl,
+          registrationId: regId,
+          batchYear: formData.passingYear,
+          category: formData.category,
+          currentClass: formData.currentClass,
+          isParent: true,
+        });
+        if (uploadRes.success && uploadRes.storagePath) {
+          parentPhotoStoragePath = uploadRes.storagePath;
+          finalParentPhotoUrl = uploadRes.publicUrl;
+        }
+      } catch (uploadErr) {
+        console.warn('[PayStation] Parent photo upload warning:', uploadErr);
+      }
+    }
+
     const record: RegistrationRecord = {
       id: regId,
       fullName: sanitizeInput(formData.fullName),
       fullNameBn: undefined,
-      photoUrl: formData.photoUrl,
+      photoUrl: finalPhotoUrl,
+      photoStoragePath: photoStoragePath || undefined,
       mobileNumber: sanitizeInput(formData.mobileNumber),
       email: formData.email ? sanitizeInput(formData.email) : null,
       address: sanitizeInput(formData.address),
@@ -1060,7 +1108,8 @@ export class PayStationService {
       parentAge: formData.parentAge || undefined,
       parentPhone: formData.parentPhone || undefined,
       parentRelation: formData.parentRelation || undefined,
-      parentPhotoUrl: formData.parentPhotoUrl || undefined,
+      parentPhotoUrl: finalParentPhotoUrl || undefined,
+      parentPhotoStoragePath: parentPhotoStoragePath || undefined,
       parentFee: parentFee,
       category: formData.category,
       studentId: formData.studentId

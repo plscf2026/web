@@ -80,6 +80,11 @@ export interface RegistrationRecord {
   financialRejectedAt?: string;
   documentUrl?: string;
   documentName?: string;
+  // Supabase Storage Bucket photo metadata
+  photoStoragePath?: string | null;
+  parentPhotoStoragePath?: string | null;
+  photoUpdatedAt?: string;
+  photoUpdatedBy?: string;
 }
 
 export type RegistrationApprovalStatus = 'approved' | 'pending' | 'rejected';
@@ -89,7 +94,8 @@ export type ManualRegistrationType = 'online' | 'manual_venue' | 'manual_admin';
 export interface ManualRegistrationInput {
   fullName: string;
   fullNameBn?: string;
-  photoUrl: string;
+  photoUrl?: string;
+  photoStoragePath?: string;
   mobileNumber: string;
   email?: string;
   category: StudentCategory;

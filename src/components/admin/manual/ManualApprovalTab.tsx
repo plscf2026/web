@@ -21,6 +21,7 @@ import {
   User,
   GraduationCap,
   Phone,
+  Camera,
 } from 'lucide-react';
 import {
   Language,
@@ -32,6 +33,7 @@ import {
 import { ManualRegistrationService } from '../../../services/manualRegistrationService';
 import { AppStore } from '../../../services/store';
 import { TicketView } from '../../TicketView';
+import { AdminStudentPhotoModal } from '../photos/AdminStudentPhotoModal';
 
 interface ManualApprovalTabProps {
   language: Language;
@@ -78,6 +80,7 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
   const [isSubmittingFinRejection, setIsSubmittingFinRejection] = useState(false);
 
   const [editingRecord, setEditingRecord] = useState<RegistrationRecord | null>(null);
+  const [selectedStudentForPhoto, setSelectedStudentForPhoto] = useState<RegistrationRecord | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<RegistrationRecord>>({});
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
@@ -648,12 +651,19 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
                   {/* Left Column: Student Details */}
                   <div className="flex items-start gap-4 min-w-0 flex-1">
                     {/* Avatar */}
-                    <div className="relative shrink-0">
+                    <div
+                      className="relative shrink-0 group cursor-pointer"
+                      onClick={() => setSelectedStudentForPhoto(rec)}
+                      title="Click to view & manage student photo in Supabase Storage"
+                    >
                       <img
                         src={rec.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80'}
                         alt={rec.fullName}
-                        className="w-14 h-14 rounded-2xl object-cover border-2 border-slate-200 shadow-xs"
+                        className="w-14 h-14 rounded-2xl object-cover border-2 border-slate-200 shadow-xs group-hover:ring-2 group-hover:ring-emerald-500 transition-all"
                       />
+                      <div className="absolute inset-0 bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-[10px]">
+                        <Camera className="w-4 h-4" />
+                      </div>
                       <span
                         className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
                           regStatus === 'approved'
@@ -845,6 +855,17 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                       <span>{language === 'bn' ? 'সংশোধন' : 'Edit'}</span>
+                    </button>
+
+                    {/* Manage Photo in Supabase Storage */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStudentForPhoto(rec)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200 transition-colors cursor-pointer"
+                      title="Manage Student Photo in Supabase Storage (student-photos)"
+                    >
+                      <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{language === 'bn' ? 'ছবি' : 'Photo'}</span>
                     </button>
 
                     {/* Registration Approval Actions */}
@@ -1217,6 +1238,21 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Student Photo Inspection & Supabase Storage Management Modal */}
+      {selectedStudentForPhoto && (
+        <AdminStudentPhotoModal
+          isOpen={Boolean(selectedStudentForPhoto)}
+          onClose={() => setSelectedStudentForPhoto(null)}
+          registration={selectedStudentForPhoto}
+          adminName={currentAdmin.fullName || currentAdmin.username || 'Super Admin'}
+          language={language}
+          onPhotoUpdated={(updated) => {
+            setSelectedStudentForPhoto(updated);
+            setRefreshKey((k) => k + 1);
+          }}
+        />
       )}
     </div>
   );

@@ -32,6 +32,7 @@ import {
   Menu,
   X,
   UserPlus,
+  Camera,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -72,6 +73,7 @@ import { paginate } from '../utils/pagination';
 import { ErrorBoundary } from './common/ErrorBoundary';
 import { ManualRegistrationTab } from './admin/manual/ManualRegistrationTab';
 import { ManualApprovalTab } from './admin/manual/ManualApprovalTab';
+import { AdminStudentPhotoModal } from './admin/photos/AdminStudentPhotoModal';
 // Heavy administrative portals loaded lazily to preserve bundle performance
 const AdminRmsContainer = lazy(() =>
   import('./admin/rms/AdminRmsContainer').then((m) => ({ default: m.AdminRmsContainer }))
@@ -348,6 +350,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [showAddNoticeModal, setShowAddNoticeModal] = useState(false);
   const [editingNoticeId, setEditingNoticeId] = useState<string | null>(null);
   const [showEditStudentModal, setShowEditStudentModal] = useState<RegistrationRecord | null>(null);
+  const [selectedStudentForPhoto, setSelectedStudentForPhoto] = useState<RegistrationRecord | null>(null);
 
   // New Expense Form State
   const [expenseCategory, setExpenseCategory] = useState('Food & Grand Banquet');
@@ -1437,11 +1440,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <tr key={reg.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-3">
-                          <img
-                            src={reg.photoUrl}
-                            alt={reg.fullName}
-                            className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0"
-                          />
+                          <div
+                            onClick={() => setSelectedStudentForPhoto(reg)}
+                            className="relative group cursor-pointer shrink-0"
+                            title="Click to view & manage student photo in Supabase Storage"
+                          >
+                            <img
+                              src={reg.photoUrl}
+                              alt={reg.fullName}
+                              className="w-10 h-10 rounded-xl object-cover border border-slate-200 group-hover:ring-2 group-hover:ring-emerald-500 transition-all shadow-xs"
+                            />
+                            <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-[10px]">
+                              <Camera className="w-3.5 h-3.5" />
+                            </div>
+                          </div>
                           <div>
                             <span className="font-bold text-slate-900 block">{reg.fullName}</span>
                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -1532,6 +1544,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           title="View Digital Ticket"
                         >
                           View Ticket
+                        </button>
+
+                        <button
+                          onClick={() => setSelectedStudentForPhoto(reg)}
+                          className="p-1.5 text-emerald-600 hover:text-emerald-800 rounded hover:bg-emerald-50 cursor-pointer"
+                          title="Manage Student Photo in Supabase Storage (student-photos)"
+                        >
+                          <Camera className="w-3.5 h-3.5" />
                         </button>
 
                         <button
@@ -3162,6 +3182,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
         </div>
+      )}
+      {/* MODAL: STUDENT PHOTO INSPECTION & SUPABASE STORAGE MANAGEMENT */}
+      {selectedStudentForPhoto && (
+        <AdminStudentPhotoModal
+          isOpen={Boolean(selectedStudentForPhoto)}
+          onClose={() => setSelectedStudentForPhoto(null)}
+          registration={selectedStudentForPhoto}
+          adminName={effectiveAdmin?.fullName || 'Super Admin'}
+          language={language}
+          onPhotoUpdated={(updatedReg) => {
+            setRegistrations((prev) => prev.map((r) => (r.id === updatedReg.id ? updatedReg : r)));
+            setSelectedStudentForPhoto(updatedReg);
+            refreshAll();
+          }}
+        />
       )}
     </div>
   );
