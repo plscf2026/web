@@ -12,6 +12,8 @@ import {
   X,
   UserPlus,
   AlertTriangle,
+  Clock,
+  XCircle,
 } from 'lucide-react';
 import { RegistrationRecord, Language } from '../types';
 import { translations } from '../i18n/translations';
@@ -23,8 +25,9 @@ import { IdCardStore } from '../services/idCardStore';
 interface TicketViewProps {
   registration: RegistrationRecord;
   language: Language;
-  onNavigateHome: () => void;
+  onNavigateHome?: () => void;
   onRegisterAnother?: () => void;
+  onClose?: () => void;
 }
 
 export const TicketView: React.FC<TicketViewProps> = ({
@@ -32,6 +35,7 @@ export const TicketView: React.FC<TicketViewProps> = ({
   language,
   onNavigateHome,
   onRegisterAnother,
+  onClose,
 }) => {
   const t = translations[language];
   const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -62,26 +66,84 @@ export const TicketView: React.FC<TicketViewProps> = ({
   };
 
   const isPaid = registration.paymentStatus === 'paid';
+  const isManual = Boolean(registration.isManualRegistration);
+  const approvalStatus = registration.registrationApprovalStatus || (isManual ? 'pending' : 'approved');
+  const isPendingApproval = approvalStatus === 'pending';
+  const isRejected = approvalStatus === 'rejected';
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Top Banner */}
       <div className="no-print mb-6 text-center space-y-2">
-        <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${
-          isPaid ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800 border border-amber-300'
-        }`}>
-          {isPaid ? <Sparkles className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />}
+        <div
+          className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold ${
+            isPendingApproval
+              ? 'bg-amber-100 text-amber-900 border-2 border-amber-300 animate-pulse'
+              : isRejected
+              ? 'bg-rose-100 text-rose-900 border border-rose-300'
+              : isPaid
+              ? 'bg-emerald-100 text-emerald-800'
+              : 'bg-amber-100 text-amber-800 border border-amber-300'
+          }`}
+        >
+          {isPendingApproval ? (
+            <Clock className="w-4 h-4 text-amber-600" />
+          ) : isRejected ? (
+            <XCircle className="w-4 h-4 text-rose-600" />
+          ) : isPaid ? (
+            <Sparkles className="w-3.5 h-3.5" />
+          ) : (
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+          )}
           <span>
-            {isPaid
-              ? (language === 'bn' ? 'অভিনন্দন! আপনার রেজিস্ট্রেশন ও পেমেন্ট সফল হয়েছে' : 'Congratulations! Registration & Payment Verified')
-              : (language === 'bn' ? 'পেমেন্ট অসম্পূর্ণ — রেজিস্ট্রেশন ফি পরিশোধের অপেক্ষায়' : 'Payment Incomplete — Awaiting Registration Fee Payment')}
+            {isPendingApproval
+              ? language === 'bn'
+                ? '⚠️ ম্যানুয়াল টিকিট — সুপার অ্যাডমিন অনুমোদনের অপেক্ষায় রয়েছে (অযাচাইকৃত)'
+                : '⚠️ MANUAL TICKET — PENDING SUPER ADMIN APPROVAL (UNVERIFIED)'
+              : isRejected
+              ? language === 'bn'
+                ? '❌ রেজিস্ট্রেশন বাতিলকৃত — এই টিকিটটি ব্যবহারের অযোগ্য'
+                : '❌ REGISTRATION REJECTED — THIS TICKET CANNOT BE USED'
+              : isPaid
+              ? language === 'bn'
+                ? 'অভিনন্দন! আপনার রেজিস্ট্রেশন ও পেমেন্ট সফল হয়েছে'
+                : 'Congratulations! Registration & Payment Verified'
+              : language === 'bn'
+              ? 'পেমেন্ট অসম্পূর্ণ — রেজিস্ট্রেশন ফি পরিশোধের অপেক্ষায়'
+              : 'Payment Incomplete — Awaiting Registration Fee Payment'}
           </span>
         </div>
+
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-          {isPaid ? t.ticketHeading : (language === 'bn' ? 'অসম্পূর্ণ রেজিস্ট্রেশন পাস' : 'Incomplete Registration Pass')}
+          {isPendingApproval
+            ? language === 'bn'
+              ? 'অপেক্ষমান টিকিট পাস (অনুমোদন সাপেক্ষ)'
+              : 'Pending Approval Ticket Pass'
+            : isRejected
+            ? language === 'bn'
+              ? 'বাতিলকৃত টিকিট পাস'
+              : 'Rejected Registration Pass'
+            : isPaid
+            ? t.ticketHeading
+            : language === 'bn'
+            ? 'অসম্পূর্ণ রেজিস্ট্রেশন পাস'
+            : 'Incomplete Registration Pass'}
         </h1>
+
         <p className="text-xs sm:text-sm text-slate-600 max-w-xl mx-auto">
-          {isPaid ? t.ticketNotice : (language === 'bn' ? 'পেমেন্ট সম্পন্ন না হওয়া পর্যন্ত ডিজিটাল টিকিট ও আইডি কার্ড প্রবেশ বা কিউআর ভেরিফিকেশনের জন্য বৈধ নয়।' : 'Official digital ticket pass and ID card are invalid for event entry or QR verification until payment is completed.')}
+          {isPendingApproval
+            ? language === 'bn'
+              ? 'সুপার অ্যাডমিন অনুমোদন না দেওয়া পর্যন্ত টিকিটটি অযাচাইকৃত থাকবে এবং কিউআর স্ক্যানার কোনো সেবা বা ভেন্যু প্রবেশের অনুমতি দেবে না।'
+              : 'Generating this ticket does not mean the student is verified. The QR code remains inactive until approved by the Super Admin.'
+            : isRejected
+            ? language === 'bn'
+              ? 'এই নিবন্ধনটি সুপার অ্যাডমিন দ্বারা বাতিল করা হয়েছে। কিউআর কোড অকার্যকর।'
+              : 'This registration has been rejected by Super Admin. Facility and venue entry are denied.'
+            : isPaid
+            ? t.ticketNotice
+            : language === 'bn'
+            ? 'পেমেন্ট সম্পন্ন না হওয়া পর্যন্ত ডিজিটাল টিকিট ও আইডি কার্ড প্রবেশ বা কিউআর ভেরিফিকেশনের জন্য বৈধ নয়।'
+            : 'Official digital ticket pass and ID card are invalid for event entry or QR verification until payment is completed.'}
         </p>
       </div>
 
@@ -117,12 +179,14 @@ export const TicketView: React.FC<TicketViewProps> = ({
           </button>
         )}
 
-        <button
-          onClick={onNavigateHome}
-          className="px-4 py-2.5 rounded-xl text-slate-600 hover:text-slate-900 text-xs sm:text-sm font-medium transition-colors cursor-pointer"
-        >
-          {language === 'bn' ? 'হোমে ফিরুন' : 'Back to Home'}
-        </button>
+        {(onNavigateHome || onClose) && (
+          <button
+            onClick={onNavigateHome || onClose}
+            className="px-4 py-2.5 rounded-xl text-slate-600 hover:text-slate-900 text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+          >
+            {language === 'bn' ? (onClose ? 'বন্ধ করুন' : 'হোমে ফিরুন') : (onClose ? 'Close' : 'Back to Home')}
+          </button>
+        )}
       </div>
 
       {/* Official Student ID Card Section */}
@@ -251,16 +315,58 @@ export const TicketView: React.FC<TicketViewProps> = ({
               </div>
             </div>
 
-            {/* Official Seal / Verified Badge */}
+            {/* Official Seal / Verified / Pending Badge */}
             <div className="flex flex-col items-center sm:items-end">
-              <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold shadow-xs ${
-                isPaid ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white'
-              }`}>
-                {isPaid ? <ShieldCheck className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-                <span>{isPaid ? t.ticketVerified : (language === 'bn' ? 'পেমেন্ট বাকি' : 'UNPAID / PENDING')}</span>
+              <div
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold shadow-xs ${
+                  isPendingApproval
+                    ? 'bg-amber-500 text-white'
+                    : isRejected
+                    ? 'bg-rose-600 text-white'
+                    : isPaid
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-amber-500 text-white'
+                }`}
+              >
+                {isPendingApproval ? (
+                  <Clock className="w-4 h-4" />
+                ) : isRejected ? (
+                  <XCircle className="w-4 h-4" />
+                ) : isPaid ? (
+                  <ShieldCheck className="w-4 h-4" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4" />
+                )}
+                <span>
+                  {isPendingApproval
+                    ? language === 'bn'
+                      ? 'অনুমোদনের অপেক্ষায়'
+                      : 'PENDING APPROVAL'
+                    : isRejected
+                    ? language === 'bn'
+                      ? 'বাতিলকৃত'
+                      : 'REJECTED'
+                    : isPaid
+                    ? t.ticketVerified
+                    : language === 'bn'
+                    ? 'পেমেন্ট বাকি'
+                    : 'UNPAID / PENDING'}
+                </span>
               </div>
               <span className="text-[10px] text-slate-400 mt-1 font-mono">
-                {isPaid ? `TXN: ${registration.transactionId || 'CONFIRMED'}` : (language === 'bn' ? 'ফি বকেয়া' : 'AWAITING PAYMENT')}
+                {isPendingApproval
+                  ? language === 'bn'
+                    ? 'সুপার অ্যাডমিন পর্যালোচনায়'
+                    : 'AWAITING SUPER ADMIN'
+                  : isRejected
+                  ? language === 'bn'
+                    ? 'প্রবেশাধিকার বাতিল'
+                    : 'ENTRY DENIED'
+                  : isPaid
+                  ? `TXN: ${registration.transactionId || 'CONFIRMED'}`
+                  : language === 'bn'
+                  ? 'ফি বকেয়া'
+                  : 'AWAITING PAYMENT'}
               </span>
             </div>
           </div>
@@ -352,8 +458,35 @@ export const TicketView: React.FC<TicketViewProps> = ({
 
           {/* Col 3: Real Scannable QR Code */}
           <div className="flex flex-col items-center text-center space-y-2">
-            <div className="p-3 bg-white rounded-2xl shadow-md border-2 border-slate-200 inline-block">
+            <div
+              className={`p-3 bg-white rounded-2xl shadow-md border-2 inline-block relative ${
+                isPendingApproval
+                  ? 'border-amber-400 ring-2 ring-amber-200'
+                  : isRejected
+                  ? 'border-rose-400 opacity-60'
+                  : 'border-slate-200'
+              }`}
+            >
               <canvas ref={qrCanvasRef} className="rounded-lg" />
+              {isPendingApproval && (
+                <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex flex-col items-center justify-center rounded-2xl p-2 text-center">
+                  <Clock className="w-7 h-7 text-amber-600 mb-1 animate-pulse" />
+                  <span className="text-[9px] font-black text-amber-900 uppercase tracking-tight">
+                    {language === 'bn' ? 'অযাচাইকৃত কিউআর' : 'INACTIVE QR'}
+                  </span>
+                  <span className="text-[8px] text-amber-800 font-semibold leading-tight">
+                    {language === 'bn' ? 'অনুমোদন বাকি' : 'Pending Approval'}
+                  </span>
+                </div>
+              )}
+              {isRejected && (
+                <div className="absolute inset-0 bg-white/80 backdrop-blur-[1px] flex flex-col items-center justify-center rounded-2xl p-2 text-center">
+                  <XCircle className="w-8 h-8 text-rose-600 mb-1" />
+                  <span className="text-[9px] font-black text-rose-900 uppercase">
+                    {language === 'bn' ? 'বাতিল' : 'REJECTED'}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 rounded-lg border border-amber-300">
               <span className="text-[10px] uppercase font-bold text-amber-700">TOKEN:</span>
@@ -361,9 +494,19 @@ export const TicketView: React.FC<TicketViewProps> = ({
                 {registration.qrToken}
               </span>
             </div>
-            <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-              {language === 'bn' ? 'প্রবেশদ্বার ও সেবায় স্ক্যান করুন' : 'Scan for Entry & Services'}
-            </span>
+            {isPendingApproval ? (
+              <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-2.5 py-1 rounded-full border border-amber-300">
+                {language === 'bn' ? '⚠️ কিউআর কোড এখনো সক্রিয় নয়' : '⚠️ QR Code Inactive (Pending Approval)'}
+              </span>
+            ) : isRejected ? (
+              <span className="text-[10px] text-rose-800 font-bold bg-rose-100 px-2.5 py-1 rounded-full border border-rose-300">
+                {language === 'bn' ? '❌ কিউআর অকার্যকর' : '❌ QR Code Deactivated'}
+              </span>
+            ) : (
+              <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                {language === 'bn' ? 'প্রবেশদ্বার ও সেবায় স্ক্যান করুন' : 'Scan for Entry & Services'}
+              </span>
+            )}
           </div>
         </div>
 

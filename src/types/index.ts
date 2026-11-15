@@ -56,6 +56,67 @@ export interface RegistrationRecord {
   serverVerificationSignature?: string;
   verificationTimestamp?: string;
   verifiedBy?: string;
+  // Admin-Assisted Manual Registration & Super Admin Approval System
+  isManualRegistration?: boolean;
+  registrationType?: 'online' | 'manual_venue' | 'manual_admin';
+  registrationApprovalStatus?: 'approved' | 'pending' | 'rejected';
+  approvalNotes?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
+  createdByAdminId?: string;
+  createdByAdminName?: string;
+  financialAmount?: number;
+  financialDescription?: string;
+  financialMethod?: string;
+  financialReference?: string;
+  financialNotes?: string;
+  financialApprovalStatus?: 'none' | 'pending' | 'approved' | 'rejected';
+  financialApprovedBy?: string;
+  financialApprovedAt?: string;
+  financialRejectedBy?: string;
+  financialRejectedAt?: string;
+  documentUrl?: string;
+  documentName?: string;
+}
+
+export type RegistrationApprovalStatus = 'approved' | 'pending' | 'rejected';
+export type FinancialApprovalStatus = 'none' | 'pending' | 'approved' | 'rejected';
+export type ManualRegistrationType = 'online' | 'manual_venue' | 'manual_admin';
+
+export interface ManualRegistrationInput {
+  fullName: string;
+  fullNameBn?: string;
+  photoUrl: string;
+  mobileNumber: string;
+  email?: string;
+  category: StudentCategory;
+  studentId?: string;
+  passingYear?: string;
+  lastClassAttended?: string;
+  currentClass?: string;
+  batchName: string;
+  groupOrSection?: string;
+  rollNumber?: string;
+  tShirtSize: TShirtSize;
+  address?: string;
+  gender?: 'male' | 'female';
+  bloodGroup?: string;
+  hasParent?: boolean;
+  parentName?: string;
+  parentRelation?: string;
+  parentPhone?: string;
+  notes?: string;
+  documentUrl?: string;
+  documentName?: string;
+  // Optional Financial Section
+  financialAmount?: number;
+  financialDescription?: string;
+  financialMethod?: string;
+  financialReference?: string;
+  financialNotes?: string;
 }
 
 export interface ScanLog {

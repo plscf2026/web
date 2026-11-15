@@ -31,6 +31,7 @@ import {
   Layers,
   Menu,
   X,
+  UserPlus,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -69,6 +70,8 @@ import { FinancialService } from '../services/financialService';
 import { GlobalPagination } from './common/GlobalPagination';
 import { paginate } from '../utils/pagination';
 import { ErrorBoundary } from './common/ErrorBoundary';
+import { ManualRegistrationTab } from './admin/manual/ManualRegistrationTab';
+import { ManualApprovalTab } from './admin/manual/ManualApprovalTab';
 // Heavy administrative portals loaded lazily to preserve bundle performance
 const AdminRmsContainer = lazy(() =>
   import('./admin/rms/AdminRmsContainer').then((m) => ({ default: m.AdminRmsContainer }))
@@ -221,6 +224,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   type AdminTab =
     | 'reunionManagement'
     | 'idCardManagement'
+    | 'manualRegistration'
+    | 'manualApproval'
     | 'masterOverview'
     | 'budgetManagement'
     | 'dailyAnalytics'
@@ -240,6 +245,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'finances'
     | 'notices'
     | 'reports';
+
+  const isSuperAdmin = adminSession?.role === 'super_admin' || !adminSession;
+  const effectiveAdmin: AdminAccount = adminSession || {
+    id: 'admin_master',
+    username: 'admin',
+    fullName: 'Venue Admin',
+    email: 'admin@gmail.com',
+    role: 'super_admin',
+    createdAt: new Date().toISOString(),
+  };
 
   const [activeTab, setActiveTab] = useState<AdminTab>(() => {
     if (typeof window !== 'undefined') {
@@ -963,6 +978,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 highlight: true,
                 badge: 'ID Suite',
               },
+              {
+                id: 'manualRegistration',
+                label: language === 'bn' ? '📝 ভেন্যু শিক্ষার্থী নিবন্ধন' : '📝 Manual Student Reg',
+                icon: UserPlus,
+                highlight: true,
+                badge: 'Venue Desk',
+              },
+              ...(isSuperAdmin
+                ? [
+                    {
+                      id: 'manualApproval' as const,
+                      label: language === 'bn' ? '🛡️ ম্যানুয়াল নিবন্ধন অনুমোদন' : '🛡️ Manual Reg Approval',
+                      icon: ShieldCheck,
+                      highlight: true,
+                      badge: 'Super Admin',
+                    },
+                  ]
+                : []),
               { id: 'masterOverview', label: language === 'bn' ? 'মাস্টার ইভেন্ট ড্যাশবোর্ড' : 'Master Overview', icon: Sparkles },
               { id: 'budgetManagement', label: language === 'bn' ? 'বাজেট ও ব্যয়' : 'Budget & Expenses', icon: DollarSign },
               { id: 'dailyAnalytics', label: language === 'bn' ? 'দৈনিক অ্যানালিটিক্স' : 'Daily Analytics', icon: BarChart3 },
@@ -1050,6 +1083,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     icon: CreditCard,
                     highlight: true,
                   },
+                  {
+                    id: 'manualRegistration',
+                    label: language === 'bn' ? '📝 ভেন্যু শিক্ষার্থী নিবন্ধন' : '📝 Manual Student Reg',
+                    icon: UserPlus,
+                    highlight: true,
+                  },
+                  ...(isSuperAdmin
+                    ? [
+                        {
+                          id: 'manualApproval' as const,
+                          label: language === 'bn' ? '🛡️ ম্যানুয়াল নিবন্ধন অনুমোদন' : '🛡️ Manual Reg Approval',
+                          icon: ShieldCheck,
+                          highlight: true,
+                        },
+                      ]
+                    : []),
                   { id: 'masterOverview', label: language === 'bn' ? 'মাস্টার ইভেন্ট ড্যাশবোর্ড' : 'Master Overview', icon: Sparkles },
                   { id: 'budgetManagement', label: language === 'bn' ? 'বাজেট ও ব্যয়' : 'Budget & Expenses', icon: DollarSign },
                   { id: 'dailyAnalytics', label: language === 'bn' ? 'দৈনিক অ্যানালিটিক্স' : 'Daily Analytics', icon: BarChart3 },
@@ -1112,6 +1161,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     ? (language === 'bn' ? '🏛️ পুনর্মিলনী ইআরপি (RMS)' : '🏛️ Reunion Management (RMS)')
                     : activeTab === 'idCardManagement'
                     ? (language === 'bn' ? '🪪 আইডি কার্ড পোর্টাল' : '🪪 Student ID Cards')
+                    : activeTab === 'manualRegistration'
+                    ? (language === 'bn' ? '📝 ভেন্যু শিক্ষার্থী নিবন্ধন' : '📝 Manual Student Reg')
+                    : activeTab === 'manualApproval'
+                    ? (language === 'bn' ? '🛡️ ম্যানুয়াল নিবন্ধন অনুমোদন' : '🛡️ Manual Reg Approval')
                     : activeTab === 'masterOverview'
                     ? (language === 'bn' ? 'মাস্টার ইভেন্ট ড্যাশবোর্ড' : 'Master Overview')
                     : activeTab === 'budgetManagement'
@@ -1173,6 +1226,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </ErrorBoundary>
       )}
 
+      {/* TAB: MANUAL STUDENT REGISTRATION (ADMIN VENUE ASSISTANCE) */}
+      {activeTab === 'manualRegistration' && (
+        <ErrorBoundary>
+          <ManualRegistrationTab
+            language={language}
+            currentAdmin={effectiveAdmin}
+          />
+        </ErrorBoundary>
+      )}
+
+      {/* TAB: SUPER ADMIN MANUAL REGISTRATION & FINANCIAL APPROVAL PORTAL */}
+      {activeTab === 'manualApproval' && isSuperAdmin && (
+        <ErrorBoundary>
+          <ManualApprovalTab
+            language={language}
+            currentAdmin={effectiveAdmin}
+          />
+        </ErrorBoundary>
+      )}
+
       {/* TAB: MASTER EVENT OVERVIEW (PART 9) */}
       {activeTab === 'masterOverview' && (
         <MasterEventOverview
@@ -1191,8 +1264,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* TAB: BUDGET & EXPENSE MANAGEMENT (PART 8) */}
       {activeTab === 'budgetManagement' && (
         <BudgetManagementTab
-          adminId={adminSession.id}
-          adminName={adminSession.fullName}
+          adminId={adminSession?.id || effectiveAdmin.id}
+          adminName={adminSession?.fullName || effectiveAdmin.fullName}
         />
       )}
 
@@ -1203,7 +1276,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* TAB: STAFF ACCOUNTS & ROLE ISOLATION (PART 2) */}
       {activeTab === 'staffManagement' && (
-        <StaffManagementTab currentAdminEmail={adminSession.email} />
+        <StaffManagementTab currentAdminEmail={adminSession?.email || effectiveAdmin.email} />
       )}
 
       {/* TAB: PRIVILEGED OPERATIONS AUDIT TRAIL (PART 10) */}

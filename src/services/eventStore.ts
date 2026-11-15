@@ -897,6 +897,22 @@ export class EventStore {
       };
     }
 
+    // 2.1 CRITICAL: Inactive QR Code check for manual registrations pending or rejected
+    if (student.registrationApprovalStatus === 'pending') {
+      return {
+        valid: false,
+        status: 'NOT_ELIGIBLE',
+        message: 'REGISTRATION_PENDING_APPROVAL: Manual registration is pending Super Admin approval. QR code is inactive. No entry or services permitted.',
+      };
+    }
+    if (student.registrationApprovalStatus === 'rejected') {
+      return {
+        valid: false,
+        status: 'NOT_ELIGIBLE',
+        message: 'REGISTRATION_REJECTED: Manual registration was rejected by Super Admin. QR code is inactive. No entry or services permitted.',
+      };
+    }
+
     // 3. Department Specific Status Evaluation
     let isCollected = false;
     let collectedAt: string | undefined;
@@ -1019,6 +1035,21 @@ export class EventStore {
       return {
         success: false,
         error: 'Breakfast service is closed after 1:00 PM Bangladesh time.',
+      };
+    }
+
+    // Inactive QR Code check for pending/rejected manual registrations
+    const studentCheck = AppStore.getRegistrations().find((r) => r.id === registrationId);
+    if (studentCheck && studentCheck.registrationApprovalStatus === 'pending') {
+      return {
+        success: false,
+        error: 'REGISTRATION_PENDING_APPROVAL: Registration is awaiting Super Admin approval. QR code is inactive.',
+      };
+    }
+    if (studentCheck && studentCheck.registrationApprovalStatus === 'rejected') {
+      return {
+        success: false,
+        error: 'REGISTRATION_REJECTED: Registration was rejected by Super Admin. Facility access denied.',
       };
     }
 
@@ -1162,6 +1193,21 @@ export class EventStore {
       return {
         success: false,
         error: `PERMISSION_DENIED: Staff member "${staff.fullName}" is not authorized for gate entry/exit approval.`,
+      };
+    }
+
+    // Inactive QR Code check for pending/rejected manual registrations
+    const studentCheck = AppStore.getRegistrations().find((r) => r.id === registrationId);
+    if (studentCheck && studentCheck.registrationApprovalStatus === 'pending') {
+      return {
+        success: false,
+        error: 'REGISTRATION_PENDING_APPROVAL: Registration is awaiting Super Admin approval. QR code is inactive.',
+      };
+    }
+    if (studentCheck && studentCheck.registrationApprovalStatus === 'rejected') {
+      return {
+        success: false,
+        error: 'REGISTRATION_REJECTED: Registration was rejected by Super Admin. Venue entry denied.',
       };
     }
 
@@ -1389,6 +1435,21 @@ export class EventStore {
       return {
         success: false,
         error: `PERMISSION_DENIED: Staff member "${staff.fullName}" is not authorized for dress kit distribution approval.`,
+      };
+    }
+
+    // Inactive QR Code check for pending/rejected manual registrations
+    const studentCheck = AppStore.getRegistrations().find((r) => r.id === registrationId);
+    if (studentCheck && studentCheck.registrationApprovalStatus === 'pending') {
+      return {
+        success: false,
+        error: 'REGISTRATION_PENDING_APPROVAL: Registration is awaiting Super Admin approval. QR code is inactive.',
+      };
+    }
+    if (studentCheck && studentCheck.registrationApprovalStatus === 'rejected') {
+      return {
+        success: false,
+        error: 'REGISTRATION_REJECTED: Registration was rejected by Super Admin. Facility access denied.',
       };
     }
 

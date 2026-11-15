@@ -380,6 +380,93 @@ export const FinancialTransparencyDashboard: React.FC<FinancialTransparencyDashb
           </div>
         </div>
 
+        {/* ── 1.1 REGISTRATION COLLECTION AUDIT BREAKDOWN (ONLINE VS MANUAL) ── */}
+        <div className="bg-slate-900 text-white rounded-3xl p-5 border border-slate-800 shadow-md">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-xs font-black uppercase tracking-wider text-emerald-400">
+                  {isBangla ? 'নিবন্ধন সংগ্রহ ও অনুমোদন হিসাব' : 'Registration Collection & Audit Breakdown'}
+                </span>
+              </div>
+              <h4 className="text-sm font-bold text-slate-200 mt-0.5">
+                {isBangla ? 'অনলাইন ও ম্যানুয়াল সংগ্রহের বিস্তারিত বিবরণ' : 'Authoritative Online & Manual Inflow Breakdown'}
+              </h4>
+            </div>
+            <span className="text-[11px] text-slate-400 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
+              {isBangla ? 'কেবল অনুমোদিত অর্থ মূল তহবিলে যোগকৃত' : 'Only Approved Funds Counted in Official Total'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-4">
+            {/* Metric 1: Total Approved Collection */}
+            <div className="p-3 bg-slate-800/80 rounded-2xl border border-emerald-500/30 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-emerald-400 block tracking-wider">
+                {isBangla ? 'সর্বমোট অনুমোদিত সংগ্রহ' : 'Approved Collection'}
+              </span>
+              <p className="text-base sm:text-lg font-black text-white tabular-nums">
+                ৳{(summary?.total_approved_collection ?? summary?.total_collected ?? 0).toLocaleString()}
+              </p>
+              <span className="text-[9px] text-emerald-400/80 block">
+                {isBangla ? 'মূল তহবিলে কার্যকর' : 'Active in Central Treasury'}
+              </span>
+            </div>
+
+            {/* Metric 2: Online Registrations Collection */}
+            <div className="p-3 bg-slate-800/80 rounded-2xl border border-sky-500/30 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-sky-400 block tracking-wider">
+                {isBangla ? 'অনলাইন নিবন্ধন সংগ্রহ' : 'Online Registrations'}
+              </span>
+              <p className="text-base sm:text-lg font-black text-white tabular-nums">
+                ৳{(summary?.total_online_collection ?? summary?.total_registration_fees ?? 0).toLocaleString()}
+              </p>
+              <span className="text-[9px] text-sky-300/80 block">
+                {isBangla ? 'গেটওয়ে পরিশোধিত' : 'Gateway Paid'}
+              </span>
+            </div>
+
+            {/* Metric 3: Manual Registrations Collection (Approved) */}
+            <div className="p-3 bg-slate-800/80 rounded-2xl border border-indigo-500/30 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-indigo-400 block tracking-wider">
+                {isBangla ? 'ম্যানুয়াল নিবন্ধন (অনুমোদিত)' : 'Manual (Approved)'}
+              </span>
+              <p className="text-base sm:text-lg font-black text-white tabular-nums">
+                ৳{(summary?.total_manual_collection ?? 0).toLocaleString()}
+              </p>
+              <span className="text-[9px] text-indigo-300/80 block">
+                {isBangla ? 'সুপার অ্যাডমিন অনুমোদিত' : 'Super Admin Approved'}
+              </span>
+            </div>
+
+            {/* Metric 4: Total Pending Collection */}
+            <div className="p-3 bg-slate-800/80 rounded-2xl border border-amber-500/30 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-amber-400 block tracking-wider">
+                {isBangla ? 'অপেক্ষমান সংগ্রহ (পেন্ডিং)' : 'Pending Review'}
+              </span>
+              <p className="text-base sm:text-lg font-black text-amber-300 tabular-nums">
+                ৳{(summary?.total_pending_collection ?? 0).toLocaleString()}
+              </p>
+              <span className="text-[9px] text-amber-400/80 block">
+                {isBangla ? 'অনুমোদনের অপেক্ষায়' : 'Awaiting Approval (Excluded)'}
+              </span>
+            </div>
+
+            {/* Metric 5: Total Rejected Collection */}
+            <div className="p-3 bg-slate-800/80 rounded-2xl border border-rose-500/30 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-rose-400 block tracking-wider">
+                {isBangla ? 'বাতিলকৃত সংগ্রহ (রিজেক্টেড)' : 'Rejected Collection'}
+              </span>
+              <p className="text-base sm:text-lg font-black text-rose-300 tabular-nums">
+                ৳{(summary?.total_rejected_collection ?? 0).toLocaleString()}
+              </p>
+              <span className="text-[9px] text-rose-400/80 block">
+                {isBangla ? 'তহবিল থেকে বাদ' : 'Excluded from Treasury'}
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* ── 2. INTERACTIVE SECTION TABS ── */}
         <div className="bg-white rounded-3xl border border-slate-200 p-2 shadow-xs flex flex-col sm:flex-row gap-2">
           <button

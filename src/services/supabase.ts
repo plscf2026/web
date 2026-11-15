@@ -311,6 +311,30 @@ function toRegistrationDbRow(reg: RegistrationRecord, year: number = 2027) {
     gateway_charge: reg.gatewayCharge || 0,
     notes: sanitizeInput(reg.notes || ''),
     year: year || 2027,
+    // Admin-Assisted Manual Registration & Approval Fields
+    is_manual_registration: Boolean(reg.isManualRegistration ?? false),
+    registration_type: reg.registrationType || (reg.isManualRegistration ? 'manual_venue' : 'online'),
+    registration_approval_status: reg.registrationApprovalStatus || (reg.isManualRegistration ? 'pending' : 'approved'),
+    approval_notes: reg.approvalNotes ? sanitizeInput(reg.approvalNotes) : null,
+    approved_by: reg.approvedBy ? sanitizeInput(reg.approvedBy) : null,
+    approved_at: reg.approvedAt || null,
+    rejected_by: reg.rejectedBy ? sanitizeInput(reg.rejectedBy) : null,
+    rejected_at: reg.rejectedAt || null,
+    rejection_reason: reg.rejectionReason ? sanitizeInput(reg.rejectionReason) : null,
+    created_by_admin_id: reg.createdByAdminId || null,
+    created_by_admin_name: reg.createdByAdminName ? sanitizeInput(reg.createdByAdminName) : null,
+    financial_amount: Number(reg.financialAmount || 0),
+    financial_description: reg.financialDescription ? sanitizeInput(reg.financialDescription) : null,
+    financial_method: reg.financialMethod ? sanitizeInput(reg.financialMethod) : null,
+    financial_reference: reg.financialReference ? sanitizeInput(reg.financialReference) : null,
+    financial_notes: reg.financialNotes ? sanitizeInput(reg.financialNotes) : null,
+    financial_approval_status: reg.financialApprovalStatus || (reg.isManualRegistration ? (Number(reg.financialAmount) > 0 ? 'pending' : 'none') : 'approved'),
+    financial_approved_by: reg.financialApprovedBy ? sanitizeInput(reg.financialApprovedBy) : null,
+    financial_approved_at: reg.financialApprovedAt || null,
+    financial_rejected_by: reg.financialRejectedBy ? sanitizeInput(reg.financialRejectedBy) : null,
+    financial_rejected_at: reg.financialRejectedAt || null,
+    document_url: reg.documentUrl || null,
+    document_name: reg.documentName ? sanitizeInput(reg.documentName) : null,
   };
 }
 
@@ -364,6 +388,30 @@ function fromRegistrationDbRow(row: any): RegistrationRecord {
     isLegacy: Boolean(row.is_legacy ?? false),
     migrationSource: row.migration_source || undefined,
     legacySourceYear: row.legacy_source_year ? Number(row.legacy_source_year) : undefined,
+    // Admin-Assisted Manual Registration & Approval Fields
+    isManualRegistration: Boolean(row.is_manual_registration ?? row.isManualRegistration ?? false),
+    registrationType: row.registration_type || row.registrationType || (row.is_manual_registration ? 'manual_venue' : 'online'),
+    registrationApprovalStatus: row.registration_approval_status || row.registrationApprovalStatus || (row.is_manual_registration ? 'pending' : 'approved'),
+    approvalNotes: row.approval_notes || row.approvalNotes || undefined,
+    approvedBy: row.approved_by || row.approvedBy || undefined,
+    approvedAt: row.approved_at || row.approvedAt || undefined,
+    rejectedBy: row.rejected_by || row.rejectedBy || undefined,
+    rejectedAt: row.rejected_at || row.rejectedAt || undefined,
+    rejectionReason: row.rejection_reason || row.rejectionReason || undefined,
+    createdByAdminId: row.created_by_admin_id || row.createdByAdminId || undefined,
+    createdByAdminName: row.created_by_admin_name || row.createdByAdminName || undefined,
+    financialAmount: Number(row.financial_amount ?? row.financialAmount ?? 0),
+    financialDescription: row.financial_description || row.financialDescription || undefined,
+    financialMethod: row.financial_method || row.financialMethod || undefined,
+    financialReference: row.financial_reference || row.financialReference || undefined,
+    financialNotes: row.financial_notes || row.financialNotes || undefined,
+    financialApprovalStatus: row.financial_approval_status || row.financialApprovalStatus || (row.is_manual_registration ? (Number(row.financial_amount) > 0 ? 'pending' : 'none') : 'approved'),
+    financialApprovedBy: row.financial_approved_by || row.financialApprovedBy || undefined,
+    financialApprovedAt: row.financial_approved_at || row.financialApprovedAt || undefined,
+    financialRejectedBy: row.financial_rejected_by || row.financialRejectedBy || undefined,
+    financialRejectedAt: row.financial_rejected_at || row.financialRejectedAt || undefined,
+    documentUrl: row.document_url || row.documentUrl || undefined,
+    documentName: row.document_name || row.documentName || undefined,
   };
 }
 
@@ -968,6 +1016,22 @@ export const SupabaseService = {
           return { success: true, verified: true, student: regRecord };
         }
 
+        if (res.status === 'PENDING_APPROVAL') {
+          return {
+            success: false,
+            verified: false,
+            errorType: 'PENDING_APPROVAL' as any,
+            error: res.error || `PENDING APPROVAL: Manual registration "${safeId}" is pending Super Admin approval. QR code is inactive.`,
+          };
+        }
+        if (res.status === 'REGISTRATION_REJECTED') {
+          return {
+            success: false,
+            verified: false,
+            errorType: 'REGISTRATION_REJECTED' as any,
+            error: res.error || `REGISTRATION REJECTED: Registration "${safeId}" was rejected. QR code is invalid.`,
+          };
+        }
         if (res.status === 'UNPAID') {
           return {
             success: false,
@@ -1109,7 +1173,23 @@ export const SupabaseService = {
         const { data, error } = await query.limit(1);
         if (!error && Array.isArray(data) && data.length > 0) {
           const row = fromRegistrationDbRow(data[0]);
-          if (row.paymentStatus !== 'paid') {
+          if (row.registrationApprovalStatus === 'pending') {
+            return {
+              success: false,
+              verified: false,
+              errorType: 'PENDING_APPROVAL' as any,
+              error: `PENDING APPROVAL: Manual registration "${row.id}" is pending Super Admin approval. QR code is inactive.`,
+            };
+          }
+          if (row.registrationApprovalStatus === 'rejected') {
+            return {
+              success: false,
+              verified: false,
+              errorType: 'REGISTRATION_REJECTED' as any,
+              error: `REGISTRATION REJECTED: Registration "${row.id}" was rejected by Super Admin. QR code is invalid.`,
+            };
+          }
+          if (row.paymentStatus !== 'paid' && row.registrationApprovalStatus !== 'approved') {
             return {
               success: false,
               verified: false,

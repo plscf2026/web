@@ -7,6 +7,7 @@
 import { supabase } from './supabase';
 import { AppStore } from './store';
 import { sanitizeInput } from '../utils/security';
+import { RegistrationRecord } from '../types';
 
 export interface ExpenseCategoryItem {
   id: string;
@@ -236,6 +237,12 @@ export interface FinancialTransparencySummary {
   recent_expenses: TransparencyExpenseItem[];
   recent_donations: PublicDonationItem[];
   updated_at: string;
+  // Manual Registration Financial Breakdown (Requirement 8)
+  total_approved_collection?: number;
+  total_pending_collection?: number;
+  total_rejected_collection?: number;
+  total_online_collection?: number;
+  total_manual_collection?: number;
 }
 
 export interface PersonalDonationRecord {
@@ -302,6 +309,11 @@ export class FinancialService {
           recent_expenses: Array.isArray(data.recent_expenses) ? data.recent_expenses : [],
           recent_donations: Array.isArray(data.recent_donations) ? data.recent_donations : [],
           updated_at: data.updated_at || new Date().toISOString(),
+          total_approved_collection: Number(data.total_approved_collection ?? data.total_collected ?? 0),
+          total_pending_collection: Number(data.total_pending_collection || 0),
+          total_rejected_collection: Number(data.total_rejected_collection || 0),
+          total_online_collection: Number(data.total_online_collection ?? data.total_registration_fees ?? 0),
+          total_manual_collection: Number(data.total_manual_collection || 0),
         };
       }
       if (error) {
@@ -609,17 +621,50 @@ export class FinancialService {
   // ── Private Local Fallbacks ────────────────────────────────────────────────
 
   private static computeLocalFinancialSummary(): FinancialTransparencySummary {
-    const registrations = AppStore.getRegistrations().filter((r) => r.paymentStatus === 'paid');
+    const allRegistrations = AppStore.getRegistrations();
+    const onlinePaidRegistrations = allRegistrations.filter(
+      (r) => !r.isManualRegistration && r.paymentStatus === 'paid'
+    );
+    const manualApprovedRegistrations = allRegistrations.filter(
+      (r) => r.isManualRegistration && r.financialApprovalStatus === 'approved'
+    );
+    const manualPendingRegistrations = allRegistrations.filter(
+      (r) => r.isManualRegistration && r.financialApprovalStatus === 'pending'
+    );
+    const manualRejectedRegistrations = allRegistrations.filter(
+      (r) => r.isManualRegistration && r.financialApprovalStatus === 'rejected'
+    );
+
     const localExpenses = AppStore.getExpenses();
     const localDonations = AppStore.getDonations();
 
-    const regFees = registrations.reduce((sum, r) => sum + (r.registrationFee || (r.category === 'current' ? 1000 : 1500)), 0);
-    const regDonations = registrations.reduce((sum, r) => sum + (r.donationAmount || 0), 0);
+    const onlineRegFees = onlinePaidRegistrations.reduce(
+      (sum, r) => sum + (r.registrationFee || (r.category === 'current' ? 1000 : 1500)),
+      0
+    );
+    const manualApprovedFees = manualApprovedRegistrations.reduce(
+      (sum, r) => sum + (r.financialAmount || r.totalPaid || 0),
+      0
+    );
+    const manualPendingFees = manualPendingRegistrations.reduce(
+      (sum, r) => sum + (r.financialAmount || 0),
+      0
+    );
+    const manualRejectedFees = manualRejectedRegistrations.reduce(
+      (sum, r) => sum + (r.financialAmount || 0),
+      0
+    );
+
+    // Official collections: Only approved entries contribute to official total!
+    const regFees = onlineRegFees + manualApprovedFees;
+    const regDonations = onlinePaidRegistrations.reduce((sum, r) => sum + (r.donationAmount || 0), 0);
     const standaloneDonations = localDonations.reduce((sum, d) => sum + (d.amount || 0), 0);
     const totalDonations = regDonations + standaloneDonations;
     const totalCollected = regFees + totalDonations;
     const totalExpenses = localExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
     const remainingBalance = totalCollected - totalExpenses;
+
+    const paidStudents = [...onlinePaidRegistrations, ...manualApprovedRegistrations];
 
     const defaultCategories: ExpenseCategoryItem[] = [
       { id: 'cat-stage', name_en: 'Stage & Decoration', name_bn: 'মঞ্চ ও সাজসজ্জা', icon: 'Layers', color: '#4F46E5', budget_allocated: 150000, total_spent: 85000, expense_count: 1 },
@@ -646,9 +691,9 @@ export class FinancialService {
     }));
 
     // Collect raw donations from paid registrations
-    const regDonationsList: PublicDonationItem[] = registrations
-      .filter((r) => (r.donationAmount || 0) > 0)
-      .map((r) => ({
+    const regDonationsList: PublicDonationItem[] = allRegistrations
+      .filter((r: RegistrationRecord) => (r.donationAmount || 0) > 0)
+      .map((r: RegistrationRecord) => ({
         id: `DON-REG-${r.id}`,
         donor_name: r.fullName,
         raw_registration_id: r.id,
@@ -705,12 +750,18 @@ export class FinancialService {
       total_donations: totalDonations,
       total_expenses: totalExpenses,
       remaining_balance: remainingBalance,
-      paid_student_count: registrations.length,
+      paid_student_count: paidStudents.length,
       donor_count: allUniqueAggregated.length,
       categories: defaultCategories,
       recent_expenses: recentExpenses,
       recent_donations: top10Donors,
       updated_at: new Date().toISOString(),
+      // Manual Registration Financial Breakdown
+      total_approved_collection: totalCollected,
+      total_pending_collection: manualPendingFees,
+      total_rejected_collection: manualRejectedFees,
+      total_online_collection: onlineRegFees,
+      total_manual_collection: manualApprovedFees,
     };
   }
 

@@ -357,7 +357,23 @@ export class AppStore {
     if (updates.isTShirtCollected !== undefined) dbUpdates.is_tshirt_collected = updates.isTShirtCollected;
     if (updates.isCheckedIn !== undefined) dbUpdates.is_checked_in = updates.isCheckedIn;
     if (updates.paymentStatus !== undefined) dbUpdates.payment_status = updates.paymentStatus;
+    if (updates.totalPaid !== undefined) dbUpdates.total_paid = updates.totalPaid;
+    if (updates.transactionId !== undefined) dbUpdates.transaction_id = updates.transactionId;
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+    // Manual Registration & Approval Fields
+    if (updates.registrationApprovalStatus !== undefined) dbUpdates.registration_approval_status = updates.registrationApprovalStatus;
+    if (updates.approvalNotes !== undefined) dbUpdates.approval_notes = updates.approvalNotes;
+    if (updates.approvedBy !== undefined) dbUpdates.approved_by = updates.approvedBy;
+    if (updates.approvedAt !== undefined) dbUpdates.approved_at = updates.approvedAt;
+    if (updates.rejectedBy !== undefined) dbUpdates.rejected_by = updates.rejectedBy;
+    if (updates.rejectedAt !== undefined) dbUpdates.rejected_at = updates.rejectedAt;
+    if (updates.rejectionReason !== undefined) dbUpdates.rejection_reason = updates.rejectionReason;
+    if (updates.financialApprovalStatus !== undefined) dbUpdates.financial_approval_status = updates.financialApprovalStatus;
+    if (updates.financialApprovedBy !== undefined) dbUpdates.financial_approved_by = updates.financialApprovedBy;
+    if (updates.financialApprovedAt !== undefined) dbUpdates.financial_approved_at = updates.financialApprovedAt;
+    if (updates.financialRejectedBy !== undefined) dbUpdates.financial_rejected_by = updates.financialRejectedBy;
+    if (updates.financialRejectedAt !== undefined) dbUpdates.financial_rejected_at = updates.financialRejectedAt;
+    if (updates.financialAmount !== undefined) dbUpdates.financial_amount = updates.financialAmount;
 
     if (Object.keys(dbUpdates).length > 0) {
       supabase.from(yearTableName).update(dbUpdates).eq('id', id).then(undefined, () => {});
