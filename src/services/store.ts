@@ -404,55 +404,26 @@ export class AppStore {
 
   /**
    * Synchronizes registrations from Supabase cloud into local storage.
-   * Pulls authoritative records from consolidated registrations_2027.
+   * Supabase PostgreSQL registrations_2027 is the authoritative source of truth.
+   * Local storage acts as a read cache. Deleted cloud rows are cleanly reflected.
    */
   static async syncWithSupabase(preferredYear?: number): Promise<{ count: number; error?: string }> {
     try {
       const targetYear = preferredYear || 2027;
       const res = await SupabaseService.fetchRegistrations(targetYear);
-      const fetched: RegistrationRecord[] = res.data && res.data.length > 0 ? res.data : [];
       const deletedIds = this.getDeletedRegistrationIds();
 
-      if (fetched.length === 0) {
-        return { count: this.getRegistrations().length };
+      if (res.error) {
+        // If network failed, retain existing local cache for offline operation
+        return { count: this.getRegistrations().length, error: res.error };
       }
 
-      const existing = this.getRegistrations();
-      const map = new Map<string, RegistrationRecord>();
+      // Supabase is authoritative: local cache mirrors database state
+      const fetched: RegistrationRecord[] = res.data || [];
+      const validCloudData = fetched.filter((r) => !deletedIds.has(r.id));
+      this.saveRegistrations(validCloudData);
 
-      // Keep existing local records
-      for (const r of existing) {
-        if (!deletedIds.has(r.id)) {
-          map.set(r.id, r);
-        }
-      }
-      // Authoritative update from cloud (filtering out any locally deleted/tombstoned IDs)
-      for (const r of fetched) {
-        if (!deletedIds.has(r.id)) {
-          map.set(r.id, r);
-        }
-      }
-
-      const merged = Array.from(map.values());
-      this.saveRegistrations(merged);
-
-      // Bidirectional sync: Push any genuine paid local registrations up to Supabase
-      const cloudIds = new Set(fetched.map((r) => r.id));
-      for (const localReg of existing) {
-        if (
-          localReg.paymentStatus === 'paid' &&
-          !cloudIds.has(localReg.id) &&
-          !localReg.isDemo &&
-          !deletedIds.has(localReg.id)
-        ) {
-          console.log(`[AppStore] Auto-pushing unsynced paid registration ${localReg.id} to Supabase...`);
-          SupabaseService.saveRegistration(localReg, targetYear).catch((err) => {
-            console.warn(`[AppStore] Sync error for ${localReg.id}:`, err);
-          });
-        }
-      }
-
-      return { count: merged.length };
+      return { count: validCloudData.length };
     } catch (err: any) {
       console.warn('[AppStore] Supabase sync notice:', err);
       return { count: this.getRegistrations().length, error: err?.message };

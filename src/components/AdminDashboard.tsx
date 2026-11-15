@@ -381,40 +381,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const deletedIds = AppStore.getDeletedRegistrationIds();
 
       if (res.data) {
-        // Filter out any deleted/tombstoned bookings
+        // Supabase is authoritative: mirror cloud state and filter out tombstoned IDs
         const validCloudData = res.data.filter((r) => !deletedIds.has(r.id));
-        const localList = AppStore.getRegistrations();
-        const mergedMap = new Map<string, RegistrationRecord>();
-
-        localList.forEach((r) => {
-          if (!deletedIds.has(r.id)) {
-            mergedMap.set(r.id, r);
-          }
-        });
-
-        validCloudData.forEach((r) => {
-          if (!deletedIds.has(r.id)) {
-            mergedMap.set(r.id, r);
-          }
-        });
-
-        const mergedArray = Array.from(mergedMap.values());
-        setRegistrations(mergedArray);
-        AppStore.saveRegistrations(mergedArray);
-
-        // Auto-push any genuine paid local registrations that were not yet in Supabase (excluding deleted ones)
-        const cloudIds = new Set(validCloudData.map((r) => r.id));
-        for (const localReg of localList) {
-          if (
-            localReg.paymentStatus === 'paid' &&
-            !cloudIds.has(localReg.id) &&
-            !localReg.isDemo &&
-            !deletedIds.has(localReg.id)
-          ) {
-            console.log(`[AdminSync] Auto-pushing unsynced paid registration ${localReg.id} to Supabase...`);
-            SupabaseService.saveRegistration(localReg, year).catch(console.warn);
-          }
-        }
+        setRegistrations(validCloudData);
+        AppStore.saveRegistrations(validCloudData);
       }
     } catch (err) {
       console.warn('Error fetching registrations from Supabase:', err);

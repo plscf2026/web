@@ -90,6 +90,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [activeCardTab, setActiveCardTab] = useState<'student' | 'parent'>('student');
   const [pollCount, setPollCount] = useState(0);
   const [copiedField, setCopiedField] = useState('');
+  const [showSandboxGuide, setShowSandboxGuide] = useState(false);
 
   // Dynamic fee, parent pass, and gateway charge calculation
   // Official gateway charges:
@@ -746,6 +747,21 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <p className="text-xs text-rose-700 max-w-xs mx-auto leading-relaxed">{errorMessage}</p>
             </div>
 
+            {/* Sandbox explanation box */}
+            {config.isSandbox && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-900 space-y-2 text-left">
+                <div className="font-bold flex items-center gap-1.5 text-amber-800">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>{isBangla ? 'কেন PayStation/bKash এ ত্রুটি হলো?' : 'Why did the payment fail?'}</span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-amber-800">
+                  {isBangla
+                    ? 'স্যান্ডবক্স টেস্ট মোডে bKash গেটওয়ে ব্যক্তিগত নম্বর দিয়ে পেমেন্ট সম্পন্ন করতে পারে না ("The input wallet is not eligible / Insufficient balance")। আপনার রেজিস্ট্রেশনের সমস্ত তথ্য ডেটাবেজে সংরক্ষিত রয়েছে। নিচের সবুজ বাটনে ক্লিক করে তাৎক্ষণিক নিশ্চিতকরণ টিকিট সংগ্রহ করুন।'
+                    : 'In Sandbox mode, bKash rejects personal mobile numbers after OTP verification because they do not exist in the sandbox mock ledger. All your entered registration details are safely preserved. Click below to instantly complete registration and get your verified ticket.'}
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2.5 pt-1">
               {config.isSandbox && (
                 <button
@@ -1271,7 +1287,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <div className="text-center pt-0.5">
                   <button
                     type="button"
-                    onClick={() => handlePayStationHostedCheckout(true)}
+                    onClick={() => setShowSandboxGuide(true)}
                     className="text-[10px] text-slate-400 hover:text-slate-600 underline cursor-pointer transition"
                   >
                     {isBangla
@@ -1297,6 +1313,69 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <span>Merchant ID: {config.merchantId}</span>
               <span>•</span>
               <span className="text-emerald-600 font-semibold">bKash (Active) · Nagad (Active) · Rocket (Active) · Cards (Active) · Amex (Active)</span>
+            </div>
+          </div>
+        )}
+
+        {/* Sandbox test wallet guide modal */}
+        {showSandboxGuide && (
+          <div className="fixed inset-0 z-60 bg-black/75 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-slate-200 text-left animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center gap-2 text-amber-600">
+                <AlertCircle className="w-5 h-5 shrink-0" />
+                <h3 className="font-bold text-sm text-slate-900">
+                  {isBangla ? 'PayStation স্যান্ডবক্স টেস্ট ওয়ালেট নির্দেশিকা' : 'PayStation Sandbox Test Wallet Guide'}
+                </h3>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                {isBangla
+                  ? 'বিকাশ স্যান্ডবক্সে ব্যক্তিগত নম্বর (যেমন 017..., 018...) দিলে ওটিপি ভেরিফিকেশন সফল দেখালেও পেমেন্ট "Sorry! Payment Failed" দেখাবে। টেস্ট করতে নিচের অফিসিয়াল স্যান্ডবক্স নম্বর ব্যবহার করুন:'
+                  : 'In bKash Sandbox, personal numbers will verify OTP but fail payment with "Sorry! Payment Failed". Please use the official sandbox credentials:'}
+              </p>
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5 font-mono">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-sans">Wallet / Number:</span>
+                  <span className="font-bold text-slate-900">01770618575</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-sans">OTP:</span>
+                  <span className="font-bold text-slate-900">123456</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-sans">PIN:</span>
+                  <span className="font-bold text-slate-900">12121</span>
+                </div>
+              </div>
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSandboxGuide(false);
+                    handleInstantSandboxPayment(selectedMethod || 'bkash');
+                  }}
+                  className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer transition flex items-center justify-center gap-2 shadow"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{isBangla ? 'তাৎক্ষণিক টেস্ট ভেরিফাই করুন (সুপারিশকৃত)' : 'Instant Test Verify (Recommended)'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSandboxGuide(false);
+                    handlePayStationHostedCheckout(true);
+                  }}
+                  className="w-full py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs cursor-pointer transition"
+                >
+                  {isBangla ? 'বাহ্যিক গেটওয়েতে যান (01770618575 দিয়ে)' : 'Continue to External Gateway (with test wallet)'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSandboxGuide(false)}
+                  className="w-full py-1.5 text-slate-400 hover:text-slate-600 text-xs font-medium cursor-pointer transition"
+                >
+                  {isBangla ? 'বন্ধ করুন' : 'Cancel'}
+                </button>
+              </div>
             </div>
           </div>
         )}
