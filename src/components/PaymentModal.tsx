@@ -352,11 +352,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       return;
     }
 
-    // In sandbox mode, PayStation's demo sandbox account (104-1653730183) server disables Nagad, Rocket, Card, and Amex
-    // (rendering them disabled-gateway / blurred-wrapper on paystation.com.bd).
-    // When Nagad, Rocket, Card, or Amex is selected in Sandbox, immediately process via our full sandbox verification
-    // unless the user explicitly requested the raw external hosted link.
-    if (config.isSandbox && selectedMethod !== 'bkash' && !forceHostedExternal) {
+    // In sandbox mode, PayStation's public demo account (104-1653730183) disabled Nagad, Rocket, Card, and Amex
+    // and its bKash upstream callback execution fails with "Sorry! Payment Failed Please contact with Merchant".
+    // Therefore, in sandbox mode (unless the user explicitly requests raw external hosted testing),
+    // we process all channels (including bKash) via our authoritative internal sandbox verification
+    // ensuring the user's booking, QR token, and ticket are generated with 100% reliability.
+    if (config.isSandbox && !forceHostedExternal) {
       await handleInstantSandboxPayment(selectedMethod);
       return;
     }
@@ -730,6 +731,21 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
 
             <div className="space-y-2.5 pt-1">
+              {config.isSandbox && (
+                <button
+                  type="button"
+                  onClick={() => handleInstantSandboxPayment(selectedMethod || 'bkash')}
+                  className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm cursor-pointer transition shadow-lg flex items-center justify-center gap-2"
+                >
+                  <CheckCircle2 className="w-5 h-5 text-white" />
+                  <span>
+                    {isBangla
+                      ? 'স্যান্ডবক্স টেস্ট মোডে নিশ্চিত করুন ও টিকিট সংগ্রহ করুন'
+                      : 'Complete in Test Mode & Get Verified Ticket'}
+                  </span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => {
@@ -1166,11 +1182,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 >
                   <Lock className="w-4 h-4 text-pink-200" />
                   <span>
-                    {isBangla
-                      ? `বিকাশ (PayStation)-এ ৳${finalTotalPayable.toLocaleString()} পে করুন`
-                      : `Pay ৳${finalTotalPayable.toLocaleString()} via bKash (PayStation)`}
+                    {config.isSandbox
+                      ? (isBangla
+                          ? `বিকাশ-এ ৳${finalTotalPayable.toLocaleString()} পে করুন (নিশ্চিত ও টিকিট তৈরি)`
+                          : `Pay ৳${finalTotalPayable.toLocaleString()} via bKash (Confirm & Ticket)`)
+                      : (isBangla
+                          ? `বিকাশ (PayStation)-এ ৳${finalTotalPayable.toLocaleString()} পে করুন`
+                          : `Pay ৳${finalTotalPayable.toLocaleString()} via bKash (PayStation)`)}
                   </span>
-                  <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                  <ArrowRight className="w-3.5 h-3.5 opacity-80" />
                 </button>
               ) : selectedMethod === 'nagad' ? (
                 <button
@@ -1230,24 +1250,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </button>
               )}
 
-              {/* In Sandbox Mode: Quick Test verification for bKash */}
-              {config.isSandbox && selectedMethod === 'bkash' && (
-                <button
-                  type="button"
-                  onClick={() => handleInstantSandboxPayment('bkash')}
-                  className="w-full py-2.5 rounded-xl border border-pink-200 hover:border-pink-300 bg-pink-50 hover:bg-pink-100 text-pink-700 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5 text-pink-600" />
-                  <span>
-                    {isBangla
-                      ? 'তাৎক্ষণিক বিকাশ টেস্ট পেমেন্ট (স্যান্ডবক্স ভেরিফাই)'
-                      : 'Instant bKash Test Payment (Sandbox Verify)'}
-                  </span>
-                </button>
-              )}
-
-              {/* In Sandbox Mode: Option to inspect raw PayStation hosted URL if desired */}
-              {config.isSandbox && selectedMethod !== 'bkash' && (
+              {/* In Sandbox Mode: Option to test raw external PayStation hosted checkout URL */}
+              {config.isSandbox && (
                 <div className="text-center pt-0.5">
                   <button
                     type="button"
@@ -1255,8 +1259,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     className="text-[10px] text-slate-400 hover:text-slate-600 underline cursor-pointer transition"
                   >
                     {isBangla
-                      ? 'PayStation বাহ্যিক গেটওয়ে পেজ টেস্ট করুন (স্যান্ডবক্সে PayStation কেবল বিকাশ উন্মুক্ত রেখেছে)'
-                      : 'Test external PayStation hosted page (PayStation sandbox restricts to bKash)'}
+                      ? 'PayStation বাহ্যিক গেটওয়ে পেজ টেস্ট করুন (স্যান্ডবক্স সার্ভার লিঙ্ক)'
+                      : 'Test external PayStation sandbox hosted page'}
                   </button>
                 </div>
               )}
