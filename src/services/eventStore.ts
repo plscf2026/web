@@ -1945,6 +1945,20 @@ export class EventStore {
   // ==========================================
 
   private static realtimeChannel: any = null;
+  private static stationBroadcast: any = null;
+
+  /**
+   * Broadcast station events across all tabs/windows in the same browser instantly (<5ms)
+   */
+  static broadcastStationEvent(eventType: string, payload?: any): void {
+    if (typeof window === 'undefined') return;
+    try {
+      if (!this.stationBroadcast && 'BroadcastChannel' in window) {
+        this.stationBroadcast = new (window as any).BroadcastChannel('plscf_realtime_events');
+      }
+      this.stationBroadcast?.postMessage({ type: eventType, payload, timestamp: Date.now() });
+    } catch (_) {}
+  }
 
   /**
    * Authoritative Cloud Distribution Sync
@@ -2030,21 +2044,51 @@ export class EventStore {
    * Initializes Supabase Realtime broadcast listener for all stations
    */
   static initRealtimeSync(): void {
-    if (typeof window === 'undefined' || this.realtimeChannel) return;
+    if (typeof window === 'undefined') return;
+
+    // 1. Cross-tab instant communication via BroadcastChannel
+    if (!this.stationBroadcast && 'BroadcastChannel' in window) {
+      try {
+        this.stationBroadcast = new (window as any).BroadcastChannel('plscf_realtime_events');
+        this.stationBroadcast.onmessage = (event: any) => {
+          const { type, payload } = event.data || {};
+          if (type) {
+            window.dispatchEvent(new CustomEvent(type, { detail: payload }));
+          }
+        };
+      } catch (_) {}
+    }
+
+    if (this.realtimeChannel) return;
     try {
       this.realtimeChannel = supabase
         .channel('plscf_realtime_stations')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'food_distributions' }, () => {
           this.syncDistributionsWithSupabase();
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('plscf_food_sync'));
+          }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'dress_distributions' }, () => {
           this.syncDistributionsWithSupabase();
+          AppStore.syncWithSupabase(2027);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('plscf_dress_sync'));
+            window.dispatchEvent(new CustomEvent('plscf_registration_updated'));
+          }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'gate_events' }, () => {
           this.syncDistributionsWithSupabase();
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('plscf_gate_sync'));
+          }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'registrations_2027' }, () => {
-          AppStore.syncWithSupabase(2027);
+          AppStore.syncWithSupabase(2027).then(() => {
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('plscf_registration_updated'));
+            }
+          });
         })
         .subscribe();
     } catch (err) {

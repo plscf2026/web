@@ -32,6 +32,9 @@ import {
   X,
   UserPlus,
   Camera,
+  CheckCircle2,
+  Clock,
+  Utensils,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -42,6 +45,8 @@ import {
   NoticeItem,
   ScanLog,
   AdminAccount,
+  DressDistributionRecord,
+  FoodDistributionRecord,
   HomePageSectionId,
   HomePageSectionSetting,
   DEFAULT_HOME_PAGE_SECTIONS,
@@ -362,6 +367,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   );
   const [notices, setNotices] = useState<NoticeItem[]>(() => AppStore.getNotices());
   const [scanLogs, setScanLogs] = useState<ScanLog[]>(() => AppStore.getScanLogs());
+  const [dressDistributions, setDressDistributions] = useState<DressDistributionRecord[]>(() =>
+    EventStore.getDressDistributions()
+  );
+  const [foodDistributions, setFoodDistributions] = useState<FoodDistributionRecord[]>(() =>
+    EventStore.getFoodDistributions()
+  );
 
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -521,6 +532,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const freshSettings = AppStore.getFeeSettings();
     const freshNotices = AppStore.getNotices();
     const freshScanLogs = AppStore.getScanLogs();
+    const freshDress = EventStore.getDressDistributions();
+    const freshFood = EventStore.getFoodDistributions();
 
     setRegistrations(freshRegs);
     setDonations(freshDonations);
@@ -528,6 +541,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setFeeSettings(freshSettings);
     setNotices(freshNotices);
     setScanLogs(freshScanLogs);
+    setDressDistributions(freshDress);
+    setFoodDistributions(freshFood);
 
     setFormerFeeInput(freshSettings.formerStudentFee);
     setCurrentFeeInput(freshSettings.currentStudentFee);
@@ -716,9 +731,138 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setNotices(updated);
   };
 
-  const handleToggleTShirtCollected = (regId: string, current: boolean) => {
-    AppStore.updateRegistration(regId, { isTShirtCollected: !current }, selectedYear);
-    refreshAll();
+  const isTShirtGiven = (reg: RegistrationRecord): boolean => {
+    if (reg.isTShirtCollected) return true;
+    return dressDistributions.some(
+      (d) =>
+        (d.registrationId === reg.id || (reg.studentId && d.registrationId === reg.studentId)) &&
+        d.status === 'RECEIVED'
+    );
+  };
+
+  const isMealCollected = (reg: RegistrationRecord, mealType: 'breakfast' | 'lunch' | 'dinner'): boolean => {
+    return foodDistributions.some(
+      (d) =>
+        (d.registrationId === reg.id || (reg.studentId && d.registrationId === reg.studentId)) &&
+        d.mealType === mealType &&
+        d.status === 'COLLECTED'
+    );
+  };
+
+  const handleToggleTShirtCollected = async (regId: string, current: boolean) => {
+    const nextStatus = !current;
+
+    // 1. Optimistic UI update
+    setRegistrations((prev) =>
+      prev.map((r) => (r.id === regId ? { ...r, isTShirtCollected: nextStatus } : r))
+    );
+    AppStore.updateRegistration(regId, { isTShirtCollected: nextStatus }, selectedYear);
+
+    // 2. Authoritative Supabase toggle via SECURITY DEFINER RPC
+    await SupabaseService.toggleTShirtDistribution(
+      regId,
+      nextStatus,
+      effectiveAdmin.id,
+      effectiveAdmin.fullName
+    );
+
+    // 3. Update EventStore dress distributions
+    if (nextStatus) {
+      const targetReg = registrations.find((r) => r.id === regId);
+      if (targetReg) {
+        EventStore.confirmDressDistribution(
+          regId,
+          targetReg.fullName,
+          'reunion_tshirt',
+          targetReg.tShirtSize || 'L',
+          effectiveAdmin.id,
+          effectiveAdmin.fullName,
+          'Admin Manual Toggle'
+        );
+      }
+    } else {
+      const dList = EventStore.getDressDistributions();
+      const match = dList.find((d) => d.registrationId === regId);
+      if (match) {
+        EventStore.adminCorrectDressDistribution(
+          match.id,
+          'RETURNED',
+          match.registeredSize,
+          'Admin toggled to Pending',
+          effectiveAdmin.id,
+          effectiveAdmin.fullName
+        );
+      }
+      const remaining = EventStore.getDressDistributions().filter((d) => d.registrationId !== regId);
+      EventStore.saveDressDistributions(remaining);
+    }
+
+    setDressDistributions(EventStore.getDressDistributions());
+
+    // 4. Cross-tab & window event broadcast
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('plscf_dress_sync'));
+      window.dispatchEvent(new CustomEvent('plscf_registration_updated'));
+    }
+    EventStore.broadcastStationEvent('plscf_dress_sync', { regId, isCollected: nextStatus });
+    EventStore.broadcastStationEvent('plscf_registration_updated', { id: regId, isTShirtCollected: nextStatus });
+  };
+
+  const handleToggleFoodDistribution = async (
+    reg: RegistrationRecord,
+    mealType: 'breakfast' | 'lunch' | 'dinner'
+  ) => {
+    const current = isMealCollected(reg, mealType);
+    const nextStatus = !current;
+
+    // 1. Authoritative Supabase toggle via SECURITY DEFINER RPC
+    await SupabaseService.toggleFoodDistribution(
+      reg.id,
+      mealType,
+      nextStatus,
+      effectiveAdmin.id,
+      effectiveAdmin.fullName,
+      reg.batchName || 'General'
+    );
+
+    // 2. Update EventStore
+    if (nextStatus) {
+      EventStore.confirmFoodDistribution(
+        reg.id,
+        reg.fullName,
+        reg.batchName || 'General',
+        mealType,
+        effectiveAdmin.id,
+        effectiveAdmin.fullName,
+        'Admin Dashboard Manual Toggle'
+      );
+    } else {
+      const fList = EventStore.getFoodDistributions();
+      const match = fList.find(
+        (d) => (d.registrationId === reg.id || d.registrationId === reg.studentId) && d.mealType === mealType
+      );
+      if (match) {
+        EventStore.adminCorrectFoodDistribution(
+          match.id,
+          'CANCELLED',
+          'Admin toggled meal to Pending',
+          effectiveAdmin.id,
+          effectiveAdmin.fullName
+        );
+      }
+      const remaining = EventStore.getFoodDistributions().filter(
+        (d) => !((d.registrationId === reg.id || d.registrationId === reg.studentId) && d.mealType === mealType)
+      );
+      EventStore.saveFoodDistributions(remaining);
+    }
+
+    setFoodDistributions(EventStore.getFoodDistributions());
+
+    // 3. Broadcast instant event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('plscf_food_sync'));
+    }
+    EventStore.broadcastStationEvent('plscf_food_sync', { regId: reg.id, mealType, collected: nextStatus });
   };
 
   const handleConfirmDeleteBooking = async () => {
@@ -1465,6 +1609,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <th className="py-3 px-3">Category & Batch</th>
                   <th className="py-3 px-3">Contact</th>
                   <th className="py-3 px-3">T-Shirt</th>
+                  <th className="py-3 px-3 text-center min-w-[130px]">
+                    <div className="flex items-center justify-center gap-1">
+                      <Utensils className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Food</span>
+                    </div>
+                  </th>
                   <th className="py-3 px-3">Amount Paid</th>
                   <th className="py-3 px-3">Status</th>
                   <th className="py-3 px-3">Transaction</th>
@@ -1474,7 +1624,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <tbody className="divide-y divide-slate-100">
                 {filteredRegistrations.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400">
+                    <td colSpan={9} className="py-8 text-center text-slate-400">
                       No bookings found for year {selectedYear} matching your criteria.
                     </td>
                   </tr>
@@ -1540,16 +1690,96 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                       <td className="py-3 px-3">
                         <button
-                          onClick={() => handleToggleTShirtCollected(reg.id, reg.isTShirtCollected)}
-                          className={`px-2 py-1 rounded text-[10px] font-bold cursor-pointer transition-colors ${
-                            reg.isTShirtCollected
-                              ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                              : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                          type="button"
+                          onClick={() => handleToggleTShirtCollected(reg.id, isTShirtGiven(reg))}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 shadow-xs whitespace-nowrap ${
+                            isTShirtGiven(reg)
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-1 ring-emerald-500'
+                              : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
                           }`}
-                          title="Click to toggle collected status"
+                          title={
+                            isTShirtGiven(reg)
+                              ? 'T-Shirt Status: Given (Green). Click to reset to Pending (allows re-scanning).'
+                              : 'T-Shirt Status: Pending (Yellow). Click to mark as Given.'
+                          }
                         >
-                          {reg.tShirtSize} • {reg.isTShirtCollected ? 'Delivered' : 'Pending'}
+                          {isTShirtGiven(reg) ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>{reg.tShirtSize} • Given</span>
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-3.5 h-3.5 text-amber-700" />
+                              <span>{reg.tShirtSize} • Pending</span>
+                            </>
+                          )}
                         </button>
+                      </td>
+
+                      <td className="py-3 px-3">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {/* Morning Breakfast */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleFoodDistribution(reg, 'breakfast')}
+                            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-xs font-black transition-all transform active:scale-95 cursor-pointer shadow-xs ${
+                              isMealCollected(reg, 'breakfast')
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
+                                : 'bg-rose-500 hover:bg-rose-600 text-white ring-1 ring-rose-400'
+                            }`}
+                            title={`Breakfast (সকালের নাস্তা): ${
+                              isMealCollected(reg, 'breakfast')
+                                ? 'Taken (Green - Click to toggle)'
+                                : 'Not Taken (Red - Click to toggle)'
+                            }`}
+                          >
+                            B
+                          </button>
+
+                          {/* Lunch */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleFoodDistribution(reg, 'lunch')}
+                            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-xs font-black transition-all transform active:scale-95 cursor-pointer shadow-xs ${
+                              isMealCollected(reg, 'lunch')
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
+                                : 'bg-rose-500 hover:bg-rose-600 text-white ring-1 ring-rose-400'
+                            }`}
+                            title={`Lunch (দুপুরের খাবার): ${
+                              isMealCollected(reg, 'lunch')
+                                ? 'Taken (Green - Click to toggle)'
+                                : 'Not Taken (Red - Click to toggle)'
+                            }`}
+                          >
+                            L
+                          </button>
+
+                          {/* Dinner */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleFoodDistribution(reg, 'dinner')}
+                            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-xs font-black transition-all transform active:scale-95 cursor-pointer shadow-xs ${
+                              isMealCollected(reg, 'dinner')
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
+                                : 'bg-rose-500 hover:bg-rose-600 text-white ring-1 ring-rose-400'
+                            }`}
+                            title={`Dinner (রাতের খাবার): ${
+                              isMealCollected(reg, 'dinner')
+                                ? 'Taken (Green - Click to toggle)'
+                                : 'Not Taken (Red - Click to toggle)'
+                            }`}
+                          >
+                            D
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-center gap-1.5 text-[9px] text-slate-400 font-semibold mt-1">
+                          <span>B: সকাল</span>
+                          <span>•</span>
+                          <span>L: দুপুর</span>
+                          <span>•</span>
+                          <span>D: রাত</span>
+                        </div>
                       </td>
 
                       <td className="py-3 px-3">
@@ -1719,15 +1949,75 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </span>
                       <button
                         type="button"
-                        onClick={() => handleToggleTShirtCollected(reg.id, reg.isTShirtCollected)}
-                        className={`mt-0.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors w-full text-center cursor-pointer min-h-[38px] ${
-                          reg.isTShirtCollected
-                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                            : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                        onClick={() => handleToggleTShirtCollected(reg.id, isTShirtGiven(reg))}
+                        className={`mt-0.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all w-full text-center cursor-pointer min-h-[40px] flex items-center justify-center gap-1.5 shadow-xs whitespace-nowrap ${
+                          isTShirtGiven(reg)
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-1 ring-emerald-500'
+                            : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
                         }`}
+                        title={
+                          isTShirtGiven(reg)
+                            ? 'T-Shirt Status: Given (Green). Click to reset to Pending.'
+                            : 'T-Shirt Status: Pending (Yellow). Click to mark as Given.'
+                        }
                       >
-                        {reg.tShirtSize} • {reg.isTShirtCollected ? 'Delivered' : 'Pending'}
+                        {isTShirtGiven(reg) ? `✓ ${reg.tShirtSize} • Given` : `⏳ ${reg.tShirtSize} • Pending`}
                       </button>
+                    </div>
+
+                    <div className="col-span-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] uppercase font-bold text-slate-500">
+                          Food Distribution (খাবার বিতরণ)
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          Green: Taken • Red: Pending
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleFoodDistribution(reg, 'breakfast')}
+                          className={`min-h-[40px] px-2 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1 ${
+                            isMealCollected(reg, 'breakfast')
+                              ? 'bg-emerald-600 active:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
+                              : 'bg-rose-500 active:bg-rose-600 text-white ring-1 ring-rose-400'
+                          }`}
+                          title={`Breakfast (সকালের নাস্তা): ${
+                            isMealCollected(reg, 'breakfast') ? 'Taken (Green)' : 'Pending (Red)'
+                          }`}
+                        >
+                          B • সকাল
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleFoodDistribution(reg, 'lunch')}
+                          className={`min-h-[40px] px-2 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1 ${
+                            isMealCollected(reg, 'lunch')
+                              ? 'bg-emerald-600 active:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
+                              : 'bg-rose-500 active:bg-rose-600 text-white ring-1 ring-rose-400'
+                          }`}
+                          title={`Lunch (দুপুরের খাবার): ${
+                            isMealCollected(reg, 'lunch') ? 'Taken (Green)' : 'Pending (Red)'
+                          }`}
+                        >
+                          L • দুপুর
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleFoodDistribution(reg, 'dinner')}
+                          className={`min-h-[40px] px-2 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1 ${
+                            isMealCollected(reg, 'dinner')
+                              ? 'bg-emerald-600 active:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
+                              : 'bg-rose-500 active:bg-rose-600 text-white ring-1 ring-rose-400'
+                          }`}
+                          title={`Dinner (রাতের খাবার): ${
+                            isMealCollected(reg, 'dinner') ? 'Taken (Green)' : 'Pending (Red)'
+                          }`}
+                        >
+                          D • রাত
+                        </button>
+                      </div>
                     </div>
 
                     {reg.transactionId && (
@@ -2447,14 +2737,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <td className="py-2.5 px-3 font-bold">{reg.tShirtSize}</td>
                     <td className="py-2.5 px-3">
                       <button
-                        onClick={() => handleToggleTShirtCollected(reg.id, reg.isTShirtCollected)}
-                        className={`px-2.5 py-1 rounded text-xs font-bold cursor-pointer ${
-                          reg.isTShirtCollected
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-amber-100 text-amber-800'
+                        onClick={() => handleToggleTShirtCollected(reg.id, isTShirtGiven(reg))}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 shadow-xs ${
+                          isTShirtGiven(reg)
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
                         }`}
+                        title={isTShirtGiven(reg) ? 'Status: Given (Click to reset to Pending)' : 'Status: Pending (Click to mark Given)'}
                       >
-                        {reg.isTShirtCollected ? '✓ Handed Over' : '⏳ Pending Collection'}
+                        {isTShirtGiven(reg) ? '✓ Given / Handed Over' : '⏳ Pending Collection'}
                       </button>
                     </td>
                   </tr>
@@ -2478,14 +2769,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleToggleTShirtCollected(reg.id, reg.isTShirtCollected)}
-                  className={`w-full min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-2 ${
-                    reg.isTShirtCollected
-                      ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                      : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                  onClick={() => handleToggleTShirtCollected(reg.id, isTShirtGiven(reg))}
+                  className={`w-full min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs ${
+                    isTShirtGiven(reg)
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
                   }`}
                 >
-                  {reg.isTShirtCollected ? '✓ Handed Over / Delivered' : '⏳ Pending Collection (Tap to Hand Over)'}
+                  {isTShirtGiven(reg) ? '✓ Given / Handed Over (Tap to reset)' : '⏳ Pending Collection (Tap to Give)'}
                 </button>
               </div>
             ))}

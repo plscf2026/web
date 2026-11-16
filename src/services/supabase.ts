@@ -1917,6 +1917,96 @@ export const SupabaseService = {
     return [];
   },
 
+  /**
+   * Authoritatively toggle T-shirt distribution status in Supabase.
+   * Calls SECURITY DEFINER rpc_toggle_tshirt_distribution and falls back to table updates.
+   */
+  async toggleTShirtDistribution(
+    regId: string,
+    collected: boolean,
+    staffId: string = 'ADMIN',
+    staffName: string = 'Admin'
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { data, error } = await supabase.rpc('rpc_toggle_tshirt_distribution', {
+        p_reg_id: regId,
+        p_collected: collected,
+        p_staff_id: staffId,
+        p_staff_name: staffName,
+      });
+
+      if (!error && data && data.success) {
+        return { success: true };
+      }
+
+      // Direct fallback update
+      await supabase
+        .from('registrations_2027')
+        .update({ is_tshirt_collected: collected })
+        .eq('id', regId);
+
+      return { success: true };
+    } catch (err: any) {
+      console.warn('[SupabaseService] toggleTShirtDistribution notice:', err);
+      return { success: false, error: err?.message };
+    }
+  },
+
+  /**
+   * Authoritatively toggle food distribution status in Supabase.
+   * Calls SECURITY DEFINER rpc_toggle_food_distribution and falls back to table updates.
+   */
+  async toggleFoodDistribution(
+    regId: string,
+    mealType: 'breakfast' | 'lunch' | 'dinner',
+    collected: boolean,
+    staffId: string = 'ADMIN',
+    staffName: string = 'Admin',
+    batchName: string = 'General'
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { data, error } = await supabase.rpc('rpc_toggle_food_distribution', {
+        p_reg_id: regId,
+        p_meal_type: mealType,
+        p_collected: collected,
+        p_staff_id: staffId,
+        p_staff_name: staffName,
+      });
+
+      if (!error && data && data.success) {
+        return { success: true };
+      }
+
+      // Direct fallback
+      if (collected) {
+        await supabase
+          .from('food_distributions')
+          .upsert({
+            id: `FOOD-${Date.now()}-${Math.floor(Math.random() * 900 + 100)}`,
+            registration_id: regId,
+            student_name: staffName,
+            batch_name: batchName,
+            meal_type: mealType,
+            status: 'COLLECTED',
+            collected_at: new Date().toISOString(),
+            staff_id: staffId,
+            staff_name: staffName,
+          }, { onConflict: 'registration_id,meal_type' });
+      } else {
+        await supabase
+          .from('food_distributions')
+          .delete()
+          .eq('registration_id', regId)
+          .eq('meal_type', mealType);
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      console.warn('[SupabaseService] toggleFoodDistribution notice:', err);
+      return { success: false, error: err?.message };
+    }
+  },
+
   // ==========================================
   // DATABASE BACKUP & RECOVERY (Requirement #12)
   // ==========================================

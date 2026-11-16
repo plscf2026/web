@@ -205,6 +205,7 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
     if (res.success && res.record) {
       playScanSuccessSound();
       refreshDistributions();
+      EventStore.broadcastStationEvent('plscf_food_sync', res.record);
       setFeedbackNotice({
         type: 'success',
         message: `${mealType.toUpperCase()} marked as COLLECTED for ${scannedStudent.fullName}.`,

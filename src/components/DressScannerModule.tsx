@@ -22,6 +22,7 @@ import {
   TShirtSize,
 } from '../types';
 import { AppStore } from '../services/store';
+import { SupabaseService } from '../services/supabase';
 import { EventStore, hasDepartmentPermission } from '../services/eventStore';
 import { parseScannedInput } from '../utils/tokenGenerator';
 import { validateDressDistribution } from '../utils/eventRules';
@@ -212,8 +213,11 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
         message: `REUNION T-SHIRT (Size: ${scannedStudent.tShirtSize}) confirmed as RECEIVED for ${scannedStudent.fullName}.`,
       });
 
-      // Update local registration record flag
+      // Update local registration record flag & authoritative RPC
       AppStore.updateRegistration(scannedStudent.id, { isTShirtCollected: true });
+      SupabaseService.toggleTShirtDistribution(scannedStudent.id, true, staffUser.id, staffUser.fullName);
+      EventStore.broadcastStationEvent('plscf_dress_sync', res.record);
+      EventStore.broadcastStationEvent('plscf_registration_updated', { id: scannedStudent.id, isTShirtCollected: true });
 
       const currentDistributions = EventStore.getDressDistributions();
       const updatedValidation = validateDressDistribution(scannedStudent, 'reunion_tshirt', currentDistributions);

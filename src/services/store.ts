@@ -346,7 +346,8 @@ export class AppStore {
 
   static updateRegistration(id: string, updates: Partial<RegistrationRecord>, year: number = 2027): RegistrationRecord | null {
     const list = this.getRegistrations();
-    const index = list.findIndex((r) => r.id === id);
+    const cleanId = (id || '').trim();
+    const index = list.findIndex((r) => r.id === cleanId || r.id?.toLowerCase() === cleanId.toLowerCase() || (r.studentId && r.studentId.toLowerCase() === cleanId.toLowerCase()));
     if (index === -1) return null;
     list[index] = { ...list[index], ...updates };
     this.saveRegistrations(list);
@@ -376,12 +377,22 @@ export class AppStore {
     if (updates.financialAmount !== undefined) dbUpdates.financial_amount = updates.financialAmount;
 
     if (Object.keys(dbUpdates).length > 0) {
-      supabase.from(yearTableName).update(dbUpdates).eq('id', id).then(undefined, () => {});
-      supabase.from('registrations_2027').update(dbUpdates).eq('id', id).then(undefined, () => {});
+      if (updates.isTShirtCollected !== undefined) {
+        SupabaseService.toggleTShirtDistribution(list[index].id, updates.isTShirtCollected).catch(() => {});
+      }
+      supabase.from(yearTableName).update(dbUpdates).eq('id', list[index].id).then(undefined, () => {});
+      supabase.from('registrations_2027').update(dbUpdates).eq('id', list[index].id).then(undefined, () => {});
     }
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('plscf_registration_updated', { detail: list[index] }));
+      if ('BroadcastChannel' in window) {
+        try {
+          const bc = new (window as any).BroadcastChannel('plscf_realtime_events');
+          bc.postMessage({ type: 'plscf_registration_updated', payload: list[index], timestamp: Date.now() });
+          bc.close();
+        } catch (_) {}
+      }
     }
 
     return list[index];
@@ -438,6 +449,10 @@ export class AppStore {
       const fetched: RegistrationRecord[] = res.data || [];
       const validCloudData = fetched.filter((r) => !deletedIds.has(r.id));
       this.saveRegistrations(validCloudData);
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('plscf_registration_updated'));
+      }
 
       return { count: validCloudData.length };
     } catch (err: any) {
