@@ -11,7 +11,7 @@ import { generateUniqueSixCharToken, isValidSixCharToken } from '../utils/tokenG
 import { sanitizeInput } from '../utils/security';
 import { isValidBangladeshiMobile, normalizeBangladeshiMobileNumber } from '../utils/rules';
 import { FinancialService } from './financialService';
-import { StudentPhotoStorageService, isBase64DataUrl } from './studentPhotoStorageService';
+import { StudentPhotoStorageService, isBase64DataUrl, extractStoragePathFromPublicUrl } from './studentPhotoStorageService';
 
 export interface ManualRegistrationResult {
   success: boolean;
@@ -122,10 +122,11 @@ export class ManualRegistrationService {
       const defaultFee = input.category === 'current' ? 500 : 1500;
 
       // 4b. Upload student photo to dedicated Supabase Storage bucket 'student-photos'
-      let photoStoragePath: string | null = input.photoStoragePath || null;
+      let photoStoragePath: string | null = input.photoStoragePath || extractStoragePathFromPublicUrl(input.photoUrl) || null;
       let finalPhotoUrl =
-        input.photoUrl ||
-        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
+        input.photoUrl && !input.photoUrl.includes('images.unsplash.com')
+          ? input.photoUrl
+          : '';
 
       if (input.photoUrl && isBase64DataUrl(input.photoUrl)) {
         try {

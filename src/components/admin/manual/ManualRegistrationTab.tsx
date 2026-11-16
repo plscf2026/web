@@ -5,7 +5,7 @@
  * and submit optional financial entries for Super Admin review.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Camera,
   Upload,
@@ -18,6 +18,8 @@ import {
   Lock,
   User,
   Shirt,
+  RefreshCw,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   Language,
@@ -32,18 +34,14 @@ import { AppStore } from '../../../services/store';
 import { SynchronizedCameraCardModal } from '../../idcard/SynchronizedCameraCardModal';
 import { TicketView } from '../../TicketView';
 import { isValidBangladeshiMobile, normalizeBangladeshiMobileNumber } from '../../../utils/rules';
+import { StudentPhotoStorageService } from '../../../services/studentPhotoStorageService';
+import { readValidatedImage } from '../../../utils/fileValidation';
+import { compressImageTo200KB } from '../../../utils/imageCompressor';
 
 interface ManualRegistrationTabProps {
   language: Language;
   currentAdmin: AdminAccount;
 }
-
-const PRESET_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
-];
 
 const T_SHIRT_SIZES: TShirtSize[] = ['S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Oversize 50'];
 
@@ -56,7 +54,9 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
   // ── Form State ─────────────────────────────────────────────────────────────
   const [fullName, setFullName] = useState('');
   const [fullNameBn, setFullNameBn] = useState('');
-  const [photoUrl, setPhotoUrl] = useState(PRESET_AVATARS[0]);
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const photoFileInputRef = useRef<HTMLInputElement | null>(null);
   const [mobileNumber, setMobileNumber] = useState('');
   const [email, setEmail] = useState('');
   const [category, setCategory] = useState<StudentCategory>('former');
@@ -132,7 +132,43 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
     setFinancialReference('');
     setDocumentName('');
     setDocumentUrl('');
+    setPhotoUrl('');
     setErrorMessage(null);
+    if (photoFileInputRef.current) {
+      photoFileInputRef.current.value = '';
+    }
+  };
+
+  // Student Photo upload handler directly to Supabase Storage student-photos bucket
+  const handlePhotoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingPhoto(true);
+    setErrorMessage(null);
+    try {
+      const validDataUrl = await readValidatedImage(file);
+      const compressed = await compressImageTo200KB(validDataUrl);
+      const res = await StudentPhotoStorageService.uploadStudentPhoto({
+        fileOrDataUrl: compressed.dataUrl,
+        registrationId: studentId.trim() || `VENUE-${Date.now()}`,
+        batchYear: passingYear || undefined,
+        category,
+        currentClass: currentClass || undefined,
+        isParent: false,
+      });
+      if (res.success && res.publicUrl) {
+        setPhotoUrl(res.publicUrl);
+      } else {
+        setErrorMessage(res.error || (isBangla ? 'ছবি আপলোড ব্যর্থ হয়েছে।' : 'Failed to upload photo to storage.'));
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || (isBangla ? 'ছবি ভ্যালিডেশন বা আপলোডে ত্রুটি।' : 'Error processing image file.'));
+    } finally {
+      setIsUploadingPhoto(false);
+      if (photoFileInputRef.current) {
+        photoFileInputRef.current.value = '';
+      }
+    }
   };
 
   // Document upload simulation
@@ -307,11 +343,18 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
             {/* Col 1: Photo Selection / Capture */}
             <div className="flex flex-col items-center text-center space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
               <div className="relative">
-                <img
-                  src={photoUrl}
-                  alt="Student Avatar"
-                  className="w-32 h-32 rounded-2xl object-cover border-4 border-indigo-600 shadow-md bg-white"
-                />
+                {photoUrl ? (
+                  <img
+                    src={photoUrl}
+                    alt="Student Avatar"
+                    className="w-32 h-32 rounded-2xl object-cover border-4 border-indigo-600 shadow-md bg-white"
+                  />
+                ) : (
+                  <div className="w-32 h-32 rounded-2xl bg-slate-200 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-500">
+                    <User className="w-10 h-10 text-slate-400" />
+                    <span className="text-[10px] mt-1 font-medium">{isBangla ? 'ছবি নেই' : 'No Photo'}</span>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => setIsCameraOpen(true)}
@@ -322,31 +365,43 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
                 </button>
               </div>
 
-              <div className="space-y-1.5 w-full">
+              <div className="space-y-2 w-full">
                 <button
                   type="button"
+                  disabled={isUploadingPhoto}
                   onClick={() => setIsCameraOpen(true)}
                   className="w-full py-1.5 px-3 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
                 >
                   <Camera className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>{isBangla ? 'লাইভ ছবি তুলুন' : 'Open Camera'}</span>
+                  <span>{isBangla ? 'লাইভ ক্যামেরা' : 'Open Camera'}</span>
                 </button>
 
-                <div className="flex items-center justify-center gap-1.5 pt-2">
-                  <span className="text-[10px] text-slate-400">{isBangla ? 'নমুনা ছবি:' : 'Presets:'}</span>
-                  {PRESET_AVATARS.map((url, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setPhotoUrl(url)}
-                      className={`w-6 h-6 rounded-full overflow-hidden border-2 cursor-pointer transition-all ${
-                        photoUrl === url ? 'border-indigo-600 ring-2 ring-indigo-200 scale-110' : 'border-slate-300 opacity-60'
-                      }`}
-                    >
-                      <img src={url} alt={`Preset ${idx + 1}`} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
+                <label className="w-full py-1.5 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs">
+                  <Upload className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{isBangla ? 'ফাইল থেকে আপলোড' : 'Upload File'}</span>
+                  <input
+                    ref={photoFileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handlePhotoFileUpload}
+                    className="hidden"
+                    disabled={isUploadingPhoto}
+                  />
+                </label>
+
+                {isUploadingPhoto && (
+                  <div className="flex items-center justify-center gap-1.5 text-xs text-sky-700 font-medium py-1 animate-pulse">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-600" />
+                    <span>{isBangla ? 'ক্লাউডে আপলোড হচ্ছে...' : 'Uploading to cloud...'}</span>
+                  </div>
+                )}
+
+                {!isUploadingPhoto && photoUrl && (
+                  <div className="flex items-center justify-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{isBangla ? 'নিরাপদ ক্লাউডে সংরক্ষিত' : 'Verified Cloud Storage'}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -840,9 +895,29 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
         <SynchronizedCameraCardModal
           isOpen={isCameraOpen}
           onClose={() => setIsCameraOpen(false)}
-          onPhotoConfirmed={(photoDataUrl: string) => {
-            setPhotoUrl(photoDataUrl);
+          onPhotoConfirmed={async (photoDataUrl: string) => {
             setIsCameraOpen(false);
+            setIsUploadingPhoto(true);
+            try {
+              const res = await StudentPhotoStorageService.uploadStudentPhoto({
+                fileOrDataUrl: photoDataUrl,
+                registrationId: studentId.trim() || `VENUE-${Date.now()}`,
+                batchYear: passingYear || undefined,
+                category,
+                currentClass: currentClass || undefined,
+                isParent: false,
+              });
+              if (res.success && res.publicUrl) {
+                setPhotoUrl(res.publicUrl);
+                setErrorMessage(null);
+              } else {
+                setErrorMessage(res.error || (isBangla ? 'ছবি আপলোড করতে ব্যর্থ হয়েছে।' : 'Failed to upload photo to storage.'));
+              }
+            } catch (err: any) {
+              setErrorMessage(err?.message || (isBangla ? 'ছবি আপলোডে ত্রুটি।' : 'Error uploading photo.'));
+            } finally {
+              setIsUploadingPhoto(false);
+            }
           }}
           language={language}
           studentPreview={{

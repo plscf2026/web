@@ -257,8 +257,7 @@ export const AdminStudentPhotoModal: React.FC<AdminStudentPhotoModalProps> = ({
     setIsLoading(true);
     setStatusMessage(null);
 
-    const defaultAvatar =
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
+    const defaultAvatar = '';
 
     try {
       await StudentPhotoStorageService.resetStudentPhotoToDefault({

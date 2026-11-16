@@ -41,6 +41,7 @@ import { readValidatedImage } from '../utils/fileValidation';
 import { compressImageTo200KB } from '../utils/imageCompressor';
 import { AppStore } from '../services/store';
 import { PayStationService } from '../services/paystation';
+import { StudentPhotoStorageService, extractStoragePathFromPublicUrl } from '../services/studentPhotoStorageService';
 import { StudentIdCardRecord } from '../types/idcard';
 import { SynchronizedCameraCardModal } from './idcard/SynchronizedCameraCardModal';
 
@@ -57,13 +58,6 @@ interface RegistrationPageProps {
   /** Whether payment processing is active (prevents duplicate submission) */
   isProcessingPayment?: boolean;
 }
-
-const SAMPLE_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
-];
 
 export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   language,
@@ -96,6 +90,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   // Form State — initialized from saved draft if available
   const [fullName, setFullName] = useState(() => draft?.fullName || '');
   const [photoUrl, setPhotoUrl] = useState(() => draft?.photoUrl || '');
+  const [photoStoragePath, setPhotoStoragePath] = useState<string | null>(() => draft?.photoStoragePath || extractStoragePathFromPublicUrl(draft?.photoUrl) || null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [mobileNumber, setMobileNumber] = useState(() => draft?.mobileNumber || '');
   const [email, setEmail] = useState(() => draft?.email || ''); // OPTIONAL
   const [address, setAddress] = useState(() => draft?.address || '');
@@ -110,10 +106,13 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   const [parentPhone, setParentPhone] = useState(() => draft?.parentPhone || '');
   const [parentRelation, setParentRelation] = useState(() => draft?.parentRelation || 'Guardian');
   const [parentPhotoUrl, setParentPhotoUrl] = useState(() => draft?.parentPhotoUrl || '');
+  const [parentPhotoStoragePath, setParentPhotoStoragePath] = useState<string | null>(() => draft?.parentPhotoStoragePath || extractStoragePathFromPublicUrl(draft?.parentPhotoUrl) || null);
+  const [isUploadingParentPhoto, setIsUploadingParentPhoto] = useState(false);
   const [parentPhotoSizeKb, setParentPhotoSizeKb] = useState<number | null>(null);
   const [isCompressingParentPhoto, setIsCompressingParentPhoto] = useState(false);
   const [isParentCameraModalOpen, setIsParentCameraModalOpen] = useState(false);
   const parentFileInputRef = useRef<HTMLInputElement>(null);
+  const [registrationDraftId] = useState(() => `DRAFT-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`);
 
   // Academic Information
   const [passingYear, setPassingYear] = useState(() => draft?.passingYear || '2015'); // Mandatory for former
@@ -353,14 +352,55 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   };
 
   // Callback when user confirms photo crop in the modal
-  const handlePhotoConfirmed = (confirmedDataUrl: string, sizeKb: number) => {
-    setPhotoUrl(confirmedDataUrl);
+  // Directly uploads photo to Supabase Storage bucket 'student-photos' and retrieves public URL
+  const handlePhotoConfirmed = async (confirmedDataUrl: string, sizeKb: number) => {
+    setIsUploadingPhoto(true);
     setPhotoSizeKb(sizeKb);
-    setValidationErrors((current) => {
-      const next = { ...current };
-      delete next.photoUrl;
-      return next;
-    });
+    try {
+      const uploadRes = await StudentPhotoStorageService.uploadStudentPhoto({
+        fileOrDataUrl: confirmedDataUrl,
+        registrationId: studentId.trim() || registrationDraftId,
+        batchYear: passingYear || undefined,
+        category,
+        currentClass: currentClass || undefined,
+        isParent: false,
+      });
+
+      if (uploadRes.success && uploadRes.publicUrl) {
+        setPhotoUrl(uploadRes.publicUrl);
+        setPhotoStoragePath(uploadRes.storagePath);
+        setPhotoSizeKb(Math.round((uploadRes.sizeBytes || 0) / 1024) || sizeKb);
+        setValidationErrors((current) => {
+          const next = { ...current };
+          delete next.photoUrl;
+          return next;
+        });
+      } else {
+        const message =
+          uploadRes.error ||
+          (language === 'bn'
+            ? 'ছবি ক্লাউড স্টোরেজে আপলোড করতে সমস্যা হয়েছে।'
+            : 'Failed to upload photo to Supabase Storage.');
+        setValidationErrors((current) => ({
+          ...current,
+          photoUrl: { en: message, bn: message },
+        }));
+      }
+    } catch (uploadError: any) {
+      const message =
+        uploadError?.message ||
+        (language === 'bn'
+          ? 'ছবি আপলোড করতে ত্রুটি হয়েছে।'
+          : 'Error uploading photo to Supabase Storage.');
+      setValidationErrors((current) => ({
+        ...current,
+        photoUrl: { en: message, bn: message },
+      }));
+    } finally {
+      setIsUploadingPhoto(false);
+      setIsCameraModalOpen(false);
+      setModalInitialImage(null);
+    }
   };
 
   // Handle Photo File Upload & Open Synchronized Adjuster with ID Card Preview
@@ -450,6 +490,52 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     category: 'current',
   };
 
+  // Callback when user confirms parent photo
+  const handleParentPhotoConfirmed = async (confirmedDataUrl: string, sizeKb: number) => {
+    setIsUploadingParentPhoto(true);
+    setParentPhotoSizeKb(sizeKb);
+    try {
+      const uploadRes = await StudentPhotoStorageService.uploadStudentPhoto({
+        fileOrDataUrl: confirmedDataUrl,
+        registrationId: studentId.trim() || registrationDraftId,
+        batchYear: passingYear || undefined,
+        category,
+        currentClass: currentClass || undefined,
+        isParent: true,
+      });
+
+      if (uploadRes.success && uploadRes.publicUrl) {
+        setParentPhotoUrl(uploadRes.publicUrl);
+        setParentPhotoStoragePath(uploadRes.storagePath);
+        setParentPhotoSizeKb(Math.round((uploadRes.sizeBytes || 0) / 1024) || sizeKb);
+        clearValidationError('parentPhotoUrl');
+      } else {
+        const message =
+          uploadRes.error ||
+          (language === 'bn'
+            ? 'অভিভাবকের ছবি আপলোড করতে সমস্যা হয়েছে।'
+            : 'Failed to upload guardian photo to storage.');
+        setValidationErrors((current) => ({
+          ...current,
+          parentPhotoUrl: { en: message, bn: message },
+        }));
+      }
+    } catch (uploadError: any) {
+      const message =
+        uploadError?.message ||
+        (language === 'bn'
+          ? 'অভিভাবকের ছবি আপলোড করতে ত্রুটি হয়েছে।'
+          : 'Error uploading guardian photo to storage.');
+      setValidationErrors((current) => ({
+        ...current,
+        parentPhotoUrl: { en: message, bn: message },
+      }));
+    } finally {
+      setIsUploadingParentPhoto(false);
+      setIsParentCameraModalOpen(false);
+    }
+  };
+
   // Handle Parent Photo File Upload
   const handleParentPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -459,9 +545,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     try {
       const validDataUrl = await readValidatedImage(file);
       const compressed = await compressImageTo200KB(validDataUrl);
-      setParentPhotoUrl(compressed.dataUrl);
-      setParentPhotoSizeKb(compressed.sizeKb);
-      clearValidationError('parentPhotoUrl');
+      await handleParentPhotoConfirmed(compressed.dataUrl, compressed.sizeKb);
     } catch (error: any) {
       e.target.value = '';
       const message =
@@ -514,11 +598,23 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
       return;
     }
 
+    if (isUploadingPhoto || isUploadingParentPhoto) {
+      setValidationErrors((current) => ({
+        ...current,
+        photoUrl: {
+          en: 'Please wait for your photo to finish uploading to secure storage.',
+          bn: 'অনুগ্রহ করে নিরাপদ স্টোরেজে ছবি আপলোড সম্পন্ন হওয়া পর্যন্ত অপেক্ষা করুন।',
+        },
+      }));
+      return;
+    }
+
     setIsSubmitting(true);
 
     const formData: RegistrationFormData = {
       fullName,
       photoUrl,
+      photoStoragePath: photoStoragePath || (photoUrl ? extractStoragePathFromPublicUrl(photoUrl) || undefined : undefined),
       mobileNumber,
       email: email.trim() || undefined,
       address,
@@ -530,6 +626,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
       parentPhone: effectiveHasParent ? parentPhone.trim() : undefined,
       parentRelation: effectiveHasParent ? parentRelation : undefined,
       parentPhotoUrl: effectiveHasParent ? parentPhotoUrl : undefined,
+      parentPhotoStoragePath: effectiveHasParent ? (parentPhotoStoragePath || (parentPhotoUrl ? extractStoragePathFromPublicUrl(parentPhotoUrl) || undefined : undefined)) : undefined,
       category,
       studentId: category === 'current' ? studentId.trim() : undefined,
       passingYear: category === 'former' ? passingYear : undefined,
@@ -905,6 +1002,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                       type="button"
                       onClick={() => {
                         setPhotoUrl('');
+                        setPhotoStoragePath('');
                         setPhotoSizeKb(null);
                         setModalInitialImage(null);
                         if (fileInputRef.current) {
@@ -963,31 +1061,18 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                       />
                     </label>
 
-                    {/* Quick Sample Avatars */}
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 ml-auto">
-                      <span className="text-[11px] font-medium hidden md:inline">
-                        {language === 'bn' ? 'নমুনা:' : 'Sample:'}
-                      </span>
-                      {SAMPLE_AVATARS.map((avatar, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            setPhotoUrl(avatar);
-                            setPhotoSizeKb(48);
-                            if (validationErrors.photoUrl) {
-                              const next = { ...validationErrors };
-                              delete next.photoUrl;
-                              setValidationErrors(next);
-                            }
-                          }}
-                          className="w-8 h-8 rounded-lg overflow-hidden border border-slate-300 hover:scale-110 transition-transform cursor-pointer"
-                          title="Use sample photo"
-                        >
-                          <img src={avatar} alt={`Avatar ${idx}`} className="w-full h-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
+                    {/* Supabase Storage upload indicator / verification badge */}
+                    {isUploadingPhoto ? (
+                      <div className="flex items-center gap-1.5 text-xs text-sky-800 font-medium ml-auto bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200 animate-pulse">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-600" />
+                        <span>{language === 'bn' ? 'ক্লাউড স্টোরেজে আপলোড হচ্ছে...' : 'Uploading to cloud storage...'}</span>
+                      </div>
+                    ) : photoUrl ? (
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 ml-auto">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>{language === 'bn' ? 'নিরাপদ ক্লাউডে সংরক্ষিত' : 'Verified Cloud Storage'}</span>
+                      </div>
+                    ) : null}
                   </div>
 
                   {isCompressingPhoto && (
@@ -1324,6 +1409,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                             type="button"
                             onClick={() => {
                               setParentPhotoUrl('');
+                              setParentPhotoStoragePath('');
                               setParentPhotoSizeKb(null);
                               if (parentFileInputRef.current) {
                                 parentFileInputRef.current.value = '';
@@ -1378,27 +1464,18 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                             />
                           </label>
 
-                          {/* Quick sample avatars */}
-                          <div className="flex items-center gap-1.5 text-xs text-slate-500 ml-auto">
-                            <span className="text-[10px] font-medium hidden md:inline">
-                              {language === 'bn' ? 'নমুনা:' : 'Sample:'}
-                            </span>
-                            {SAMPLE_AVATARS.map((avatar, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => {
-                                  setParentPhotoUrl(avatar);
-                                  setParentPhotoSizeKb(48);
-                                  clearValidationError('parentPhotoUrl');
-                                }}
-                                className="w-6 h-6 rounded-full overflow-hidden border border-amber-300 hover:scale-110 transition cursor-pointer"
-                                title={`Select sample avatar ${idx + 1}`}
-                              >
-                                <img src={avatar} alt="Sample" className="w-full h-full object-cover" />
-                              </button>
-                            ))}
-                          </div>
+                          {/* Supabase Storage upload indicator / verification badge */}
+                          {isUploadingParentPhoto ? (
+                            <div className="flex items-center gap-1.5 text-xs text-amber-800 font-medium ml-auto bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 animate-pulse">
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                              <span>{language === 'bn' ? 'অভিভাবকের ছবি আপলোড হচ্ছে...' : 'Uploading guardian photo...'}</span>
+                            </div>
+                          ) : parentPhotoUrl ? (
+                            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 ml-auto">
+                              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                              <span>{language === 'bn' ? 'নিরাপদ ক্লাউডে সংরক্ষিত' : 'Verified Cloud Storage'}</span>
+                            </div>
+                          ) : null}
                         </div>
 
                         {validationErrors.parentPhotoUrl && (
@@ -1482,10 +1559,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                 isOpen={isParentCameraModalOpen}
                 onClose={() => setIsParentCameraModalOpen(false)}
                 onPhotoConfirmed={(photoDataUrl, sizeKb) => {
-                  setParentPhotoUrl(photoDataUrl);
-                  setParentPhotoSizeKb(sizeKb);
-                  clearValidationError('parentPhotoUrl');
-                  setIsParentCameraModalOpen(false);
+                  handleParentPhotoConfirmed(photoDataUrl, sizeKb);
                 }}
                 studentPreview={previewParentRecord}
                 language={language}

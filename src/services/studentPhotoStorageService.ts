@@ -23,6 +23,9 @@ export const TARGET_MAX_COMPRESSED_BYTES = 150 * 1024; // 150 KB
 export const TARGET_MAX_DIMENSION = 800; // 800x800 px max
 export const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
+export const DEFAULT_STUDENT_AVATAR_PLACEHOLDER =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cbd5e1'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z' fill='%2394a3b8'/%3E%3C/svg%3E";
+
 export type AllowedMimeType = typeof ALLOWED_MIME_TYPES[number];
 
 export interface PhotoValidationResult {
@@ -80,6 +83,21 @@ export function normalizeBatchFolder(
   }
 
   return 'general';
+}
+
+/**
+ * Extracts relative storage path from a full Supabase CDN URL
+ * e.g. 'https://.../storage/v1/object/public/student-photos/2014/PLSCF-2027-F1042/profile.webp'
+ * -> '2014/PLSCF-2027-F1042/profile.webp'
+ */
+export function extractStoragePathFromPublicUrl(url?: string | null): string | null {
+  if (!url || typeof url !== 'string') return null;
+  const marker = `/storage/v1/object/public/${STUDENT_PHOTOS_BUCKET}/`;
+  const idx = url.indexOf(marker);
+  if (idx !== -1) {
+    return decodeURIComponent(url.slice(idx + marker.length).split('?')[0]);
+  }
+  return null;
 }
 
 /**
@@ -591,6 +609,7 @@ export const StudentPhotoStorageService = {
     oldStoragePath?: string | null;
   }): Promise<{ success: boolean; error?: string }> {
     const { registrationId, defaultAvatarUrl, adminName, oldStoragePath } = params;
+    const cleanAvatarUrl = defaultAvatarUrl && !defaultAvatarUrl.includes('images.unsplash.com') ? defaultAvatarUrl : '';
 
     if (oldStoragePath) {
       await this.deleteStudentPhoto(oldStoragePath);
@@ -601,7 +620,7 @@ export const StudentPhotoStorageService = {
         .from('registrations_2027')
         .update({
           photo_storage_path: null,
-          photo_url: defaultAvatarUrl,
+          photo_url: cleanAvatarUrl,
           photo_updated_at: new Date().toISOString(),
           photo_updated_by: adminName || 'Admin',
         })
@@ -614,7 +633,7 @@ export const StudentPhotoStorageService = {
     const target = regs.find((r: RegistrationRecord) => r.id === registrationId);
     if (target) {
       target.photoStoragePath = null;
-      target.photoUrl = defaultAvatarUrl;
+      target.photoUrl = cleanAvatarUrl;
       target.photoUpdatedAt = new Date().toISOString();
       target.photoUpdatedBy = adminName || 'Admin';
       AppStore.saveRegistrations(regs);

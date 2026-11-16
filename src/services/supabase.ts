@@ -270,21 +270,34 @@ export async function runSupabaseDiagnostic(): Promise<{
  * Transform application RegistrationRecord into database row with sanitization
  */
 function toRegistrationDbRow(reg: RegistrationRecord, year: number = 2027) {
-  // Prevent Base64 strings from polluting PostgreSQL database rows
+  // Prevent Base64 strings from polluting PostgreSQL database rows and avoid Unsplash placeholders
+  let photoStoragePath = reg.photoStoragePath || null;
   let photoUrl = reg.photoUrl;
-  if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image/')) {
-    if (reg.photoStoragePath) {
-      photoUrl = `${SUPABASE_URL}/storage/v1/object/public/student-photos/${reg.photoStoragePath.replace(/^\/+/, '')}`;
-    } else {
-      photoUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
+
+  if (photoStoragePath) {
+    photoUrl = `${SUPABASE_URL}/storage/v1/object/public/student-photos/${photoStoragePath.replace(/^\/+/, '')}`;
+  } else if (photoUrl && typeof photoUrl === 'string') {
+    if (photoUrl.startsWith('data:image/')) {
+      const folder = reg.passingYear || (reg.category === 'current' ? (reg.currentClass?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'current-students') : 'general');
+      const cleanRegId = reg.id.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '_');
+      photoStoragePath = `${folder}/${cleanRegId}/profile.webp`;
+      photoUrl = `${SUPABASE_URL}/storage/v1/object/public/student-photos/${photoStoragePath}`;
+    } else if (photoUrl.includes('images.unsplash.com')) {
+      photoUrl = '';
     }
   }
 
+  let parentPhotoStoragePath = reg.parentPhotoStoragePath || null;
   let parentPhotoUrl = reg.parentPhotoUrl;
-  if (parentPhotoUrl && typeof parentPhotoUrl === 'string' && parentPhotoUrl.startsWith('data:image/')) {
-    if (reg.parentPhotoStoragePath) {
-      parentPhotoUrl = `${SUPABASE_URL}/storage/v1/object/public/student-photos/${reg.parentPhotoStoragePath.replace(/^\/+/, '')}`;
-    } else {
+  if (parentPhotoStoragePath) {
+    parentPhotoUrl = `${SUPABASE_URL}/storage/v1/object/public/student-photos/${parentPhotoStoragePath.replace(/^\/+/, '')}`;
+  } else if (parentPhotoUrl && typeof parentPhotoUrl === 'string') {
+    if (parentPhotoUrl.startsWith('data:image/')) {
+      const folder = reg.passingYear || (reg.category === 'current' ? (reg.currentClass?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'current-students') : 'general');
+      const cleanRegId = reg.id.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '_');
+      parentPhotoStoragePath = `${folder}/${cleanRegId}/parent.webp`;
+      parentPhotoUrl = `${SUPABASE_URL}/storage/v1/object/public/student-photos/${parentPhotoStoragePath}`;
+    } else if (parentPhotoUrl.includes('images.unsplash.com')) {
       parentPhotoUrl = undefined;
     }
   }
@@ -294,7 +307,7 @@ function toRegistrationDbRow(reg: RegistrationRecord, year: number = 2027) {
     full_name: sanitizeInput(reg.fullName),
     full_name_bn: sanitizeInput(reg.fullNameBn || ''),
     photo_url: photoUrl,
-    photo_storage_path: reg.photoStoragePath || null,
+    photo_storage_path: photoStoragePath,
     mobile_number: sanitizeInput(reg.mobileNumber),
     email: sanitizeInput(reg.email),
     address: sanitizeInput(reg.address || ''),
@@ -371,18 +384,18 @@ function fromRegistrationDbRow(row: any): RegistrationRecord {
   const photoStoragePath = row.photo_storage_path || row.photoStoragePath || null;
   const parentPhotoStoragePath = row.parent_photo_storage_path || row.parentPhotoStoragePath || null;
 
-  // Resolve photo URL: If storage path exists, use Supabase CDN; otherwise use valid HTTP url or fallback
-  let resolvedPhotoUrl = row.photo_url || row.photoUrl;
+  // Resolve photo URL: If storage path exists, use Supabase CDN; otherwise use valid HTTP url without Unsplash
+  let resolvedPhotoUrl = row.photo_url || row.photoUrl || '';
   if (photoStoragePath) {
     resolvedPhotoUrl = `${SUPABASE_URL}/storage/v1/object/public/student-photos/${photoStoragePath.replace(/^\/+/, '')}`;
-  } else if (!resolvedPhotoUrl || (typeof resolvedPhotoUrl === 'string' && resolvedPhotoUrl.startsWith('data:image/'))) {
-    resolvedPhotoUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
+  } else if (typeof resolvedPhotoUrl === 'string' && (resolvedPhotoUrl.startsWith('data:image/') || resolvedPhotoUrl.includes('images.unsplash.com'))) {
+    resolvedPhotoUrl = '';
   }
 
   let resolvedParentPhotoUrl = row.parent_photo_url || row.parentPhotoUrl;
   if (parentPhotoStoragePath) {
     resolvedParentPhotoUrl = `${SUPABASE_URL}/storage/v1/object/public/student-photos/${parentPhotoStoragePath.replace(/^\/+/, '')}`;
-  } else if (resolvedParentPhotoUrl && typeof resolvedParentPhotoUrl === 'string' && resolvedParentPhotoUrl.startsWith('data:image/')) {
+  } else if (resolvedParentPhotoUrl && typeof resolvedParentPhotoUrl === 'string' && (resolvedParentPhotoUrl.startsWith('data:image/') || resolvedParentPhotoUrl.includes('images.unsplash.com'))) {
     resolvedParentPhotoUrl = undefined;
   }
 

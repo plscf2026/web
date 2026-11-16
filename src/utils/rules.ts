@@ -50,6 +50,7 @@ export interface ValidationResult {
 export interface RegistrationFormData {
   fullName: string;
   photoUrl: string;
+  photoStoragePath?: string;
   mobileNumber: string;
   email?: string; // Optional: users can register without an email address
   address: string;
@@ -62,6 +63,7 @@ export interface RegistrationFormData {
   parentRelation?: string;
   parentFee?: number;
   parentPhotoUrl?: string;
+  parentPhotoStoragePath?: string;
   gatewayCharge?: number;
   category: StudentCategory;
   studentId?: string; // Mandatory for current students

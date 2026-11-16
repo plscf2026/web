@@ -29,6 +29,7 @@ import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
 import { QrCameraScanner } from './common/QrCameraScanner';
 import { GlobalPagination } from './common/GlobalPagination';
 import { paginate } from '../utils/pagination';
+import { DEFAULT_STUDENT_AVATAR_PLACEHOLDER } from '../services/studentPhotoStorageService';
 
 interface GateScannerModuleProps {
   language: Language;
@@ -415,7 +416,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 pb-6 border-b border-slate-100 text-center sm:text-left">
                 <div className="relative">
                   <img
-                    src={scannedStudent.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300'}
+                    src={scannedStudent.photoUrl || DEFAULT_STUDENT_AVATAR_PLACEHOLDER}
                     alt={scannedStudent.fullName}
                     className="w-28 h-36 object-cover rounded-2xl border-4 border-slate-200 shadow-md bg-slate-100"
                   />
@@ -799,10 +800,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                   {/* Student Profile Card */}
                   <div className="flex items-start gap-4 pb-5 border-b border-slate-100">
                     <img
-                      src={
-                        scannedStudent.photoUrl ||
-                        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300'
-                      }
+                      src={scannedStudent.photoUrl || DEFAULT_STUDENT_AVATAR_PLACEHOLDER}
                       alt={scannedStudent.fullName}
                       className="w-20 h-24 object-cover rounded-2xl border-2 border-slate-200 shadow-xs bg-slate-100 shrink-0"
                     />

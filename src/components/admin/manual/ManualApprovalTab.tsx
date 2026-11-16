@@ -34,6 +34,7 @@ import { ManualRegistrationService } from '../../../services/manualRegistrationS
 import { AppStore } from '../../../services/store';
 import { TicketView } from '../../TicketView';
 import { AdminStudentPhotoModal } from '../photos/AdminStudentPhotoModal';
+import { DEFAULT_STUDENT_AVATAR_PLACEHOLDER } from '../../../services/studentPhotoStorageService';
 
 interface ManualApprovalTabProps {
   language: Language;
@@ -657,7 +658,7 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
                       title="Click to view & manage student photo in Supabase Storage"
                     >
                       <img
-                        src={rec.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80'}
+                        src={rec.photoUrl || DEFAULT_STUDENT_AVATAR_PLACEHOLDER}
                         alt={rec.fullName}
                         className="w-14 h-14 rounded-2xl object-cover border-2 border-slate-200 shadow-xs group-hover:ring-2 group-hover:ring-emerald-500 transition-all"
                       />

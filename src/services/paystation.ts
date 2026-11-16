@@ -25,7 +25,7 @@ import { SupabaseService, supabase } from './supabase';
 import { EventStore } from './eventStore';
 import { StudentIdService } from './studentIdStore';
 import { IdCardStore } from './idCardStore';
-import { StudentPhotoStorageService, isBase64DataUrl } from './studentPhotoStorageService';
+import { StudentPhotoStorageService, isBase64DataUrl, extractStoragePathFromPublicUrl } from './studentPhotoStorageService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1046,9 +1046,9 @@ export class PayStationService {
     const totalBaseWithParent = baseFee + parentFee;
     const donation = Math.max(0, payment.amount - totalBaseWithParent);
 
-    // Upload student photo to dedicated 'student-photos' bucket if Base64
-    let photoStoragePath: string | null = null;
-    let finalPhotoUrl = formData.photoUrl;
+    // Upload student photo to dedicated 'student-photos' bucket if Base64, or use Supabase CDN URL directly
+    let photoStoragePath: string | null = formData.photoStoragePath || extractStoragePathFromPublicUrl(formData.photoUrl) || null;
+    let finalPhotoUrl = formData.photoUrl && !formData.photoUrl.includes('images.unsplash.com') ? formData.photoUrl : '';
 
     if (formData.photoUrl && isBase64DataUrl(formData.photoUrl)) {
       try {
@@ -1069,9 +1069,9 @@ export class PayStationService {
       }
     }
 
-    // Upload parent photo to dedicated 'student-photos' bucket if present and Base64
-    let parentPhotoStoragePath: string | null = null;
-    let finalParentPhotoUrl = formData.parentPhotoUrl;
+    // Upload parent photo to dedicated 'student-photos' bucket if present and Base64, or use Supabase CDN URL directly
+    let parentPhotoStoragePath: string | null = formData.parentPhotoStoragePath || extractStoragePathFromPublicUrl(formData.parentPhotoUrl) || null;
+    let finalParentPhotoUrl = formData.parentPhotoUrl && !formData.parentPhotoUrl.includes('images.unsplash.com') ? formData.parentPhotoUrl : undefined;
 
     if (formData.parentPhotoUrl && isBase64DataUrl(formData.parentPhotoUrl)) {
       try {

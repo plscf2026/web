@@ -30,6 +30,7 @@ import { EventStore } from '../services/eventStore';
 import { parseScannedInput } from '../utils/tokenGenerator';
 import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
 import { QrCameraScanner } from './common/QrCameraScanner';
+import { DEFAULT_STUDENT_AVATAR_PLACEHOLDER } from '../services/studentPhotoStorageService';
 
 export type DeskStationId =
   | 'MASTER_DESK'
@@ -717,10 +718,7 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
                   {/* Student Profile Header */}
                   <div className="flex items-start gap-4 pb-5 border-b border-slate-100">
                     <img
-                      src={
-                        scannedStudent.photoUrl ||
-                        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300'
-                      }
+                      src={scannedStudent.photoUrl || DEFAULT_STUDENT_AVATAR_PLACEHOLDER}
                       alt={scannedStudent.fullName}
                       className="w-20 h-24 object-cover rounded-2xl border-2 border-slate-200 shadow-xs bg-slate-100 shrink-0"
                     />
