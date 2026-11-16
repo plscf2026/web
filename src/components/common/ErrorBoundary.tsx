@@ -14,6 +14,7 @@ interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
+  showDebugDetails?: boolean;
 }
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
@@ -23,6 +24,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       hasError: false,
       error: null,
       errorInfo: null,
+      showDebugDetails: false,
     };
   }
 
@@ -36,7 +38,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   handleRetry = () => {
-    this.setState({ hasError: false, error: null, errorInfo: null });
+    this.setState({ hasError: false, error: null, errorInfo: null, showDebugDetails: false });
     if (this.props.onReset) {
       this.props.onReset();
     }
@@ -44,6 +46,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   render(): ReactNode {
     if (this.state.hasError) {
+      const isDevOrDebug =
+        Boolean((import.meta as any)?.env?.DEV) ||
+        (typeof window !== 'undefined' &&
+          (window.location.search.includes('debug=1') ||
+            window.location.hostname === 'localhost' ||
+            window.location.hostname === '127.0.0.1')) ||
+        this.state.showDebugDetails;
+
       return (
         <div className="w-full p-4 sm:p-8 flex items-center justify-center min-h-[280px]">
           <div className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-8 border border-rose-200 shadow-xl text-center space-y-4">
@@ -61,15 +71,21 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               </p>
             </div>
 
-            {typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production' && this.state.error && (
-              <details className="text-left text-[11px] p-3 rounded-xl bg-slate-900 text-rose-300 font-mono overflow-x-auto max-h-36">
-                <summary className="cursor-pointer text-slate-400 font-semibold mb-1">
-                  Technical Details (Debug)
+            {this.state.error && (
+              <details
+                open={isDevOrDebug}
+                className="text-left text-[11px] p-3 rounded-xl bg-slate-900 text-rose-300 font-mono overflow-x-auto max-h-48 border border-slate-800"
+              >
+                <summary className="cursor-pointer text-slate-400 hover:text-slate-200 font-semibold mb-1 flex items-center justify-between">
+                  <span>🔍 Technical Details (Debug Log)</span>
+                  <span className="text-[10px] text-slate-500">Click to collapse/expand</span>
                 </summary>
-                <div>{this.state.error.toString()}</div>
-                <div className="mt-1 text-slate-500 whitespace-pre-wrap">
-                  {this.state.errorInfo?.componentStack}
-                </div>
+                <div className="font-bold text-rose-400 mt-1">{this.state.error.toString()}</div>
+                {this.state.errorInfo?.componentStack && (
+                  <div className="mt-1 text-slate-400 whitespace-pre-wrap text-[10px] border-t border-slate-800 pt-1">
+                    {this.state.errorInfo.componentStack}
+                  </div>
+                )}
               </details>
             )}
 

@@ -446,6 +446,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     };
   }, []);
 
+  // RBAC & Portal Configuration Resolution (Unconditional Hook Compliance)
+  const userAccountRole = adminSession?.role ? normalizePortalRole(adminSession.role) : undefined;
+  const targetPortalRole = activePortalRole ? normalizePortalRole(activePortalRole) : userAccountRole;
+  const isSuperAdminAccount = adminSession?.role === 'super_admin';
+  const isAuthorizedForPortal = isSuperAdminAccount || (Boolean(userAccountRole) && userAccountRole === targetPortalRole);
+  const effectivePortalRole: PortalRole = targetPortalRole || 'admin';
+  const currentPortalConfig = getPortalConfigByRole(effectivePortalRole);
+
+  // Auto-redirect if activeTab is not permitted for this role
+  useEffect(() => {
+    if (adminSession && !isSuperAdminAccount) {
+      if (!currentPortalConfig.allowedTabs.includes(activeTab as any)) {
+        setActiveTab(currentPortalConfig.defaultTab as any);
+      }
+    }
+  }, [adminSession, isSuperAdminAccount, currentPortalConfig, activeTab]);
+
   // Refresh all state
   const refreshAll = () => {
     const freshRegs = AppStore.getRegistrations();
@@ -784,11 +801,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // ==========================================
   // VIEW 1.5: ROLE AUTHORIZATION ACCESS DENIED GUARD (URL Tampering Protection)
   // ==========================================
-  const userAccountRole = normalizePortalRole(adminSession.role);
-  const targetPortalRole = activePortalRole ? normalizePortalRole(activePortalRole) : userAccountRole;
-  const isSuperAdminAccount = adminSession.role === 'super_admin';
-  const isAuthorizedForPortal = isSuperAdminAccount || (userAccountRole === targetPortalRole);
-
   if (activePortalRole && !isAuthorizedForPortal) {
     return (
       <AccessDeniedGate
@@ -813,18 +825,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       />
     );
   }
-
-  const effectivePortalRole: PortalRole = targetPortalRole || 'admin';
-  const currentPortalConfig = getPortalConfigByRole(effectivePortalRole);
-
-  // Auto-redirect if activeTab is not permitted for this role
-  useEffect(() => {
-    if (adminSession && !isSuperAdminAccount) {
-      if (!currentPortalConfig.allowedTabs.includes(activeTab as any)) {
-        setActiveTab(currentPortalConfig.defaultTab as any);
-      }
-    }
-  }, [adminSession, isSuperAdminAccount, currentPortalConfig, activeTab]);
 
   const allNavigationTabs = [
     {
