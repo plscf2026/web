@@ -104,7 +104,7 @@ export const AdminRmsCentralDashboard: React.FC<Props> = ({
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl leading-relaxed">
             {language === 'bn'
-              ? 'সিলেট পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজের পুনর্মিলনী ২০২৭-এর সার্বিক প্রশাসনিক অগ্রগতি, আর্থিক হিসাব, ব্যাচভিত্তিক উপস্থিতি ও উপকমিটির রিয়েল-টাইম তথ্য।'
+              ? 'ফরিদপুর পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজের পুনর্মিলনী ২০২৭-এর সার্বিক প্রশাসনিক অগ্রগতি, আর্থিক হিসাব, ব্যাচভিত্তিক উপস্থিতি ও উপকমিটির রিয়েল-টাইম তথ্য।'
               : 'Real-time telemetry, committee oversight, budget ledger, and attendee reconciliation for Police Lines High School & College, Faridpur Reunion 2027.'}
           </p>
         </div>

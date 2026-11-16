@@ -263,7 +263,7 @@ export const translations = {
   },
   bn: {
     // Top banner & Header
-    institutionName: 'সিলেট পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজ',
+    institutionName: 'ফরিদপুর পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজ',
     institutionSubtitle: 'প্রতিষ্ঠিত: ১৯৬২ • ফরিদপুর, বাংলাদেশ',
     reunionTitle: 'গ্র্যান্ড পুনর্মিলনী ২০২৭',
     reunionDates: '২৮ - ২৯ জানুয়ারি, ২০২৭',
@@ -286,7 +286,7 @@ export const translations = {
     // Hero & Home
     heroHeading: 'স্মৃতির আঙিনায় ফিরে দেখা, ঐতিহ্যের মেলবন্ধন',
     heroSubheading:
-      'সিলেট পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজের ঐতিহাসিক গ্র্যান্ড পুনর্মিলনী ২০২৭-এ আপনাকে সাদর আমন্ত্রণ।',
+      'ফরিদপুর পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজের ঐতিহাসিক গ্র্যান্ড পুনর্মিলনী ২০২৭-এ আপনাকে সাদর আমন্ত্রণ।',
     btnRegisterNow: 'রেজিস্ট্রেশন করুন',
     btnMakeDonation: 'অনুদান প্রদান করুন',
     btnDownloadTicket: 'টিকিট ডাউনলোড',
