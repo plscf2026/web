@@ -2258,7 +2258,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <td className="py-2.5 px-3 uppercase font-semibold text-slate-600">
                       {r.paymentMethod}
                     </td>
-                    <td className="py-2.5 px-3 font-bold text-emerald-700 whitespace-nowrap inline-block tabular-nums">৳{r.totalPaid}</td>
+                    <td className="py-2.5 px-3 font-bold text-emerald-700 whitespace-nowrap tabular-nums">৳{r.totalPaid}</td>
                     <td className="py-2.5 px-3">
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
                         {r.paymentStatus}
@@ -2353,7 +2353,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <span className="text-[10px] text-slate-400">{d.mobileNumber}</span>
                     </td>
                     <td className="py-2.5 px-3 text-slate-600">{d.purpose}</td>
-                    <td className="py-2.5 px-3 font-bold text-emerald-700 whitespace-nowrap inline-block tabular-nums">৳{d.amount.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 font-bold text-emerald-700 whitespace-nowrap tabular-nums">৳{d.amount.toLocaleString()}</td>
                     <td className="py-2.5 px-3 uppercase text-slate-600">{d.paymentMethod}</td>
                     <td className="py-2.5 px-3 font-mono text-[10px] text-slate-500">{d.transactionId}</td>
                     <td className="py-2.5 px-3 text-slate-400">{d.date}</td>
@@ -2677,7 +2677,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <td className="py-2.5 px-3 font-semibold text-slate-700">{exp.category}</td>
                     <td className="py-2.5 px-3 text-slate-600">{exp.reason}</td>
                     <td className="py-2.5 px-3 text-slate-500">{exp.responsiblePerson}</td>
-                    <td className="py-2.5 px-3 font-bold text-rose-600 whitespace-nowrap inline-block tabular-nums">৳{exp.amount.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 font-bold text-rose-600 whitespace-nowrap tabular-nums">৳{exp.amount.toLocaleString()}</td>
                     <td className="py-2.5 px-3 text-slate-400">{exp.date}</td>
                   </tr>
                 ))}

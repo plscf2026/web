@@ -557,7 +557,7 @@ export const StaffFinanceModule: React.FC<StaffFinanceModuleProps> = ({
                       <td className="py-2.5 px-3 font-semibold text-slate-800">{exp.category}</td>
                       <td className="py-2.5 px-3 text-slate-600 max-w-xs">{exp.description}</td>
                       <td className="py-2.5 px-3 text-slate-500">{exp.vendorName || '—'}</td>
-                      <td className="py-2.5 px-3 text-right font-mono font-black text-slate-900 whitespace-nowrap inline-block tabular-nums">
+                      <td className="py-2.5 px-3 text-right font-mono font-black text-slate-900 whitespace-nowrap tabular-nums">
                         BDT {exp.amount.toLocaleString()}
                       </td>
                       <td className="py-2.5 px-3 text-center">

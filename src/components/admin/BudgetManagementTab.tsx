@@ -541,13 +541,13 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
                         {stf.role}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap inline-block tabular-nums">
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap tabular-nums">
                       BDT {sSummary.totalAllocated.toLocaleString()}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-amber-700 font-semibold whitespace-nowrap inline-block tabular-nums">
+                    <td className="py-2.5 px-3 text-right font-mono text-amber-700 font-semibold whitespace-nowrap tabular-nums">
                       BDT {(sSummary.totalSubmittedExpenses + sSummary.totalApprovedExpenses).toLocaleString()}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-700 whitespace-nowrap inline-block tabular-nums">
+                    <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-700 whitespace-nowrap tabular-nums">
                       BDT {sSummary.remainingSpendableBalance.toLocaleString()}
                     </td>
                     <td className="py-2.5 px-3 text-center">
@@ -710,7 +710,7 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
                       <td className="py-2.5 px-3 font-semibold text-slate-900">{exp.staffName}</td>
                       <td className="py-2.5 px-3 text-slate-700">{exp.category}</td>
                       <td className="py-2.5 px-3 text-slate-600 max-w-xs truncate">{exp.description}</td>
-                      <td className="py-2.5 px-3 text-right font-mono font-black text-slate-900 whitespace-nowrap inline-block tabular-nums">
+                      <td className="py-2.5 px-3 text-right font-mono font-black text-slate-900 whitespace-nowrap tabular-nums">
                         BDT {exp.amount.toLocaleString()}
                       </td>
                       <td className="py-2.5 px-3 text-center">
@@ -934,7 +934,7 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
                     </span>
                   </td>
                   <td className="py-2 px-3 font-sans text-slate-700">{l.description}</td>
-                  <td className="py-2 px-3 text-right font-black text-slate-900 whitespace-nowrap inline-block tabular-nums">
+                  <td className="py-2 px-3 text-right font-black text-slate-900 whitespace-nowrap tabular-nums">
                     BDT {l.amount.toLocaleString()}
                   </td>
                   <td className="py-2 px-3 text-slate-500">{new Date(l.createdAt).toLocaleDateString()}</td>

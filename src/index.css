@@ -255,10 +255,6 @@
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.35);
 }
 
-.main-content {
-  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
-}
-
 @media (max-width: 639.98px) {
   body {
     padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
@@ -426,6 +422,7 @@
   body {
     background: white !important;
     color: black !important;
+    padding-bottom: 0 !important;
   }
   .no-print {
     display: none !important;

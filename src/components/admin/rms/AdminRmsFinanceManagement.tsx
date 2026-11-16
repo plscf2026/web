@@ -479,7 +479,7 @@ export const AdminRmsFinanceManagement: React.FC<Props> = ({ language, registrat
                       </td>
                       <td className="px-4 py-3 text-slate-600 font-medium">{exp.committeeName}</td>
                       <td className="px-4 py-3 text-slate-600">{exp.vendor}</td>
-                      <td className="px-4 py-3 font-mono font-black text-slate-900 whitespace-nowrap inline-block tabular-nums">
+                      <td className="px-4 py-3 font-mono font-black text-slate-900 whitespace-nowrap tabular-nums">
                         ৳{exp.amount.toLocaleString('en-IN')}
                       </td>
                       <td className="px-4 py-3">

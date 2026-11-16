@@ -504,7 +504,7 @@ export const DailyAnalyticsTab: React.FC<DailyAnalyticsTabProps> = ({
                     {getDhakaDateString(r.registeredAt)}
                   </td>
                   <td className="py-2 px-3 font-mono font-bold text-slate-700">{r.tShirtSize}</td>
-                  <td className="py-2 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap inline-block tabular-nums">
+                  <td className="py-2 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap tabular-nums">
                     BDT {r.totalPaid.toLocaleString()}
                   </td>
                   <td className="py-2 px-3 text-center">
