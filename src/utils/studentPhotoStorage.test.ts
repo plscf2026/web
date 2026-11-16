@@ -21,7 +21,6 @@ import {
   TARGET_MAX_COMPRESSED_BYTES,
   TARGET_MAX_DIMENSION,
   ALLOWED_MIME_TYPES,
-  normalizeBatchFolder,
   buildStudentPhotoStoragePath,
   isBase64DataUrl,
   validateStudentImage,
@@ -154,6 +153,7 @@ test('3. Base64 Eradication in PostgreSQL Database Rows', async () => {
     hasParent: true,
     parentPhotoUrl: dummyBase64,
     parentPhotoStoragePath: '2005/PLSCF-2027-F8821/parent.webp',
+    isTShirtCollected: false,
   };
 
   // Convert to DB row via Supabase mapping

@@ -3,6 +3,8 @@
  * Preserves active views, handles nested routes, and provides reliable in-place page refreshes across the entire application.
  */
 
+import { PortalRole, getPortalRoleFromSlug } from '../types';
+
 export const VALID_VIEWS = [
   'home',
   'register',
@@ -25,6 +27,7 @@ export type AppView = (typeof VALID_VIEWS)[number];
 
 export interface ResolvedRoute {
   view: AppView;
+  portalRole?: PortalRole;
   tab?: string;
   ticketQuery?: string;
   isPaymentReturn?: boolean;
@@ -132,6 +135,56 @@ export function resolveRouteFromLocation(): ResolvedRoute {
     const subSegment = segments[1] || '';
     const cleanPathLower = cleanPath.toLowerCase();
 
+    // Nested login role route: /login/:role (e.g. /login/super-admin, /login/finance)
+    if (primarySegment === 'login') {
+      const parsedRole = subSegment ? getPortalRoleFromSlug(subSegment) : null;
+      return {
+        view: 'login',
+        portalRole: parsedRole || undefined,
+        tab: searchParams.get('tab') || undefined,
+      };
+    }
+
+    // Nested dashboard role route: /dashboard/:role (e.g. /dashboard/super-admin, /dashboard/finance)
+    if (primarySegment === 'dashboard') {
+      const parsedRole = subSegment ? getPortalRoleFromSlug(subSegment) : null;
+      return {
+        view: 'dashboard',
+        portalRole: parsedRole || undefined,
+        tab: segments[2] || searchParams.get('tab') || undefined,
+      };
+    }
+
+    // Direct role portals shortcuts
+    if (primarySegment === 'super-admin') {
+      return {
+        view: 'dashboard',
+        portalRole: 'super_admin',
+        tab: subSegment || searchParams.get('tab') || undefined,
+      };
+    }
+    if (primarySegment === 'finance') {
+      return {
+        view: 'dashboard',
+        portalRole: 'finance_manager',
+        tab: subSegment || searchParams.get('tab') || undefined,
+      };
+    }
+    if (primarySegment === 'moderator') {
+      return {
+        view: 'dashboard',
+        portalRole: 'moderator',
+        tab: subSegment || searchParams.get('tab') || undefined,
+      };
+    }
+    if (primarySegment === 'committee') {
+      return {
+        view: 'dashboard',
+        portalRole: 'committee_member',
+        tab: subSegment || searchParams.get('tab') || undefined,
+      };
+    }
+
     // Dynamic ticket route: /ticket/:idOrToken
     if (primarySegment === 'ticket') {
       const dynamicId = subSegment || searchParams.get('id') || undefined;
@@ -228,9 +281,18 @@ export function getUrlForView(view: string, extraParams?: Record<string, string>
     return '/404';
   }
 
-  const basePath = view === 'home' ? '/' : `/${view}`;
-  if (extraParams && Object.keys(extraParams).length > 0) {
-    const sp = new URLSearchParams(extraParams);
+  let basePath = view === 'home' ? '/' : `/${view}`;
+  const queryParams: Record<string, string> = { ...(extraParams || {}) };
+
+  // Format dedicated role login and dashboard URLs cleanly (e.g. /login/super-admin, /dashboard/finance)
+  if ((view === 'login' || view === 'dashboard') && queryParams.role) {
+    const roleSlug = queryParams.role.replace(/_/g, '-');
+    delete queryParams.role;
+    basePath = `/${view}/${roleSlug}`;
+  }
+
+  if (Object.keys(queryParams).length > 0) {
+    const sp = new URLSearchParams(queryParams);
     return `${basePath}?${sp.toString()}`;
   }
   return basePath;

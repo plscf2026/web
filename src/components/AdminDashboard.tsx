@@ -15,7 +15,6 @@ import {
   Check,
   BarChart3,
   Calendar,
-  AlertCircle,
   RefreshCw,
   Lock,
   Unlock,
@@ -46,7 +45,14 @@ import {
   HomePageSectionId,
   HomePageSectionSetting,
   DEFAULT_HOME_PAGE_SECTIONS,
+  PortalRole,
+  normalizePortalRole,
+  getPortalRoleFromSlug,
+  getPortalConfigByRole,
 } from '../types';
+import { RoleLoginPage } from './auth/RoleLoginPage';
+import { RoleDirectoryPortal } from './auth/RoleDirectoryPortal';
+import { AccessDeniedGate } from './auth/AccessDeniedGate';
 import { translations } from '../i18n/translations';
 import { AppStore, INITIAL_STAFF_USERS } from '../services/store';
 import { calculateFinancialSummary } from '../utils/rules';
@@ -93,13 +99,41 @@ import { formatCsvRow } from '../utils/security';
 interface AdminDashboardProps {
   language: Language;
   onSelectTicket?: (reg: RegistrationRecord) => void;
+  portalRole?: PortalRole;
+  onNavigateHome?: () => void;
+  onSwitchPortal?: (targetRole: PortalRole) => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   language,
   onSelectTicket,
+  portalRole,
+  onNavigateHome,
+  onSwitchPortal,
 }) => {
   const t = translations[language];
+
+  // Active portal role resolution from props, URL or session
+  const [activePortalRole, setActivePortalRole] = useState<PortalRole | undefined>(() => {
+    if (portalRole) return portalRole;
+    if (typeof window !== 'undefined') {
+      try {
+        const sp = new URLSearchParams(window.location.search);
+        const roleParam = sp.get('role');
+        const parsed = getPortalRoleFromSlug(roleParam);
+        if (parsed) return parsed;
+        const saved = sessionStorage.getItem('plscf_current_portal_role');
+        if (saved) return getPortalRoleFromSlug(saved) || undefined;
+      } catch (_) {}
+    }
+    return undefined;
+  });
+
+  useEffect(() => {
+    if (portalRole && portalRole !== activePortalRole) {
+      setActivePortalRole(portalRole);
+    }
+  }, [portalRole]);
 
   // ==========================================
   // SINGLE-SLOT ADMIN AUTHENTICATION STATE
@@ -107,12 +141,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [adminSession, setAdminSession] = useState<AdminAccount | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState<boolean>(true);
 
-  // Login form state - dev bypass enabled only in local development
+  // Dev bypass enabled only in local development
   const isDevBypass = isDevTestBypassAllowed();
-  const [loginUsername, setLoginUsername] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
-  const [isSubmittingLogin, setIsSubmittingLogin] = useState(false);
 
   // Check session on mount and handle RBAC prefill / auto-login
   useEffect(() => {
@@ -130,8 +160,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         }
 
         if (prefillUser) {
-          setLoginUsername(prefillUser);
-          setLoginPassword('admin@123');
           sessionStorage.removeItem('plscf_admin_prefill_user');
 
           if (isDevBypass && autoLogin === 'true') {
@@ -185,31 +213,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     };
   }, [isDevBypass]);
 
-  // Handle Admin Login
-  const handleAdminLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError('');
-    setIsSubmittingLogin(true);
-
-    try {
-      const result = await SupabaseService.loginAdmin(loginUsername, loginPassword);
-      if (result.success && result.account) {
-        setAdminSession(result.account);
-      } else {
-        setLoginError(
-          result.error ||
-            (language === 'bn'
-              ? 'ভুল ইউজারনেম বা পাসওয়ার্ড।'
-              : 'Invalid credentials. Please verify your username and password.')
-        );
-      }
-    } catch (err: any) {
-      setLoginError(err.message || 'Login error occurred.');
-    } finally {
-      setIsSubmittingLogin(false);
-    }
-  };
-
   // Handle Log Out
   const handleLogout = async () => {
     try {
@@ -218,6 +221,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       console.error('Admin logout failed:', err);
     }
     setAdminSession(null);
+    try {
+      sessionStorage.removeItem('plscf_current_portal_role');
+      sessionStorage.removeItem('plscf_admin_active_tab');
+    } catch (_) {}
   };
 
   // ==========================================
@@ -248,7 +255,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'notices'
     | 'reports';
 
-  const isSuperAdmin = adminSession?.role === 'super_admin' || !adminSession;
+  const isSuperAdmin = adminSession?.role === 'super_admin';
   const effectiveAdmin: AdminAccount = adminSession || {
     id: 'admin_master',
     username: 'admin',
@@ -730,160 +737,144 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }
 
   // ==========================================
-  // VIEW 1: AUTHENTICATION GATE (SINGLE SLOT / LOGIN)
+  // VIEW 1: AUTHENTICATION GATE (ROLE-SPECIFIC LOGIN PORTAL)
   // ==========================================
   if (!adminSession) {
+    if (activePortalRole) {
+      return (
+        <RoleLoginPage
+          role={activePortalRole}
+          language={language}
+          onLoginSuccess={(account) => {
+            setAdminSession(account);
+          }}
+          onSwitchPortal={(targetRole) => {
+            setActivePortalRole(targetRole);
+            onSwitchPortal?.(targetRole);
+          }}
+          onNavigateHome={() => {
+            if (onNavigateHome) {
+              onNavigateHome();
+            } else if (typeof window !== 'undefined') {
+              window.location.href = '/';
+            }
+          }}
+        />
+      );
+    }
+
     return (
-      <div className="max-w-xl mx-auto px-4 py-16">
-        <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
-          {/* Header Banner - Solid Institutional Navy Blue */}
-          <div className="bg-[#172554] p-6 sm:p-8 text-white text-center space-y-2 border-b border-blue-900">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white p-1 border-2 border-[#C5A45D] shadow-md mb-1 overflow-hidden">
-              <img
-                src="/assets/school_logo.png"
-                alt="Police Lines School & College Faridpur Emblem"
-                className="w-full h-full object-contain rounded-full"
-              />
-            </div>
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight">
-              {language === 'bn'
-                ? 'পুলিশ লাইন্স স্কুল ও কলেজ পুনর্মিলনী অ্যাডমিন পোর্টাল'
-                : 'Police Lines School & College Reunion Admin Portal'}
-            </h1>
-            <p className="text-xs text-slate-300">
-              Supabase Backend: <span className="font-mono text-amber-300">{SUPABASE_PROJECT_ID}</span>
-            </p>
-          </div>
-
-          <div className="p-6 sm:p-8 space-y-6">
-            {/* Strict Admin Login Protection Gate (Requirement 1) */}
-            <div className="space-y-5">
-              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 space-y-1">
-                <div className="flex items-center gap-2 font-black text-xs uppercase tracking-wider text-amber-800">
-                  <Lock className="w-4 h-4 text-amber-600" />
-                  <span>
-                    {language === 'bn'
-                      ? 'অ্যাডমিন প্যানেল পাসওয়ার্ড সুরক্ষিত (Access Protected)'
-                      : 'Admin Portal Login Protected (Restricted Access)'}
-                  </span>
-                </div>
-                <p className="text-[11px] text-amber-800 leading-relaxed">
-                  {language === 'bn'
-                    ? 'এই প্যানেলে প্রবেশের জন্য অনুমোদিত অ্যাডমিন আইডি ও পাসওয়ার্ড বাধ্যতামূলক। অননুমোদিত প্রবেশ প্রতিরোধে সকল লগইন প্রচেষ্টা অডিট লগে রেকর্ড করা হয়।'
-                    : 'This administration portal is strictly login-protected. Only authorized administrators with verified credentials may enter. All authentication attempts are logged.'}
-                </p>
-              </div>
-
-              {/* Testing Mode Credentials Banner (Rendered in development/testing mode) */}
-              {isDevBypass && (
-                <div className="p-3 bg-sky-50 border border-sky-300 text-sky-900 rounded-xl text-xs space-y-2 shadow-2xs">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 font-medium flex-wrap">
-                      <span className="font-bold text-sky-950">🧪 Testing Credentials:</span>
-                      <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">admin@gmail.com</span>
-                      <span className="text-slate-400">/</span>
-                      <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">admin@123</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLoginUsername('admin@gmail.com');
-                        setLoginPassword('admin@123');
-                      }}
-                      className="text-[10px] text-sky-800 bg-sky-100 hover:bg-sky-200 px-2.5 py-1 rounded-full font-bold cursor-pointer transition-colors shadow-2xs"
-                    >
-                      Auto-fill
-                    </button>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-sky-200/60 text-[11px]">
-                    <span className="text-[10px] text-slate-500 font-semibold">Other Test Roles:</span>
-                    {[
-                      { label: 'Registration Mgr', email: 'registration@gmail.com' },
-                      { label: 'Finance Mgr', email: 'finance@gmail.com' },
-                      { label: 'Scanner Supervisor', email: 'supervisor@gmail.com' },
-                    ].map((role) => (
-                      <button
-                        key={role.email}
-                        type="button"
-                        onClick={() => {
-                          setLoginUsername(role.email);
-                          setLoginPassword('admin@123');
-                        }}
-                        className="px-2 py-0.5 bg-white hover:bg-sky-100 rounded-md border border-sky-200 text-slate-700 text-[10px] font-medium transition cursor-pointer"
-                      >
-                        {role.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {loginError && (
-                <div className="p-3 bg-rose-50 border border-rose-300 text-rose-800 rounded-xl text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                  <span>{loginError}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleAdminLogin} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    {language === 'bn' ? 'অ্যাডমিন ইমেইল / ইউজারনেম' : 'Administrator Email / Username'} *
-                  </label>
-                  <input
-                    type="text"
-                    value={loginUsername}
-                    onChange={(e) => setLoginUsername(e.target.value)}
-                    placeholder="admin@example.com"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:border-slate-900 focus:outline-hidden"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    {language === 'bn' ? 'পাসওয়ার্ড / নিরাপত্তা পিন' : 'Password / Access PIN'} *
-                  </label>
-                  <input
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:border-slate-900 focus:outline-hidden"
-                    required
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmittingLogin}
-                  className="w-full py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs sm:text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 mt-2"
-                >
-                  <Lock className="w-4 h-4 text-amber-400" />
-                  <span>
-                    {isSubmittingLogin
-                      ? language === 'bn'
-                        ? 'যাচাই করা হচ্ছে...'
-                        : 'Authenticating...'
-                      : language === 'bn'
-                      ? 'নিরাপদ অ্যাডমিন লগইন (Sign In)'
-                      : 'Secure Admin Sign In'}
-                  </span>
-                </button>
-              </form>
-
-              <div className="pt-2 text-center border-t border-slate-100">
-                <span className="text-[11px] text-slate-400">
-                  Administrator accounts must be provisioned and authorized in Supabase Auth.
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <RoleDirectoryPortal
+        language={language}
+        onSelectRole={(role) => {
+          setActivePortalRole(role);
+          onSwitchPortal?.(role);
+        }}
+        onNavigateHome={() => {
+          if (onNavigateHome) {
+            onNavigateHome();
+          } else if (typeof window !== 'undefined') {
+            window.location.href = '/';
+          }
+        }}
+      />
     );
   }
+
+  // ==========================================
+  // VIEW 1.5: ROLE AUTHORIZATION ACCESS DENIED GUARD (URL Tampering Protection)
+  // ==========================================
+  const userAccountRole = normalizePortalRole(adminSession.role);
+  const targetPortalRole = activePortalRole ? normalizePortalRole(activePortalRole) : userAccountRole;
+  const isSuperAdminAccount = adminSession.role === 'super_admin';
+  const isAuthorizedForPortal = isSuperAdminAccount || (userAccountRole === targetPortalRole);
+
+  if (activePortalRole && !isAuthorizedForPortal) {
+    return (
+      <AccessDeniedGate
+        currentAccount={adminSession}
+        requiredRole={activePortalRole}
+        language={language}
+        onNavigateAuthorized={() => {
+          const authorizedRole = userAccountRole || 'admin';
+          setActivePortalRole(authorizedRole);
+          onSwitchPortal?.(authorizedRole);
+        }}
+        onLogoutAndSwitch={() => {
+          handleLogout();
+        }}
+        onNavigateHome={() => {
+          if (onNavigateHome) {
+            onNavigateHome();
+          } else if (typeof window !== 'undefined') {
+            window.location.href = '/';
+          }
+        }}
+      />
+    );
+  }
+
+  const effectivePortalRole: PortalRole = targetPortalRole || 'admin';
+  const currentPortalConfig = getPortalConfigByRole(effectivePortalRole);
+
+  // Auto-redirect if activeTab is not permitted for this role
+  useEffect(() => {
+    if (adminSession && !isSuperAdminAccount) {
+      if (!currentPortalConfig.allowedTabs.includes(activeTab as any)) {
+        setActiveTab(currentPortalConfig.defaultTab as any);
+      }
+    }
+  }, [adminSession, isSuperAdminAccount, currentPortalConfig, activeTab]);
+
+  const allNavigationTabs = [
+    {
+      id: 'reunionManagement',
+      label: language === 'bn' ? '🏛️ পুনর্মিলনী ইআরপি (RMS)' : '🏛️ Reunion Management (RMS)',
+      icon: Landmark,
+      highlight: true,
+      badge: 'ERP 2027',
+    },
+    {
+      id: 'idCardManagement',
+      label: language === 'bn' ? '🪪 আইডি কার্ড পোর্টাল' : '🪪 Student ID Cards',
+      icon: CreditCard,
+      highlight: true,
+      badge: 'ID Suite',
+    },
+    {
+      id: 'manualRegistration',
+      label: language === 'bn' ? '📝 ভেন্যু শিক্ষার্থী নিবন্ধন' : '📝 Manual Student Reg',
+      icon: UserPlus,
+      highlight: true,
+      badge: 'Venue Desk',
+    },
+    ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('manualApproval' as any)
+      ? [
+          {
+            id: 'manualApproval' as const,
+            label: language === 'bn' ? '🛡️ ম্যানুয়াল নিবন্ধন অনুমোদন' : '🛡️ Manual Reg Approval',
+            icon: ShieldCheck,
+            highlight: true,
+            badge: 'Super Admin',
+          },
+        ]
+      : []),
+    { id: 'masterOverview', label: language === 'bn' ? 'মাস্টার ইভেন্ট ড্যাশবোর্ড' : 'Master Overview', icon: Sparkles },
+    { id: 'budgetManagement', label: language === 'bn' ? 'বাজেট ও ব্যয়' : 'Budget & Expenses', icon: DollarSign },
+    { id: 'dailyAnalytics', label: language === 'bn' ? 'দৈনিক অ্যানালিটিক্স' : 'Daily Analytics', icon: BarChart3 },
+    { id: 'staffManagement', label: language === 'bn' ? 'স্টাফ ও রোলস' : 'Staff & Roles', icon: Users },
+    { id: 'auditHistory', label: language === 'bn' ? 'অডিট হিস্ট্রি' : 'Audit Trail', icon: ShieldAlert },
+    { id: 'allBookings', label: language === 'bn' ? 'সকল বুকিং (সুপাবেস)' : 'All Bookings (Supabase)', icon: Database },
+    { id: 'studentIds', label: language === 'bn' ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা' : 'Student ID Management', icon: ShieldCheck },
+    { id: 'feeSettings', label: t.tabFeeSettings, icon: Settings },
+    { id: 'tickets', label: t.tabTickets, icon: QrCode },
+    { id: 'notices', label: t.tabNoticesAdmin, icon: FileText },
+    { id: 'reports', label: t.tabReports, icon: Download },
+  ];
+
+  const visibleNavTabs = isSuperAdminAccount
+    ? allNavigationTabs
+    : allNavigationTabs.filter((tab) => currentPortalConfig.allowedTabs.includes(tab.id as any));
 
   // ==========================================
   // VIEW 2: AUTHENTICATED CENTRAL COMMAND DASHBOARD
@@ -913,14 +904,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Supabase: {SUPABASE_PROJECT_ID}</span>
             </span>
 
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-950 border border-blue-800 text-[10px] font-bold uppercase text-[#C5A45D]">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-950 border border-blue-800 text-[10px] font-bold uppercase text-[#C5A45D]">
               <Lock className="w-3 h-3 text-[#C5A45D]" />
-              <span>Single Admin Slot Claimed</span>
+              <span>{language === 'bn' ? currentPortalConfig.badgeLabelBn : currentPortalConfig.badgeLabelEn}</span>
             </span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{t.adminHeading}</h1>
-          <p className="text-xs text-slate-300 mt-1">{t.adminSubtitle}</p>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
+            {language === 'bn' ? currentPortalConfig.titleBn : currentPortalConfig.titleEn}
+          </h1>
+          <p className="text-xs text-slate-300 mt-1">
+            {language === 'bn' ? currentPortalConfig.taglineBn : currentPortalConfig.taglineEn}
+          </p>
         </div>
       </div>
 
@@ -956,61 +951,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="flex items-center gap-2">
               <Layers className="w-4 h-4 text-[#172554]" />
               <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                {language === 'bn' ? 'অ্যাডমিন মডিউল (১৩টি)' : 'ADMIN MODULES (13)'}
+                {language === 'bn'
+                  ? `${currentPortalConfig.badgeLabelBn} (${visibleNavTabs.length}টি)`
+                  : `${currentPortalConfig.badgeLabelEn} (${visibleNavTabs.length})`}
               </span>
             </div>
             <span className="text-[10px] font-mono font-bold bg-[#172554]/10 text-[#172554] px-1.5 py-0.5 rounded">
-              CONTROL
+              {currentPortalConfig.badgeLabelEn.split(' ')[0]}
             </span>
           </div>
 
           {/* Navigation Items List */}
           <nav className="space-y-1">
-            {[
-              {
-                id: 'reunionManagement',
-                label: language === 'bn' ? '🏛️ পুনর্মিলনী ইআরপি (RMS)' : '🏛️ Reunion Management (RMS)',
-                icon: Landmark,
-                highlight: true,
-                badge: 'ERP 2027',
-              },
-              {
-                id: 'idCardManagement',
-                label: language === 'bn' ? '🪪 আইডি কার্ড পোর্টাল' : '🪪 Student ID Cards',
-                icon: CreditCard,
-                highlight: true,
-                badge: 'ID Suite',
-              },
-              {
-                id: 'manualRegistration',
-                label: language === 'bn' ? '📝 ভেন্যু শিক্ষার্থী নিবন্ধন' : '📝 Manual Student Reg',
-                icon: UserPlus,
-                highlight: true,
-                badge: 'Venue Desk',
-              },
-              ...(isSuperAdmin
-                ? [
-                    {
-                      id: 'manualApproval' as const,
-                      label: language === 'bn' ? '🛡️ ম্যানুয়াল নিবন্ধন অনুমোদন' : '🛡️ Manual Reg Approval',
-                      icon: ShieldCheck,
-                      highlight: true,
-                      badge: 'Super Admin',
-                    },
-                  ]
-                : []),
-              { id: 'masterOverview', label: language === 'bn' ? 'মাস্টার ইভেন্ট ড্যাশবোর্ড' : 'Master Overview', icon: Sparkles },
-              { id: 'budgetManagement', label: language === 'bn' ? 'বাজেট ও ব্যয়' : 'Budget & Expenses', icon: DollarSign },
-              { id: 'dailyAnalytics', label: language === 'bn' ? 'দৈনিক অ্যানালিটিক্স' : 'Daily Analytics', icon: BarChart3 },
-              { id: 'staffManagement', label: language === 'bn' ? 'স্টাফ ও রোলস' : 'Staff & Roles', icon: Users },
-              { id: 'auditHistory', label: language === 'bn' ? 'অডিট হিস্ট্রি' : 'Audit Trail', icon: ShieldAlert },
-              { id: 'allBookings', label: language === 'bn' ? 'সকল বুকিং (সুপাবেস)' : 'All Bookings (Supabase)', icon: Database },
-              { id: 'studentIds', label: language === 'bn' ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা' : 'Student ID Management', icon: ShieldCheck },
-              { id: 'feeSettings', label: t.tabFeeSettings, icon: Settings },
-              { id: 'tickets', label: t.tabTickets, icon: QrCode },
-              { id: 'notices', label: t.tabNoticesAdmin, icon: FileText },
-              { id: 'reports', label: t.tabReports, icon: Download },
-            ].map((tab) => {
+            {visibleNavTabs.map((tab) => {
               const isActive = activeTab === tab.id;
               const Icon = tab.icon;
               return (
@@ -1060,7 +1013,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="flex items-center gap-2">
                   <Layers className="w-4 h-4 text-[#172554]" />
                   <span className="text-xs font-black text-slate-900">
-                    {language === 'bn' ? 'অ্যাডমিন মডিউলসমূহ' : 'Admin Modules (13)'}
+                    {language === 'bn'
+                      ? `${currentPortalConfig.badgeLabelBn} মডিউলসমূহ`
+                      : `${currentPortalConfig.badgeLabelEn} Modules`}
                   </span>
                 </div>
                 <button
@@ -1073,47 +1028,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <nav className="space-y-1 flex-1">
-                {[
-                  {
-                    id: 'reunionManagement',
-                    label: language === 'bn' ? '🏛️ পুনর্মিলনী ইআরপি (RMS)' : '🏛️ Reunion Management (RMS)',
-                    icon: Landmark,
-                    highlight: true,
-                  },
-                  {
-                    id: 'idCardManagement',
-                    label: language === 'bn' ? '🪪 আইডি কার্ড পোর্টাল' : '🪪 Student ID Cards',
-                    icon: CreditCard,
-                    highlight: true,
-                  },
-                  {
-                    id: 'manualRegistration',
-                    label: language === 'bn' ? '📝 ভেন্যু শিক্ষার্থী নিবন্ধন' : '📝 Manual Student Reg',
-                    icon: UserPlus,
-                    highlight: true,
-                  },
-                  ...(isSuperAdmin
-                    ? [
-                        {
-                          id: 'manualApproval' as const,
-                          label: language === 'bn' ? '🛡️ ম্যানুয়াল নিবন্ধন অনুমোদন' : '🛡️ Manual Reg Approval',
-                          icon: ShieldCheck,
-                          highlight: true,
-                        },
-                      ]
-                    : []),
-                  { id: 'masterOverview', label: language === 'bn' ? 'মাস্টার ইভেন্ট ড্যাশবোর্ড' : 'Master Overview', icon: Sparkles },
-                  { id: 'budgetManagement', label: language === 'bn' ? 'বাজেট ও ব্যয়' : 'Budget & Expenses', icon: DollarSign },
-                  { id: 'dailyAnalytics', label: language === 'bn' ? 'দৈনিক অ্যানালিটিক্স' : 'Daily Analytics', icon: BarChart3 },
-                  { id: 'staffManagement', label: language === 'bn' ? 'স্টাফ ও রোলস' : 'Staff & Roles', icon: Users },
-                  { id: 'auditHistory', label: language === 'bn' ? 'অডিট হিস্ট্রি' : 'Audit Trail', icon: ShieldAlert },
-                  { id: 'allBookings', label: language === 'bn' ? 'সকল বুকিং (সুপাবেস)' : 'All Bookings (Supabase)', icon: Database },
-                  { id: 'studentIds', label: language === 'bn' ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা' : 'Student ID Management', icon: ShieldCheck },
-                  { id: 'feeSettings', label: t.tabFeeSettings, icon: Settings },
-                  { id: 'tickets', label: t.tabTickets, icon: QrCode },
-                  { id: 'notices', label: t.tabNoticesAdmin, icon: FileText },
-                  { id: 'reports', label: t.tabReports, icon: Download },
-                ].map((tab) => {
+                {visibleNavTabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
                   return (

@@ -236,12 +236,291 @@ export const DEFAULT_HOME_PAGE_SECTIONS: HomePageSectionSetting[] = [
   { id: 'committee', visible: true },
 ];
 
+export type PortalRole =
+  | 'super_admin'
+  | 'admin'
+  | 'moderator'
+  | 'finance_manager'
+  | 'registration_officer'
+  | 'committee_member';
+
+export interface PortalRoleConfig {
+  role: PortalRole;
+  slug: string;
+  titleEn: string;
+  titleBn: string;
+  taglineEn: string;
+  taglineBn: string;
+  descriptionEn: string;
+  descriptionBn: string;
+  badgeLabelEn: string;
+  badgeLabelBn: string;
+  themeColor: string;
+  bgGradient: string;
+  headerBg: string;
+  accentBorder: string;
+  accentText: string;
+  accentButton: string;
+  iconName: 'Crown' | 'Shield' | 'UserCheck' | 'DollarSign' | 'UserPlus' | 'Users';
+  defaultTab: string;
+  allowedTabs: string[];
+  demoCredentials: {
+    email: string;
+    password: string;
+    fullName: string;
+  };
+}
+
+export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
+  super_admin: {
+    role: 'super_admin',
+    slug: 'super-admin',
+    titleEn: 'Police Lines School & College Reunion Super Admin Portal',
+    titleBn: 'পুলিশ লাইন্স স্কুল অ্যান্ড কলেজ পুনর্মিলনী সুপার অ্যাডমিন পোর্টাল',
+    taglineEn: 'Master Executive Governance & Full Control Center',
+    taglineBn: 'সার্বভৌম নির্বাহী প্রশাসন ও কেন্দ্রীয় নিয়ন্ত্রণ কেন্দ্র',
+    descriptionEn: 'Unrestricted master access for institution principals, head conveners, and system architects. Full authority over budgets, approvals, audit logs, and security infrastructure.',
+    descriptionBn: 'প্রতিষ্ঠানের অধ্যক্ষ, প্রধান আহ্বায়ক ও সিস্টেম অ্যাডমিনের জন্য পূর্ণ নিয়ন্ত্রণ ও পরিচালনা পোর্টাল।',
+    badgeLabelEn: 'SUPER ADMIN PORTAL',
+    badgeLabelBn: 'সুপার অ্যাডমিন পোর্টাল',
+    themeColor: 'amber',
+    bgGradient: 'from-slate-950 via-slate-900 to-amber-950',
+    headerBg: 'bg-slate-900 border-amber-500/30',
+    accentBorder: 'border-amber-500',
+    accentText: 'text-amber-500',
+    accentButton: 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black shadow-amber-500/20',
+    iconName: 'Crown',
+    defaultTab: 'masterOverview',
+    allowedTabs: [
+      'masterOverview',
+      'manualApproval',
+      'allBookings',
+      'staffManagement',
+      'budgetManagement',
+      'dailyAnalytics',
+      'securityAudit',
+      'auditHistory',
+      'studentIds',
+      'idCardManagement',
+      'reunionManagement',
+      'feeSettings',
+      'payments',
+      'donations',
+      'tshirts',
+      'tickets',
+      'staff',
+      'finances',
+      'notices',
+      'reports',
+    ],
+    demoCredentials: {
+      email: 'admin@gmail.com',
+      password: 'admin@123',
+      fullName: 'Principal / Head Convener',
+    },
+  },
+  admin: {
+    role: 'admin',
+    slug: 'admin',
+    titleEn: 'Police Lines School & College Reunion Admin Portal',
+    titleBn: 'পুলিশ লাইন্স স্কুল অ্যান্ড কলেজ পুনর্মিলনী অ্যাডমিন পোর্টাল',
+    taglineEn: 'General Venue Operations & Event Management Console',
+    taglineBn: 'সাধারণ ভেন্যু পরিচালনা ও ইভেন্ট ম্যানেজমেন্ট কনসোল',
+    descriptionEn: 'Operational oversight for campus venue supervisors, attendance tracking, student bookings, ID badges, kit collections, and analytical event reports.',
+    descriptionBn: 'ক্যাম্পাস ভেন্যু সুপারভাইজার, উপস্থিতি পর্যবেক্ষণ, বুকিং ও কিট বিতরণের অফিসিয়াল পোর্টাল।',
+    badgeLabelEn: 'ADMIN PORTAL',
+    badgeLabelBn: 'অ্যাডমিন পোর্টাল',
+    themeColor: 'blue',
+    bgGradient: 'from-slate-950 via-slate-900 to-blue-950',
+    headerBg: 'bg-slate-900 border-blue-500/30',
+    accentBorder: 'border-blue-500',
+    accentText: 'text-blue-500',
+    accentButton: 'bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-blue-500/20',
+    iconName: 'Shield',
+    defaultTab: 'allBookings',
+    allowedTabs: [
+      'allBookings',
+      'manualRegistration',
+      'studentIds',
+      'idCardManagement',
+      'tshirts',
+      'tickets',
+      'dailyAnalytics',
+      'notices',
+      'reports',
+    ],
+    demoCredentials: {
+      email: 'venue.admin@gmail.com',
+      password: 'admin@123',
+      fullName: 'Venue Operations Administrator',
+    },
+  },
+  moderator: {
+    role: 'moderator',
+    slug: 'moderator',
+    titleEn: 'Police Lines School & College Reunion Moderator Portal',
+    titleBn: 'পুলিশ লাইন্স স্কুল অ্যান্ড কলেজ পুনর্মিলনী মডারেটর পোর্টাল',
+    taglineEn: 'Verification, Security Oversight & Event Gate Supervision',
+    taglineBn: 'যাচাইকরণ, নিরাপত্তা তদারকি ও গেইট সুপারভিশন',
+    descriptionEn: 'Supervisory access for field moderators, security officers, and floor leads to verify attendee credentials, monitor gate check-ins, and inspect digital tickets.',
+    descriptionBn: 'ফিল্ড মডারেটর ও নিরাপত্তা কর্মকর্তাদের জন্য টিকিট যাচাই ও উপস্থিতি তদারকি পোর্টাল।',
+    badgeLabelEn: 'MODERATOR PORTAL',
+    badgeLabelBn: 'মডারেটর পোর্টাল',
+    themeColor: 'emerald',
+    bgGradient: 'from-slate-950 via-slate-900 to-emerald-950',
+    headerBg: 'bg-slate-900 border-emerald-500/30',
+    accentBorder: 'border-emerald-500',
+    accentText: 'text-emerald-500',
+    accentButton: 'bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-emerald-500/20',
+    iconName: 'UserCheck',
+    defaultTab: 'allBookings',
+    allowedTabs: ['allBookings', 'tickets', 'idCardManagement', 'notices', 'masterOverview'],
+    demoCredentials: {
+      email: 'moderator@gmail.com',
+      password: 'admin@123',
+      fullName: 'Campus Security & Floor Moderator',
+    },
+  },
+  finance_manager: {
+    role: 'finance_manager',
+    slug: 'finance',
+    titleEn: 'Police Lines School & College Reunion Finance Portal',
+    titleBn: 'পুলিশ লাইন্স স্কুল অ্যান্ড কলেজ পুনর্মিলনী ফাইন্যান্স পোর্টাল',
+    taglineEn: 'Treasury Management, Accounts & Financial Transparency',
+    taglineBn: 'ট্রেজারি ব্যবস্থাপনা, হিসাব ও আর্থিক স্বচ্ছতা',
+    descriptionEn: 'Dedicated financial portal for the Reunion Finance Committee, accounting team, and treasurers. Manage revenue streams, verify expenditures, vouchers, and donation ledgers.',
+    descriptionBn: 'পুনর্মিলনী অর্থ কমিটি, অডিট ও হিসাব রক্ষকদের জন্য বাজেট ও তহবিল ব্যবস্থাপনা পোর্টাল।',
+    badgeLabelEn: 'FINANCE PORTAL',
+    badgeLabelBn: 'ফাইন্যান্স পোর্টাল',
+    themeColor: 'amber',
+    bgGradient: 'from-stone-950 via-stone-900 to-amber-950',
+    headerBg: 'bg-stone-900 border-amber-600/30',
+    accentBorder: 'border-amber-600',
+    accentText: 'text-amber-500',
+    accentButton: 'bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-amber-600/20',
+    iconName: 'DollarSign',
+    defaultTab: 'budgetManagement',
+    allowedTabs: [
+      'budgetManagement',
+      'finances',
+      'payments',
+      'donations',
+      'manualApproval',
+      'dailyAnalytics',
+      'reports',
+    ],
+    demoCredentials: {
+      email: 'finance@gmail.com',
+      password: 'admin@123',
+      fullName: 'Treasurer / Finance Secretary',
+    },
+  },
+  registration_officer: {
+    role: 'registration_officer',
+    slug: 'registration',
+    titleEn: 'Police Lines School & College Reunion Registration Portal',
+    titleBn: 'পুলিশ লাইন্স স্কুল অ্যান্ড কলেজ পুনর্মিলনী রেজিস্ট্রেশন পোর্টাল',
+    taglineEn: 'On-Site Venue Helpdesk & Attendee Enrollment Desk',
+    taglineBn: 'অন-সাইট ভেন্যু হেল্পডেস্ক ও শিক্ষার্থী নিবন্ধন ডেস্ক',
+    descriptionEn: 'Front-desk registration station for creating manual student entries, taking student photos, verifying alumni passing years, issuing ID cards, and handing out kits.',
+    descriptionBn: 'সরাসরি ভেন্যুতে উপস্থিত শিক্ষার্থীদের অন-স্পট নিবন্ধন ও আইডি কার্ড ইস্যু পোর্টাল।',
+    badgeLabelEn: 'REGISTRATION PORTAL',
+    badgeLabelBn: 'রেজিস্ট্রেশন পোর্টাল',
+    themeColor: 'cyan',
+    bgGradient: 'from-slate-950 via-slate-900 to-sky-950',
+    headerBg: 'bg-slate-900 border-sky-500/30',
+    accentBorder: 'border-sky-500',
+    accentText: 'text-sky-400',
+    accentButton: 'bg-sky-600 hover:bg-sky-700 text-white font-bold shadow-sky-500/20',
+    iconName: 'UserPlus',
+    defaultTab: 'manualRegistration',
+    allowedTabs: [
+      'manualRegistration',
+      'allBookings',
+      'studentIds',
+      'idCardManagement',
+      'tshirts',
+      'tickets',
+    ],
+    demoCredentials: {
+      email: 'registration@gmail.com',
+      password: 'admin@123',
+      fullName: 'Registration Desk Officer',
+    },
+  },
+  committee_member: {
+    role: 'committee_member',
+    slug: 'committee',
+    titleEn: 'Police Lines School & College Reunion Committee Portal',
+    titleBn: 'পুলিশ লাইন্স স্কুল অ্যান্ড কলেজ পুনর্মিলনী কমিটি পোর্টাল',
+    taglineEn: 'Organizing Committee Collaboration & Task Management',
+    taglineBn: 'আয়োজক কমিটি সমন্বয় ও টাস্ক ম্যানেজমেন্ট',
+    descriptionEn: 'Collaborative workspace for Reunion Executive Committee members, subcommittees, directors, and volunteers. Plan schedules, manage agendas, task boards, and sponsors.',
+    descriptionBn: 'নির্বাহী কমিটি সদস্য ও উপকমিটির জন্য কার্যক্রম সমন্বয় ও মিটিং রেজুলেশন পোর্টাল।',
+    badgeLabelEn: 'COMMITTEE PORTAL',
+    badgeLabelBn: 'কমিটি পোর্টাল',
+    themeColor: 'purple',
+    bgGradient: 'from-slate-950 via-slate-900 to-purple-950',
+    headerBg: 'bg-slate-900 border-purple-500/30',
+    accentBorder: 'border-purple-500',
+    accentText: 'text-purple-400',
+    accentButton: 'bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-purple-500/20',
+    iconName: 'Users',
+    defaultTab: 'reunionManagement',
+    allowedTabs: ['reunionManagement', 'notices', 'reports'],
+    demoCredentials: {
+      email: 'committee@gmail.com',
+      password: 'admin@123',
+      fullName: 'Executive Committee Member',
+    },
+  },
+};
+
+/**
+ * Normalizes input role string or slug into a validated PortalRole
+ */
+export function normalizePortalRole(raw: string | undefined | null): PortalRole | null {
+  if (!raw) return null;
+  const clean = raw.toLowerCase().trim().replace(/[-_\s]+/g, '_');
+  if (clean === 'super_admin' || clean === 'superadmin') return 'super_admin';
+  if (clean === 'admin' || clean === 'administrator') return 'admin';
+  if (clean === 'moderator' || clean === 'mod') return 'moderator';
+  if (clean === 'finance' || clean === 'finance_manager' || clean === 'finance_team') return 'finance_manager';
+  if (clean === 'registration' || clean === 'registration_officer' || clean === 'reg_team') return 'registration_officer';
+  if (clean === 'committee' || clean === 'committee_member') return 'committee_member';
+  return null;
+}
+
+/**
+ * Normalizes URL slug to a validated PortalRole
+ */
+export function getPortalRoleFromSlug(slug: string | undefined | null): PortalRole | null {
+  if (!slug) return null;
+  const clean = slug.toLowerCase().trim().replace(/[_]+/g, '-');
+  if (clean === 'super-admin' || clean === 'superadmin') return 'super_admin';
+  if (clean === 'admin') return 'admin';
+  if (clean === 'moderator') return 'moderator';
+  if (clean === 'finance') return 'finance_manager';
+  if (clean === 'registration') return 'registration_officer';
+  if (clean === 'committee') return 'committee_member';
+  return null;
+}
+
+export function getPortalConfigByRole(role: PortalRole): PortalRoleConfig {
+  return PORTAL_ROLE_CONFIGS[role] || PORTAL_ROLE_CONFIGS.super_admin;
+}
+
+export function getPortalConfigBySlug(slug: string): PortalRoleConfig | null {
+  const role = getPortalRoleFromSlug(slug);
+  return role ? PORTAL_ROLE_CONFIGS[role] : null;
+}
+
 export interface AdminAccount {
   id: string;
   username: string;
   fullName: string;
   email: string;
-  role: 'super_admin' | 'registration_officer' | 'gate_scanner' | 'finance_manager';
+  role: PortalRole | 'gate_scanner';
   createdAt: string;
 }
 

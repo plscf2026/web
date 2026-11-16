@@ -5,6 +5,8 @@ import {
   AdminAccount,
   AdminAuditLog,
   SecurityAuditItem,
+  PortalRole,
+  PORTAL_ROLE_CONFIGS,
 } from '../types';
 import {
   sanitizeInput,
@@ -1436,11 +1438,13 @@ export const SupabaseService = {
   },
 
   /**
-   * Verify admin login credentials against the single claimed slot.
+   * Verify admin login credentials against the single claimed slot or role portal.
+   * If targetRole is specified, strictly validates that the user's role is authorized for that portal.
    */
   async loginAdmin(
     email: string,
-    password: string
+    password: string,
+    targetRole?: PortalRole
   ): Promise<{ success: boolean; account?: AdminAccount; error?: string }> {
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -1451,8 +1455,11 @@ export const SupabaseService = {
       (
         normalizedEmail === 'admin@gmail.com' ||
         normalizedEmail === 'admin' ||
+        normalizedEmail === 'venue.admin@gmail.com' ||
+        normalizedEmail === 'moderator@gmail.com' ||
         normalizedEmail === 'registration@gmail.com' ||
         normalizedEmail === 'finance@gmail.com' ||
+        normalizedEmail === 'committee@gmail.com' ||
         normalizedEmail === 'idcard.staff@gmail.com' ||
         normalizedEmail === 'supervisor@gmail.com'
       )
@@ -1461,7 +1468,15 @@ export const SupabaseService = {
       let fullName = 'System Administrator (Testing)';
       let id = 'admin-master-001';
 
-      if (normalizedEmail === 'registration@gmail.com') {
+      if (normalizedEmail === 'venue.admin@gmail.com') {
+        role = 'admin';
+        fullName = 'Venue Operations Administrator';
+        id = 'admin-venue-001';
+      } else if (normalizedEmail === 'moderator@gmail.com') {
+        role = 'moderator';
+        fullName = 'Campus Security & Floor Moderator';
+        id = 'admin-mod-001';
+      } else if (normalizedEmail === 'registration@gmail.com') {
         role = 'registration_officer';
         fullName = 'Dr. Nusrat Jahan (Registration Lead)';
         id = 'admin-reg-001';
@@ -1469,6 +1484,10 @@ export const SupabaseService = {
         role = 'finance_manager';
         fullName = 'Md. Shafiqul Alam (Finance Secretary)';
         id = 'admin-fin-001';
+      } else if (normalizedEmail === 'committee@gmail.com') {
+        role = 'committee_member';
+        fullName = 'Executive Committee Member';
+        id = 'admin-comm-001';
       } else if (normalizedEmail === 'idcard.staff@gmail.com') {
         role = 'super_admin';
         fullName = 'Kamrul Hasan (ID Card Coordinator)';
@@ -1477,6 +1496,16 @@ export const SupabaseService = {
         role = 'super_admin';
         fullName = 'Engr. Moniruzzaman (Floor Supervisor)';
         id = 'admin-sup-001';
+      }
+
+      // Role authorization check: Super admin can access all portals; other roles must match targetRole
+      if (targetRole && role !== 'super_admin' && role !== targetRole) {
+        const requiredPortalName = PORTAL_ROLE_CONFIGS[targetRole]?.titleEn || targetRole;
+        const userPortalName = PORTAL_ROLE_CONFIGS[role as PortalRole]?.titleEn || role;
+        return {
+          success: false,
+          error: `Access Denied: Your account is assigned to the "${userPortalName}". You cannot sign in through the "${requiredPortalName}".`,
+        };
       }
 
       const testAccount: AdminAccount & { expiresAt: number } = {
@@ -1514,12 +1543,25 @@ export const SupabaseService = {
       return { success: false, error: 'This account is not authorized as an administrator.' };
     }
 
+    const accountRole = (data.role || 'super_admin') as PortalRole;
+
+    // Authorize role against requested portal
+    if (targetRole && accountRole !== 'super_admin' && accountRole !== targetRole) {
+      await supabase.auth.signOut();
+      const requiredPortalName = PORTAL_ROLE_CONFIGS[targetRole]?.titleEn || targetRole;
+      const userPortalName = PORTAL_ROLE_CONFIGS[accountRole]?.titleEn || accountRole;
+      return {
+        success: false,
+        error: `Access Denied: Your account is assigned to the "${userPortalName}". You cannot sign in through the "${requiredPortalName}".`,
+      };
+    }
+
     const account: AdminAccount = {
       id: data.id,
       username: data.username,
       fullName: data.full_name || 'Administrator',
       email: data.email || authData.user.email || '',
-      role: data.role || 'super_admin',
+      role: accountRole,
       createdAt: data.created_at || new Date().toISOString(),
     };
 

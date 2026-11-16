@@ -7,6 +7,9 @@ import {
   Language,
   RegistrationRecord,
   FeeSettings,
+  PortalRole,
+  PORTAL_ROLE_CONFIGS,
+  getPortalRoleFromSlug,
 } from './types';
 import { AppStore } from './services/store';
 import { RegistrationFormData } from './utils/rules';
@@ -63,6 +66,10 @@ export default function App() {
     return resolveRouteFromLocation().view;
   });
 
+  const [currentPortalRole, setCurrentPortalRole] = useState<PortalRole | undefined>(() => {
+    return resolveRouteFromLocation().portalRole;
+  });
+
   const [notFoundPath, setNotFoundPath] = useState<string>(() => {
     return resolveRouteFromLocation().notFoundPath || '';
   });
@@ -72,6 +79,12 @@ export default function App() {
     if (view === 'register' && activeView === 'ticket') {
       handleStartNewRegistration();
       return;
+    }
+    if (extraParams?.role) {
+      const parsedRole = getPortalRoleFromSlug(extraParams.role);
+      setCurrentPortalRole(parsedRole || undefined);
+    } else if (view !== 'login' && view !== 'dashboard' && view !== 'admin') {
+      setCurrentPortalRole(undefined);
     }
     setActiveView(view);
     syncRouteHistory(view, replace, extraParams);
@@ -83,6 +96,7 @@ export default function App() {
     const handlePopState = () => {
       const resolved = resolveRouteFromLocation();
       setActiveView(resolved.view);
+      setCurrentPortalRole(resolved.portalRole);
       if (resolved.notFoundPath) {
         setNotFoundPath(resolved.notFoundPath);
       }
@@ -418,6 +432,13 @@ export default function App() {
           {(activeView === 'admin' || activeView === 'login' || activeView === 'dashboard') && (
             <AdminDashboard
               language={language}
+              portalRole={currentPortalRole}
+              onSwitchPortal={(targetRole) => {
+                setCurrentPortalRole(targetRole);
+                const slug = PORTAL_ROLE_CONFIGS[targetRole]?.slug || targetRole;
+                handleNavigate(activeView === 'dashboard' ? 'dashboard' : 'login', false, { role: slug });
+              }}
+              onNavigateHome={() => handleNavigate('home')}
               onSelectTicket={(reg) => {
                 setActiveTicket(reg);
                 handleNavigate('ticket');

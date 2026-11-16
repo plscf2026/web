@@ -5,7 +5,6 @@ import {
   Mail,
   Shield,
   ShieldCheck,
-  ShieldAlert,
   Heart,
   QrCode,
   ArrowUpRight,
@@ -13,7 +12,6 @@ import {
   Key,
   Building,
   Users,
-  Landmark,
   Utensils,
   Shirt,
   CreditCard,
@@ -21,13 +19,17 @@ import {
   Sparkles,
   Layers,
   CheckCircle2,
+  Crown,
+  UserCheck,
+  DollarSign,
+  UserPlus,
 } from 'lucide-react';
-import { Language } from '../types';
+import { Language, PortalRole, PORTAL_ROLE_CONFIGS } from '../types';
 import { translations } from '../i18n/translations';
 
 interface FooterProps {
   language: Language;
-  onNavigate: (view: string) => void;
+  onNavigate: (view: string, replace?: boolean, extraParams?: Record<string, string>) => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
@@ -62,29 +64,32 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
     };
   }, [isStaffOpen]);
 
-  // Executive Role Navigation Handler (Roles 1-4)
-  const handleSelectExecutiveRole = (
-    role: 'super_admin' | 'admin' | 'reg_mgr' | 'finance_mgr'
-  ) => {
+  // Executive Role Navigation Handler (Roles 1-6)
+  const handleSelectExecutiveRole = (role: PortalRole) => {
     setIsStaffOpen(false);
+    const config = PORTAL_ROLE_CONFIGS[role];
+    const slug = config?.slug || role;
     if (role === 'super_admin') {
       sessionStorage.setItem('plscf_admin_active_tab', 'masterOverview');
       sessionStorage.setItem('plscf_admin_prefill_user', 'admin@gmail.com');
-      sessionStorage.setItem('plscf_admin_auto_login', 'true');
     } else if (role === 'admin') {
       sessionStorage.setItem('plscf_admin_active_tab', 'allBookings');
       sessionStorage.setItem('plscf_admin_prefill_user', 'admin@gmail.com');
-      sessionStorage.setItem('plscf_admin_auto_login', 'true');
-    } else if (role === 'reg_mgr') {
-      sessionStorage.setItem('plscf_admin_active_tab', 'studentIds');
+    } else if (role === 'moderator') {
+      sessionStorage.setItem('plscf_admin_active_tab', 'tickets');
+      sessionStorage.setItem('plscf_admin_prefill_user', 'moderator@gmail.com');
+    } else if (role === 'registration_officer') {
+      sessionStorage.setItem('plscf_admin_active_tab', 'manualRegistration');
       sessionStorage.setItem('plscf_admin_prefill_user', 'registration@gmail.com');
-      sessionStorage.setItem('plscf_admin_auto_login', 'true');
-    } else if (role === 'finance_mgr') {
+    } else if (role === 'finance_manager') {
       sessionStorage.setItem('plscf_admin_active_tab', 'budgetManagement');
       sessionStorage.setItem('plscf_admin_prefill_user', 'finance@gmail.com');
-      sessionStorage.setItem('plscf_admin_auto_login', 'true');
+    } else if (role === 'committee_member') {
+      sessionStorage.setItem('plscf_admin_active_tab', 'reunionManagement');
+      sessionStorage.setItem('plscf_admin_prefill_user', 'committee@gmail.com');
     }
-    onNavigate('admin');
+    sessionStorage.setItem('plscf_current_portal_role', slug);
+    onNavigate('login', false, { role: slug });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -347,26 +352,21 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
               </div>
             </div>
 
-            {/* Smart RBAC Button Grid: 4 Executive Roles + 1 Smart Staff Button */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 relative">
+            {/* Dedicated Role Portals: 6 Separate Portals for Each User Role */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-3">
               {/* 1. Super Admin */}
               <button
                 type="button"
                 onClick={() => handleSelectExecutiveRole('super_admin')}
                 className="group flex flex-col justify-between p-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-purple-500/30 hover:border-purple-400 transition-all text-left cursor-pointer shadow-md hover:shadow-purple-950/40"
-                title="Super Admin • Master Overview & Root DB Control"
+                title="Super Admin Portal • Master Event Architecture & DB Governance"
               >
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300 group-hover:scale-105 transition-transform">
-                      <ShieldAlert className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-mono font-bold text-purple-300 bg-purple-950/60 px-1.5 py-0.5 rounded border border-purple-800/60">
-                      1
-                    </span>
+                <div className="flex items-center justify-between gap-1.5 mb-2">
+                  <div className="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300 group-hover:scale-105 transition-transform">
+                    <Crown className="w-4 h-4" />
                   </div>
                   <span className="text-[10px] uppercase font-bold tracking-wider text-purple-300/80 bg-purple-900/30 px-2 py-0.5 rounded-full border border-purple-800/40">
-                    Root L1
+                    Master
                   </span>
                 </div>
                 <div>
@@ -374,7 +374,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
                     {language === 'bn' ? '১. সুপার অ্যাডমিন' : '1. Super Admin'}
                   </h5>
                   <p className="text-[11px] text-slate-400 leading-tight mt-0.5">
-                    {language === 'bn' ? 'মাস্টার ওভারভিউ ও সিস্টেম অডিট' : 'Master Overview & System DB'}
+                    {language === 'bn' ? 'মাস্টার কমান্ড ও পূর্ণ এক্সেস' : 'Master Overview & DB'}
                   </p>
                 </div>
               </button>
@@ -384,19 +384,14 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
                 type="button"
                 onClick={() => handleSelectExecutiveRole('admin')}
                 className="group flex flex-col justify-between p-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-sky-500/30 hover:border-sky-400 transition-all text-left cursor-pointer shadow-md hover:shadow-sky-950/40"
-                title="Admin • All Bookings, Registry & Fee Settings"
+                title="Admin Portal • All Bookings, Registry & Venue Management"
               >
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-[#38BDF8] group-hover:scale-105 transition-transform">
-                      <ShieldCheck className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-mono font-bold text-[#38BDF8] bg-sky-950/60 px-1.5 py-0.5 rounded border border-sky-800/60">
-                      2
-                    </span>
+                <div className="flex items-center justify-between gap-1.5 mb-2">
+                  <div className="w-7 h-7 rounded-lg bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-[#38BDF8] group-hover:scale-105 transition-transform">
+                    <ShieldCheck className="w-4 h-4" />
                   </div>
                   <span className="text-[10px] uppercase font-bold tracking-wider text-sky-300/80 bg-sky-900/30 px-2 py-0.5 rounded-full border border-sky-800/40">
-                    Admin L2
+                    Admin
                   </span>
                 </div>
                 <div>
@@ -404,118 +399,144 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
                     {language === 'bn' ? '২. অ্যাডমিন' : '2. Admin'}
                   </h5>
                   <p className="text-[11px] text-slate-400 leading-tight mt-0.5">
-                    {language === 'bn' ? 'সকল বুকিং, রেজিস্ট্রেশন ও নোটিশ' : 'All Bookings & Supabase DB'}
+                    {language === 'bn' ? 'বুকিং, নোটিশ ও সেটিংস' : 'Bookings & Venue Ops'}
                   </p>
                 </div>
               </button>
 
-              {/* 3. Reg Manager */}
+              {/* 3. Moderator */}
               <button
                 type="button"
-                onClick={() => handleSelectExecutiveRole('reg_mgr')}
+                onClick={() => handleSelectExecutiveRole('moderator')}
                 className="group flex flex-col justify-between p-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-emerald-500/30 hover:border-emerald-400 transition-all text-left cursor-pointer shadow-md hover:shadow-emerald-950/40"
-                title="Registration Manager • Student ID Verification & Approval"
+                title="Moderator Portal • Verification & Attendee Supervision"
               >
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-300 group-hover:scale-105 transition-transform">
-                      <Users className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-mono font-bold text-emerald-300 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/60">
-                      3
-                    </span>
+                <div className="flex items-center justify-between gap-1.5 mb-2">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
+                    <UserCheck className="w-4 h-4" />
                   </div>
                   <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-300/80 bg-emerald-900/30 px-2 py-0.5 rounded-full border border-emerald-800/40">
-                    Reg L3
+                    Mod
                   </span>
                 </div>
                 <div>
                   <h5 className="text-xs font-bold text-white group-hover:text-emerald-200 transition-colors">
-                    {language === 'bn' ? '৩. রেজি. ম্যানেজার' : '3. Reg Manager'}
+                    {language === 'bn' ? '৩. মডারেটর' : '3. Moderator'}
                   </h5>
                   <p className="text-[11px] text-slate-400 leading-tight mt-0.5">
-                    {language === 'bn' ? 'স্টুডেন্ট আইডি ও যাচাইকরণ' : 'Student ID & Verification'}
+                    {language === 'bn' ? 'যাচাই ও টিকিট তথ্য' : 'Verification & Passes'}
                   </p>
                 </div>
               </button>
 
-              {/* 4. Finance Mgr */}
+              {/* 4. Finance Team */}
               <button
                 type="button"
-                onClick={() => handleSelectExecutiveRole('finance_mgr')}
+                onClick={() => handleSelectExecutiveRole('finance_manager')}
                 className="group flex flex-col justify-between p-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-amber-500/30 hover:border-amber-400 transition-all text-left cursor-pointer shadow-md hover:shadow-amber-950/40"
-                title="Finance Manager • Budget Allocation & Expense Vouchers"
+                title="Finance Team Portal • Treasury, Budget & Manual Financial Approval"
               >
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 group-hover:scale-105 transition-transform">
-                      <Landmark className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-mono font-bold text-amber-300 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-800/60">
-                      4
-                    </span>
+                <div className="flex items-center justify-between gap-1.5 mb-2">
+                  <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 group-hover:scale-105 transition-transform">
+                    <DollarSign className="w-4 h-4" />
                   </div>
                   <span className="text-[10px] uppercase font-bold tracking-wider text-amber-300/80 bg-amber-900/30 px-2 py-0.5 rounded-full border border-amber-800/40">
-                    Finance L4
+                    Finance
                   </span>
                 </div>
                 <div>
                   <h5 className="text-xs font-bold text-white group-hover:text-amber-200 transition-colors">
-                    {language === 'bn' ? '৪. ফাইন্যান্স ম্যানেজার' : '4. Finance Mgr'}
+                    {language === 'bn' ? '৪. ফাইন্যান্স' : '4. Finance'}
                   </h5>
                   <p className="text-[11px] text-slate-400 leading-tight mt-0.5">
-                    {language === 'bn' ? 'বাজেট, ভাউচার ও ব্যয় অডিট' : 'Budget, Vouchers & Accounts'}
+                    {language === 'bn' ? 'বাজেট, ভাউচার ও হিসেব' : 'Budget & Treasury'}
                   </p>
                 </div>
               </button>
 
-              {/* 5. Smart Staff Button with Expandable Popover / Dropdown */}
+              {/* 5. Registration Team */}
+              <button
+                type="button"
+                onClick={() => handleSelectExecutiveRole('registration_officer')}
+                className="group flex flex-col justify-between p-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-cyan-500/30 hover:border-cyan-400 transition-all text-left cursor-pointer shadow-md hover:shadow-cyan-950/40"
+                title="Registration Team Portal • Venue Registration Desk & ID Cards"
+              >
+                <div className="flex items-center justify-between gap-1.5 mb-2">
+                  <div className="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-300 group-hover:scale-105 transition-transform">
+                    <UserPlus className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-cyan-300/80 bg-cyan-900/30 px-2 py-0.5 rounded-full border border-cyan-800/40">
+                    Register
+                  </span>
+                </div>
+                <div>
+                  <h5 className="text-xs font-bold text-white group-hover:text-cyan-200 transition-colors">
+                    {language === 'bn' ? '৫. রেজিস্ট্রেশন' : '5. Registration'}
+                  </h5>
+                  <p className="text-[11px] text-slate-400 leading-tight mt-0.5">
+                    {language === 'bn' ? 'ভেন্যু নিবন্ধন ও আইডি কার্ড' : 'Venue Desk & Badges'}
+                  </p>
+                </div>
+              </button>
+
+              {/* 6. Committee Member */}
+              <button
+                type="button"
+                onClick={() => handleSelectExecutiveRole('committee_member')}
+                className="group flex flex-col justify-between p-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-purple-500/30 hover:border-purple-400 transition-all text-left cursor-pointer shadow-md hover:shadow-purple-950/40"
+                title="Committee Member Portal • Collaboration & Task Board"
+              >
+                <div className="flex items-center justify-between gap-1.5 mb-2">
+                  <div className="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300 group-hover:scale-105 transition-transform">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-purple-300/80 bg-purple-900/30 px-2 py-0.5 rounded-full border border-purple-800/40">
+                    Committee
+                  </span>
+                </div>
+                <div>
+                  <h5 className="text-xs font-bold text-white group-hover:text-purple-200 transition-colors">
+                    {language === 'bn' ? '৬. কমিটি পোর্টাল' : '6. Committee'}
+                  </h5>
+                  <p className="text-[11px] text-slate-400 leading-tight mt-0.5">
+                    {language === 'bn' ? 'সমন্বয় ও টাস্ক ম্যানেজমেন্ট' : 'RMS & Planning'}
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            {/* Field Staff Station Bar with Expandable Popover */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-slate-900/60 border border-slate-800 relative mb-4">
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>
+                  {language === 'bn'
+                    ? 'অন-সাইট ফিল্ড স্ক্যানার স্টেশন (গেট, ফুড, টি-শার্ট ও কার্ড ম্যানেজমেন্ট)'
+                    : 'On-Site Field Scanner Stations (Gate, Lunch, Kit & ID Card Scanners)'}
+                </span>
+              </div>
+
+              {/* Smart Staff Button with Expandable Popover / Dropdown */}
               <div className="relative" ref={staffMenuRef}>
                 <button
                   type="button"
                   onClick={() => setIsStaffOpen((prev) => !prev)}
                   aria-expanded={isStaffOpen}
                   aria-haspopup="true"
-                  className={`w-full h-full group flex flex-col justify-between p-3.5 rounded-xl transition-all text-left cursor-pointer shadow-md ${
+                  className={`group flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all cursor-pointer text-xs font-bold ${
                     isStaffOpen
-                      ? 'bg-rose-950/70 border-2 border-rose-400 shadow-rose-950/50'
-                      : 'bg-slate-900/90 hover:bg-slate-800/90 border border-rose-500/30 hover:border-rose-400 hover:shadow-rose-950/40'
+                      ? 'bg-rose-950 text-rose-300 border border-rose-500/80 shadow-rose-950/50'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
                   }`}
-                  title="Staff Stations • Click to select Gate, Meal, Dress, Card Manager, or Committee Dir"
+                  title="Staff Stations • Gate, Meal, Dress, Card Desk"
                 >
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-300 group-hover:scale-105 transition-transform">
-                        <QrCode className="w-4 h-4" />
-                      </div>
-                      <span className="text-xs font-mono font-bold text-rose-300 bg-rose-950/60 px-1.5 py-0.5 rounded border border-rose-800/60">
-                        5
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-rose-300/90 bg-rose-900/40 px-2 py-0.5 rounded-full border border-rose-800/50">
-                        5 Stations
-                      </span>
-                      <ChevronDown
-                        className={`w-3.5 h-3.5 text-rose-400 transition-transform duration-200 ${
-                          isStaffOpen ? 'rotate-180' : ''
-                        }`}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <h5 className="text-xs font-bold text-white group-hover:text-rose-200 transition-colors flex items-center justify-between">
-                      <span>{language === 'bn' ? '৫. ফিল্ড স্টাফ' : '5. Staff'}</span>
-                      <span className="text-[10px] text-rose-300/80 font-mono">
-                        {isStaffOpen ? '▲ Close' : '▼ Open'}
-                      </span>
-                    </h5>
-                    <p className="text-[11px] text-slate-400 leading-tight mt-0.5">
-                      {language === 'bn'
-                        ? 'গেট, মিল, ড্রেস, কার্ড ও কমিটি'
-                        : 'Gate, Meal, Dress, Card, Dir'}
-                    </p>
-                  </div>
+                  <QrCode className="w-3.5 h-3.5 text-rose-400" />
+                  <span>{language === 'bn' ? 'ফিল্ড স্ক্যানার স্টেশনসমূহ' : 'Field Scanner Stations'}</span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 text-rose-400 transition-transform duration-200 ${
+                      isStaffOpen ? 'rotate-180' : ''
+                    }`}
+                  />
                 </button>
 
                 {/* Smart Popover for the 5 Staff Stations */}
@@ -671,12 +692,12 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
           {/* Admin link in bottom bar */}
           <div className="flex items-center gap-4">
             <button
-              onClick={() => onNavigate('admin')}
+              onClick={() => onNavigate('login')}
               className="text-slate-400 hover:text-[#38BDF8] flex items-center gap-1.5 transition-colors cursor-pointer text-xs"
             >
               <Key className="w-3.5 h-3.5 text-[#0EA5E9]" />
               <span>
-                {language === 'bn' ? 'অ্যাডমিন পোর্টাল (লগইন/সাইন-আপ)' : 'Admin Portal (Login / Sign-up)'}
+                {language === 'bn' ? 'অ্যাডমিন ও রোল পোর্টাল ডিরেক্টরি' : 'Role Portals Directory (Login)'}
               </span>
             </button>
 
