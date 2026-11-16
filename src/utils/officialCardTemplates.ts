@@ -39,6 +39,90 @@ export interface OfficialCardData {
   isPreview?: boolean;
 }
 
+/**
+ * Convert any remote or blob image URL into a standalone Base64 Data URL.
+ * Required because modern web browsers isolate SVG Blob URLs during canvas rasterization
+ * and refuse to load external HTTPS subresources inside SVG <img> elements.
+ */
+export async function convertImageUrlToDataUrl(url?: string | null): Promise<string> {
+  if (!url || typeof url !== 'string' || !url.trim()) return '';
+  const trimmed = url.trim();
+  if (trimmed.startsWith('data:image/')) return trimmed;
+
+  // 1. Browser/Node fetch with CORS
+  if (typeof fetch !== 'undefined') {
+    try {
+      const response = await fetch(trimmed, { mode: 'cors' });
+      if (response.ok) {
+        if (typeof FileReader !== 'undefined') {
+          const blob = await response.blob();
+          return await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve((reader.result as string) || trimmed);
+            reader.onerror = () => resolve(trimmed);
+            reader.readAsDataURL(blob);
+          });
+        } else if (typeof Buffer !== 'undefined') {
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          const mime = response.headers.get('content-type') || 'image/webp';
+          return `data:${mime};base64,${buffer.toString('base64')}`;
+        }
+      }
+    } catch {
+      // Fetch failed (network or CORS block), proceed to Image canvas fallback
+    }
+  }
+
+  // 2. Offscreen Canvas fallback for browser context
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    try {
+      const dataUri = await new Promise<string>((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth || img.width || 400;
+            canvas.height = img.naturalHeight || img.height || 400;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0);
+              resolve(canvas.toDataURL('image/jpeg', 0.95));
+              return;
+            }
+          } catch {}
+          resolve(trimmed);
+        };
+        img.onerror = () => resolve(trimmed);
+        img.src = trimmed;
+      });
+      return dataUri;
+    } catch {}
+  }
+
+  return trimmed;
+}
+
+/**
+ * Preload all external assets (specifically student photo and QR code)
+ * into Base64 Data URIs so that rasterization never encounters cross-origin or SVG sandboxing issues.
+ */
+export async function preloadCardAssets(data: OfficialCardData): Promise<OfficialCardData> {
+  const cloned: OfficialCardData = { ...data };
+  if (cloned.photoUrl && !cloned.photoUrl.startsWith('data:image/')) {
+    try {
+      const converted = await convertImageUrlToDataUrl(cloned.photoUrl);
+      if (converted && converted.startsWith('data:image/')) {
+        cloned.photoUrl = converted;
+      }
+    } catch (err) {
+      console.warn('[OfficialCard] Error preloading photo to dataUrl:', err);
+    }
+  }
+  return cloned;
+}
+
 const REFERENCED_DEF_IDS = [
   'blue',
   'book',
@@ -262,7 +346,8 @@ export function rasterizeSvgToCanvas(
 export async function generateOfficialCardImage(
   data: OfficialCardData
 ): Promise<{ dataUrl: string; blob: Blob }> {
-  const svgString = buildOfficialCardSvg(data);
+  const readyData = await preloadCardAssets(data);
+  const svgString = buildOfficialCardSvg(readyData);
   const canvas = await rasterizeSvgToCanvas(svgString, 900, 1350);
 
   const dataUrl = canvas.toDataURL('image/png');

@@ -153,6 +153,13 @@ export function fromDownloadLogDbRow(row: any): IdCardDownloadLog {
   };
 }
 
+function getBaseVerificationUrl(): string {
+  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+    return window.location.origin;
+  }
+  return 'https://plscf2026.reunion.org';
+}
+
 function safeSupabaseUpsert(table: string, row: Record<string, any>): void {
   try {
     Promise.resolve(supabase.from(table).upsert(row))
@@ -412,7 +419,7 @@ export class IdCardStore {
     const safeId = reg.id || 'IDC-CARD';
     const safeToken = reg.qrToken || 'TOKEN';
 
-    const verificationUrl = `https://plscf2026.reunion.org/verify-student-id?id=${encodeURIComponent(
+    const verificationUrl = `${getBaseVerificationUrl()}/verify-student-id?id=${encodeURIComponent(
       safeId
     )}&token=${encodeURIComponent(safeToken)}`;
 
@@ -516,7 +523,7 @@ export class IdCardStore {
         });
       } else {
         // Create new ID card record
-        const verificationUrl = `https://plscf2026.reunion.org/verify-student-id?id=${encodeURIComponent(
+        const verificationUrl = `${getBaseVerificationUrl()}/verify-student-id?id=${encodeURIComponent(
           safeId
         )}&token=${encodeURIComponent(safeToken)}`;
 
@@ -564,10 +571,11 @@ export class IdCardStore {
             contactNumber: card.contactNumber || 'N/A',
             qrToken: card.qrToken || 'TOKEN',
             verificationUrl:
-              card.verificationUrl ||
-              `https://plscf2026.reunion.org/verify-student-id?id=${encodeURIComponent(
-                card.idNumber || card.registrationId || 'ID'
-              )}&token=${encodeURIComponent(card.qrToken || 'TOKEN')}`,
+              card.verificationUrl && !card.verificationUrl.includes('plscf2026.reunion.org')
+                ? card.verificationUrl
+                : `${getBaseVerificationUrl()}/verify-student-id?id=${encodeURIComponent(
+                    card.idNumber || card.registrationId || 'ID'
+                  )}&token=${encodeURIComponent(card.qrToken || 'TOKEN')}`,
           }));
         }
       }

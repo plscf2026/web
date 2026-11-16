@@ -272,7 +272,19 @@ export default function App() {
           setActiveTicket(local);
           handleNavigate('ticket', true, { id: ticketIdOrToken! });
         } else {
-          handleNavigate('find-ticket', true);
+          // Resilient cloud lookup if attendee opens ticket on a different/mobile device
+          AppStore.findRegistrationAsync(ticketIdOrToken!)
+            .then((cloudRecord) => {
+              if (cloudRecord) {
+                setActiveTicket(cloudRecord);
+                handleNavigate('ticket', true, { id: ticketIdOrToken! });
+              } else {
+                handleNavigate('find-ticket', true);
+              }
+            })
+            .catch(() => {
+              handleNavigate('find-ticket', true);
+            });
         }
       } else if (resolved.view === '404') {
         setNotFoundPath(resolved.notFoundPath || (typeof window !== 'undefined' ? window.location.pathname : ''));

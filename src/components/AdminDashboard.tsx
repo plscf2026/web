@@ -456,6 +456,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const validCloudData = res.data.filter((r) => !deletedIds.has(r.id));
         setRegistrations(validCloudData);
         AppStore.saveRegistrations(validCloudData);
+        IdCardStore.syncWithRegistrations();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('plscf_registration_updated'));
+        }
       }
     } catch (err) {
       console.warn('Error fetching registrations from Supabase:', err);

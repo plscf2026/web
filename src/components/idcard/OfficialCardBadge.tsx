@@ -19,6 +19,7 @@ import {
   generateOfficialCardPdf,
   printOfficialCard,
   OfficialCardData,
+  convertImageUrlToDataUrl,
 } from '../../utils/officialCardTemplates';
 
 export interface OfficialCardBadgeProps {
@@ -53,6 +54,7 @@ export const OfficialCardBadge: React.FC<OfficialCardBadgeProps> = ({
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [localQrDataUrl, setLocalQrDataUrl] = useState<string>('');
+  const [embeddedPhotoDataUrl, setEmbeddedPhotoDataUrl] = useState<string>('');
 
   // Determine actual card design: 'student' | 'alumni' | 'parent'
   const resolvedCardType: CardType =
@@ -62,6 +64,31 @@ export const OfficialCardBadge: React.FC<OfficialCardBadgeProps> = ({
 
   // Parent Pass specifics
   const isParent = resolvedCardType === 'parent';
+
+  // Pre-resolve student or parent photo into standalone Base64 Data URL for on-screen SVG & print rasterization
+  useEffect(() => {
+    let isCancelled = false;
+    const targetPhoto = isParent ? student?.parentPhotoUrl : student?.photoUrl;
+    if (targetPhoto && targetPhoto.trim()) {
+      if (targetPhoto.startsWith('data:image/')) {
+        setEmbeddedPhotoDataUrl(targetPhoto);
+      } else {
+        convertImageUrlToDataUrl(targetPhoto)
+          .then((dataUri) => {
+            if (!isCancelled && dataUri && dataUri.startsWith('data:image/')) {
+              setEmbeddedPhotoDataUrl(dataUri);
+            }
+          })
+          .catch(() => {});
+      }
+    } else {
+      setEmbeddedPhotoDataUrl('');
+    }
+    return () => {
+      isCancelled = true;
+    };
+  }, [student?.photoUrl, student?.parentPhotoUrl, isParent]);
+
   const parentPassId = student
     ? student.idNumber?.startsWith('PAR-')
       ? student.idNumber
@@ -77,14 +104,19 @@ export const OfficialCardBadge: React.FC<OfficialCardBadgeProps> = ({
   useEffect(() => {
     let isCancelled = false;
     if (student) {
+      const baseUrl =
+        typeof window !== 'undefined' && window.location.origin
+          ? window.location.origin
+          : 'https://plscf2026.reunion.org';
       const targetUrl = isParent
-        ? `https://plscf2026.reunion.org/verify-parent-pass?id=${encodeURIComponent(
+        ? `${baseUrl}/verify-parent-pass?id=${encodeURIComponent(
             parentPassId
           )}&studentId=${encodeURIComponent(student.idNumber || '')}&token=${encodeURIComponent(
             parentToken
           )}`
-        : student.verificationUrl ||
-          `https://plscf2026.reunion.org/verify-student-id?id=${encodeURIComponent(
+        : student.verificationUrl?.startsWith('http') && !student.verificationUrl.includes('plscf2026.reunion.org')
+        ? student.verificationUrl
+        : `${baseUrl}/verify-student-id?id=${encodeURIComponent(
             student.idNumber || student.registrationId || 'ID'
           )}&token=${encodeURIComponent(student.qrToken || 'TOKEN')}`;
 
@@ -149,7 +181,7 @@ export const OfficialCardBadge: React.FC<OfficialCardBadgeProps> = ({
       : isParent
       ? parentPassId
       : student.idNumber || student.registrationId || 'N/A',
-    photoUrl: isParent ? student.parentPhotoUrl || '' : student.photoUrl || '',
+    photoUrl: embeddedPhotoDataUrl || (isParent ? student.parentPhotoUrl || '' : student.photoUrl || ''),
     qrDataUrl: localQrDataUrl || '',
     uniqueId: safeUniqueId,
     isPreview: isPreviewCard,

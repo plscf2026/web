@@ -112,17 +112,32 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
   // Synchronize with Supabase ID card & download job tables on mount
   useEffect(() => {
     let mounted = true;
+    const reloadAllCards = () => {
+      IdCardStore.syncWithRegistrations();
+      if (mounted) {
+        setCards(IdCardStore.getIdCards());
+        setBatches(IdCardStore.getBatchCollections());
+        setDownloadLogs(IdCardStore.getDownloadLogs());
+      }
+    };
+
+    reloadAllCards();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('plscf_registration_updated', reloadAllCards);
+    }
+
     IdCardStore.syncWithSupabase()
       .then(() => {
         if (mounted) {
-          setCards(IdCardStore.getIdCards());
-          setBatches(IdCardStore.getBatchCollections());
-          setDownloadLogs(IdCardStore.getDownloadLogs());
+          reloadAllCards();
         }
       })
       .catch(() => {});
     return () => {
       mounted = false;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('plscf_registration_updated', reloadAllCards);
+      }
     };
   }, []);
 
