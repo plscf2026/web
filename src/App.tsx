@@ -20,6 +20,8 @@ import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
 import type { ModalStep } from './components/PaymentModal';
 import { resolveRouteFromLocation, syncRouteHistory } from './utils/navigation';
+import { SupabaseService } from './services/supabase';
+import { subscribeToAuthSync } from './services/authSync';
 
 // Route-level code-splitting: heavy pages and portals are loaded on-demand
 const RegistrationPage = lazy(() => import('./components/RegistrationPage').then((m) => ({ default: m.RegistrationPage })));
@@ -80,6 +82,12 @@ export default function App() {
       handleStartNewRegistration();
       return;
     }
+
+    // Role-based session isolation: returning to public Home Page terminates administrative/staff sessions
+    if (view === 'home' && (activeView === 'dashboard' || activeView === 'admin' || activeView === 'login' || activeView === 'scanner' || activeView === 'portal')) {
+      SupabaseService.terminateAdministrativeSession({ forceLocal: true }).catch(() => {});
+    }
+
     if (extraParams?.role) {
       const parsedRole = getPortalRoleFromSlug(extraParams.role);
       setCurrentPortalRole(parsedRole || undefined);
@@ -91,10 +99,29 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Cross-tab authentication synchronization listener
+  useEffect(() => {
+    const unsubscribe = subscribeToAuthSync((event) => {
+      if (event.action === 'LOGOUT') {
+        setActiveView((prev) => {
+          if (prev === 'dashboard') {
+            return 'home';
+          }
+          return prev;
+        });
+        setCurrentPortalRole(undefined);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Listen to browser Back/Forward navigation buttons
   useEffect(() => {
     const handlePopState = () => {
       const resolved = resolveRouteFromLocation();
+      if (resolved.view === 'home') {
+        SupabaseService.terminateAdministrativeSession({ forceLocal: true }).catch(() => {});
+      }
       setActiveView(resolved.view);
       setCurrentPortalRole(resolved.portalRole);
       if (resolved.notFoundPath) {

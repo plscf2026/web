@@ -16,6 +16,7 @@ import { StaffAccount, Language } from '../types';
 import { EventStore } from '../services/eventStore';
 import { AppStore } from '../services/store';
 import { isDevTestBypassAllowed, supabase } from '../services/supabase';
+import { subscribeToAuthSync } from '../services/authSync';
 import { isBreakfastCollectionOpen } from '../utils/eventRules';
 import { FoodScannerModule } from './FoodScannerModule';
 import { DressScannerModule } from './DressScannerModule';
@@ -152,9 +153,17 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
       }
     });
 
+    const unsubscribeAuthSync = subscribeToAuthSync((syncEvent) => {
+      if (syncEvent.action === 'LOGOUT' && active) {
+        setCurrentStaff(null);
+        setIsLoadingSession(false);
+      }
+    });
+
     return () => {
       active = false;
       subscription?.unsubscribe();
+      unsubscribeAuthSync();
     };
   }, [isDevMode]);
 

@@ -24,7 +24,7 @@ import {
   FinancialLedgerEntry,
   AdminAuditHistoryItem,
 } from '../types';
-import { supabase, isDevTestBypassAllowed } from './supabase';
+import { supabase, isDevTestBypassAllowed, SupabaseService } from './supabase';
 import { safeRandomUUID } from '../utils/security';
 import { findRegistrationByTokenOrId } from '../utils/tokenGenerator';
 import { AppStore } from './store';
@@ -722,15 +722,7 @@ export class EventStore {
   }
 
   static async logoutStaff(): Promise<void> {
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.removeItem('plscf_test_staff_session');
-        sessionStorage.removeItem('plscf_scanner_module');
-        sessionStorage.removeItem('plscf_scanner_prefill_user');
-      } catch (_) { }
-    }
-    const { error } = await supabase.auth.signOut();
-    if (error) console.warn('Supabase staff logout:', error);
+    await SupabaseService.terminateAdministrativeSession({ forceLocal: true });
   }
 
   /**

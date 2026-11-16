@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { Language, PortalRole, PORTAL_ROLE_CONFIGS } from '../types';
 import { translations } from '../i18n/translations';
+import { SupabaseService } from '../services/supabase';
 
 interface FooterProps {
   language: Language;
@@ -64,9 +65,12 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
     };
   }, [isStaffOpen]);
 
-  // Executive Role Navigation Handler (Roles 1-6)
-  const handleSelectExecutiveRole = (role: PortalRole) => {
+  // Executive Role Navigation Handler (Roles 1-6) with strict session isolation
+  const handleSelectExecutiveRole = async (role: PortalRole) => {
     setIsStaffOpen(false);
+    try {
+      await SupabaseService.terminateAdministrativeSession({ forceLocal: true });
+    } catch (_) {}
     const config = PORTAL_ROLE_CONFIGS[role];
     const slug = config?.slug || role;
     if (role === 'super_admin') {
@@ -93,11 +97,14 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Staff Station Navigation Handler (Role 5 stations)
-  const handleSelectStaffStation = (
+  // Staff Station Navigation Handler (Role 5 stations) with strict session isolation
+  const handleSelectStaffStation = async (
     station: 'gate' | 'meal' | 'dress' | 'card' | 'committee'
   ) => {
     setIsStaffOpen(false);
+    try {
+      await SupabaseService.terminateAdministrativeSession({ forceLocal: true });
+    } catch (_) {}
     if (station === 'gate') {
       sessionStorage.setItem('plscf_scanner_module', 'gate_scanner');
       sessionStorage.setItem('plscf_scanner_prefill_user', 'gate@gmail.com');
@@ -121,6 +128,14 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
     } else if (station === 'committee') {
       onNavigate('portal');
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDirectPortalNav = async (view: string) => {
+    try {
+      await SupabaseService.terminateAdministrativeSession({ forceLocal: true });
+    } catch (_) {}
+    onNavigate(view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -227,7 +242,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
             <ul className="space-y-2 text-xs">
               <li>
                 <button
-                  onClick={() => onNavigate('portal')}
+                  onClick={() => handleDirectPortalNav('portal')}
                   className="flex items-center justify-between px-3 py-2 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] border border-[#0284C7]/60 text-white w-full transition-all cursor-pointer group shadow-xs"
                   title="Central Organizing Committee RMS Portal"
                 >
@@ -244,7 +259,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
               </li>
               <li>
                 <button
-                  onClick={() => onNavigate('scanner')}
+                  onClick={() => handleDirectPortalNav('scanner')}
                   className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] border border-[#1E293B] text-[#38BDF8] w-full transition-colors cursor-pointer"
                 >
                   <QrCode className="w-4 h-4 text-[#0EA5E9]" />
@@ -253,7 +268,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
               </li>
               <li>
                 <button
-                  onClick={() => onNavigate('admin')}
+                  onClick={() => handleDirectPortalNav('admin')}
                   className="flex items-center justify-between px-3 py-2 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] border border-[#0284C7]/40 text-[#E2EEF8] w-full transition-all cursor-pointer group shadow-xs"
                   title="Exclusive Administrator Access (Single Slot / Supabase Command)"
                 >
@@ -692,7 +707,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
           {/* Admin link in bottom bar */}
           <div className="flex items-center gap-4">
             <button
-              onClick={() => onNavigate('login')}
+              onClick={() => handleDirectPortalNav('login')}
               className="text-slate-400 hover:text-[#38BDF8] flex items-center gap-1.5 transition-colors cursor-pointer text-xs"
             >
               <Key className="w-3.5 h-3.5 text-[#0EA5E9]" />

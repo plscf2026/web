@@ -53,6 +53,7 @@ import {
 import { RoleLoginPage } from './auth/RoleLoginPage';
 import { RoleDirectoryPortal } from './auth/RoleDirectoryPortal';
 import { AccessDeniedGate } from './auth/AccessDeniedGate';
+import { subscribeToAuthSync } from '../services/authSync';
 import { translations } from '../i18n/translations';
 import { AppStore, INITIAL_STAFF_USERS } from '../services/store';
 import { calculateFinancialSummary } from '../utils/rules';
@@ -142,9 +143,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // ==========================================
   const [adminSession, setAdminSession] = useState<AdminAccount | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState<boolean>(true);
+  const [quarantineError, setQuarantineError] = useState<string | null>(null);
+  const [isRetryingLogout, setIsRetryingLogout] = useState<boolean>(false);
 
   // Dev bypass enabled only in local development
   const isDevBypass = isDevTestBypassAllowed();
+
+  // Cross-tab authentication synchronization listener
+  useEffect(() => {
+    const unsubscribe = subscribeToAuthSync((event) => {
+      if (event.action === 'LOGOUT') {
+        setAdminSession(null);
+        setIsLoadingSession(false);
+        setQuarantineError(null);
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   // Check session on mount and handle RBAC prefill / auto-login
   useEffect(() => {
@@ -227,6 +242,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       sessionStorage.removeItem('plscf_current_portal_role');
       sessionStorage.removeItem('plscf_admin_active_tab');
     } catch (_) {}
+  };
+
+  // Handle portal switching with strict session isolation
+  const handleSwitchPortalWithIsolation = async (targetRole: PortalRole, toDashboard = false) => {
+    if (adminSession && targetRole !== adminSession.role) {
+      const res = await SupabaseService.terminateAdministrativeSession();
+      if (!res.success) {
+        setQuarantineError(res.error || 'Server-side sign-out unconfirmed');
+        return;
+      }
+      setAdminSession(null);
+    }
+    setQuarantineError(null);
+    setActivePortalRole(targetRole);
+    onSwitchPortal?.(targetRole, toDashboard);
+  };
+
+  // Handle returning to the public Home page with strict session termination
+  const handleNavigateHomeWithIsolation = async () => {
+    if (adminSession) {
+      await SupabaseService.terminateAdministrativeSession({ forceLocal: true });
+      setAdminSession(null);
+    }
+    setQuarantineError(null);
+    if (onNavigateHome) {
+      onNavigateHome();
+    } else if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
   };
 
   // ==========================================
@@ -755,6 +799,79 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     );
   }
 
+  // ==========================================
+  // VIEW 0.5: FAILED LOGOUT QUARANTINE GATE (Requirement #3)
+  // Blocks destination administrative portal until clean unauthenticated state is achieved
+  // ==========================================
+  if (quarantineError) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4 sm:p-8 font-satoshi">
+        <div className="max-w-md w-full bg-slate-900 border border-amber-500/40 rounded-3xl p-6 sm:p-8 text-center text-white space-y-4 shadow-2xl">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <div>
+            <span className="text-[10px] font-black tracking-widest uppercase px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              {language === 'bn' ? 'সার্ভার সাইন-আউট অসমাপ্ত' : 'Server Sign-Out Unconfirmed'}
+            </span>
+            <h2 className="text-xl font-black mt-2">
+              {language === 'bn' ? 'সুপাবেস সেশন প্রত্যাহার নিশ্চিত নয়' : 'Revocation Confirmation Pending'}
+            </h2>
+            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+              {language === 'bn'
+                ? 'নেটওয়ার্ক বা সার্ভার ত্রুটির কারণে সুপাবেস অথেন্টিকেশন সার্ভারের সাথে সংযোগ বিচ্ছিন্ন হয়েছে। অন্য প্রশাসনিক পোর্টালে প্রবেশের পূর্বে সার্ভার সাইন-আউট পুনরায় চেষ্টা করুন অথবা লোকাল সেশন মুছে হোমে ফিরে যান।'
+                : 'Unable to confirm session revocation with the Supabase authentication server (Network / Server Error). Access to the destination administrative portal is quarantined until an unauthenticated state is verified.'}
+            </p>
+            <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-rose-300 font-mono text-[11px] mt-3 break-all">
+              {quarantineError}
+            </div>
+          </div>
+          <div className="space-y-2 pt-2">
+            <button
+              type="button"
+              disabled={isRetryingLogout}
+              onClick={async () => {
+                setIsRetryingLogout(true);
+                const res = await SupabaseService.terminateAdministrativeSession();
+                setIsRetryingLogout(false);
+                if (res.success) {
+                  setQuarantineError(null);
+                  setAdminSession(null);
+                  if (activePortalRole) {
+                    onSwitchPortal?.(activePortalRole, false);
+                  }
+                } else {
+                  setQuarantineError(res.error || 'Server sign-out failed again.');
+                }
+              }}
+              className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRetryingLogout ? 'animate-spin' : ''}`} />
+              <span>{language === 'bn' ? 'সাইন-আউট পুনরায় চেষ্টা করুন (Retry)' : 'Retry Server Sign-Out'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await SupabaseService.terminateAdministrativeSession({ forceLocal: true });
+                setQuarantineError(null);
+                setAdminSession(null);
+                if (onNavigateHome) {
+                  onNavigateHome();
+                } else if (typeof window !== 'undefined') {
+                  window.location.href = '/';
+                }
+              }}
+              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors border border-slate-700"
+            >
+              <LogOut className="w-3.5 h-3.5 text-rose-400" />
+              <span>{language === 'bn' ? 'ফোর্স লোকাল সাইন-আউট ও হোমপেজে যান' : 'Force Local Sign-Out & Return Home'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Check if current route is a login view (/login or /login/:role)
   const isLoginRoute =
     activeView === 'login' ||
@@ -780,16 +897,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             }
           }}
           onSwitchPortal={(targetRole) => {
-            setActivePortalRole(targetRole);
-            onSwitchPortal?.(targetRole, false);
+            handleSwitchPortalWithIsolation(targetRole, false);
           }}
-          onNavigateHome={() => {
-            if (onNavigateHome) {
-              onNavigateHome();
-            } else if (typeof window !== 'undefined') {
-              window.location.href = '/';
-            }
-          }}
+          onNavigateHome={handleNavigateHomeWithIsolation}
           onNavigateAuthorized={() => {
             const authorizedRole = userAccountRole || 'admin';
             setActivePortalRole(authorizedRole);
@@ -803,16 +913,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <RoleDirectoryPortal
         language={language}
         onSelectRole={(role) => {
-          setActivePortalRole(role);
-          onSwitchPortal?.(role, false);
+          handleSwitchPortalWithIsolation(role, false);
         }}
-        onNavigateHome={() => {
-          if (onNavigateHome) {
-            onNavigateHome();
-          } else if (typeof window !== 'undefined') {
-            window.location.href = '/';
-          }
-        }}
+        onNavigateHome={handleNavigateHomeWithIsolation}
       />
     );
   }
@@ -832,17 +935,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           setActivePortalRole(authorizedRole);
           onSwitchPortal?.(authorizedRole, true);
         }}
-        onLogoutAndSwitch={() => {
-          handleLogout();
-          onSwitchPortal?.(activePortalRole, false);
-        }}
-        onNavigateHome={() => {
-          if (onNavigateHome) {
-            onNavigateHome();
-          } else if (typeof window !== 'undefined') {
-            window.location.href = '/';
+        onLogoutAndSwitch={async () => {
+          const res = await SupabaseService.terminateAdministrativeSession();
+          if (!res.success) {
+            setQuarantineError(res.error || 'Server-side sign-out unconfirmed');
+          } else {
+            setAdminSession(null);
+            setQuarantineError(null);
+            onSwitchPortal?.(activePortalRole, false);
           }
         }}
+        onNavigateHome={handleNavigateHomeWithIsolation}
       />
     );
   }

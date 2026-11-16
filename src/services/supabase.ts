@@ -16,6 +16,7 @@ import {
   hasSqlInjectionPattern,
 } from '../utils/security';
 import { parseScannedInput } from '../utils/tokenGenerator';
+import { broadcastLogout } from './authSync';
 
 // Supabase configuration provided by the user
 export const SUPABASE_PROJECT_ID =
@@ -1659,18 +1660,74 @@ export const SupabaseService = {
   },
 
   /**
-   * Log out admin session
+   * Authoritatively terminates an active administrative or staff session.
+   * Uses scope: 'local' to terminate only the current browser session.
+   * Distinguishes between local credential cleanup and confirmed server-side sign-out.
+   * If server sign-out fails, preserves the credential for retry unless forceLocal is true.
    */
-  async logoutAdmin(): Promise<void> {
+  async terminateAdministrativeSession(options?: {
+    forceLocal?: boolean;
+    suppressBroadcast?: boolean;
+  }): Promise<{ success: boolean; serverRevoked: boolean; error: string | null }> {
+    const forceLocal = options?.forceLocal === true;
+    let serverRevoked = false;
+    let serverError: string | null = null;
+
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error) {
+        serverError = error.message || 'Supabase server sign-out failed';
+      } else {
+        serverRevoked = true;
+      }
+    } catch (err: any) {
+      serverError = err?.message || 'Network disruption during Supabase sign-out';
+    }
+
+    // If server-side logout failed and forceLocal was not requested, do not destroy the
+    // retry credentials prematurely, so the user can click "Retry Logout"
+    if (!serverRevoked && !forceLocal) {
+      return {
+        success: false,
+        serverRevoked: false,
+        error: serverError,
+      };
+    }
+
+    // Server-side revocation succeeded OR forceLocal was explicitly requested:
+    // Execute strictly scoped local credential cleanup
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('plscf_test_admin_session');
+        localStorage.removeItem('plscf_test_staff_session');
+        sessionStorage.removeItem('plscf_current_portal_role');
         sessionStorage.removeItem('plscf_admin_active_tab');
         sessionStorage.removeItem('plscf_admin_prefill_user');
-      } catch (_) { }
+        sessionStorage.removeItem('plscf_admin_auto_login');
+        sessionStorage.removeItem('plscf_scanner_module');
+        sessionStorage.removeItem('plscf_scanner_prefill_user');
+        sessionStorage.removeItem('plscf_scanner_auto_login');
+        sessionStorage.removeItem('plscf_rms_active_tab');
+      } catch (_) {}
     }
-    const { error } = await supabase.auth.signOut();
-    if (error) console.warn('Supabase logout:', error);
+
+    // Broadcast logout to all other open tabs (preventing self-echo)
+    if (!options?.suppressBroadcast) {
+      broadcastLogout();
+    }
+
+    return {
+      success: true,
+      serverRevoked,
+      error: serverError,
+    };
+  },
+
+  /**
+   * Log out admin session (backward compatible wrapper)
+   */
+  async logoutAdmin(): Promise<void> {
+    await this.terminateAdministrativeSession({ forceLocal: true });
   },
 
   // ==========================================
