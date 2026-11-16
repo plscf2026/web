@@ -322,7 +322,8 @@ export function rasterizeSvgToCanvas(
     }
 
     const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-    const URLObj = window.URL || window.webkitURL || window;
+    const URLObj: typeof URL =
+      (typeof window !== 'undefined' && ((window as any).URL || (window as any).webkitURL)) || URL;
     const blobUrl = URLObj.createObjectURL(svgBlob);
 
     const img = new Image();
