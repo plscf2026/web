@@ -433,10 +433,11 @@ export default function App() {
             <AdminDashboard
               language={language}
               portalRole={currentPortalRole}
-              onSwitchPortal={(targetRole) => {
+              activeView={activeView}
+              onSwitchPortal={(targetRole, toDashboard = false) => {
                 setCurrentPortalRole(targetRole);
                 const slug = PORTAL_ROLE_CONFIGS[targetRole]?.slug || targetRole;
-                handleNavigate(activeView === 'dashboard' ? 'dashboard' : 'login', false, { role: slug });
+                handleNavigate(toDashboard || activeView === 'dashboard' ? 'dashboard' : 'login', false, { role: slug });
               }}
               onNavigateHome={() => handleNavigate('home')}
               onSelectTicket={(reg) => {

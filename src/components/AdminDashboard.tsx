@@ -100,14 +100,16 @@ interface AdminDashboardProps {
   language: Language;
   onSelectTicket?: (reg: RegistrationRecord) => void;
   portalRole?: PortalRole;
+  activeView?: string;
   onNavigateHome?: () => void;
-  onSwitchPortal?: (targetRole: PortalRole) => void;
+  onSwitchPortal?: (targetRole: PortalRole, toDashboard?: boolean) => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   language,
   onSelectTicket,
   portalRole,
+  activeView,
   onNavigateHome,
   onSwitchPortal,
 }) => {
@@ -753,21 +755,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     );
   }
 
+  // Check if current route is a login view (/login or /login/:role)
+  const isLoginRoute =
+    activeView === 'login' ||
+    (typeof window !== 'undefined' && window.location.pathname.startsWith('/login'));
+
   // ==========================================
   // VIEW 1: AUTHENTICATION GATE (ROLE-SPECIFIC LOGIN PORTAL)
+  // Shown when not logged in, OR when explicitly visiting a /login route for a role not yet authorized
   // ==========================================
-  if (!adminSession) {
+  const shouldShowLoginPage = !adminSession || (isLoginRoute && !isAuthorizedForPortal);
+
+  if (shouldShowLoginPage) {
     if (activePortalRole) {
       return (
         <RoleLoginPage
           role={activePortalRole}
           language={language}
+          currentAccount={adminSession || undefined}
           onLoginSuccess={(account) => {
             setAdminSession(account);
+            if (isLoginRoute) {
+              onSwitchPortal?.(activePortalRole, true);
+            }
           }}
           onSwitchPortal={(targetRole) => {
             setActivePortalRole(targetRole);
-            onSwitchPortal?.(targetRole);
+            onSwitchPortal?.(targetRole, false);
           }}
           onNavigateHome={() => {
             if (onNavigateHome) {
@@ -775,6 +789,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             } else if (typeof window !== 'undefined') {
               window.location.href = '/';
             }
+          }}
+          onNavigateAuthorized={() => {
+            const authorizedRole = userAccountRole || 'admin';
+            setActivePortalRole(authorizedRole);
+            onSwitchPortal?.(authorizedRole, true);
           }}
         />
       );
@@ -785,7 +804,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         language={language}
         onSelectRole={(role) => {
           setActivePortalRole(role);
-          onSwitchPortal?.(role);
+          onSwitchPortal?.(role, false);
         }}
         onNavigateHome={() => {
           if (onNavigateHome) {
@@ -800,6 +819,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // ==========================================
   // VIEW 1.5: ROLE AUTHORIZATION ACCESS DENIED GUARD (URL Tampering Protection)
+  // Only triggers when attempting to access a protected dashboard view directly
   // ==========================================
   if (activePortalRole && !isAuthorizedForPortal) {
     return (
@@ -810,10 +830,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         onNavigateAuthorized={() => {
           const authorizedRole = userAccountRole || 'admin';
           setActivePortalRole(authorizedRole);
-          onSwitchPortal?.(authorizedRole);
+          onSwitchPortal?.(authorizedRole, true);
         }}
         onLogoutAndSwitch={() => {
           handleLogout();
+          onSwitchPortal?.(activePortalRole, false);
         }}
         onNavigateHome={() => {
           if (onNavigateHome) {

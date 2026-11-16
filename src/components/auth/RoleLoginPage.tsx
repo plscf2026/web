@@ -28,19 +28,23 @@ import { SupabaseService, isDevTestBypassAllowed } from '../../services/supabase
 interface RoleLoginPageProps {
   role: PortalRole;
   language?: Language;
+  currentAccount?: AdminAccount;
   onLanguageChange?: (lang: Language) => void;
   onLoginSuccess: (account: AdminAccount) => void;
   onSwitchPortal: (targetRole: PortalRole) => void;
   onNavigateHome: () => void;
+  onNavigateAuthorized?: () => void;
 }
 
 export const RoleLoginPage: React.FC<RoleLoginPageProps> = ({
   role,
   language = 'en',
+  currentAccount,
   onLanguageChange,
   onLoginSuccess,
   onSwitchPortal,
   onNavigateHome,
+  onNavigateAuthorized,
 }) => {
   const isBn = language === 'bn';
   const config = getPortalConfigByRole(role);
@@ -204,6 +208,29 @@ export const RoleLoginPage: React.FC<RoleLoginPageProps> = ({
             <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-start gap-2.5 animate-in fade-in duration-150">
               <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
               <span className="leading-snug">{errorMessage}</span>
+            </div>
+          )}
+
+          {/* Current Signed-In Session Switcher Notice */}
+          {currentAccount && (
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 animate-in fade-in duration-150">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0 animate-pulse" />
+                <span className="truncate">
+                  {isBn ? 'বর্তমানে সাইন ইন করা:' : 'Signed in as:'}{' '}
+                  <strong className="text-white font-mono">{currentAccount.email}</strong>{' '}
+                  <span className="text-amber-400 font-bold uppercase text-[10px]">({currentAccount.role})</span>
+                </span>
+              </div>
+              {onNavigateAuthorized && (
+                <button
+                  type="button"
+                  onClick={onNavigateAuthorized}
+                  className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-[11px] shrink-0 cursor-pointer transition-colors border border-white/10"
+                >
+                  {isBn ? 'ড্যাশবোর্ডে ফিরে যান →' : 'My Dashboard →'}
+                </button>
+              )}
             </div>
           )}
 
