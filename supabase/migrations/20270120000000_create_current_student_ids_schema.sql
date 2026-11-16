@@ -47,9 +47,9 @@ DROP POLICY IF EXISTS "Authenticated admins full access on current_student_ids" 
 CREATE POLICY "Authenticated admins full access on current_student_ids"
     ON public.current_student_ids
     FOR ALL
-    TO authenticated
-    USING (true)
-    WITH CHECK (true);
+    TO authenticated, service_role
+    USING (public.current_admin_role() = 'super_admin')
+    WITH CHECK (public.current_admin_role() = 'super_admin');
 
 -- 3.4 Service role full access (Edge functions, background workers)
 DROP POLICY IF EXISTS "Service role full access on current_student_ids" ON public.current_student_ids;

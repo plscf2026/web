@@ -1025,21 +1025,43 @@ export const SupabaseService = {
     mobileNumber: string,
     year: number = 2027
   ): Promise<{ registration?: RegistrationRecord; error?: string }> {
-    const { data, error } = await supabase.functions.invoke<{
-      success: boolean;
-      error?: string;
-      ticket?: Record<string, unknown>;
-    }>('secure-ticket-lookup', {
-      body: { registrationId, mobileNumber, year },
-    });
+    // 1. Primary: Edge Function
+    try {
+      const { data, error } = await supabase.functions.invoke<{
+        success: boolean;
+        error?: string;
+        ticket?: Record<string, unknown>;
+      }>('secure-ticket-lookup', {
+        body: { registrationId, mobileNumber, year },
+      });
 
-    if (error || !data?.success || !data.ticket) {
-      return {
-        error: data?.error || error?.message || 'No verified ticket matched those details.',
-      };
+      if (!error && data?.success && data.ticket) {
+        return { registration: fromRegistrationDbRow(data.ticket) };
+      }
+    } catch {
+      // Edge Function unavailable or network failure; continue to database RPC fallback
     }
 
-    return { registration: fromRegistrationDbRow(data.ticket) };
+    // 2. Resilient Database Fallback: rpc_lookup_ticket (SECURITY DEFINER)
+    try {
+      const { data, error } = await supabase.rpc('rpc_lookup_ticket', {
+        p_registration_id: (registrationId || '').trim(),
+        p_mobile: (mobileNumber || '').trim(),
+      });
+
+      if (!error && data?.success && data?.ticket) {
+        return { registration: fromRegistrationDbRow(data.ticket) };
+      }
+      if (data?.error) {
+        return { error: data.error };
+      }
+    } catch (rpcErr) {
+      console.warn('[SupabaseService] rpc_lookup_ticket fallback notice:', rpcErr);
+    }
+
+    return {
+      error: 'No verified ticket matched those details.',
+    };
   },
 
   /**

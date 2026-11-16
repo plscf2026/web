@@ -153,13 +153,15 @@ ALTER TABLE public.id_card_download_logs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Super Admins can manage all staff accounts"
   ON public.id_card_staff_accounts
   FOR ALL
-  USING (true)
-  WITH CHECK (true);
+  TO authenticated, service_role
+  USING (public.current_admin_role() = 'super_admin')
+  WITH CHECK (public.current_admin_role() = 'super_admin');
 
 -- Student ID Cards: Accessible to authorized staff & admin; read-only to verified token checks
 CREATE POLICY "Authorized staff can read and manage student ID cards"
   ON public.student_id_cards
   FOR ALL
+  TO authenticated, service_role
   USING (true)
   WITH CHECK (true);
 
@@ -167,6 +169,7 @@ CREATE POLICY "Authorized staff can read and manage student ID cards"
 CREATE POLICY "Authorized staff can read and manage batch collections"
   ON public.batch_id_card_collections
   FOR ALL
+  TO authenticated, service_role
   USING (true)
   WITH CHECK (true);
 
@@ -174,6 +177,7 @@ CREATE POLICY "Authorized staff can read and manage batch collections"
 CREATE POLICY "Users can manage their download jobs"
   ON public.id_card_download_jobs
   FOR ALL
+  TO authenticated, service_role
   USING (true)
   WITH CHECK (true);
 
@@ -181,10 +185,12 @@ CREATE POLICY "Users can manage their download jobs"
 CREATE POLICY "Append-only ID card audit logs"
   ON public.id_card_download_logs
   FOR INSERT
+  TO authenticated, service_role
   WITH CHECK (true);
 
 CREATE POLICY "Super Admin can view ID card audit logs"
   ON public.id_card_download_logs
   FOR SELECT
+  TO authenticated, service_role
   USING (true);
 

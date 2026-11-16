@@ -37,23 +37,23 @@ DROP POLICY IF EXISTS "Authenticated admins can view inquiries" ON public.inquir
 CREATE POLICY "Authenticated admins can view inquiries"
     ON public.inquiries
     FOR SELECT
-    TO authenticated
-    USING (true);
+    TO authenticated, service_role
+    USING (public.current_admin_role() = 'super_admin');
 
 DROP POLICY IF EXISTS "Authenticated admins can update inquiries" ON public.inquiries;
 CREATE POLICY "Authenticated admins can update inquiries"
     ON public.inquiries
     FOR UPDATE
-    TO authenticated
-    USING (true)
-    WITH CHECK (true);
+    TO authenticated, service_role
+    USING (public.current_admin_role() = 'super_admin')
+    WITH CHECK (public.current_admin_role() = 'super_admin');
 
 DROP POLICY IF EXISTS "Authenticated admins can delete inquiries" ON public.inquiries;
 CREATE POLICY "Authenticated admins can delete inquiries"
     ON public.inquiries
     FOR DELETE
-    TO authenticated
-    USING (true);
+    TO authenticated, service_role
+    USING (public.current_admin_role() = 'super_admin');
 
 -- 3.3 Service role full access
 DROP POLICY IF EXISTS "Service role full access on inquiries" ON public.inquiries;
