@@ -21,7 +21,6 @@ import {
   Users,
   Droplet,
   HeartHandshake,
-  Sparkles,
 } from 'lucide-react';
 import {
   StudentCategory,
@@ -44,7 +43,6 @@ import { AppStore } from '../services/store';
 import { PayStationService } from '../services/paystation';
 import { StudentIdCardRecord } from '../types/idcard';
 import { SynchronizedCameraCardModal } from './idcard/SynchronizedCameraCardModal';
-import { OfficialCardBadge } from './idcard/OfficialCardBadge';
 
 interface RegistrationPageProps {
   language: Language;
@@ -115,7 +113,6 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   const [parentPhotoSizeKb, setParentPhotoSizeKb] = useState<number | null>(null);
   const [isCompressingParentPhoto, setIsCompressingParentPhoto] = useState(false);
   const [isParentCameraModalOpen, setIsParentCameraModalOpen] = useState(false);
-  const [activePreviewTab, setActivePreviewTab] = useState<'student' | 'parent'>('student');
   const parentFileInputRef = useRef<HTMLInputElement>(null);
 
   // Academic Information
@@ -1509,81 +1506,6 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           </div>
         )}
 
-        {/* LIVE OFFICIAL ID CARD PREVIEW (Real-time update on picture click and form input) */}
-        <div className="bg-gradient-to-b from-white to-slate-50/70 rounded-3xl p-5 sm:p-7 shadow-sm border border-[#E2EEF8] space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-            <div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-100 text-[#0284C7] text-xs font-bold mb-1">
-                <Sparkles className="w-3.5 h-3.5 text-[#0284C7]" />
-                <span>{language === 'bn' ? 'লাইভ প্রিভিউ' : 'Live Interactive Preview'}</span>
-              </span>
-              <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <span>🪪</span>
-                <span>
-                  {language === 'bn'
-                    ? 'অফিসিয়াল আইডি কার্ড লাইভ প্রিভিউ'
-                    : 'Official ID Card Live Preview'}
-                </span>
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {language === 'bn'
-                  ? 'তথ্য পূরণ ও ছবি তোলার সাথে সাথে কার্ডের প্রিভিউ রিয়েল-টাইমে আপডেট হচ্ছে।'
-                  : 'Preview updates in real-time as you enter your details and upload or take your photo.'}
-              </p>
-            </div>
-
-            {/* Tab Switcher if student has parent pass */}
-            {effectiveHasParent && (
-              <div className="flex p-1 bg-slate-200/80 rounded-2xl gap-1 shrink-0 self-start sm:self-center">
-                <button
-                  type="button"
-                  onClick={() => setActivePreviewTab('student')}
-                  className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    activePreviewTab === 'student'
-                      ? 'bg-slate-900 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  🎓 {language === 'bn' ? 'শিক্ষার্থী কার্ড' : 'Student Card'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActivePreviewTab('parent')}
-                  className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    activePreviewTab === 'parent'
-                      ? 'bg-emerald-800 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  👨‍👩‍👧 {language === 'bn' ? 'অভিভাবক পাস' : 'Parent Pass'}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Card Display Container */}
-          <div className="flex flex-col items-center justify-center py-2">
-            <OfficialCardBadge
-              student={activePreviewTab === 'parent' && effectiveHasParent ? previewParentRecord : previewStudentRecord}
-              isParentPass={activePreviewTab === 'parent' && effectiveHasParent}
-              cardType={
-                activePreviewTab === 'parent' && effectiveHasParent
-                  ? 'parent'
-                  : category === 'former'
-                  ? 'alumni'
-                  : 'student'
-              }
-              language={language}
-              showActions={false}
-              isPreview={true}
-            />
-            <p className="text-[11px] text-slate-400 mt-3 text-center max-w-sm">
-              {language === 'bn'
-                ? 'নিবন্ধন ও পেমেন্ট সম্পন্ন হলে এই কার্ডটি অফিসিয়াল কিউআর ও টোকেন সহ ডাউনলোড ও প্রিন্ট করতে পারবেন।'
-                : 'Upon successful registration & payment, your print-ready card with verified QR token will be ready to download and print.'}
-            </p>
-          </div>
-        </div>
 
         {/* Section 2: Academic Information & Current Student ID Verification */}
         <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
