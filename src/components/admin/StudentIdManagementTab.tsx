@@ -46,6 +46,21 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
     setCurrentPage(1);
   }, [searchQuery, selectedClass, selectedYear, selectedUsage]);
 
+  // Synchronize student IDs with Supabase on mount
+  useEffect(() => {
+    let active = true;
+    StudentIdService.syncWithSupabase()
+      .then((list) => {
+        if (active && Array.isArray(list)) {
+          setStudentIds(list);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // Modal States
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);

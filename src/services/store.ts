@@ -332,7 +332,7 @@ export class AppStore {
     }
     this.saveRegistrations(updated);
 
-    // Asynchronously sync with Supabase backend tables (e.g. registrations_2026)
+    // Asynchronously sync with Supabase backend tables (e.g. registrations_2027)
     SupabaseService.saveRegistration(record, year).then((res) => {
       if (res.success) {
         console.log(`[Supabase] Successfully saved booking ${record.id} to table ${res.table}`);

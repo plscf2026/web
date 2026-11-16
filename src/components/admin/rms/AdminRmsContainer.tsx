@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   GraduationCap,
@@ -16,6 +16,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { RegistrationRecord, Language, AdminAccount } from '../../../types';
+import { RmsStore } from '../../../services/rmsStore';
 import { AdminRmsCentralDashboard } from './AdminRmsCentralDashboard';
 import { AdminRmsBatchManagement } from './AdminRmsBatchManagement';
 import { AdminRmsCommitteeManagement } from './AdminRmsCommitteeManagement';
@@ -54,6 +55,11 @@ export const AdminRmsContainer: React.FC<Props> = ({
   registrations,
 }) => {
   const [activeModule, setActiveModule] = useState<RmsModuleId>('central-dashboard');
+
+  useEffect(() => {
+    // Authoritative background synchronization with Supabase PostgreSQL tables
+    RmsStore.syncWithSupabase().catch(() => {});
+  }, []);
 
   const modules: {
     id: RmsModuleId;

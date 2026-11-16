@@ -22,6 +22,466 @@ import {
   RmsAuditLog,
 } from '../types/rms';
 import { safeRandomUUID, sanitizeInput, sanitizeUrl } from '../utils/security';
+import { supabase, isNetworkException } from './supabase';
+
+// ==========================================
+// SNAKE_CASE <-> CAMELCASE MAPPERS FOR SUPABASE POSTGRESQL
+// ==========================================
+
+export function toCommitteeDbRow(c: CommitteeRecord): Record<string, any> {
+  return {
+    id: c.id,
+    name_en: c.nameEn,
+    name_bn: c.nameBn,
+    description_en: c.descriptionEn || '',
+    description_bn: c.descriptionBn || '',
+    director_id: c.directorId || '',
+    director_name: c.directorName || '',
+    director_phone: c.directorPhone || '',
+    director_email: c.directorEmail || '',
+    assistant_director_names: c.assistantDirectorNames || [],
+    assigned_responsibilities: c.assignedResponsibilities || [],
+    budget_total: Number(c.budgetTotal) || 0,
+    budget_allocated: Number(c.budgetAllocated) || 0,
+    budget_spent: Number(c.budgetSpent) || 0,
+    is_active: Boolean(c.isActive),
+    meeting_day: c.meetingDay || null,
+    created_at: c.createdAt || new Date().toISOString(),
+    updated_at: c.updatedAt || new Date().toISOString(),
+  };
+}
+
+export function fromCommitteeDbRow(row: any): CommitteeRecord {
+  return {
+    id: row.id,
+    nameEn: row.name_en || '',
+    nameBn: row.name_bn || '',
+    descriptionEn: row.description_en || '',
+    descriptionBn: row.description_bn || '',
+    directorId: row.director_id || '',
+    directorName: row.director_name || '',
+    directorPhone: row.director_phone || '',
+    directorEmail: row.director_email || '',
+    assistantDirectorIds: [],
+    assistantDirectorNames: Array.isArray(row.assistant_director_names) ? row.assistant_director_names : [],
+    members: [],
+    assignedResponsibilities: Array.isArray(row.assigned_responsibilities) ? row.assigned_responsibilities : [],
+    budgetTotal: Number(row.budget_total) || 0,
+    budgetAllocated: Number(row.budget_allocated) || 0,
+    budgetSpent: Number(row.budget_spent) || 0,
+    isActive: row.is_active !== false,
+    meetingDay: row.meeting_day || undefined,
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || new Date().toISOString(),
+  };
+}
+
+export function toTaskDbRow(t: RmsTask): Record<string, any> {
+  return {
+    id: t.id,
+    title: t.title,
+    description: t.description || '',
+    committee_id: t.committeeId,
+    committee_name: t.committeeName,
+    assigned_member_id: t.assignedMemberId || null,
+    assigned_member_name: t.assignedMemberName || null,
+    created_by: t.createdBy,
+    created_by_name: t.createdByName,
+    start_date: t.startDate || new Date().toISOString().split('T')[0],
+    deadline: t.deadline || new Date().toISOString().split('T')[0],
+    priority: t.priority || 'MEDIUM',
+    status: t.status || 'PENDING',
+    completion_evidence: t.completionEvidence || null,
+    rejection_reason: t.rejectionReason || null,
+    reviewed_by: t.reviewedBy || null,
+    reviewed_at: t.reviewedAt || null,
+    created_at: t.createdAt || new Date().toISOString(),
+    updated_at: t.updatedAt || new Date().toISOString(),
+  };
+}
+
+export function fromTaskDbRow(row: any): RmsTask {
+  return {
+    id: row.id,
+    title: row.title || '',
+    description: row.description || '',
+    committeeId: row.committee_id || '',
+    committeeName: row.committee_name || '',
+    assignedMemberId: row.assigned_member_id || undefined,
+    assignedMemberName: row.assigned_member_name || undefined,
+    createdBy: row.created_by || '',
+    createdByName: row.created_by_name || '',
+    startDate: row.start_date || '',
+    deadline: row.deadline || '',
+    priority: row.priority || 'MEDIUM',
+    status: row.status || 'PENDING',
+    attachments: [],
+    comments: [],
+    completionEvidence: row.completion_evidence || undefined,
+    rejectionReason: row.rejection_reason || undefined,
+    reviewedBy: row.reviewed_by || undefined,
+    reviewedAt: row.reviewed_at || undefined,
+    history: [],
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || new Date().toISOString(),
+  };
+}
+
+export function toBudgetRequestDbRow(b: BudgetRequest): Record<string, any> {
+  return {
+    id: b.id,
+    committee_id: b.committeeId,
+    committee_name: b.committeeName,
+    request_title: b.requestTitle,
+    expense_category: b.expenseCategory,
+    requested_amount: Number(b.requestedAmount) || 0,
+    description: b.description || '',
+    supporting_documents: b.supportingDocuments || [],
+    requested_by: b.requestedBy,
+    requested_by_name: b.requestedByName,
+    request_date: b.requestDate || new Date().toISOString().split('T')[0],
+    status: b.status || 'SUBMITTED',
+    finance_reviewer_id: b.financeReviewerId || null,
+    finance_reviewer_name: b.financeReviewerName || null,
+    finance_comments: b.financeComments || null,
+    approved_by: b.approvedBy || null,
+    approved_by_name: b.approvedByName || null,
+    approved_amount: b.approvedAmount != null ? Number(b.approvedAmount) : null,
+    approval_date: b.approvalDate || null,
+    rejection_reason: b.rejectionReason || null,
+    created_at: new Date().toISOString(),
+  };
+}
+
+export function fromBudgetRequestDbRow(row: any): BudgetRequest {
+  return {
+    id: row.id,
+    committeeId: row.committee_id || '',
+    committeeName: row.committee_name || '',
+    requestTitle: row.request_title || '',
+    expenseCategory: row.expense_category || '',
+    requestedAmount: Number(row.requested_amount) || 0,
+    description: row.description || '',
+    supportingDocuments: Array.isArray(row.supporting_documents) ? row.supporting_documents : [],
+    requestedBy: row.requested_by || '',
+    requestedByName: row.requested_by_name || '',
+    requestDate: row.request_date || '',
+    status: row.status || 'SUBMITTED',
+    financeReviewerId: row.finance_reviewer_id || undefined,
+    financeReviewerName: row.finance_reviewer_name || undefined,
+    financeComments: row.finance_comments || undefined,
+    approvedBy: row.approved_by || undefined,
+    approvedByName: row.approved_by_name || undefined,
+    approvedAmount: row.approved_amount != null ? Number(row.approved_amount) : undefined,
+    approvalDate: row.approval_date || undefined,
+    rejectionReason: row.rejection_reason || undefined,
+  };
+}
+
+export function toExpenseDbRow(e: RmsExpense): Record<string, any> {
+  return {
+    id: e.id,
+    committee_id: e.committeeId,
+    committee_name: e.committeeName,
+    expense_title: e.expenseTitle,
+    expense_category: e.expenseCategory,
+    amount: Number(e.amount) || 0,
+    payment_method: e.paymentMethod,
+    vendor: e.vendor,
+    expense_date: e.expenseDate || new Date().toISOString().split('T')[0],
+    voucher_number: e.voucherNumber,
+    voucher_url: e.voucherUrl || null,
+    submitted_by: e.submittedBy,
+    submitted_by_name: e.submittedByName,
+    verification_status: e.verificationStatus || 'PENDING',
+    verified_by: e.verifiedBy || null,
+    verified_by_name: e.verifiedByName || null,
+    reversal_reason: e.reversalReason || null,
+    reversal_authorized_by: e.reversalAuthorizedBy || null,
+    created_at: e.createdAt || new Date().toISOString(),
+  };
+}
+
+export function fromExpenseDbRow(row: any): RmsExpense {
+  return {
+    id: row.id,
+    committeeId: row.committee_id || '',
+    committeeName: row.committee_name || '',
+    expenseTitle: row.expense_title || '',
+    expenseCategory: row.expense_category || '',
+    amount: Number(row.amount) || 0,
+    paymentMethod: row.payment_method || 'CASH',
+    vendor: row.vendor || '',
+    expenseDate: row.expense_date || '',
+    voucherNumber: row.voucher_number || '',
+    voucherUrl: row.voucher_url || undefined,
+    submittedBy: row.submitted_by || '',
+    submittedByName: row.submitted_by_name || '',
+    verificationStatus: row.verification_status || 'PENDING',
+    verifiedBy: row.verified_by || undefined,
+    verifiedByName: row.verified_by_name || undefined,
+    reversalReason: row.reversal_reason || undefined,
+    reversalAuthorizedBy: row.reversal_authorized_by || undefined,
+    createdAt: row.created_at || new Date().toISOString(),
+  };
+}
+
+export function toMeetingDbRow(m: RmsMeeting): Record<string, any> {
+  return {
+    id: m.id,
+    title: m.title,
+    committee_id: m.committeeId || null,
+    committee_name: m.committeeName || null,
+    is_central_meeting: Boolean(m.isCentralMeeting),
+    meeting_date: m.meetingDate,
+    start_time: m.startTime,
+    end_time: m.endTime,
+    venue: m.venue,
+    agenda: m.agenda || [],
+    attendees: m.attendees || [],
+    meeting_minutes: m.meetingMinutes || null,
+    decisions: m.decisions || [],
+    follow_up_tasks: m.followUpTasks || [],
+    minutes_document_url: m.minutesDocumentUrl || null,
+    created_by: m.createdBy,
+    created_at: m.createdAt || new Date().toISOString(),
+  };
+}
+
+export function fromMeetingDbRow(row: any): RmsMeeting {
+  return {
+    id: row.id,
+    title: row.title || '',
+    committeeId: row.committee_id || undefined,
+    committeeName: row.committee_name || undefined,
+    isCentralMeeting: Boolean(row.is_central_meeting),
+    meetingDate: row.meeting_date || '',
+    startTime: row.start_time || '',
+    endTime: row.end_time || '',
+    venue: row.venue || '',
+    agenda: Array.isArray(row.agenda) ? row.agenda : [],
+    attendees: Array.isArray(row.attendees) ? row.attendees : [],
+    meetingMinutes: row.meeting_minutes || undefined,
+    decisions: Array.isArray(row.decisions) ? row.decisions : [],
+    followUpTasks: Array.isArray(row.follow_up_tasks) ? row.follow_up_tasks : [],
+    minutesDocumentUrl: row.minutes_document_url || undefined,
+    createdBy: row.created_by || '',
+    createdAt: row.created_at || new Date().toISOString(),
+  };
+}
+
+export function toVolunteerDbRow(v: VolunteerRecord): Record<string, any> {
+  return {
+    id: v.id,
+    full_name: v.fullName,
+    phone: v.phone,
+    email: v.email || null,
+    assigned_committee_id: v.assignedCommitteeId,
+    assigned_location: v.assignedLocation,
+    assigned_date: v.assignedDate,
+    duty_start_time: v.dutyStartTime,
+    duty_end_time: v.dutyEndTime,
+    supervisor_name: v.supervisorName,
+    supervisor_phone: v.supervisorPhone,
+    attendance_status: v.attendanceStatus || 'PENDING',
+    check_in_time: v.checkInTime || null,
+    check_out_time: v.checkOutTime || null,
+    responsibilities: v.responsibilities || [],
+    emergency_contact: v.emergencyContact || {},
+    created_at: new Date().toISOString(),
+  };
+}
+
+export function fromVolunteerDbRow(row: any): VolunteerRecord {
+  return {
+    id: row.id,
+    fullName: row.full_name || '',
+    phone: row.phone || '',
+    email: row.email || undefined,
+    assignedCommitteeId: row.assigned_committee_id || '',
+    assignedLocation: row.assigned_location || '',
+    assignedDate: row.assigned_date || '',
+    dutyStartTime: row.duty_start_time || '',
+    dutyEndTime: row.duty_end_time || '',
+    supervisorName: row.supervisor_name || '',
+    supervisorPhone: row.supervisor_phone || '',
+    attendanceStatus: row.attendance_status || 'PENDING',
+    checkInTime: row.check_in_time || undefined,
+    checkOutTime: row.check_out_time || undefined,
+    responsibilities: Array.isArray(row.responsibilities) ? row.responsibilities : [],
+    emergencyContact: row.emergency_contact || { name: '', relation: '', phone: '' },
+  };
+}
+
+export function toAnnouncementDbRow(a: RmsAnnouncement): Record<string, any> {
+  return {
+    id: a.id,
+    title_en: a.titleEn,
+    title_bn: a.titleBn,
+    content_en: a.contentEn,
+    content_bn: a.contentBn,
+    priority: a.priority || 'NORMAL',
+    target_audience: a.targetAudience || 'ALL',
+    committee_id: a.committeeId || null,
+    author_name: a.authorName,
+    is_active: a.isActive !== false,
+    created_at: a.createdAt || new Date().toISOString(),
+  };
+}
+
+export function fromAnnouncementDbRow(row: any): RmsAnnouncement {
+  return {
+    id: row.id,
+    titleEn: row.title_en || '',
+    titleBn: row.title_bn || '',
+    contentEn: row.content_en || '',
+    contentBn: row.content_bn || '',
+    priority: row.priority || 'NORMAL',
+    targetAudience: row.target_audience || 'ALL',
+    committeeId: row.committee_id || undefined,
+    authorName: row.author_name || '',
+    isActive: row.is_active !== false,
+    createdAt: row.created_at || new Date().toISOString(),
+  };
+}
+
+export function toSponsorDbRow(s: RmsSponsor): Record<string, any> {
+  return {
+    id: s.id,
+    company_name: s.companyName,
+    contact_person: s.contactPerson,
+    phone: s.phone,
+    email: s.email || null,
+    address: s.address || null,
+    category: s.category,
+    proposed_amount: Number(s.proposedAmount) || 0,
+    agreed_amount: Number(s.agreedAmount) || 0,
+    received_amount: Number(s.receivedAmount) || 0,
+    payment_status: s.paymentStatus || 'NOT_PAID',
+    agreement_document_url: s.agreementDocumentUrl || null,
+    assigned_member_id: s.assignedMemberId || null,
+    assigned_member_name: s.assignedMemberName || null,
+    benefits: s.benefits || [],
+    contact_history: s.contactHistory || [],
+    created_at: s.createdAt || new Date().toISOString(),
+  };
+}
+
+export function fromSponsorDbRow(row: any): RmsSponsor {
+  return {
+    id: row.id,
+    companyName: row.company_name || '',
+    contactPerson: row.contact_person || '',
+    phone: row.phone || '',
+    email: row.email || '',
+    address: row.address || '',
+    category: row.category || 'OTHER_PARTNER',
+    proposedAmount: Number(row.proposed_amount) || 0,
+    agreedAmount: Number(row.agreed_amount) || 0,
+    receivedAmount: Number(row.received_amount) || 0,
+    paymentStatus: row.payment_status || 'NOT_PAID',
+    agreementDocumentUrl: row.agreement_document_url || undefined,
+    assignedMemberId: row.assigned_member_id || undefined,
+    assignedMemberName: row.assigned_member_name || undefined,
+    benefits: Array.isArray(row.benefits) ? row.benefits : [],
+    contactHistory: Array.isArray(row.contact_history) ? row.contact_history : [],
+    createdAt: row.created_at || new Date().toISOString(),
+  };
+}
+
+export function toDocumentDbRow(d: RmsDocument): Record<string, any> {
+  return {
+    id: d.id,
+    title: d.title,
+    committee_id: d.committeeId,
+    committee_name: d.committeeName,
+    category: d.category,
+    file_url: d.fileUrl,
+    file_name: d.fileName,
+    file_size_bytes: Number(d.fileSizeBytes) || 0,
+    file_type: d.fileType || '',
+    version: Number(d.version) || 1,
+    uploaded_by: d.uploadedBy,
+    uploaded_by_name: d.uploadedByName,
+    access_permission: d.accessPermission || 'COMMITTEE_ONLY',
+    uploaded_at: d.uploadedAt || new Date().toISOString(),
+  };
+}
+
+export function fromDocumentDbRow(row: any): RmsDocument {
+  return {
+    id: row.id,
+    title: row.title || '',
+    committeeId: row.committee_id || '',
+    committeeName: row.committee_name || '',
+    category: row.category || 'OTHER',
+    fileUrl: row.file_url || '',
+    fileName: row.file_name || '',
+    fileSizeBytes: Number(row.file_size_bytes) || 0,
+    fileType: row.file_type || '',
+    version: Number(row.version) || 1,
+    uploadedBy: row.uploaded_by || '',
+    uploadedByName: row.uploaded_by_name || '',
+    accessPermission: row.access_permission || 'COMMITTEE_ONLY',
+    uploadedAt: row.uploaded_at || new Date().toISOString(),
+  };
+}
+
+export function toAuditLogDbRow(log: RmsAuditLog): Record<string, any> {
+  return {
+    id: log.id,
+    user_id: log.userId,
+    user_name: log.userName,
+    user_role: log.userRole,
+    action: log.action,
+    entity_type: log.entityType,
+    entity_id: log.entityId,
+    previous_value: log.previousValue || null,
+    new_value: log.newValue || null,
+    details: log.details,
+    timestamp: log.timestamp || new Date().toISOString(),
+  };
+}
+
+function safeSupabaseUpsert(table: string, row: Record<string, any>): void {
+  try {
+    Promise.resolve(supabase.from(table).upsert(row))
+      .then(({ error }: any) => {
+        if (error) {
+          console.warn(`[RMS Store] Background upsert to ${table} notice:`, error.message);
+        }
+      })
+      .catch((err: any) => {
+        if (!isNetworkException(err)) {
+          console.warn(`[RMS Store] Background upsert exception on ${table}:`, err?.message || err);
+        }
+      });
+  } catch (err: any) {
+    if (!isNetworkException(err)) {
+      console.warn(`[RMS Store] Failed to queue background upsert for ${table}:`, err?.message || err);
+    }
+  }
+}
+
+function safeSupabaseInsert(table: string, row: Record<string, any>): void {
+  try {
+    Promise.resolve(supabase.from(table).insert(row))
+      .then(({ error }: any) => {
+        if (error) {
+          console.warn(`[RMS Store] Background insert to ${table} notice:`, error.message);
+        }
+      })
+      .catch((err: any) => {
+        if (!isNetworkException(err)) {
+          console.warn(`[RMS Store] Background insert exception on ${table}:`, err?.message || err);
+        }
+      });
+  } catch (err: any) {
+    if (!isNetworkException(err)) {
+      console.warn(`[RMS Store] Failed to queue background insert for ${table}:`, err?.message || err);
+    }
+  }
+}
 
 // In-memory fallback for environments without localStorage
 const memoryStore: Record<string, string> = {};
@@ -914,6 +1374,7 @@ export class RmsStore {
     };
     committees.push(newComm);
     this.saveCommittees(committees);
+    safeSupabaseUpsert('rms_committees', toCommitteeDbRow(newComm));
 
     const currentUser = this.getCurrentUser();
     this.recordAuditLog({
@@ -940,6 +1401,7 @@ export class RmsStore {
       updatedAt: new Date().toISOString(),
     };
     this.saveCommittees(committees);
+    safeSupabaseUpsert('rms_committees', toCommitteeDbRow(committees[idx]));
 
     const currentUser = this.getCurrentUser();
     this.recordAuditLog({
@@ -989,6 +1451,7 @@ export class RmsStore {
     };
     tasks.unshift(newTask);
     this.saveTasks(tasks);
+    safeSupabaseUpsert('rms_tasks', toTaskDbRow(newTask));
 
     const currentUser = this.getCurrentUser();
     this.recordAuditLog({
@@ -1032,6 +1495,7 @@ export class RmsStore {
     });
 
     this.saveTasks(tasks);
+    safeSupabaseUpsert('rms_tasks', toTaskDbRow(task));
 
     const currentUser = this.getCurrentUser();
     this.recordAuditLog({
@@ -1065,6 +1529,7 @@ export class RmsStore {
     });
     task.updatedAt = new Date().toISOString();
     this.saveTasks(tasks);
+    safeSupabaseUpsert('rms_tasks', toTaskDbRow(task));
     return true;
   }
 
@@ -1090,6 +1555,7 @@ export class RmsStore {
     };
     reqs.unshift(newReq);
     this.saveBudgetRequests(reqs);
+    safeSupabaseUpsert('rms_budget_requests', toBudgetRequestDbRow(newReq));
 
     const currentUser = this.getCurrentUser();
     this.recordAuditLog({
@@ -1132,12 +1598,14 @@ export class RmsStore {
       if (comm) {
         comm.budgetAllocated += req.approvedAmount;
         this.saveCommittees(committees);
+        safeSupabaseUpsert('rms_committees', toCommitteeDbRow(comm));
       }
     } else if (status === 'REJECTED') {
       req.rejectionReason = comments || 'Request declined by central authority.';
     }
 
     this.saveBudgetRequests(reqs);
+    safeSupabaseUpsert('rms_budget_requests', toBudgetRequestDbRow(req));
 
     const currentUser = this.getCurrentUser();
     this.recordAuditLog({
@@ -1177,6 +1645,7 @@ export class RmsStore {
     };
     expenses.unshift(newExp);
     this.saveExpenses(expenses);
+    safeSupabaseUpsert('rms_expenses', toExpenseDbRow(newExp));
 
     // Update committee spent balance
     const committees = this.getCommittees();
@@ -1184,6 +1653,7 @@ export class RmsStore {
     if (comm) {
       comm.budgetSpent += exp.amount;
       this.saveCommittees(committees);
+      safeSupabaseUpsert('rms_committees', toCommitteeDbRow(comm));
     }
 
     const currentUser = this.getCurrentUser();
@@ -1209,6 +1679,7 @@ export class RmsStore {
     exp.reversalReason = reversalReason;
     exp.reversalAuthorizedBy = authorizedBy;
     this.saveExpenses(expenses);
+    safeSupabaseUpsert('rms_expenses', toExpenseDbRow(exp));
 
     // Deduct from committee spent balance
     const committees = this.getCommittees();
@@ -1216,6 +1687,7 @@ export class RmsStore {
     if (comm) {
       comm.budgetSpent = Math.max(0, comm.budgetSpent - exp.amount);
       this.saveCommittees(committees);
+      safeSupabaseUpsert('rms_committees', toCommitteeDbRow(comm));
     }
 
     const currentUser = this.getCurrentUser();
@@ -1290,6 +1762,7 @@ export class RmsStore {
       list.unshift(sanitizedSponsor);
     }
     this.saveSponsors(list);
+    safeSupabaseUpsert('rms_sponsors', toSponsorDbRow(sanitizedSponsor));
   }
 
   // ==========================================
@@ -1317,6 +1790,7 @@ export class RmsStore {
     };
     docs.unshift(newDoc);
     this.saveDocuments(docs);
+    safeSupabaseUpsert('rms_documents', toDocumentDbRow(newDoc));
 
     const currentUser = this.getCurrentUser();
     this.recordAuditLog({
@@ -1359,6 +1833,7 @@ export class RmsStore {
     };
     meetings.unshift(newMeeting);
     this.saveMeetings(meetings);
+    safeSupabaseUpsert('rms_meetings', toMeetingDbRow(newMeeting));
 
     const currentUser = this.getCurrentUser();
     this.recordAuditLog({
@@ -1400,6 +1875,7 @@ export class RmsStore {
     };
     anns.unshift(newAnn);
     this.saveAnnouncements(anns);
+    safeSupabaseUpsert('rms_announcements', toAnnouncementDbRow(newAnn));
     return newAnn;
   }
 
@@ -1462,6 +1938,7 @@ export class RmsStore {
       list.unshift(sanitizedVol);
     }
     this.saveVolunteers(list);
+    safeSupabaseUpsert('rms_volunteers', toVolunteerDbRow(sanitizedVol));
   }
 
   static volunteerCheckIn(volunteerId: string): boolean {
@@ -1471,6 +1948,7 @@ export class RmsStore {
     vol.attendanceStatus = 'CHECKED_IN';
     vol.checkInTime = new Date().toISOString();
     this.saveVolunteers(list);
+    safeSupabaseUpsert('rms_volunteers', toVolunteerDbRow(vol));
     return true;
   }
 
@@ -1481,6 +1959,7 @@ export class RmsStore {
     vol.attendanceStatus = 'COMPLETED';
     vol.checkOutTime = new Date().toISOString();
     this.saveVolunteers(list);
+    safeSupabaseUpsert('rms_volunteers', toVolunteerDbRow(vol));
     return true;
   }
 
@@ -1619,6 +2098,150 @@ export class RmsStore {
     };
     logs.unshift(newEntry);
     this.saveAuditLogs(logs);
+    safeSupabaseInsert('rms_audit_logs', toAuditLogDbRow(newEntry));
+  }
+
+  // ==========================================
+  // 12. SUPABASE BACKGROUND SYNCHRONIZATION
+  // ==========================================
+  static async syncWithSupabase(): Promise<{ success: boolean; syncedCount: number; error?: string }> {
+    try {
+      let syncedCount = 0;
+
+      // 1. Committees
+      const { data: commRows, error: commErr } = await supabase.from('rms_committees').select('*');
+      if (!commErr && Array.isArray(commRows) && commRows.length > 0) {
+        const dbComms = commRows.map(fromCommitteeDbRow);
+        const localComms = this.getCommittees();
+        const localMap = new Map(localComms.map((c) => [c.id, c]));
+        const mergedComms = dbComms.map((c) => {
+          const local = localMap.get(c.id);
+          return {
+            ...c,
+            members: local?.members && local.members.length > 0 ? local.members : c.members,
+          };
+        });
+        const dbIds = new Set(dbComms.map((c) => c.id));
+        for (const local of localComms) {
+          if (!dbIds.has(local.id)) mergedComms.push(local);
+        }
+        this.saveCommittees(mergedComms);
+        syncedCount += dbComms.length;
+      }
+
+      // 2. Tasks
+      const { data: taskRows, error: taskErr } = await supabase.from('rms_tasks').select('*');
+      if (!taskErr && Array.isArray(taskRows) && taskRows.length > 0) {
+        const dbTasks = taskRows.map(fromTaskDbRow);
+        const localTasks = this.getTasks();
+        const localMap = new Map(localTasks.map((t) => [t.id, t]));
+        const mergedTasks = dbTasks.map((t) => {
+          const local = localMap.get(t.id);
+          return {
+            ...t,
+            comments: local?.comments && local.comments.length > 0 ? local.comments : t.comments,
+            history: local?.history && local.history.length > 0 ? local.history : t.history,
+          };
+        });
+        const dbIds = new Set(dbTasks.map((t) => t.id));
+        for (const local of localTasks) {
+          if (!dbIds.has(local.id)) mergedTasks.push(local);
+        }
+        this.saveTasks(mergedTasks);
+        syncedCount += dbTasks.length;
+      }
+
+      // 3. Budget Requests
+      const { data: bgtRows, error: bgtErr } = await supabase.from('rms_budget_requests').select('*');
+      if (!bgtErr && Array.isArray(bgtRows) && bgtRows.length > 0) {
+        const dbBgts = bgtRows.map(fromBudgetRequestDbRow);
+        const localBgts = this.getBudgetRequests();
+        const dbIds = new Set(dbBgts.map((b) => b.id));
+        const mergedBgts = [...dbBgts];
+        for (const local of localBgts) {
+          if (!dbIds.has(local.id)) mergedBgts.push(local);
+        }
+        this.saveBudgetRequests(mergedBgts);
+        syncedCount += dbBgts.length;
+      }
+
+      // 4. Expenses
+      const { data: expRows, error: expErr } = await supabase.from('rms_expenses').select('*');
+      if (!expErr && Array.isArray(expRows) && expRows.length > 0) {
+        const dbExps = expRows.map(fromExpenseDbRow);
+        const localExps = this.getExpenses();
+        const dbIds = new Set(dbExps.map((e) => e.id));
+        const mergedExps = [...dbExps];
+        for (const local of localExps) {
+          if (!dbIds.has(local.id)) mergedExps.push(local);
+        }
+        this.saveExpenses(mergedExps);
+        syncedCount += dbExps.length;
+      }
+
+      // 5. Sponsors
+      const { data: spnRows, error: spnErr } = await supabase.from('rms_sponsors').select('*');
+      if (!spnErr && Array.isArray(spnRows) && spnRows.length > 0) {
+        const dbSpns = spnRows.map(fromSponsorDbRow);
+        const localSpns = this.getSponsors();
+        const dbIds = new Set(dbSpns.map((s) => s.id));
+        const mergedSpns = [...dbSpns];
+        for (const local of localSpns) {
+          if (!dbIds.has(local.id)) mergedSpns.push(local);
+        }
+        this.saveSponsors(mergedSpns);
+        syncedCount += dbSpns.length;
+      }
+
+      // 6. Meetings
+      const { data: mtgRows, error: mtgErr } = await supabase.from('rms_meetings').select('*');
+      if (!mtgErr && Array.isArray(mtgRows) && mtgRows.length > 0) {
+        const dbMtgs = mtgRows.map(fromMeetingDbRow);
+        const localMtgs = this.getMeetings();
+        const dbIds = new Set(dbMtgs.map((m) => m.id));
+        const mergedMtgs = [...dbMtgs];
+        for (const local of localMtgs) {
+          if (!dbIds.has(local.id)) mergedMtgs.push(local);
+        }
+        this.saveMeetings(mergedMtgs);
+        syncedCount += dbMtgs.length;
+      }
+
+      // 7. Volunteers
+      const { data: volRows, error: volErr } = await supabase.from('rms_volunteers').select('*');
+      if (!volErr && Array.isArray(volRows) && volRows.length > 0) {
+        const dbVols = volRows.map(fromVolunteerDbRow);
+        const localVols = this.getVolunteers();
+        const dbIds = new Set(dbVols.map((v) => v.id));
+        const mergedVols = [...dbVols];
+        for (const local of localVols) {
+          if (!dbIds.has(local.id)) mergedVols.push(local);
+        }
+        this.saveVolunteers(mergedVols);
+        syncedCount += dbVols.length;
+      }
+
+      // 8. Announcements
+      const { data: annRows, error: annErr } = await supabase.from('rms_announcements').select('*');
+      if (!annErr && Array.isArray(annRows) && annRows.length > 0) {
+        const dbAnns = annRows.map(fromAnnouncementDbRow);
+        const localAnns = this.getAnnouncements();
+        const dbIds = new Set(dbAnns.map((a) => a.id));
+        const mergedAnns = [...dbAnns];
+        for (const local of localAnns) {
+          if (!dbIds.has(local.id)) mergedAnns.push(local);
+        }
+        this.saveAnnouncements(mergedAnns);
+        syncedCount += dbAnns.length;
+      }
+
+      return { success: true, syncedCount };
+    } catch (err: any) {
+      if (!isNetworkException(err)) {
+        console.warn('[RMS Store] Supabase sync encountered non-blocking notice:', err?.message || err);
+      }
+      return { success: false, syncedCount: 0, error: err?.message || 'Sync failed' };
+    }
   }
 }
 

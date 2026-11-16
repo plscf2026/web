@@ -109,6 +109,23 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
     setStudentPage(1);
   }, [searchQuery, selectedBatchFilter, statusFilter]);
 
+  // Synchronize with Supabase ID card & download job tables on mount
+  useEffect(() => {
+    let mounted = true;
+    IdCardStore.syncWithSupabase()
+      .then(() => {
+        if (mounted) {
+          setCards(IdCardStore.getIdCards());
+          setBatches(IdCardStore.getBatchCollections());
+          setDownloadLogs(IdCardStore.getDownloadLogs());
+        }
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   // Modals & Preview States
   const [previewStudent, setPreviewStudent] = useState<StudentIdCardRecord | null>(null);
   const [showCreateStaffModal, setShowCreateStaffModal] = useState(false);

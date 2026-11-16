@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SupabaseService, supabase } from '../services/supabase';
 import {
-  broadcastLogout,
   subscribeToAuthSync,
   simulateIncomingAuthSyncEvent,
   getTabId,
@@ -11,8 +10,6 @@ import {
 import {
   PortalRole,
   PORTAL_ROLE_CONFIGS,
-  getPortalRoleFromSlug,
-  normalizePortalRole,
 } from '../types';
 import { resolveRouteFromLocation } from './navigation';
 
@@ -239,7 +236,7 @@ test('Scenario 7: Multi-Tab Logout Synchronization propagates across open tabs',
   // Guard: Self-echo prevention test
   // An event originating from this same tab should be ignored by the self-echo guard
   let selfEchoReceived = false;
-  const unsubSelf = subscribeToAuthSync((event) => {
+  const unsubSelf = subscribeToAuthSync(() => {
     selfEchoReceived = true;
   });
 

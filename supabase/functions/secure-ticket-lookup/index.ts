@@ -72,13 +72,14 @@ serve(async (req) => {
     const body = JSON.parse(requestBody);
     const registrationId = typeof body.registrationId === 'string' ? body.registrationId.trim() : '';
     const mobileNumber = typeof body.mobileNumber === 'string' ? normalizeMobile(body.mobileNumber) : '';
-    const year = Number(body.year ?? 2026);
+    // Authoritative reunion year is 2027 (registrations_2026 was consolidated into registrations_2027)
+    const rawYear = body.year !== undefined && body.year !== null ? Number(body.year) : 2027;
+    const year = Number.isInteger(rawYear) && rawYear >= 2027 && rawYear <= 2030 ? rawYear : 2027;
+    const targetTable = 'registrations_2027';
+
     if (
       !/^[A-Za-z0-9-]{3,60}$/.test(registrationId) ||
-      !/^0\d{10}$/.test(mobileNumber) ||
-      !Number.isInteger(year) ||
-      year < 2026 ||
-      year > 2100
+      !/^0\d{10}$/.test(mobileNumber)
     ) {
       return jsonResponse(
         { success: false, error: 'Enter a valid registration ID and mobile number.' },
@@ -126,7 +127,7 @@ serve(async (req) => {
     }
 
     const { data: registration, error } = await supabase
-      .from(`registrations_${year}`)
+      .from(targetTable)
       .select(
         'id, full_name, full_name_bn, photo_url, mobile_number, category, passing_year, current_class, batch_name, t_shirt_size, registration_fee, donation_amount, total_paid, payment_status, transaction_id, payment_method, registered_at, qr_token, year'
       )

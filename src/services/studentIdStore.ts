@@ -499,11 +499,81 @@ function persistList(list: CurrentStudentIdRecord[]) {
   }
 }
 
+function toStudentIdDbRow(r: CurrentStudentIdRecord) {
+  return {
+    id: r.id,
+    student_id: r.studentId,
+    student_name: r.studentName || null,
+    class_name: r.className,
+    academic_year: r.academicYear || '2026',
+    status: r.status,
+    verification_status: r.verificationStatus,
+    used_registration_id: r.usedRegistrationId || null,
+    reserved_until: r.reservedUntil || null,
+    created_at: r.createdAt,
+    updated_at: r.updatedAt,
+  };
+}
+
+function fromStudentIdDbRow(row: any): CurrentStudentIdRecord {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    studentName: row.student_name || undefined,
+    className: row.class_name,
+    academicYear: row.academic_year || '2026',
+    status: row.status,
+    verificationStatus: row.verification_status,
+    usedRegistrationId: row.used_registration_id || undefined,
+    reservedUntil: row.reserved_until || undefined,
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || new Date().toISOString(),
+  };
+}
+
 export class StudentIdService {
   /**
    * Retrieve all uploaded Student ID records
    */
   static getAllStudentIds(): CurrentStudentIdRecord[] {
+    return loadStoredList();
+  }
+
+  /**
+   * Fetch and synchronize all Student ID records from Supabase PostgreSQL
+   */
+  static async syncWithSupabase(): Promise<CurrentStudentIdRecord[]> {
+    try {
+      const { data, error } = await supabase
+        .from('current_student_ids')
+        .select('*')
+        .order('student_id', { ascending: true });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const localList = loadStoredList();
+        const map = new Map<string, CurrentStudentIdRecord>();
+
+        // Add initial records
+        for (const item of INITIAL_STUDENT_IDS) {
+          map.set(item.studentId, item);
+        }
+        // Merge local storage modifications
+        for (const item of localList) {
+          map.set(item.studentId, item);
+        }
+        // Authoritative cloud data
+        for (const row of data) {
+          const rec = fromStudentIdDbRow(row);
+          map.set(rec.studentId, rec);
+        }
+
+        const merged = Array.from(map.values());
+        persistList(merged);
+        return merged;
+      }
+    } catch (err) {
+      console.warn('[StudentIdService] Supabase sync notice:', err);
+    }
     return loadStoredList();
   }
 
@@ -694,7 +764,7 @@ export class StudentIdService {
 
     const updated = [newRecord, ...list];
     persistList(updated);
-    supabase.from('current_student_ids').insert(newRecord).then(undefined, () => {});
+    supabase.from('current_student_ids').insert(toStudentIdDbRow(newRecord)).then(undefined, () => {});
 
     EventStore.recordAuditHistory({
       adminId: adminEmail,
@@ -779,7 +849,7 @@ export class StudentIdService {
     if (newRecords.length > 0) {
       const updated = [...newRecords, ...existingList];
       persistList(updated);
-      supabase.from('current_student_ids').insert(newRecords).then(undefined, () => {});
+      supabase.from('current_student_ids').insert(newRecords.map(toStudentIdDbRow)).then(undefined, () => {});
 
       EventStore.recordAuditHistory({
         adminId: adminEmail,

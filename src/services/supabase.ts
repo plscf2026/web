@@ -564,7 +564,6 @@ export const SupabaseService = {
       await Promise.allSettled([
         supabase.from(tableUsed).delete().eq('id', cleanId),
         supabase.from('registrations_2027').delete().eq('id', cleanId),
-        supabase.from('registrations_2026').delete().eq('id', cleanId),
         supabase.from('food_distributions').delete().eq('registration_id', cleanId),
         supabase.from('dress_distributions').delete().eq('registration_id', cleanId),
         supabase.from('gate_events').delete().eq('registration_id', cleanId),
@@ -893,64 +892,88 @@ export const SupabaseService = {
   },
 
   /**
-   * Save a donation to Supabase backend in donations_<year>.
+   * Save a donation canonically to Supabase backend in public.donations.
+   * Also synchronizes to donations_2027 for backward compatibility.
    */
   async saveDonation(
     donation: DonationRecord,
     year: number = 2027
   ): Promise<{ success: boolean; table: string; error?: string }> {
-    const yearTableName = getDonationsTableName(year);
-    const row = {
+    const canonicalRow = {
       id: donation.id,
       donor_name: sanitizeInput(donation.donorName),
       mobile_number: sanitizeInput(donation.mobileNumber),
       email: sanitizeInput(donation.email),
       amount: donation.amount,
-      purpose: sanitizeInput(donation.purpose),
-      payment_method: donation.paymentMethod,
+      purpose: sanitizeInput(donation.purpose) || 'General Reunion Fund',
+      payment_method: donation.paymentMethod || 'bkash',
       transaction_id: sanitizeInput(donation.transactionId),
-      date: donation.date,
+      gateway_invoice_number: donation.gatewayInvoiceNumber || null,
+      date: donation.date || new Date().toISOString().split('T')[0],
+      donation_date: donation.date || new Date().toISOString().split('T')[0],
       year: year,
+      payment_status: donation.paymentStatus || 'paid',
     };
 
     try {
-      const { error } = await supabase
-        .from(yearTableName)
-        .upsert(row, { onConflict: 'id' });
+      // 1. Primary write to canonical public.donations
+      const { error: canonicalErr } = await supabase
+        .from('donations')
+        .upsert(canonicalRow, { onConflict: 'id' });
 
-      if (!error) {
-        return { success: true, table: yearTableName };
+      // 2. Synchronize to donations_2027 for backward compatibility
+      Promise.resolve(
+        supabase
+          .from('donations_2027')
+          .upsert(
+            {
+              id: donation.id,
+              donor_name: canonicalRow.donor_name,
+              mobile_number: canonicalRow.mobile_number,
+              email: canonicalRow.email,
+              amount: canonicalRow.amount,
+              purpose: canonicalRow.purpose,
+              payment_method: canonicalRow.payment_method,
+              transaction_id: canonicalRow.transaction_id,
+              gateway_invoice_number: canonicalRow.gateway_invoice_number,
+              date: canonicalRow.date,
+              year: year,
+              payment_status: canonicalRow.payment_status,
+            },
+            { onConflict: 'id' }
+          )
+      ).catch(() => {});
+
+      if (!canonicalErr) {
+        return { success: true, table: 'donations' };
       }
 
-      // Fallback to 'donations'
-      const { error: genericErr } = await supabase
-        .from('donations')
-        .upsert(row, { onConflict: 'id' });
-
+      console.warn('[SupabaseService] Canonical donations write notice:', canonicalErr.message);
       return {
-        success: !genericErr,
-        table: genericErr ? yearTableName : 'donations',
-        error: error.message || genericErr?.message,
+        success: false,
+        table: 'donations',
+        error: canonicalErr.message,
       };
     } catch (err: any) {
-      return { success: false, table: yearTableName, error: err.message };
+      return { success: false, table: 'donations', error: err.message };
     }
   },
 
   /**
    * Fetch all donations for a given year from Supabase.
+   * Reads from canonical public.donations, falling back to donations_2027 if empty.
    */
   async fetchDonations(
     year: number = 2027
   ): Promise<{ data: DonationRecord[]; source: 'supabase' | 'local'; tableUsed: string; error?: string }> {
-    const yearTableName = getDonationsTableName(year);
     try {
+      // 1. Fetch from canonical public.donations
       const { data, error } = await supabase
-        .from(yearTableName)
+        .from('donations')
         .select('*')
-        .order('date', { ascending: false });
+        .order('created_at', { ascending: false });
 
-      if (!error && Array.isArray(data)) {
+      if (!error && Array.isArray(data) && data.length > 0) {
         const records: DonationRecord[] = data.map((d: any) => ({
           id: d.id,
           donorName: d.donor_name || d.donorName || 'Donor',
@@ -960,14 +983,40 @@ export const SupabaseService = {
           purpose: d.purpose || 'General Fund',
           paymentMethod: d.payment_method || d.paymentMethod || 'bkash',
           transactionId: d.transaction_id || d.transactionId || 'TRX',
-          date: d.date || new Date().toISOString().split('T')[0],
+          date: d.donation_date || d.date || (d.created_at ? d.created_at.split('T')[0] : '2027-01-01'),
+          paymentStatus: d.payment_status || 'paid',
+          gatewayInvoiceNumber: d.gateway_invoice_number || undefined,
         }));
-        return { data: records, source: 'supabase', tableUsed: yearTableName };
+        return { data: records, source: 'supabase', tableUsed: 'donations' };
       }
 
-      return { data: [], source: 'supabase', tableUsed: yearTableName, error: error?.message };
+      // Fallback: check donations_2027
+      const fallbackTable = getDonationsTableName(year);
+      const { data: fbData, error: fbErr } = await supabase
+        .from(fallbackTable)
+        .select('*')
+        .order('date', { ascending: false });
+
+      if (!fbErr && Array.isArray(fbData) && fbData.length > 0) {
+        const records: DonationRecord[] = fbData.map((d: any) => ({
+          id: d.id,
+          donorName: d.donor_name || d.donorName || 'Donor',
+          mobileNumber: d.mobile_number || d.mobileNumber || '',
+          email: d.email || '',
+          amount: Number(d.amount || 0),
+          purpose: d.purpose || 'General Fund',
+          paymentMethod: d.payment_method || d.paymentMethod || 'bkash',
+          transactionId: d.transaction_id || d.transactionId || 'TRX',
+          date: d.date || (d.created_at ? d.created_at.split('T')[0] : '2027-01-01'),
+          paymentStatus: d.payment_status || 'paid',
+          gatewayInvoiceNumber: d.gateway_invoice_number || undefined,
+        }));
+        return { data: records, source: 'supabase', tableUsed: fallbackTable };
+      }
+
+      return { data: [], source: 'supabase', tableUsed: 'donations', error: error?.message || fbErr?.message };
     } catch (err: any) {
-      return { data: [], source: 'local', tableUsed: yearTableName, error: err.message };
+      return { data: [], source: 'local', tableUsed: 'donations', error: err.message };
     }
   },
 

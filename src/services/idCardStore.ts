@@ -15,6 +15,183 @@ import {
 import { RegistrationRecord } from '../types';
 import { AppStore } from './store';
 import { safeRandomUUID } from '../utils/security';
+import { supabase, isNetworkException } from './supabase';
+
+// ============================================================================
+// SNAKE_CASE <-> CAMELCASE MAPPERS FOR SUPABASE POSTGRESQL
+// ============================================================================
+
+export function toStudentIdCardDbRow(card: StudentIdCardRecord): Record<string, any> {
+  return {
+    id: card.id,
+    registration_id: card.registrationId,
+    event_year: Number(card.eventYear) || 2027,
+    student_name: card.studentName,
+    student_name_bn: card.studentNameBn || null,
+    batch_year: card.batchYear,
+    batch_name: card.batchName,
+    id_number: card.idNumber,
+    contact_number: card.contactNumber,
+    photo_url: card.photoUrl || null,
+    has_photo: Boolean(card.hasPhoto),
+    qr_token: card.qrToken,
+    verification_url: card.verificationUrl,
+    card_status: card.cardStatus || 'ELIGIBLE',
+    review_reason: card.reviewReason || null,
+    pdf_storage_path: card.pdfStoragePath || null,
+    pdf_file_size_bytes: card.pdfFileSizeBytes || 0,
+    card_dimensions: card.cardDimensions || '54x86mm',
+    version: Number(card.version) || 1,
+    generated_at: card.generatedAt || null,
+    generated_by: card.generatedBy || null,
+    created_at: card.createdAt || new Date().toISOString(),
+    updated_at: card.updatedAt || new Date().toISOString(),
+  };
+}
+
+export function fromStudentIdCardDbRow(row: any): StudentIdCardRecord {
+  return {
+    id: row.id,
+    registrationId: row.registration_id,
+    eventYear: Number(row.event_year) || 2027,
+    studentName: row.student_name || 'Student',
+    studentNameBn: row.student_name_bn || undefined,
+    batchYear: row.batch_year || '2027',
+    batchName: row.batch_name || 'Batch',
+    idNumber: row.id_number || row.registration_id,
+    contactNumber: row.contact_number || 'N/A',
+    photoUrl: row.photo_url || undefined,
+    hasPhoto: Boolean(row.has_photo),
+    qrToken: row.qr_token || 'TOKEN',
+    verificationUrl: row.verification_url || '',
+    cardStatus: row.card_status || 'ELIGIBLE',
+    reviewReason: row.review_reason || undefined,
+    pdfStoragePath: row.pdf_storage_path || undefined,
+    pdfFileSizeBytes: Number(row.pdf_file_size_bytes) || 0,
+    cardDimensions: row.card_dimensions || '54x86mm',
+    version: Number(row.version) || 1,
+    generatedAt: row.generated_at || undefined,
+    generatedBy: row.generated_by || undefined,
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || new Date().toISOString(),
+  };
+}
+
+export function toDownloadJobDbRow(job: IdCardDownloadJob): Record<string, any> {
+  return {
+    id: job.id,
+    requested_by_id: job.requestedById,
+    requested_by_name: job.requestedByName,
+    job_type: job.jobType,
+    target_batch_year: job.targetBatchYear || null,
+    total_cards: Number(job.totalCards) || 0,
+    processed_cards: Number(job.processedCards) || 0,
+    progress_percentage: Number(job.progressPercentage) || 0,
+    status: job.status || 'QUEUED',
+    archive_filename: job.archiveFilename || null,
+    archive_storage_path: job.archiveStoragePath || null,
+    archive_file_size_bytes: Number(job.archiveFileSizeBytes) || 0,
+    error_message: job.errorMessage || null,
+    started_at: job.startedAt || null,
+    completed_at: job.completedAt || null,
+    created_at: job.createdAt || new Date().toISOString(),
+  };
+}
+
+export function fromDownloadJobDbRow(row: any): IdCardDownloadJob {
+  return {
+    id: row.id,
+    requestedById: row.requested_by_id || '',
+    requestedByName: row.requested_by_name || '',
+    jobType: row.job_type,
+    targetBatchYear: row.target_batch_year || undefined,
+    totalCards: Number(row.total_cards) || 0,
+    processedCards: Number(row.processed_cards) || 0,
+    progressPercentage: Number(row.progress_percentage) || 0,
+    status: row.status || 'QUEUED',
+    archiveFilename: row.archive_filename || undefined,
+    archiveStoragePath: row.archive_storage_path || undefined,
+    archiveFileSizeBytes: Number(row.archive_file_size_bytes) || 0,
+    errorMessage: row.error_message || undefined,
+    startedAt: row.started_at || undefined,
+    completedAt: row.completed_at || undefined,
+    createdAt: row.created_at || new Date().toISOString(),
+  };
+}
+
+export function toDownloadLogDbRow(log: IdCardDownloadLog): Record<string, any> {
+  return {
+    id: log.id,
+    user_id: log.userId,
+    user_name: log.userName,
+    user_role: log.userRole,
+    download_type: log.downloadType,
+    batch_year: log.batchYear,
+    registration_id: log.registrationId || null,
+    card_count: Number(log.cardCount) || 1,
+    ip_address: log.ipAddress || null,
+    status: log.status || 'SUCCESS',
+    details: log.details || null,
+    timestamp: log.timestamp || new Date().toISOString(),
+  };
+}
+
+export function fromDownloadLogDbRow(row: any): IdCardDownloadLog {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    userName: row.user_name,
+    userRole: row.user_role,
+    downloadType: row.download_type,
+    batchYear: row.batch_year,
+    registrationId: row.registration_id || undefined,
+    cardCount: Number(row.card_count) || 1,
+    ipAddress: row.ip_address || undefined,
+    status: row.status || 'SUCCESS',
+    details: row.details || undefined,
+    timestamp: row.timestamp || new Date().toISOString(),
+  };
+}
+
+function safeSupabaseUpsert(table: string, row: Record<string, any>): void {
+  try {
+    Promise.resolve(supabase.from(table).upsert(row))
+      .then(({ error }: any) => {
+        if (error) {
+          console.warn(`[IdCardStore] Background upsert to ${table} notice:`, error.message);
+        }
+      })
+      .catch((err: any) => {
+        if (!isNetworkException(err)) {
+          console.warn(`[IdCardStore] Background upsert exception on ${table}:`, err?.message || err);
+        }
+      });
+  } catch (err: any) {
+    if (!isNetworkException(err)) {
+      console.warn(`[IdCardStore] Failed to queue background upsert for ${table}:`, err?.message || err);
+    }
+  }
+}
+
+function safeSupabaseInsert(table: string, row: Record<string, any>): void {
+  try {
+    Promise.resolve(supabase.from(table).insert(row))
+      .then(({ error }: any) => {
+        if (error) {
+          console.warn(`[IdCardStore] Background insert to ${table} notice:`, error.message);
+        }
+      })
+      .catch((err: any) => {
+        if (!isNetworkException(err)) {
+          console.warn(`[IdCardStore] Background insert exception on ${table}:`, err?.message || err);
+        }
+      });
+  } catch (err: any) {
+    if (!isNetworkException(err)) {
+      console.warn(`[IdCardStore] Failed to queue background insert for ${table}:`, err?.message || err);
+    }
+  }
+}
 
 const KEY_ID_CARD_STAFF = 'plscf_idcard_staff_accounts_v1';
 const KEY_ID_CARD_RECORDS = 'plscf_student_id_cards_v1';
@@ -434,6 +611,7 @@ export class IdCardStore {
     list[idx].updatedAt = new Date().toISOString();
 
     this.saveIdCards(list);
+    safeSupabaseUpsert('student_id_cards', toStudentIdCardDbRow(list[idx]));
   }
 
   // ==========================================================================
@@ -536,6 +714,7 @@ export class IdCardStore {
 
     jobs.unshift(newJob);
     this.saveDownloadJobs(jobs);
+    safeSupabaseUpsert('id_card_download_jobs', toDownloadJobDbRow(newJob));
     return newJob;
   }
 
@@ -559,6 +738,7 @@ export class IdCardStore {
     }
 
     this.saveDownloadJobs(jobs);
+    safeSupabaseUpsert('id_card_download_jobs', toDownloadJobDbRow(jobs[idx]));
   }
 
   // ==========================================================================
@@ -583,6 +763,7 @@ export class IdCardStore {
       };
       logs.unshift(newLog);
       safeSetItem(KEY_ID_CARD_LOGS, JSON.stringify(logs.slice(0, 500)));
+      safeSupabaseInsert('id_card_download_logs', toDownloadLogDbRow(newLog));
     } catch (err) {
       console.error('[IdCardStore] Failed to record download audit log:', err);
     }
@@ -610,5 +791,94 @@ export class IdCardStore {
       totalBatches: batches.length,
       downloadablePdfsCount: totalGenerated,
     };
+  }
+
+  // ==========================================================================
+  // 8. SUPABASE BACKGROUND SYNCHRONIZATION
+  // ==========================================================================
+  static async syncWithSupabase(): Promise<{
+    success: boolean;
+    syncedJobs: number;
+    syncedLogs: number;
+    syncedCards: number;
+    error?: string;
+  }> {
+    try {
+      let syncedJobs = 0;
+      let syncedLogs = 0;
+      let syncedCards = 0;
+
+      // 1. Sync download jobs
+      const { data: jobRows, error: jobErr } = await supabase
+        .from('id_card_download_jobs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (!jobErr && Array.isArray(jobRows) && jobRows.length > 0) {
+        const dbJobs = jobRows.map(fromDownloadJobDbRow);
+        const localJobs = this.getDownloadJobs();
+        const dbIds = new Set(dbJobs.map((j) => j.id));
+        const mergedJobs = [...dbJobs];
+        for (const local of localJobs) {
+          if (!dbIds.has(local.id)) mergedJobs.push(local);
+        }
+        this.saveDownloadJobs(mergedJobs);
+        syncedJobs = dbJobs.length;
+      }
+
+      // 2. Sync download logs
+      const { data: logRows, error: logErr } = await supabase
+        .from('id_card_download_logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(200);
+
+      if (!logErr && Array.isArray(logRows) && logRows.length > 0) {
+        const dbLogs = logRows.map(fromDownloadLogDbRow);
+        const localLogs = this.getDownloadLogs();
+        const dbIds = new Set(dbLogs.map((l) => l.id));
+        const mergedLogs = [...dbLogs];
+        for (const local of localLogs) {
+          if (!dbIds.has(local.id)) mergedLogs.push(local);
+        }
+        safeSetItem(KEY_ID_CARD_LOGS, JSON.stringify(mergedLogs.slice(0, 500)));
+        syncedLogs = dbLogs.length;
+      }
+
+      // 3. Sync student ID cards
+      const { data: cardRows, error: cardErr } = await supabase
+        .from('student_id_cards')
+        .select('*')
+        .limit(1000);
+
+      if (!cardErr && Array.isArray(cardRows) && cardRows.length > 0) {
+        const dbCards = cardRows.map(fromStudentIdCardDbRow);
+        const localCards = this.getIdCards();
+        const dbMap = new Map(dbCards.map((c) => [c.registrationId, c]));
+        const mergedCards = localCards.map((c) => {
+          const dbCard = dbMap.get(c.registrationId);
+          if (dbCard) {
+            return {
+              ...c,
+              cardStatus: dbCard.cardStatus || c.cardStatus,
+              generatedAt: dbCard.generatedAt || c.generatedAt,
+              generatedBy: dbCard.generatedBy || c.generatedBy,
+              pdfStoragePath: dbCard.pdfStoragePath || c.pdfStoragePath,
+            };
+          }
+          return c;
+        });
+        this.saveIdCards(mergedCards);
+        syncedCards = dbCards.length;
+      }
+
+      return { success: true, syncedJobs, syncedLogs, syncedCards };
+    } catch (err: any) {
+      if (!isNetworkException(err)) {
+        console.warn('[IdCardStore] Supabase sync encountered non-blocking notice:', err?.message || err);
+      }
+      return { success: false, syncedJobs: 0, syncedLogs: 0, syncedCards: 0, error: err?.message || 'Sync failed' };
+    }
   }
 }
