@@ -140,7 +140,7 @@ export const RmsDocumentsModule: React.FC<Props> = ({ currentUser, canUpload }) 
           <select
             value={selectedCommitteeId}
             onChange={(e) => setSelectedCommitteeId(e.target.value)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-700"
+            className="flex-1 sm:flex-initial px-3 py-2.5 sm:py-2 text-base sm:text-sm border border-slate-200 rounded-lg bg-white text-slate-700 min-h-[44px] sm:min-h-0"
           >
             <option value="ALL">All Committees ({committees.length})</option>
             {committees.map((c) => (
@@ -153,7 +153,7 @@ export const RmsDocumentsModule: React.FC<Props> = ({ currentUser, canUpload }) 
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-700"
+            className="flex-1 sm:flex-initial px-3 py-2.5 sm:py-2 text-base sm:text-sm border border-slate-200 rounded-lg bg-white text-slate-700 min-h-[44px] sm:min-h-0"
           >
             <option value="ALL">All Categories</option>
             <option value="OFFICIAL_LETTERS">Official Letters</option>
@@ -171,7 +171,7 @@ export const RmsDocumentsModule: React.FC<Props> = ({ currentUser, canUpload }) 
           <select
             value={selectedAccess}
             onChange={(e) => setSelectedAccess(e.target.value)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-700"
+            className="flex-1 sm:flex-initial px-3 py-2.5 sm:py-2 text-base sm:text-sm border border-slate-200 rounded-lg bg-white text-slate-700 min-h-[44px] sm:min-h-0"
           >
             <option value="ALL">All Permissions</option>
             <option value="PUBLIC">Public</option>
@@ -183,7 +183,8 @@ export const RmsDocumentsModule: React.FC<Props> = ({ currentUser, canUpload }) 
 
       {/* Documents Table View */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View (>= 640px) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-600">
             <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 font-semibold border-b border-slate-200">
               <tr>
@@ -260,7 +261,7 @@ export const RmsDocumentsModule: React.FC<Props> = ({ currentUser, canUpload }) 
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => setPreviewDoc(doc)}
-                          className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                          className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition cursor-pointer"
                           title="Preview Document Details"
                         >
                           <Eye className="w-4 h-4" />
@@ -270,7 +271,7 @@ export const RmsDocumentsModule: React.FC<Props> = ({ currentUser, canUpload }) 
                           target="_blank"
                           rel="noreferrer"
                           download={doc.fileName}
-                          className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                          className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
                           title="Download File"
                         >
                           <Download className="w-4 h-4" />
@@ -282,6 +283,92 @@ export const RmsDocumentsModule: React.FC<Props> = ({ currentUser, canUpload }) 
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Card View (< 640px) */}
+        <div className="sm:hidden space-y-3 p-3">
+          {filteredDocs.length === 0 ? (
+            <div className="py-8 text-center text-slate-400 text-sm">
+              No documents found matching the filter criteria.
+            </div>
+          ) : (
+            paginate(filteredDocs, currentPage, pageSize).map((doc) => (
+              <div
+                key={doc.id}
+                className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs space-y-3"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shrink-0 mt-0.5">
+                    <FileText className="w-5 h-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-bold text-slate-900 text-sm leading-snug">
+                      {doc.title}
+                    </h4>
+                    <p className="text-xs text-slate-400 font-mono truncate mt-0.5">{doc.fileName}</p>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      <span className="inline-block px-2 py-0.5 text-[10px] font-semibold rounded bg-slate-100 text-slate-700">
+                        {doc.category.replace('_', ' ')}
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full ${
+                          doc.accessPermission === 'PUBLIC'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : doc.accessPermission === 'COMMITTEE_ONLY'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                            : 'bg-rose-50 text-rose-700 border border-rose-200'
+                        }`}
+                      >
+                        {doc.accessPermission === 'PUBLIC' ? (
+                          <Globe className="w-2.5 h-2.5" />
+                        ) : doc.accessPermission === 'COMMITTEE_ONLY' ? (
+                          <Users className="w-2.5 h-2.5" />
+                        ) : (
+                          <Lock className="w-2.5 h-2.5" />
+                        )}
+                        {doc.accessPermission.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Committee</span>
+                    <span className="text-slate-700 font-medium block truncate">{doc.committeeName}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">File Size</span>
+                    <span className="font-mono text-slate-700 text-[11px] block">{formatFileSize(doc.fileSizeBytes)} (v{doc.version})</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Uploaded By</span>
+                    <span className="text-slate-700 font-medium block">{doc.uploadedByName} • {new Date(doc.uploadedAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                  <button
+                    onClick={() => setPreviewDoc(doc)}
+                    className="flex-1 min-h-[44px] py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-[0.98]"
+                  >
+                    <Eye className="w-4 h-4" />
+                    <span>Preview</span>
+                  </button>
+                  <a
+                    href={sanitizeUrl(doc.fileUrl)}
+                    target="_blank"
+                    rel="noreferrer"
+                    download={doc.fileName}
+                    className="flex-1 min-h-[44px] py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-[0.98]"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download</span>
+                  </a>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Global Pagination */}

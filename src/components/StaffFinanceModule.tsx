@@ -533,65 +533,128 @@ export const StaffFinanceModule: React.FC<StaffFinanceModuleProps> = ({
             No expenses recorded by your account yet. Use the "Add New Daily Expense" button above.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
-                  <th className="py-2.5 px-3">Date & Time</th>
-                  <th className="py-2.5 px-3">Category</th>
-                  <th className="py-2.5 px-3">Description</th>
-                  <th className="py-2.5 px-3">Vendor</th>
-                  <th className="py-2.5 px-3 text-right">Amount (BDT)</th>
-                  <th className="py-2.5 px-3 text-center">Receipt</th>
-                  <th className="py-2.5 px-3 text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {paginate(staffExpensesList, expensePage, expensePageSize).map((exp) => (
-                  <tr key={exp.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 whitespace-nowrap">
-                      {exp.expenseDate} {exp.expenseTime}
-                    </td>
-                    <td className="py-2.5 px-3 font-semibold text-slate-800">{exp.category}</td>
-                    <td className="py-2.5 px-3 text-slate-600 max-w-xs">{exp.description}</td>
-                    <td className="py-2.5 px-3 text-slate-500">{exp.vendorName || '—'}</td>
-                    <td className="py-2.5 px-3 text-right font-mono font-black text-slate-900">
-                      BDT {exp.amount.toLocaleString()}
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      {exp.receiptUrl ? (
-                        <button
-                          type="button"
-                          onClick={() => setViewingVoucherExpense(exp)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition border border-indigo-200 cursor-pointer shadow-2xs"
-                        >
-                          <Eye className="w-3.5 h-3.5 text-indigo-600" />
-                          <span>View Voucher</span>
-                        </button>
-                      ) : (
-                        <span className="text-slate-400 font-mono text-[11px]">—</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-right">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          exp.status === 'APPROVED'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : exp.status === 'SUBMITTED'
-                            ? 'bg-amber-100 text-amber-800'
-                            : exp.status === 'REJECTED'
-                            ? 'bg-rose-100 text-rose-800'
-                            : 'bg-slate-200 text-slate-700'
-                        }`}
-                      >
-                        {exp.status}
-                      </span>
-                    </td>
+          <>
+            {/* Desktop Table View (>= 640px) */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
+                    <th className="py-2.5 px-3">Date & Time</th>
+                    <th className="py-2.5 px-3">Category</th>
+                    <th className="py-2.5 px-3">Description</th>
+                    <th className="py-2.5 px-3">Vendor</th>
+                    <th className="py-2.5 px-3 text-right">Amount (BDT)</th>
+                    <th className="py-2.5 px-3 text-center">Receipt</th>
+                    <th className="py-2.5 px-3 text-right">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paginate(staffExpensesList, expensePage, expensePageSize).map((exp) => (
+                    <tr key={exp.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                        {exp.expenseDate} {exp.expenseTime}
+                      </td>
+                      <td className="py-2.5 px-3 font-semibold text-slate-800">{exp.category}</td>
+                      <td className="py-2.5 px-3 text-slate-600 max-w-xs">{exp.description}</td>
+                      <td className="py-2.5 px-3 text-slate-500">{exp.vendorName || '—'}</td>
+                      <td className="py-2.5 px-3 text-right font-mono font-black text-slate-900 whitespace-nowrap inline-block tabular-nums">
+                        BDT {exp.amount.toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        {exp.receiptUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => setViewingVoucherExpense(exp)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition border border-indigo-200 cursor-pointer shadow-2xs"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>View Voucher</span>
+                          </button>
+                        ) : (
+                          <span className="text-slate-400 font-mono text-[11px]">—</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            exp.status === 'APPROVED'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : exp.status === 'SUBMITTED'
+                              ? 'bg-amber-100 text-amber-800'
+                              : exp.status === 'REJECTED'
+                              ? 'bg-rose-100 text-rose-800'
+                              : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {exp.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Responsive Cards (< 640px) */}
+            <div className="sm:hidden space-y-3 pt-2">
+              {paginate(staffExpensesList, expensePage, expensePageSize).map((exp) => (
+                <div
+                  key={`mobile-staff-exp-${exp.id}`}
+                  className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-bold text-slate-900 block text-sm">{exp.category}</span>
+                      <span className="font-mono text-xs text-slate-400">
+                        {exp.expenseDate} {exp.expenseTime}
+                      </span>
+                    </div>
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                        exp.status === 'APPROVED'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : exp.status === 'SUBMITTED'
+                          ? 'bg-amber-100 text-amber-800'
+                          : exp.status === 'REJECTED'
+                          ? 'bg-rose-100 text-rose-800'
+                          : 'bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {exp.status}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    {exp.description}
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-100">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Vendor</span>
+                      <span className="font-medium text-slate-700">{exp.vendorName || '—'}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Amount</span>
+                      <span className="font-mono font-black text-slate-900 text-sm whitespace-nowrap inline-block tabular-nums">
+                        BDT {exp.amount.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {exp.receiptUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setViewingVoucherExpense(exp)}
+                      className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition border border-indigo-200 cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>View Voucher Document</span>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
         {/* Global Pagination */}

@@ -1471,7 +1471,8 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
               </button>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* Desktop Staff Table (>= 640px) */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
@@ -1515,7 +1516,7 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
                           {staff.status === 'PENDING_APPROVAL' && (
                             <button
                               onClick={() => handleUpdateStaffStatus(staff.id, 'APPROVED')}
-                              className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition flex items-center gap-1"
+                              className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
                             >
                               <UserCheck className="w-3.5 h-3.5" />
                               Approve
@@ -1524,7 +1525,7 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
                           {staff.status === 'APPROVED' && (
                             <button
                               onClick={() => handleUpdateStaffStatus(staff.id, 'DISABLED')}
-                              className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-semibold transition"
+                              className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-semibold transition cursor-pointer"
                             >
                               Deactivate
                             </button>
@@ -1532,14 +1533,14 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
                           {staff.status === 'DISABLED' && (
                             <button
                               onClick={() => handleUpdateStaffStatus(staff.id, 'APPROVED')}
-                              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 text-[11px] font-semibold transition"
+                              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 text-[11px] font-semibold transition cursor-pointer"
                             >
                               Activate
                             </button>
                           )}
                           <button
                             onClick={() => setShowResetPasswordModal(staff)}
-                            className="p-1 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-amber-400 transition"
+                            className="p-1 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-amber-400 transition cursor-pointer"
                             title="Reset Staff Password"
                           >
                             <Key className="w-3.5 h-3.5" />
@@ -1547,7 +1548,7 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
                           {staff.role !== 'SUPER_ADMIN' && (
                             <button
                               onClick={() => handleDeleteStaff(staff.id)}
-                              className="p-1 rounded-lg hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition"
+                              className="p-1 rounded-lg hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition cursor-pointer"
                               title="Delete Account"
                             >
                               <UserX className="w-4 h-4" />
@@ -1559,6 +1560,85 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Staff Cards (< 640px) */}
+            <div className="sm:hidden space-y-3">
+              {paginate(staffList, staffPage, staffPageSize).map((staff) => (
+                <div key={`mob-staff-${staff.id}`} className="rounded-xl bg-slate-800/60 border border-slate-700 p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-bold text-white text-sm">{staff.fullName}</p>
+                      <p className="text-xs text-indigo-300 font-mono">@{staff.username}</p>
+                      <p className="text-[11px] text-slate-400">{staff.email}</p>
+                    </div>
+                    {staff.status === 'APPROVED' || staff.status === 'ACTIVE' ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+                        {staff.status}
+                      </span>
+                    ) : staff.status === 'PENDING_APPROVAL' ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+                        PENDING
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 shrink-0">
+                        {staff.status}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="text-xs text-slate-400 pt-2 border-t border-slate-700 flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold text-slate-500">Role</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-indigo-300 border border-indigo-500/20">
+                      {staff.role}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-700">
+                    {staff.status === 'PENDING_APPROVAL' && (
+                      <button
+                        onClick={() => handleUpdateStaffStatus(staff.id, 'APPROVED')}
+                        className="flex-1 min-h-[44px] px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <UserCheck className="w-4 h-4" />
+                        <span>Approve</span>
+                      </button>
+                    )}
+                    {staff.status === 'APPROVED' && (
+                      <button
+                        onClick={() => handleUpdateStaffStatus(staff.id, 'DISABLED')}
+                        className="flex-1 min-h-[44px] px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold transition flex items-center justify-center cursor-pointer"
+                      >
+                        Deactivate
+                      </button>
+                    )}
+                    {staff.status === 'DISABLED' && (
+                      <button
+                        onClick={() => handleUpdateStaffStatus(staff.id, 'APPROVED')}
+                        className="flex-1 min-h-[44px] px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition flex items-center justify-center cursor-pointer"
+                      >
+                        Activate
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setShowResetPasswordModal(staff)}
+                      className="min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition flex items-center justify-center cursor-pointer"
+                      title="Reset Staff Password"
+                    >
+                      <Key className="w-4 h-4" />
+                    </button>
+                    {staff.role !== 'SUPER_ADMIN' && (
+                      <button
+                        onClick={() => handleDeleteStaff(staff.id)}
+                        className="min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 transition flex items-center justify-center cursor-pointer"
+                        title="Delete Account"
+                      >
+                        <UserX className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* Staff Global Pagination */}
@@ -1585,7 +1665,8 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
               Immutable logging of every staff download, batch packaging event, and timestamp.
             </p>
 
-            <div className="overflow-x-auto">
+            {/* Desktop Table (>= 640px) */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
@@ -1626,6 +1707,44 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Download History Cards (< 640px) */}
+            <div className="sm:hidden space-y-3">
+              {downloadLogs.length === 0 ? (
+                <p className="py-6 text-center text-slate-400 text-xs">No downloads logged yet.</p>
+              ) : (
+                paginate(downloadLogs, downloadLogPage, downloadLogPageSize).map((log) => (
+                  <div key={`mob-log-${log.id}`} className="rounded-xl bg-slate-800/60 border border-slate-700 p-4 space-y-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-bold text-white text-sm">{log.userName}</p>
+                        <p className="font-mono text-[11px] text-slate-400">{new Date(log.timestamp).toLocaleString()}</p>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0">
+                        {log.downloadType}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-700 text-slate-300">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-500 block">Batch / Scope</span>
+                        <span className="text-amber-400 font-semibold">{log.batchYear}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] uppercase font-bold text-slate-500 block">Card Count</span>
+                        <span className="font-bold text-emerald-400">{log.cardCount}</span>
+                      </div>
+                    </div>
+
+                    {log.details && (
+                      <p className="text-[11px] text-slate-400 bg-slate-800/50 p-2 rounded-lg border border-slate-700/60">
+                        {log.details}
+                      </p>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
 
             {/* Download Logs Global Pagination */}

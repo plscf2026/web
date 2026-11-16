@@ -345,7 +345,8 @@ export const RmsTaskBoardModule: React.FC<RmsTaskBoardModuleProps> = ({
       {/* VIEW 2: TABLE VIEW */}
       {activeView === 'TABLE' && (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View (>= 640px) */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold border-b border-slate-200">
@@ -359,41 +360,116 @@ export const RmsTaskBoardModule: React.FC<RmsTaskBoardModuleProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {paginate(filteredTasks, tablePage, tablePageSize).map((t) => (
-                  <tr
-                    key={t.id}
-                    onClick={() => setSelectedTask(t)}
-                    className="hover:bg-slate-50/80 cursor-pointer transition-colors"
-                  >
-                    <td className="py-3 px-4 font-bold text-slate-900 max-w-xs truncate">{t.title}</td>
-                    <td className="py-3 px-4 text-slate-600">{t.committeeName}</td>
-                    <td className="py-3 px-4 text-slate-700 font-medium">{t.assignedMemberName || 'Unassigned'}</td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
-                          t.priority === 'CRITICAL'
-                            ? 'bg-rose-100 text-rose-800'
-                            : t.priority === 'HIGH'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        {t.priority}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 font-mono text-slate-600">{t.deadline}</td>
-                    <td className="py-3 px-4">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-800">
-                        {t.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <button className="text-sky-700 font-bold hover:underline">View</button>
+                {filteredTasks.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-slate-400">
+                      No tasks found.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  paginate(filteredTasks, tablePage, tablePageSize).map((t) => (
+                    <tr
+                      key={t.id}
+                      onClick={() => setSelectedTask(t)}
+                      className="hover:bg-slate-50/80 cursor-pointer transition-colors"
+                    >
+                      <td className="py-3 px-4 font-bold text-slate-900 max-w-xs truncate">{t.title}</td>
+                      <td className="py-3 px-4 text-slate-600">{t.committeeName}</td>
+                      <td className="py-3 px-4 text-slate-700 font-medium">{t.assignedMemberName || 'Unassigned'}</td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
+                            t.priority === 'CRITICAL'
+                              ? 'bg-rose-100 text-rose-800'
+                              : t.priority === 'HIGH'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          {t.priority}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-mono text-slate-600">{t.deadline}</td>
+                      <td className="py-3 px-4">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-800">
+                          {t.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <button className="text-sky-700 font-bold hover:underline">View</button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View (< 640px) */}
+          <div className="sm:hidden space-y-3 p-3">
+            {filteredTasks.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-sm">
+                No tasks found.
+              </div>
+            ) : (
+              paginate(filteredTasks, tablePage, tablePageSize).map((t) => (
+                <div
+                  key={t.id}
+                  onClick={() => setSelectedTask(t)}
+                  className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs space-y-3 cursor-pointer active:scale-[0.99] transition"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="font-bold text-slate-900 text-sm leading-snug">
+                      {t.title}
+                    </h4>
+                    <span
+                      className={`shrink-0 text-[9px] font-black uppercase px-2 py-0.5 rounded ${
+                        t.priority === 'CRITICAL'
+                          ? 'bg-rose-100 text-rose-800'
+                          : t.priority === 'HIGH'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      {t.priority}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Committee</span>
+                      <span className="text-slate-700 font-medium block truncate">{t.committeeName}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Assignee</span>
+                      <span className="text-slate-800 font-semibold block truncate">{t.assignedMemberName || 'Unassigned'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Deadline</span>
+                      <span className="font-mono text-slate-600 text-[11px] block">{t.deadline}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Status</span>
+                      <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-200/70 text-slate-800">
+                        {t.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-1 border-t border-slate-100">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedTask(t);
+                      }}
+                      className="w-full min-h-[44px] py-2 px-3 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold transition flex items-center justify-center gap-1.5"
+                    >
+                      <span>View Task Details</span>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Tasks Table Global Pagination */}

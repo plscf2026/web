@@ -899,7 +899,8 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
           <span className="text-xs text-slate-500 font-mono">{ledger.length} ledger entries</span>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Desktop Table View (>= 640px) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
@@ -933,7 +934,7 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
                     </span>
                   </td>
                   <td className="py-2 px-3 font-sans text-slate-700">{l.description}</td>
-                  <td className="py-2 px-3 text-right font-black text-slate-900">
+                  <td className="py-2 px-3 text-right font-black text-slate-900 whitespace-nowrap inline-block tabular-nums">
                     BDT {l.amount.toLocaleString()}
                   </td>
                   <td className="py-2 px-3 text-slate-500">{new Date(l.createdAt).toLocaleDateString()}</td>
@@ -942,6 +943,60 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Responsive Cards (< 640px) */}
+        <div className="sm:hidden space-y-3 pt-2">
+          {ledger.length === 0 ? (
+            <div className="p-6 text-center text-slate-400 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
+              No ledger transactions recorded yet.
+            </div>
+          ) : (
+            paginate(ledger, ledgerPage, ledgerPageSize).map((l) => (
+              <div
+                key={`mobile-ledger-${l.id}`}
+                className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-2.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="font-mono text-xs font-bold text-slate-900 block truncate">
+                      {l.staffId}
+                    </span>
+                    <span className="font-mono text-[10px] text-slate-400 block truncate">
+                      #{l.id}
+                    </span>
+                  </div>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 ${
+                      l.transactionType === 'ALLOCATION'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : l.transactionType === 'EXPENSE'
+                        ? 'bg-amber-100 text-amber-800'
+                        : l.transactionType === 'CASH_RETURN'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-indigo-100 text-indigo-800'
+                    }`}
+                  >
+                    {l.transactionType}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                  {l.description}
+                </p>
+
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+                  <div className="text-[11px] text-slate-500">
+                    <span>{new Date(l.createdAt).toLocaleDateString()}</span> •{' '}
+                    <span className="text-slate-700 font-semibold">{l.createdBy}</span>
+                  </div>
+                  <span className="font-mono font-black text-slate-900 text-sm whitespace-nowrap inline-block tabular-nums">
+                    BDT {l.amount.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Financial Ledger Global Pagination */}

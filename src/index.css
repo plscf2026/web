@@ -147,6 +147,14 @@
   input,
   select,
   textarea,
+  input[type="text"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="email"],
+  input[type="number"],
+  input[type="password"],
+  input[type="date"],
+  input[type="time"],
   input.text-xs,
   input.text-sm,
   input.text-\[9px\],
@@ -157,21 +165,23 @@
   textarea.text-xs,
   textarea.text-sm {
     font-size: 16px !important;
+    font-size: max(16px, 1rem) !important;
     line-height: 1.45 !important;
   }
 }
 
 /* =========================================================================
    2. AMOUNTS & LARGE NUMBERS NON-BREAKING & CLAMPING RULES
-   Prevents currency symbols (+, ৳, $, etc.) and amounts from line-wrapping.
+   Prevents currency symbols (+, ৳, $, BDT, etc.) and amounts from line-wrapping.
    ========================================================================= */
 .currency-amount,
 .amount-nowrap,
-.numeric-nowrap {
+.numeric-nowrap,
+.currency-val {
   white-space: nowrap !important;
   display: inline-block;
   font-variant-numeric: tabular-nums;
-  word-break: keep-all;
+  word-break: keep-all !important;
 }
 
 /* Fluid responsive large numeric clamps */
@@ -187,16 +197,23 @@
   white-space: nowrap;
 }
 
+.hero-number-clamp {
+  font-size: clamp(1.75rem, 6vw, 3.25rem);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
 /* =========================================================================
    3. TOUCH-FRIENDLY CONTROLS (Coarse Pointer / Touch Devices)
    Ensures minimum 44px × 44px touch targets on touchscreens (Apple HIG & WCAG).
    ========================================================================= */
-@media (hover: none) and (pointer: coarse) {
+@media (hover: none) and (pointer: coarse), (max-width: 639.98px) {
   .touch-target,
   button.touch-target,
-  a.touch-target {
-    min-height: 44px;
-    min-width: 44px;
+  a.touch-target,
+  .mobile-touch-btn {
+    min-height: 44px !important;
+    min-width: 44px !important;
   }
 
   .pagination-touch-btn {
@@ -205,7 +222,7 @@
   }
 
   .mobile-table-action-btn {
-    min-height: 44px;
+    min-height: 44px !important;
     padding-left: 0.875rem;
     padding-right: 0.875rem;
     display: inline-flex;
@@ -242,10 +259,28 @@
   padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
 }
 
+@media (max-width: 639.98px) {
+  body {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
+  .main-content {
+    padding-bottom: 1.5rem;
+  }
+}
+
 @media (min-width: 640px) {
   .main-content {
     padding-bottom: 0px;
   }
+}
+
+/* Reusable Mobile Card Table Row */
+.mobile-card-row {
+  background-color: #ffffff;
+  border-radius: 1rem;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 /* Animated Square QR Laser Scanning Beam (GPU 3D Accelerated - Zero Layout Reflow) */

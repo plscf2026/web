@@ -344,7 +344,8 @@ export const RmsFinanceModule: React.FC<RmsFinanceModuleProps> = ({
       {/* TAB 2: EXPENSES & VOUCHERS */}
       {activeTab === 'EXPENSES' && (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View (>= 640px) */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold border-b border-slate-200">
@@ -359,41 +360,118 @@ export const RmsFinanceModule: React.FC<RmsFinanceModuleProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {paginate(expenses, expensePage, expensePageSize).map((exp) => (
-                  <tr key={exp.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 px-4 font-mono font-bold text-sky-700">{exp.voucherNumber}</td>
-                    <td className="py-3 px-4 font-bold text-slate-900">{exp.expenseTitle}</td>
-                    <td className="py-3 px-4 text-slate-600">{exp.committeeName}</td>
-                    <td className="py-3 px-4 text-slate-700">{exp.vendor}</td>
-                    <td className="py-3 px-4 font-mono font-bold text-slate-900">৳ {exp.amount.toLocaleString()}</td>
-                    <td className="py-3 px-4 uppercase text-[10px] text-slate-500 font-semibold">{exp.paymentMethod}</td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                          exp.verificationStatus === 'REVERSED'
-                            ? 'bg-rose-100 text-rose-800'
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}
-                      >
-                        {exp.verificationStatus}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      {exp.verificationStatus !== 'REVERSED' ? (
-                        <button
-                          onClick={() => setShowReversalModal(exp)}
-                          className="px-2.5 py-1 rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50 text-[11px] font-bold cursor-pointer"
-                        >
-                          Reverse
-                        </button>
-                      ) : (
-                        <span className="text-[10px] text-slate-400 italic">Reversed</span>
-                      )}
+                {expenses.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-slate-400">
+                      No expense vouchers recorded.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  paginate(expenses, expensePage, expensePageSize).map((exp) => (
+                    <tr key={exp.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 px-4 font-mono font-bold text-sky-700">{exp.voucherNumber}</td>
+                      <td className="py-3 px-4 font-bold text-slate-900">{exp.expenseTitle}</td>
+                      <td className="py-3 px-4 text-slate-600">{exp.committeeName}</td>
+                      <td className="py-3 px-4 text-slate-700">{exp.vendor}</td>
+                      <td className="py-3 px-4 font-mono font-bold text-slate-900 amount-nowrap">৳{exp.amount.toLocaleString()}</td>
+                      <td className="py-3 px-4 uppercase text-[10px] text-slate-500 font-semibold">{exp.paymentMethod}</td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                            exp.verificationStatus === 'REVERSED'
+                              ? 'bg-rose-100 text-rose-800'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          {exp.verificationStatus}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {exp.verificationStatus !== 'REVERSED' ? (
+                          <button
+                            onClick={() => setShowReversalModal(exp)}
+                            className="px-2.5 py-1 rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50 text-[11px] font-bold cursor-pointer"
+                          >
+                            Reverse
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic">Reversed</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View (< 640px) */}
+          <div className="sm:hidden space-y-3 p-3">
+            {expenses.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-sm">
+                No expense vouchers recorded.
+              </div>
+            ) : (
+              paginate(expenses, expensePage, expensePageSize).map((exp) => (
+                <div
+                  key={exp.id}
+                  className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-mono text-xs font-bold text-sky-700 block">
+                        {exp.voucherNumber}
+                      </span>
+                      <h4 className="font-bold text-slate-900 text-sm mt-0.5 leading-snug">
+                        {exp.expenseTitle}
+                      </h4>
+                    </div>
+                    <span
+                      className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                        exp.verificationStatus === 'REVERSED'
+                          ? 'bg-rose-100 text-rose-800'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}
+                    >
+                      {exp.verificationStatus}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Committee</span>
+                      <span className="text-slate-700 font-medium block truncate">{exp.committeeName}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Vendor</span>
+                      <span className="text-slate-800 font-semibold block truncate">{exp.vendor}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Payment Method</span>
+                      <span className="text-slate-600 font-mono text-[11px] uppercase block">{exp.paymentMethod}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Amount</span>
+                      <span className="font-mono font-bold text-slate-900 text-sm block amount-nowrap">
+                        ৳{exp.amount.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {exp.verificationStatus !== 'REVERSED' && (
+                    <div className="pt-1 border-t border-slate-100">
+                      <button
+                        onClick={() => setShowReversalModal(exp)}
+                        className="w-full min-h-[44px] py-2 px-3 rounded-lg border border-rose-300 bg-rose-50/50 hover:bg-rose-100 text-rose-700 text-xs font-bold cursor-pointer transition active:scale-[0.98] flex items-center justify-center gap-1.5"
+                      >
+                        <AlertTriangle className="w-4 h-4 text-rose-600" />
+                        <span>Reverse Voucher</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
 
           {/* Expenses Global Pagination */}
@@ -411,7 +489,8 @@ export const RmsFinanceModule: React.FC<RmsFinanceModuleProps> = ({
       {/* TAB 3: INCOME */}
       {activeTab === 'INCOME' && (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View (>= 640px) */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold border-b border-slate-200">
@@ -425,23 +504,82 @@ export const RmsFinanceModule: React.FC<RmsFinanceModuleProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {paginate(incomeList, incomePage, incomePageSize).map((inc) => (
-                  <tr key={inc.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 px-4 font-mono font-bold text-slate-700">{inc.referenceId}</td>
-                    <td className="py-3 px-4 font-bold text-slate-900">{inc.sourceTitle}</td>
-                    <td className="py-3 px-4 font-semibold text-sky-700">{inc.source}</td>
-                    <td className="py-3 px-4 font-mono font-bold text-emerald-700">৳ {inc.amount.toLocaleString()}</td>
-                    <td className="py-3 px-4 text-slate-600">{inc.paymentMethod}</td>
-                    <td className="py-3 px-4 text-slate-500 font-mono">{inc.receivedDate}</td>
-                    <td className="py-3 px-4">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
-                        {inc.status}
-                      </span>
+                {incomeList.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-slate-400">
+                      No income records found.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  paginate(incomeList, incomePage, incomePageSize).map((inc) => (
+                    <tr key={inc.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 px-4 font-mono font-bold text-slate-700">{inc.referenceId}</td>
+                      <td className="py-3 px-4 font-bold text-slate-900">{inc.sourceTitle}</td>
+                      <td className="py-3 px-4 font-semibold text-sky-700">{inc.source}</td>
+                      <td className="py-3 px-4 font-mono font-bold text-emerald-700 amount-nowrap">৳{inc.amount.toLocaleString()}</td>
+                      <td className="py-3 px-4 text-slate-600">{inc.paymentMethod}</td>
+                      <td className="py-3 px-4 text-slate-500 font-mono">{inc.receivedDate}</td>
+                      <td className="py-3 px-4">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                          {inc.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View (< 640px) */}
+          <div className="sm:hidden space-y-3 p-3">
+            {incomeList.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-sm">
+                No income records found.
+              </div>
+            ) : (
+              paginate(incomeList, incomePage, incomePageSize).map((inc) => (
+                <div
+                  key={inc.id}
+                  className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs space-y-2.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-mono text-[11px] font-bold text-slate-500 block">
+                        {inc.referenceId}
+                      </span>
+                      <h4 className="font-bold text-slate-900 text-sm mt-0.5 leading-snug">
+                        {inc.sourceTitle}
+                      </h4>
+                    </div>
+                    <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                      {inc.status}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Category</span>
+                      <span className="font-semibold text-sky-700 block truncate">{inc.source}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Payment Method</span>
+                      <span className="text-slate-600 font-mono text-[11px] block">{inc.paymentMethod}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Received Date</span>
+                      <span className="text-slate-500 font-mono text-[11px] block">{inc.receivedDate}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Amount</span>
+                      <span className="font-mono font-bold text-emerald-700 text-sm block amount-nowrap">
+                        ৳{inc.amount.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Income Global Pagination */}

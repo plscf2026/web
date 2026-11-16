@@ -163,11 +163,12 @@ export const AdminRmsMemberManagement: React.FC<Props> = ({
         <div className="relative w-full md:w-80">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
-            type="text"
+            type="search"
+            inputMode="search"
             placeholder="Search by student name, mobile, or ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-9 pr-4 py-2.5 sm:py-2 text-base sm:text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px] sm:min-h-0"
           />
         </div>
 
@@ -175,7 +176,7 @@ export const AdminRmsMemberManagement: React.FC<Props> = ({
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value as any)}
-            className="px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 font-semibold cursor-pointer"
+            className="flex-1 sm:flex-initial px-3 py-2.5 sm:py-2 text-base sm:text-xs border border-slate-200 rounded-lg bg-white text-slate-700 font-semibold cursor-pointer min-h-[44px] sm:min-h-0"
           >
             <option value="all">All Categories</option>
             <option value="former">Alumni</option>
@@ -185,7 +186,7 @@ export const AdminRmsMemberManagement: React.FC<Props> = ({
           <select
             value={selectedCommitteeFilter}
             onChange={(e) => setSelectedCommitteeFilter(e.target.value)}
-            className="px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 font-semibold cursor-pointer"
+            className="flex-1 sm:flex-initial px-3 py-2.5 sm:py-2 text-base sm:text-xs border border-slate-200 rounded-lg bg-white text-slate-700 font-semibold cursor-pointer min-h-[44px] sm:min-h-0"
           >
             <option value="all">All Committee Memberships</option>
             {committees.map((c) => (
@@ -199,7 +200,8 @@ export const AdminRmsMemberManagement: React.FC<Props> = ({
 
       {/* Member Directory Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View (>= 640px) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-600">
             <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200">
               <tr>
@@ -320,6 +322,115 @@ export const AdminRmsMemberManagement: React.FC<Props> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Card View (< 640px) */}
+        <div className="sm:hidden space-y-3 p-3">
+          {filteredMembers.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-sm">
+              No registered members found matching the filter criteria.
+            </div>
+          ) : (
+            paginate(filteredMembers, currentPage, pageSize).map((member) => {
+              const assignments =
+                memberCommitteeMap[member.mobileNumber] ||
+                memberCommitteeMap[member.fullName] ||
+                [];
+
+              return (
+                <div
+                  key={member.id}
+                  className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={member.photoUrl}
+                        alt={member.fullName}
+                        className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-900 text-sm block leading-snug truncate">
+                          {member.fullName}
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-mono block">
+                          #{member.id} {member.studentId ? `• ID: ${member.studentId}` : ''}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-700 block mt-0.5">
+                          {member.batchName} ({member.category === 'former' ? `Pass: ${member.passingYear || 'N/A'}` : `Class: ${member.currentClass || 'Enrolled'}`})
+                        </span>
+                      </div>
+                    </div>
+                    <span
+                      className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                        member.paymentStatus === 'paid'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}
+                    >
+                      ● {member.paymentStatus}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Phone</span>
+                      <a href={`tel:${member.mobileNumber}`} className="font-semibold text-slate-800 flex items-center gap-1 font-mono">
+                        <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate">{member.mobileNumber}</span>
+                      </a>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">T-Shirt Size</span>
+                      <span className="inline-block px-1.5 py-0.5 bg-slate-200/70 rounded text-[11px] font-bold text-slate-700">
+                        {member.tShirtSize}
+                      </span>
+                    </div>
+                    {member.email && (
+                      <div className="col-span-2">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Email</span>
+                        <span className="text-slate-600 font-mono text-[11px] truncate block">{member.email}</span>
+                      </div>
+                    )}
+                    <div className="col-span-2">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Committee Roles</span>
+                      {assignments.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {assignments.map((a, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-block px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded text-[10px] font-bold"
+                            >
+                              {a.committeeName}: {a.role.replace('_', ' ')}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 italic text-xs">General Attendee</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                    <button
+                      onClick={() => setSelectedMember(member)}
+                      className="flex-1 min-h-[44px] py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-[0.98]"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>Inspect Profile</span>
+                    </button>
+                    <button
+                      onClick={() => setAssigningMember(member)}
+                      className="flex-1 min-h-[44px] py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-[0.98]"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Assign Committee</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Global Pagination */}

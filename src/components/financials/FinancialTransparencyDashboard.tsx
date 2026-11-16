@@ -818,7 +818,8 @@ export const FinancialTransparencyDashboard: React.FC<FinancialTransparencyDashb
 
             {/* Donation Records Grid (Strictly Top 10 by cumulative sum) */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
-              <div className="overflow-x-auto">
+              {/* Desktop Table View (>= 640px) */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 font-bold">
@@ -939,6 +940,116 @@ export const FinancialTransparencyDashboard: React.FC<FinancialTransparencyDashb
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile Responsive Cards (< 640px) */}
+              <div className="sm:hidden space-y-3 p-3">
+                {filteredDonations.length === 0 ? (
+                  <div className="py-10 text-center text-slate-400 text-xs">
+                    {isBangla ? 'কোনো অনুদান রেকর্ড পাওয়া যায়নি।' : 'No contribution records found.'}
+                  </div>
+                ) : (
+                  filteredDonations.map((don, index) => {
+                    const rankNumber = don.rank || index + 1;
+                    const isTop1 = rankNumber === 1;
+                    const isTop2 = rankNumber === 2;
+                    const isTop3 = rankNumber === 3;
+
+                    return (
+                      <div
+                        key={`mobile-don-${don.id || don.donor_key || index}`}
+                        className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span
+                              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                                isTop1
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : isTop2
+                                  ? 'bg-slate-200 text-slate-800'
+                                  : isTop3
+                                  ? 'bg-orange-100 text-amber-900'
+                                  : 'bg-pink-100 text-pink-700'
+                              }`}
+                            >
+                              {don.donor_name.charAt(0)}
+                            </span>
+                            <div className="min-w-0">
+                              <span className="font-extrabold text-slate-900 text-sm block truncate">
+                                {don.donor_name}
+                              </span>
+                              <span className="text-[11px] text-slate-500 block truncate">
+                                {don.batch_name || don.passing_year
+                                  ? `${don.batch_name || ''} ${don.passing_year ? `(${don.passing_year})` : ''}`
+                                  : 'Alumni Member'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 text-right">
+                            {isTop1 ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-black text-[11px]">
+                                🥇 #1
+                              </span>
+                            ) : isTop2 ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-300 font-black text-[11px]">
+                                🥈 #2
+                              </span>
+                            ) : isTop3 ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-orange-100 text-amber-900 border border-amber-600/30 font-black text-[11px]">
+                                🥉 #3
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-600 font-bold text-[11px]">
+                                #{rankNumber}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {don.donation_count > 1 && (
+                          <div className="text-[11px] text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 font-semibold flex items-center gap-1.5">
+                            <span>✨</span>
+                            <span>
+                              {isBangla
+                                ? `${don.donation_count}টি অনুদান সম্মিলিত যোগফল`
+                                : `${don.donation_count} donations combined`}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100 text-slate-600">
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                              {isBangla ? 'মাস্কড আইডি/ফোন' : 'Masked ID / Phone'}
+                            </span>
+                            <span className="font-mono font-bold text-slate-700">
+                              {don.masked_registration_id || don.masked_mobile || '••••••'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                              {isBangla ? 'পদ্ধতি ও তারিখ' : 'Method & Date'}
+                            </span>
+                            <span className="font-medium text-slate-700">
+                              {don.payment_methods?.join(', ') || 'bKash'} • {don.donation_date}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                          <span className="text-[11px] font-bold text-slate-500 uppercase">
+                            {isBangla ? 'সর্বমোট অনুদান' : 'Total Contributed'}
+                          </span>
+                          <span className="font-black text-emerald-700 whitespace-nowrap inline-block tabular-nums text-base">
+                            ৳{don.amount.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
               {/* Table Footer with Summary & Privacy Guarantee */}

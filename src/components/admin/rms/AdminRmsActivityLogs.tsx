@@ -134,22 +134,23 @@ export const AdminRmsActivityLogs: React.FC<Props> = ({ language }) => {
       {/* Filter and Search Bar */}
       <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="relative flex-1 w-full md:w-auto">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
-            type="text"
+            type="search"
+            inputMode="search"
             placeholder={language === 'bn' ? 'অ্যাকশন, ইউজার বা বিবরণ অনুসন্ধান...' : 'Search logs by action, user, or details...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-hidden"
+            className="w-full pl-9 pr-3 py-2 sm:py-1.5 rounded-xl border border-slate-200 text-base sm:text-xs focus:outline-hidden min-h-[44px] sm:min-h-0"
           />
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-          <Filter className="w-3.5 h-3.5 text-slate-400" />
+          <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           <select
             value={entityFilter}
             onChange={(e) => setEntityFilter(e.target.value)}
-            className="px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-700 focus:outline-hidden"
+            className="w-full sm:w-auto px-2.5 py-2 sm:py-1.5 rounded-xl border border-slate-200 text-base sm:text-xs bg-white text-slate-700 focus:outline-hidden min-h-[44px] sm:min-h-0"
           >
             <option value="all">All Entity Types</option>
             {entityTypes.map((type) => (
@@ -163,7 +164,8 @@ export const AdminRmsActivityLogs: React.FC<Props> = ({ language }) => {
 
       {/* Audit Log Table */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
+        {/* Desktop Table (>= 640px) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-700">
             <thead className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">
               <tr>
@@ -175,56 +177,122 @@ export const AdminRmsActivityLogs: React.FC<Props> = ({ language }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {paginate(filteredLogs, currentPage, pageSize).map((log) => (
-                <tr key={log.id} className="hover:bg-slate-50/80 transition">
-                  <td className="px-4 py-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                    </div>
-                    <span className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-                      <Calendar className="w-3 h-3" />
-                      {new Date(log.timestamp).toLocaleDateString()}
-                    </span>
-                  </td>
-
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="font-bold text-slate-900">{log.userName}</div>
-                    <span className="text-[10px] text-slate-500 uppercase font-mono">{log.userRole}</span>
-                  </td>
-
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                        log.action.includes('REVERSE') || log.action.includes('REJECT')
-                          ? 'bg-rose-100 text-rose-800'
-                          : log.action.includes('CREATE') || log.action.includes('APPROVE')
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-blue-100 text-blue-800'
-                      }`}
-                    >
-                      {log.action}
-                    </span>
-                  </td>
-
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="font-bold text-slate-800">{log.entityType}</div>
-                    <div className="text-[10px] font-mono text-slate-400">{log.entityId}</div>
-                  </td>
-
-                  <td className="px-4 py-3 text-slate-600 max-w-md">
-                    <div className="leading-relaxed">{log.details}</div>
-                    {(log.previousValue || log.newValue) && (
-                      <div className="mt-1 text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-200 inline-block">
-                        {log.previousValue && <span>Old: {log.previousValue} → </span>}
-                        {log.newValue && <span className="font-bold text-slate-700">New: {log.newValue}</span>}
-                      </div>
-                    )}
+              {filteredLogs.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                    No activity logs found.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                paginate(filteredLogs, currentPage, pageSize).map((log) => (
+                  <tr key={log.id} className="hover:bg-slate-50/80 transition">
+                    <td className="px-4 py-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                        <Calendar className="w-3 h-3" />
+                        {new Date(log.timestamp).toLocaleDateString()}
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="font-bold text-slate-900">{log.userName}</div>
+                      <span className="text-[10px] text-slate-500 uppercase font-mono">{log.userRole}</span>
+                    </td>
+
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                          log.action.includes('REVERSE') || log.action.includes('REJECT')
+                            ? 'bg-rose-100 text-rose-800'
+                            : log.action.includes('CREATE') || log.action.includes('APPROVE')
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}
+                      >
+                        {log.action}
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="font-bold text-slate-800">{log.entityType}</div>
+                      <div className="text-[10px] font-mono text-slate-400">{log.entityId}</div>
+                    </td>
+
+                    <td className="px-4 py-3 text-slate-600 max-w-md">
+                      <div className="leading-relaxed">{log.details}</div>
+                      {(log.previousValue || log.newValue) && (
+                        <div className="mt-1 text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-200 inline-block">
+                          {log.previousValue && <span>Old: {log.previousValue} → </span>}
+                          {log.newValue && <span className="font-bold text-slate-700">New: {log.newValue}</span>}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Card View (< 640px) */}
+        <div className="sm:hidden space-y-3 p-3">
+          {filteredLogs.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-sm">
+              No activity logs found.
+            </div>
+          ) : (
+            paginate(filteredLogs, currentPage, pageSize).map((log) => (
+              <div
+                key={log.id}
+                className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs space-y-2.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span
+                    className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase shrink-0 ${
+                      log.action.includes('REVERSE') || log.action.includes('REJECT')
+                        ? 'bg-rose-100 text-rose-800'
+                        : log.action.includes('CREATE') || log.action.includes('APPROVE')
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-blue-100 text-blue-800'
+                    }`}
+                  >
+                    {log.action}
+                  </span>
+                  <div className="text-right text-[11px] font-mono text-slate-500">
+                    <div>{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                    <div className="text-[10px] text-slate-400">{new Date(log.timestamp).toLocaleDateString()}</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Actor</span>
+                    <span className="font-bold text-slate-900 block truncate">{log.userName}</span>
+                    <span className="text-[10px] text-slate-500 uppercase font-mono block">{log.userRole}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Target Entity</span>
+                    <span className="font-bold text-slate-800 block truncate">{log.entityType}</span>
+                    <span className="text-[10px] font-mono text-slate-400 block truncate">{log.entityId}</span>
+                  </div>
+                </div>
+
+                <div className="text-xs text-slate-600 leading-relaxed bg-slate-50/50 p-2 rounded border border-slate-100">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Details</span>
+                  {log.details}
+                  {(log.previousValue || log.newValue) && (
+                    <div className="mt-1.5 text-[10px] font-mono text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">
+                      {log.previousValue && <div>Old: {log.previousValue}</div>}
+                      {log.newValue && <div className="font-bold text-slate-800">New: {log.newValue}</div>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Global Pagination */}

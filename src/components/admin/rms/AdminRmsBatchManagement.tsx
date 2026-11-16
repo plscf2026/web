@@ -254,7 +254,8 @@ export const AdminRmsBatchManagement: React.FC<Props> = ({
 
       {/* Batches Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View (>= 640px) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-600">
             <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200">
               <tr>
@@ -321,7 +322,9 @@ export const AdminRmsBatchManagement: React.FC<Props> = ({
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="font-black text-slate-900 text-sm">৳{b.totalContribution.toLocaleString()}</span>
+                        <span className="font-black text-slate-900 text-sm whitespace-nowrap inline-block tabular-nums">
+                          ৳{b.totalContribution.toLocaleString()}
+                        </span>
                         <span className="text-[10px] text-slate-400 block">Verified collected</span>
                       </td>
                       <td className="px-6 py-4">
@@ -346,14 +349,14 @@ export const AdminRmsBatchManagement: React.FC<Props> = ({
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => setSelectedBatchDetails(b.batchName)}
-                            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition"
+                            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition cursor-pointer"
                             title="Inspect Registered Attendees"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleOpenEditRep(b)}
-                            className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition"
+                            className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition cursor-pointer"
                             title="Assign / Edit Batch Representative"
                           >
                             <Edit2 className="w-4 h-4" />
@@ -366,6 +369,100 @@ export const AdminRmsBatchManagement: React.FC<Props> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Responsive Cards (< 640px) */}
+        <div className="sm:hidden space-y-3 p-3">
+          {filteredBatches.length === 0 ? (
+            <div className="px-6 py-10 text-center text-slate-400 text-xs">
+              No student batches found matching the search criteria.
+            </div>
+          ) : (
+            paginate(filteredBatches, currentPage, pageSize).map((b) => {
+              const rep = batchMetadata[b.batchName];
+
+              return (
+                <div
+                  key={`mobile-batch-${b.batchName}`}
+                  className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="p-2 bg-indigo-50 text-indigo-700 rounded-xl">
+                        <Calendar className="w-4 h-4" />
+                      </span>
+                      <div>
+                        <span className="font-bold text-slate-900 text-sm block">{b.batchName}</span>
+                        {b.year && <span className="text-[11px] text-slate-400 font-mono">Year: {b.year}</span>}
+                      </div>
+                    </div>
+                    <span
+                      className={`inline-block px-2.5 py-0.5 text-[10px] font-bold rounded-full uppercase shrink-0 ${
+                        b.category === 'former'
+                          ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                          : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      }`}
+                    >
+                      {b.category === 'former' ? 'Alumni' : 'Current'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Registered</span>
+                      <span className="font-bold text-slate-900 text-sm">{b.attendees.length} Students</span>
+                      <div className="text-[10px] text-emerald-600 font-semibold mt-0.5">
+                        {b.paidCount} Paid {b.pendingCount > 0 ? `• ${b.pendingCount} Pending` : ''}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Collected Inflow</span>
+                      <span className="font-mono font-black text-slate-900 text-sm whitespace-nowrap inline-block tabular-nums">
+                        ৳{b.totalContribution.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {rep?.representativeName && (
+                    <div className="text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Representative</span>
+                        <span className="font-bold text-slate-800">{rep.representativeName}</span>
+                      </div>
+                      {rep.representativePhone && (
+                        <a
+                          href={`tel:${rep.representativePhone}`}
+                          className="font-mono text-indigo-600 hover:underline flex items-center gap-1 font-semibold"
+                        >
+                          <Phone className="w-3 h-3" />
+                          <span>{rep.representativePhone}</span>
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBatchDetails(b.batchName)}
+                      className="flex-1 min-h-[44px] px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>Inspect Attendees</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditRep(b)}
+                      className="min-h-[44px] px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer border border-indigo-200"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      <span>Assign Rep</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Global Pagination */}

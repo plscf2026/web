@@ -454,7 +454,8 @@ export const AdminRmsFinanceManagement: React.FC<Props> = ({ language, registrat
 
           {/* Table */}
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-            <div className="overflow-x-auto">
+            {/* Desktop Table View (>= 640px) */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-left text-xs text-slate-700">
                 <thead className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">
                   <tr>
@@ -478,7 +479,7 @@ export const AdminRmsFinanceManagement: React.FC<Props> = ({ language, registrat
                       </td>
                       <td className="px-4 py-3 text-slate-600 font-medium">{exp.committeeName}</td>
                       <td className="px-4 py-3 text-slate-600">{exp.vendor}</td>
-                      <td className="px-4 py-3 font-mono font-black text-slate-900">
+                      <td className="px-4 py-3 font-mono font-black text-slate-900 whitespace-nowrap inline-block tabular-nums">
                         ৳{exp.amount.toLocaleString('en-IN')}
                       </td>
                       <td className="px-4 py-3">
@@ -521,6 +522,70 @@ export const AdminRmsFinanceManagement: React.FC<Props> = ({ language, registrat
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Responsive Cards (< 640px) */}
+            <div className="sm:hidden space-y-3 p-3">
+              {paginate(filteredExpenses, expensePage, expensePageSize).map((exp) => (
+                <div
+                  key={`mobile-rms-exp-${exp.id}`}
+                  className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-bold text-slate-900 text-sm block">{exp.expenseTitle}</span>
+                      <span className="font-mono text-xs text-sky-700 font-semibold">{exp.voucherNumber}</span>
+                      <span className="text-[11px] text-slate-400 block">{exp.expenseCategory}</span>
+                    </div>
+                    <span
+                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase shrink-0 ${
+                        exp.verificationStatus === 'VERIFIED'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : exp.verificationStatus === 'REVERSED'
+                          ? 'bg-rose-100 text-rose-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {exp.verificationStatus}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100 text-slate-600">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Committee</span>
+                      <span className="font-medium text-slate-800">{exp.committeeName}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Vendor / Payee</span>
+                      <span className="font-medium text-slate-800">{exp.vendor}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Method</span>
+                      <span className="text-[11px] font-mono font-semibold text-slate-700">{exp.paymentMethod}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Amount</span>
+                      <span className="font-mono font-black text-slate-900 text-sm whitespace-nowrap inline-block tabular-nums">
+                        ৳{exp.amount.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {exp.verificationStatus === 'VERIFIED' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReversalTarget(exp);
+                        setReversalReason('');
+                      }}
+                      className="w-full min-h-[44px] px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 border border-rose-200 cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Reverse Voucher</span>
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
 
             {/* Expenses Global Pagination */}

@@ -460,7 +460,8 @@ export const AdminRmsTaskManagement: React.FC<Props> = ({ language }) => {
       {/* VIEW 2: LIST TABLE */}
       {viewMode === 'list' && (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View (>= 640px) */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">
                 <tr>
@@ -535,6 +536,83 @@ export const AdminRmsTaskManagement: React.FC<Props> = ({ language }) => {
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Responsive Cards (< 640px) */}
+          <div className="sm:hidden space-y-3 p-3">
+            {paginate(filteredTasks, listPage, listPageSize).map((task) => {
+              const overdue = isOverdue(task);
+              return (
+                <div
+                  key={`mobile-task-${task.id}`}
+                  className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="font-bold text-slate-900 block text-sm">{task.title}</span>
+                      <span className="font-mono text-[10px] text-slate-400">#{task.id}</span>
+                    </div>
+                    <span
+                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase shrink-0 ${
+                        task.status === 'COMPLETED'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : task.status === 'UNDER_REVIEW'
+                          ? 'bg-amber-100 text-amber-800'
+                          : task.status === 'IN_PROGRESS'
+                          ? 'bg-blue-100 text-blue-800'
+                          : task.status === 'REJECTED'
+                          ? 'bg-rose-100 text-rose-800'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      {task.status.replace('_', ' ')}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100 text-slate-600">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Committee</span>
+                      <span className="font-medium text-slate-800">{task.committeeName}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Assignee</span>
+                      <span className="font-medium text-slate-800">{task.assignedMemberName || 'Unassigned'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Priority</span>
+                      <span
+                        className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                          task.priority === 'CRITICAL'
+                            ? 'bg-rose-100 text-rose-800'
+                            : task.priority === 'HIGH'
+                            ? 'bg-orange-100 text-orange-800'
+                            : task.priority === 'MEDIUM'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {task.priority}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Deadline</span>
+                      <span className={`font-mono text-xs font-semibold ${overdue ? 'text-rose-600 flex items-center gap-1' : 'text-slate-700'}`}>
+                        {overdue && <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />}
+                        {task.deadline}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTask(task)}
+                    className="w-full min-h-[44px] px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span>View Task Details</span>
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           {/* List View Global Pagination */}

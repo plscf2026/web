@@ -103,7 +103,7 @@ export const RmsAuditTrailModule: React.FC = () => {
           <select
             value={selectedEntity}
             onChange={(e) => setSelectedEntity(e.target.value)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-700"
+            className="flex-1 sm:flex-initial px-3 py-2.5 sm:py-2 text-base sm:text-sm border border-slate-200 rounded-lg bg-white text-slate-700 min-h-[44px] sm:min-h-0"
           >
             <option value="ALL">All Entity Types</option>
             <option value="COMMITTEE">Committees</option>
@@ -120,7 +120,7 @@ export const RmsAuditTrailModule: React.FC = () => {
           <select
             value={selectedAction}
             onChange={(e) => setSelectedAction(e.target.value)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-700"
+            className="flex-1 sm:flex-initial px-3 py-2.5 sm:py-2 text-base sm:text-sm border border-slate-200 rounded-lg bg-white text-slate-700 min-h-[44px] sm:min-h-0"
           >
             <option value="ALL">All Actions</option>
             <option value="INITIALIZE_RMS_PLATFORM">Initialize RMS Platform</option>
@@ -139,7 +139,8 @@ export const RmsAuditTrailModule: React.FC = () => {
 
       {/* Audit Log Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View (>= 640px) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-600">
             <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 font-semibold border-b border-slate-200">
               <tr>
@@ -209,6 +210,62 @@ export const RmsAuditTrailModule: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Card View (< 640px) */}
+        <div className="sm:hidden space-y-3 p-3 font-sans">
+          {filteredLogs.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-sm">
+              No audit records found matching criteria.
+            </div>
+          ) : (
+            paginate(filteredLogs, currentPage, pageSize).map((log) => (
+              <div
+                key={log.id}
+                className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs space-y-2.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span
+                    className={`inline-block px-2.5 py-0.5 text-[10px] font-bold rounded-md uppercase tracking-wider shrink-0 ${
+                      log.action.includes('REVERSE')
+                        ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                        : log.action.includes('APPROVE')
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        : log.action.includes('SUBMIT')
+                        ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                        : 'bg-slate-100 text-slate-800'
+                    }`}
+                  >
+                    {log.action}
+                  </span>
+                  <div className="text-right text-[11px] font-mono text-slate-500">
+                    <div>{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                    <div className="text-[10px] text-slate-400">{new Date(log.timestamp).toLocaleDateString()}</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">User / Actor</span>
+                    <span className="font-bold text-slate-900 block truncate">{log.userName}</span>
+                    <span className="text-[10px] text-slate-500 uppercase font-mono block">{log.userRole}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Entity</span>
+                    <span className="font-bold text-slate-800 block truncate">{log.entityType}</span>
+                    {log.entityId && (
+                      <span className="text-[10px] font-mono text-slate-400 block truncate">{log.entityId}</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="text-xs text-slate-600 leading-relaxed bg-slate-50/50 p-2 rounded border border-slate-100">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Audit Justification</span>
+                  {log.details}
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Global Pagination */}

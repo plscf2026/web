@@ -244,7 +244,8 @@ export const AdminRmsReportsAnalytics: React.FC<Props> = ({
             <span className="text-xs text-slate-500">{batchStats.length} Unique Batches Registered</span>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Desktop Table (>= 640px) */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">
                 <tr>
@@ -274,13 +275,59 @@ export const AdminRmsReportsAnalytics: React.FC<Props> = ({
                     <td className="px-4 py-3 text-slate-600">{b.year || '—'}</td>
                     <td className="px-4 py-3 font-mono text-slate-700">{b.totalRegistered}</td>
                     <td className="px-4 py-3 font-mono font-bold text-emerald-600">{b.totalPaid}</td>
-                    <td className="px-4 py-3 text-right font-mono font-black text-slate-900">
+                    <td className="px-4 py-3 text-right font-mono font-black text-slate-900 amount-nowrap">
                       ৳{b.totalRevenue.toLocaleString('en-IN')}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View (< 640px) */}
+          <div className="sm:hidden space-y-3">
+            {paginate(batchStats, batchPage, batchPageSize).map((b, idx) => (
+              <div
+                key={b.batchName}
+                className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs space-y-2.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold text-slate-400">
+                      #{(batchPage - 1) * batchPageSize + idx + 1}
+                    </span>
+                    <h4 className="font-bold text-slate-900 text-sm">{b.batchName}</h4>
+                  </div>
+                  <span
+                    className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase shrink-0 ${
+                      b.category === 'former' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                    }`}
+                  >
+                    {b.category}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Year / Standard</span>
+                    <span className="text-slate-700 font-semibold">{b.year || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Registration</span>
+                    <span className="text-slate-800 font-medium">
+                      {b.totalRegistered} reg • <strong className="text-emerald-700">{b.totalPaid} paid</strong>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-xs">
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Collected Revenue</span>
+                  <span className="font-mono font-black text-slate-900 text-sm amount-nowrap">
+                    ৳{b.totalRevenue.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
 
           <GlobalPagination
@@ -302,7 +349,8 @@ export const AdminRmsReportsAnalytics: React.FC<Props> = ({
             <span className="text-xs text-slate-500">Real-time Budget vs Milestone Delivery Audit</span>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Desktop Table (>= 640px) */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">
                 <tr>
@@ -320,8 +368,8 @@ export const AdminRmsReportsAnalytics: React.FC<Props> = ({
                   <tr key={cs.committee.id} className="hover:bg-slate-50/80 transition">
                     <td className="px-4 py-3 font-bold text-slate-900">{cs.committee.nameEn}</td>
                     <td className="px-4 py-3 text-slate-600">{cs.committee.directorName}</td>
-                    <td className="px-4 py-3 font-mono">৳{cs.committee.budgetAllocated.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-3 font-mono font-bold text-rose-600">
+                    <td className="px-4 py-3 font-mono amount-nowrap">৳{cs.committee.budgetAllocated.toLocaleString('en-IN')}</td>
+                    <td className="px-4 py-3 font-mono font-bold text-rose-600 amount-nowrap">
                       ৳{cs.committee.budgetSpent.toLocaleString('en-IN')}
                     </td>
                     <td className="px-4 py-3">
@@ -345,6 +393,60 @@ export const AdminRmsReportsAnalytics: React.FC<Props> = ({
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View (< 640px) */}
+          <div className="sm:hidden space-y-3">
+            {paginate(committeeStats, commPage, commPageSize).map((cs) => (
+              <div
+                key={cs.committee.id}
+                className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs space-y-2.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm">{cs.committee.nameEn}</h4>
+                    <span className="text-xs text-slate-500">Director: {cs.committee.directorName}</span>
+                  </div>
+                  <span className="font-mono text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">
+                    {cs.taskRate}% done
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Allocated</span>
+                    <span className="font-mono font-semibold text-slate-700 amount-nowrap">
+                      ৳{cs.committee.budgetAllocated.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Spent</span>
+                    <span className="font-mono font-bold text-rose-600 amount-nowrap">
+                      ৳{cs.committee.budgetSpent.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase mb-1">
+                      <span>Burn Rate</span>
+                      <span>{cs.budgetUtilization}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          cs.budgetUtilization > 90 ? 'bg-rose-500' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${Math.min(100, cs.budgetUtilization)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-xs">
+                  <span className="text-[11px] text-slate-500">Milestones Completed</span>
+                  <span className="font-mono font-bold text-slate-800">{cs.completedTasks} of {cs.totalTasks}</span>
+                </div>
+              </div>
+            ))}
           </div>
 
           <GlobalPagination
