@@ -1818,12 +1818,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 language={language}
                 staffUser={{
                   id: effectiveAdmin.id || 'SUPER_ADMIN_01',
+                  authUserId: effectiveAdmin.id || 'SUPER_ADMIN_01',
                   username: effectiveAdmin.username || 'admin',
                   fullName: effectiveAdmin.fullName || 'Super Administrator',
+                  email: effectiveAdmin.email || 'admin@gmail.com',
                   role: 'SUPER_ADMIN',
+                  department: 'ALL_SERVICES',
+                  permissions: ['VERIFY', 'APPROVE', 'REJECT', 'MANAGE'],
+                  status: 'ACTIVE',
                   assignedGate: 'Gate 01 - Main Entrance',
                   createdAt: effectiveAdmin.createdAt || new Date().toISOString(),
-                  isActive: true,
                 }}
                 isSuperAdmin={true}
               />

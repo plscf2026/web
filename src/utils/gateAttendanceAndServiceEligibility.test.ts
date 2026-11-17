@@ -5,7 +5,6 @@ import {
   StaffAccount,
   FoodDistributionRecord,
   DressDistributionRecord,
-  GateEventRecord,
 } from '../types';
 import {
   validateMealCollection,
