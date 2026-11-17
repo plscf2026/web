@@ -128,8 +128,8 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
     setIsResultPopupOpen(true);
   };
 
-  // Perform Entry or Exit
-  const handleGateAction = (eventType: 'ENTRY' | 'EXIT') => {
+  // Perform Entry or Back (Exit)
+  const handleGateAction = (eventType: 'ENTRY' | 'BACK') => {
     if (!scannedStudent) return;
 
     // Check Department RBAC permission
@@ -172,7 +172,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
       setIsInside(updatedInside);
       setActionNotice({
         type: 'success',
-        message: `SUCCESS: ${scannedStudent.fullName} marked as ${eventType} at ${new Date().toLocaleTimeString()}.`,
+        message: `SUCCESS: ${scannedStudent.fullName} marked as ${eventType} (${eventType === 'ENTRY' ? 'GREEN' : 'RED'}) at ${new Date().toLocaleTimeString()}.`,
       });
 
       // Auto-dismiss after 1600ms on success so staff can scan next
@@ -483,7 +483,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                 </p>
               </div>
 
-              {/* Dual Gate Action Controls (Requirement 4.6) */}
+              {/* Dual Gate Action Controls: ENTRY (Green) vs BACK (Red) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <button
                   type="button"
@@ -491,26 +491,36 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                   disabled={isInside || scannedStudent.paymentStatus !== 'paid'}
                   className={`py-4 px-6 rounded-2xl font-black text-sm tracking-wider uppercase flex items-center justify-center gap-2 transition-all shadow-md ${
                     !isInside && scannedStudent.paymentStatus === 'paid'
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer hover:shadow-lg'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer hover:shadow-lg ring-2 ring-emerald-400/50'
                       : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
                   }`}
+                  title={
+                    !isInside
+                      ? 'Mark ENTRY (Green): Allow event admission, meal & T-shirt distribution'
+                      : 'Student already has ENTRY status'
+                  }
                 >
                   <UserCheck className="w-5 h-5" />
-                  <span>[ MARK ENTRY ]</span>
+                  <span>[ RECORD ENTRY ]</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => handleGateAction('EXIT')}
+                  onClick={() => handleGateAction('BACK')}
                   disabled={!isInside || scannedStudent.paymentStatus !== 'paid'}
                   className={`py-4 px-6 rounded-2xl font-black text-sm tracking-wider uppercase flex items-center justify-center gap-2 transition-all shadow-md ${
                     isInside && scannedStudent.paymentStatus === 'paid'
-                      ? 'bg-slate-900 hover:bg-slate-800 text-white cursor-pointer hover:shadow-lg'
+                      ? 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer hover:shadow-lg ring-2 ring-rose-400/50'
                       : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
                   }`}
+                  title={
+                    isInside
+                      ? 'Mark BACK (Red): Student exits venue, blocks meal & T-shirt collection'
+                      : 'Student is not inside venue'
+                  }
                 >
                   <UserX className="w-5 h-5" />
-                  <span>[ MARK EXIT ]</span>
+                  <span>[ RECORD BACK ]</span>
                 </button>
               </div>
             </div>
@@ -574,8 +584,8 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                       <span
                         className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
                           evt.eventType === 'ENTRY'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-indigo-100 text-indigo-800'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : 'bg-rose-100 text-rose-800 border border-rose-300'
                         }`}
                       >
                         {evt.eventType}
@@ -627,7 +637,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                     <p className="text-xs font-semibold text-slate-700">{evt.studentName}</p>
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${evt.eventType === 'ENTRY' ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${evt.eventType === 'ENTRY' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-rose-100 text-rose-800 border border-rose-300'}`}>
                       {evt.eventType}
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${evt.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
@@ -834,22 +844,35 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                   </div>
 
                   {/* Gate State & Location Callout Box */}
-                  <div className="p-4 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-between">
+                  <div
+                    className={`p-4 rounded-2xl border flex items-center justify-between ${
+                      isInside
+                        ? 'bg-emerald-50 border-emerald-300'
+                        : EventStore.getStudentGateStatus(scannedStudent.id) === 'BACK'
+                        ? 'bg-rose-50 border-rose-300'
+                        : 'bg-slate-100 border-slate-300'
+                    }`}
+                  >
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-sky-700 tracking-wider block">
-                        Current Campus Location
+                      <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
+                        Gate Status
                       </span>
-                      <span className="text-base font-black text-slate-900 block flex items-center gap-1.5 mt-0.5">
+                      <span className="text-base font-black block flex items-center gap-1.5 mt-0.5">
                         {isInside ? (
-                          <>
+                          <span className="text-emerald-700 flex items-center gap-1.5">
                             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <span>INSIDE VENUE CAMPUS</span>
-                          </>
+                            <span>ENTRY (Inside Event - GREEN)</span>
+                          </span>
+                        ) : EventStore.getStudentGateStatus(scannedStudent.id) === 'BACK' ? (
+                          <span className="text-rose-700 flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+                            <span>BACK (Exited Event - RED)</span>
+                          </span>
                         ) : (
-                          <>
+                          <span className="text-slate-600 flex items-center gap-1.5">
                             <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
-                            <span>OUTSIDE / NOT CHECKED IN</span>
-                          </>
+                            <span>NOT ENTERED (Neutral)</span>
+                          </span>
                         )}
                       </span>
                     </div>
@@ -862,7 +885,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                     </div>
                   </div>
 
-                  {/* Gate Dual Actions: Record Entry / Record Exit */}
+                  {/* Gate Dual Actions: Record Entry / Record Back */}
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     <button
                       type="button"
@@ -880,16 +903,16 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => handleGateAction('EXIT')}
+                      onClick={() => handleGateAction('BACK')}
                       disabled={!isInside}
                       className={`py-3.5 px-4 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
                         !isInside
                           ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
-                          : 'bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-900/25 cursor-pointer active:scale-[0.98]'
+                          : 'bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/25 cursor-pointer active:scale-[0.98]'
                       }`}
                     >
                       <UserX className="w-4 h-4" />
-                      <span>{!isInside ? 'Already Outside' : 'Record Exit'}</span>
+                      <span>{!isInside ? 'Already Outside' : 'Record Back'}</span>
                     </button>
                   </div>
                 </>

@@ -153,14 +153,16 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
   };
 
   // Station specific quick actions
-  const isInside = scannedStudent ? EventStore.isStudentCurrentlyInside(scannedStudent.id) : false;
+  const isInside = scannedStudent
+    ? (EventStore.isStudentCurrentlyInside(scannedStudent.id) || Boolean(scannedStudent.isCheckedIn))
+    : false;
   const breakfastRecord = scannedStudent ? EventStore.getMealStatus(scannedStudent.id, 'breakfast') : undefined;
   const lunchRecord = scannedStudent ? EventStore.getMealStatus(scannedStudent.id, 'lunch') : undefined;
   const dinnerRecord = scannedStudent ? EventStore.getMealStatus(scannedStudent.id, 'dinner') : undefined;
   const dressRecord = scannedStudent ? EventStore.getDressStatus(scannedStudent.id) : undefined;
 
   // Gate Action
-  const handleGateAction = (type: 'ENTRY' | 'EXIT') => {
+  const handleGateAction = (type: 'ENTRY' | 'BACK' | 'EXIT') => {
     if (!scannedStudent) return;
     const gateId = activeStation === 'GATE_02' ? 'Gate 02 - East Gate' : 'Gate 01 - Main Entrance';
 
@@ -182,7 +184,7 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
       refreshAllState();
       setActionNotice({
         type: 'success',
-        message: `${type === 'ENTRY' ? 'ENTRY APPROVED' : 'EXIT RECORDED'} for ${scannedStudent.fullName}`,
+        message: `${type === 'ENTRY' ? 'ENTRY APPROVED (GREEN)' : 'BACK RECORDED (RED)'} for ${scannedStudent.fullName}`,
       });
     } else {
       playScanErrorSound();
@@ -193,6 +195,21 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
   // Meal Action
   const handleMealAction = (meal: 'breakfast' | 'lunch' | 'dinner') => {
     if (!scannedStudent) return;
+
+    // Gate entry check: student must have ENTRY status
+    const gateStatus = EventStore.getStudentGateStatus(scannedStudent.id);
+    if (gateStatus !== 'ENTRY') {
+      playScanErrorSound();
+      setActionNotice({
+        type: 'error',
+        message:
+          gateStatus === 'BACK'
+            ? 'BACK TO THE GATE: Student has exited the event. Food collection is not allowed. Please ask the student to enter through the gate first.'
+            : 'Student has not entered the event. Please complete gate entry first.',
+      });
+      return;
+    }
+
     const res = EventStore.confirmFoodDistribution(
       scannedStudent.id,
       scannedStudent.fullName,
@@ -220,6 +237,21 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
   // Dress Action
   const handleDressAction = () => {
     if (!scannedStudent) return;
+
+    // Gate entry check: student must have ENTRY status
+    const gateStatus = EventStore.getStudentGateStatus(scannedStudent.id);
+    if (gateStatus !== 'ENTRY') {
+      playScanErrorSound();
+      setActionNotice({
+        type: 'error',
+        message:
+          gateStatus === 'BACK'
+            ? 'BACK TO THE GATE: Student has exited the event. T-shirt collection is currently blocked. Please ask the student to enter through the gate first.'
+            : 'Student has not entered the event. Please complete gate entry first.',
+      });
+      return;
+    }
+
     const res = EventStore.confirmDressDistribution(
       scannedStudent.id,
       scannedStudent.fullName,
@@ -526,14 +558,14 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
                         onClick={() => handleGateAction('ENTRY')}
                         className="w-full py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold cursor-pointer transition-colors shadow-xs"
                       >
-                        Approve Entry
+                        Approve ENTRY (Green)
                       </button>
                     ) : (
                       <button
-                        onClick={() => handleGateAction('EXIT')}
-                        className="w-full py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold cursor-pointer transition-colors shadow-xs"
+                        onClick={() => handleGateAction('BACK')}
+                        className="w-full py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold cursor-pointer transition-colors shadow-xs"
                       >
-                        Record Exit
+                        Record BACK (Red)
                       </button>
                     )}
                   </div>
@@ -767,14 +799,14 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
 
                       <button
                         type="button"
-                        onClick={() => handleGateAction(isInside ? 'EXIT' : 'ENTRY')}
+                        onClick={() => handleGateAction(isInside ? 'BACK' : 'ENTRY')}
                         className={`px-3 py-1.5 rounded-xl font-bold text-xs uppercase cursor-pointer transition-all ${
                           isInside
-                            ? 'bg-slate-900 hover:bg-slate-800 text-white'
-                            : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            ? 'bg-rose-600 hover:bg-rose-700 text-white ring-1 ring-rose-400'
+                            : 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
                         }`}
                       >
-                        {isInside ? 'Mark Exit' : 'Mark Entry'}
+                        {isInside ? 'Mark BACK (Red)' : 'Mark ENTRY (Green)'}
                       </button>
                     </div>
 

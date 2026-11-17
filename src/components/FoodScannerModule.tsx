@@ -8,6 +8,8 @@ import {
   Camera,
   CheckCircle,
   AlertTriangle,
+  AlertOctagon,
+  DoorOpen,
   XCircle,
   Clock,
   Shield,
@@ -160,9 +162,26 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
     }
 
     const student = verifyRes.student;
+    const gateStatus = EventStore.getStudentGateStatus(student.id);
+    const isInside = gateStatus === 'ENTRY';
 
     const currentDistributions = EventStore.getFoodDistributions();
-    const result = validateMealCollection(student, mealType, currentDistributions);
+    const result = validateMealCollection(student, mealType, currentDistributions, new Date(), gateStatus);
+
+    if (!isInside) {
+      playScanErrorSound();
+      setScannedStudent(student);
+      setValidationResult(result);
+      setFeedbackNotice({
+        type: 'error',
+        message:
+          gateStatus === 'BACK'
+            ? 'Student has exited the event. Food collection is not allowed. Please ask the student to enter through the gate first.'
+            : 'Student has not entered the event. Please complete gate entry first.',
+      });
+      setIsResultPopupOpen(true);
+      return;
+    }
 
     if (result.canCollect) {
       playScanSuccessSound();
@@ -179,6 +198,20 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
   // Confirm Received Handler
   const handleConfirmReceived = () => {
     if (!scannedStudent || !validationResult?.canCollect) return;
+
+    // Gate Entry check: Student must currently have ENTRY status
+    const gateStatus = EventStore.getStudentGateStatus(scannedStudent.id);
+    if (gateStatus !== 'ENTRY') {
+      playScanErrorSound();
+      setFeedbackNotice({
+        type: 'error',
+        message:
+          gateStatus === 'BACK'
+            ? 'Student has exited the event. Food collection is not allowed. Please ask the student to enter through the gate first.'
+            : 'Student has not entered the event. Please complete gate entry first.',
+      });
+      return;
+    }
 
     // Check Department RBAC permission
     const targetDept = mealType.toUpperCase() as any;
@@ -527,6 +560,14 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                       <span className="text-sm font-black text-emerald-600 flex items-center gap-1.5">
                         <CheckCircle className="w-4 h-4" /> NOT COLLECTED (ELIGIBLE)
                       </span>
+                    ) : validationResult?.status === 'BACK_TO_THE_GATE' ? (
+                      <span className="text-sm font-black text-rose-600 flex items-center gap-1.5 animate-pulse">
+                        <AlertOctagon className="w-4 h-4 text-rose-600" /> BACK TO THE GATE
+                      </span>
+                    ) : validationResult?.status === 'GATE_ENTRY_REQUIRED' ? (
+                      <span className="text-sm font-black text-rose-600 flex items-center gap-1.5">
+                        <DoorOpen className="w-4 h-4 text-rose-600" /> GATE ENTRY REQUIRED
+                      </span>
                     ) : (
                       <span className="text-sm font-black text-rose-700 flex items-center gap-1.5">
                         <AlertTriangle className="w-4 h-4" /> {validationResult?.status}
@@ -562,6 +603,32 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                   <CheckCircle className="w-5 h-5" />
                   <span>[ CONFIRM {mealType.toUpperCase()} RECEIVED ]</span>
                 </button>
+              ) : validationResult?.status === 'BACK_TO_THE_GATE' ? (
+                <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-500 text-rose-950 text-center font-bold text-xs space-y-2 shadow-md">
+                  <div className="flex items-center justify-center gap-2 text-rose-700 text-sm font-black uppercase tracking-wider">
+                    <AlertOctagon className="w-5 h-5 text-rose-600" />
+                    <span>BACK TO THE GATE</span>
+                  </div>
+                  <p className="text-xs text-rose-900 font-extrabold leading-snug">
+                    Student has exited the event. Food collection is not allowed. Please ask the student to enter through the gate first.
+                  </p>
+                  <p className="text-[11px] font-semibold text-rose-700">
+                    শিক্ষার্থী অনুষ্ঠানস্থল ত্যাগ করেছেন। পুনরায় ভেতরে প্রবেশের জন্য অনুগ্রহ করে আগে গেটে যান।
+                  </p>
+                </div>
+              ) : validationResult?.status === 'GATE_ENTRY_REQUIRED' ? (
+                <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-900 text-center font-bold text-xs space-y-1.5 shadow-xs">
+                  <div className="flex items-center justify-center gap-1.5 text-rose-700 text-sm font-black">
+                    <DoorOpen className="w-5 h-5 text-rose-600" />
+                    <span>GATE ENTRY REQUIRED</span>
+                  </div>
+                  <p className="text-xs text-rose-800 font-bold">
+                    Student has not entered the event. Please complete gate entry first.
+                  </p>
+                  <p className="text-[11px] font-medium text-rose-700">
+                    শিক্ষার্থী এখনও অনুষ্ঠানে প্রবেশ করেননি। অনুগ্রহ করে আগে গেটে প্রবেশ সম্পন্ন করুন।
+                  </p>
+                </div>
               ) : validationResult?.status === 'ALREADY_COLLECTED' ? (
                 <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-center font-bold text-xs space-y-1">
                   <p>Duplicate Prevention: Student has already collected this meal.</p>
@@ -917,6 +984,14 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                           <span className="text-xs font-black text-emerald-600 flex items-center gap-1">
                             <CheckCircle className="w-4 h-4" /> NOT COLLECTED (ELIGIBLE)
                           </span>
+                        ) : validationResult?.status === 'BACK_TO_THE_GATE' ? (
+                          <span className="text-xs font-black text-rose-600 flex items-center gap-1 animate-pulse">
+                            <AlertOctagon className="w-4 h-4 text-rose-600" /> BACK TO THE GATE
+                          </span>
+                        ) : validationResult?.status === 'GATE_ENTRY_REQUIRED' ? (
+                          <span className="text-xs font-black text-rose-600 flex items-center gap-1">
+                            <DoorOpen className="w-4 h-4 text-rose-600" /> GATE ENTRY REQUIRED
+                          </span>
                         ) : (
                           <span className="text-xs font-black text-amber-700 flex items-center gap-1">
                             <AlertTriangle className="w-4 h-4" /> {validationResult?.status}
@@ -949,6 +1024,32 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                       <CheckCircle className="w-5 h-5" />
                       <span>[ CONFIRM {mealType.toUpperCase()} COLLECTED ]</span>
                     </button>
+                  ) : validationResult?.status === 'BACK_TO_THE_GATE' ? (
+                    <div className="p-3.5 rounded-2xl bg-rose-50 border-2 border-rose-500 text-rose-950 text-center font-bold text-xs space-y-2 shadow-sm">
+                      <div className="flex items-center justify-center gap-1.5 text-rose-700 text-xs font-black uppercase tracking-wider">
+                        <AlertOctagon className="w-4 h-4 text-rose-600" />
+                        <span>BACK TO THE GATE</span>
+                      </div>
+                      <p className="text-xs text-rose-900 font-extrabold leading-snug">
+                        Student has exited the event. Food collection is not allowed. Please ask the student to enter through the gate first.
+                      </p>
+                      <p className="text-[11px] font-medium text-rose-700">
+                        শিক্ষার্থী অনুষ্ঠানস্থল ত্যাগ করেছেন। পুনরায় ভেতরে প্রবেশের জন্য অনুগ্রহ করে আগে গেটে যান।
+                      </p>
+                    </div>
+                  ) : validationResult?.status === 'GATE_ENTRY_REQUIRED' ? (
+                    <div className="p-3.5 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-900 text-center font-bold text-xs space-y-1.5 shadow-xs">
+                      <div className="flex items-center justify-center gap-1.5 text-rose-700 text-xs font-black">
+                        <DoorOpen className="w-4 h-4 text-rose-600" />
+                        <span>GATE ENTRY REQUIRED</span>
+                      </div>
+                      <p className="text-xs text-rose-800 font-bold">
+                        Student has not entered the event. Please complete gate entry first.
+                      </p>
+                      <p className="text-[11px] font-medium text-rose-700">
+                        শিক্ষার্থী এখনও অনুষ্ঠানে প্রবেশ করেননি। অনুগ্রহ করে আগে গেটে প্রবেশ সম্পন্ন করুন।
+                      </p>
+                    </div>
                   ) : validationResult?.status === 'ALREADY_COLLECTED' ? (
                     <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-center font-bold text-xs space-y-1">
                       <p>Student has already collected this {mealType} meal.</p>

@@ -35,6 +35,8 @@ import {
   CheckCircle2,
   Clock,
   Utensils,
+  DoorOpen,
+  RotateCcw,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -47,6 +49,7 @@ import {
   AdminAccount,
   DressDistributionRecord,
   FoodDistributionRecord,
+  GateEventRecord,
   HomePageSectionId,
   HomePageSectionSetting,
   DEFAULT_HOME_PAGE_SECTIONS,
@@ -373,11 +376,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [foodDistributions, setFoodDistributions] = useState<FoodDistributionRecord[]>(() =>
     EventStore.getFoodDistributions()
   );
+  const [gateEvents, setGateEvents] = useState<GateEventRecord[]>(() =>
+    EventStore.getGateEvents()
+  );
 
-  // Search & Filters
+  // Search & Column Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'former' | 'current'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'pending' | 'refunded'>('all');
+  const [gateFilter, setGateFilter] = useState<'all' | 'entry' | 'back' | 'not_entered' | 'in' | 'out'>('all');
+  const [foodFilter, setFoodFilter] = useState<string>('all');
+  const [tshirtFilter, setTshirtFilter] = useState<'all' | 'given' | 'pending'>('all');
+  const [tshirtSizeFilter, setTshirtSizeFilter] = useState<string>('all');
+  const [batchFilter, setBatchFilter] = useState<string>('all');
 
   // Global Pagination States (Default 10 per page, dynamic 10/20/30/40 selector)
   const [regPage, setRegPage] = useState(1);
@@ -534,6 +545,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const freshScanLogs = AppStore.getScanLogs();
     const freshDress = EventStore.getDressDistributions();
     const freshFood = EventStore.getFoodDistributions();
+    const freshGate = EventStore.getGateEvents();
 
     setRegistrations(freshRegs);
     setDonations(freshDonations);
@@ -543,6 +555,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setScanLogs(freshScanLogs);
     setDressDistributions(freshDress);
     setFoodDistributions(freshFood);
+    setGateEvents(freshGate);
 
     setFormerFeeInput(freshSettings.formerStudentFee);
     setCurrentFeeInput(freshSettings.currentStudentFee);
@@ -555,6 +568,106 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setEndDateInput(freshSettings.endDate || '2026-12-15');
 
     fetchSupabaseRegistrationsForYear(selectedYear);
+  };
+
+  const isTShirtGiven = (reg: RegistrationRecord): boolean => {
+    if (reg.isTShirtCollected) return true;
+    return dressDistributions.some(
+      (d) =>
+        (d.registrationId === reg.id || (reg.studentId && d.registrationId === reg.studentId)) &&
+        d.status === 'RECEIVED'
+    );
+  };
+
+  const isMealCollected = (reg: RegistrationRecord, mealType: 'breakfast' | 'lunch' | 'dinner'): boolean => {
+    return foodDistributions.some(
+      (d) =>
+        (d.registrationId === reg.id || (reg.studentId && d.registrationId === reg.studentId)) &&
+        d.mealType === mealType &&
+        d.status === 'COLLECTED'
+    );
+  };
+
+  const getStudentGateStatus = (reg: RegistrationRecord): 'NOT_ENTERED' | 'ENTRY' | 'BACK' => {
+    const events = gateEvents.filter(
+      (e) =>
+        (e.registrationId === reg.id || (reg.studentId && e.registrationId === reg.studentId)) &&
+        e.status === 'APPROVED'
+    );
+    if (events.length > 0) {
+      const type = events[0].eventType;
+      if (type === 'ENTRY') return 'ENTRY';
+      if (type === 'BACK' || type === 'EXIT') return 'BACK';
+    }
+    if (reg.gateStatus === 'BACK') return 'BACK';
+    if (reg.gateStatus === 'ENTRY' || reg.isCheckedIn) return 'ENTRY';
+    return 'NOT_ENTERED';
+  };
+
+  const isStudentInside = (reg: RegistrationRecord): boolean => {
+    return getStudentGateStatus(reg) === 'ENTRY';
+  };
+
+  const handleToggleGateAttendance = async (
+    reg: RegistrationRecord,
+    currentGateStatus: 'NOT_ENTERED' | 'ENTRY' | 'BACK'
+  ) => {
+    const nextIsInside = currentGateStatus !== 'ENTRY';
+    const nextGateStatus: 'ENTRY' | 'BACK' = nextIsInside ? 'ENTRY' : 'BACK';
+
+    // 1. Optimistic UI update on registrations state
+    setRegistrations((prev) =>
+      prev.map((r) =>
+        r.id === reg.id ? { ...r, isCheckedIn: nextIsInside, gateStatus: nextGateStatus } : r
+      )
+    );
+    AppStore.updateRegistration(
+      reg.id,
+      { isCheckedIn: nextIsInside, gateStatus: nextGateStatus },
+      selectedYear
+    );
+
+    // 2. Authoritative Supabase update via toggleGateAttendance
+    await SupabaseService.toggleGateAttendance(
+      reg.id,
+      nextIsInside,
+      effectiveAdmin.id,
+      effectiveAdmin.fullName
+    );
+
+    // 3. Update EventStore gate events
+    const res = EventStore.recordGateEvent(
+      reg.id,
+      reg.fullName,
+      reg.batchName,
+      reg.photoUrl,
+      nextGateStatus,
+      'Gate 01 - Main Entrance',
+      'ADMIN-DASHBOARD',
+      effectiveAdmin.id,
+      effectiveAdmin.fullName,
+      undefined
+    );
+
+    if (res.event) {
+      setGateEvents(EventStore.getGateEvents());
+    }
+
+    // 4. Cross-tab & window event broadcast
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('plscf_gate_sync', { detail: res.event }));
+      window.dispatchEvent(
+        new CustomEvent('plscf_registration_updated', {
+          detail: { id: reg.id, isCheckedIn: nextIsInside, gateStatus: nextGateStatus },
+        })
+      );
+    }
+    EventStore.broadcastStationEvent('plscf_gate_sync', { regId: reg.id, isInside: nextIsInside, gateStatus: nextGateStatus });
+    EventStore.broadcastStationEvent('plscf_registration_updated', {
+      id: reg.id,
+      isCheckedIn: nextIsInside,
+      gateStatus: nextGateStatus,
+    });
   };
 
   const registrationsForYear = registrations.filter(
@@ -573,7 +686,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     committee: 'Organizing committee',
   };
 
-  // Filtered registrations for selected year / criteria
+  const uniqueBatches = Array.from(
+    new Set(registrationsForYear.map((r) => r.batchName).filter(Boolean))
+  ).sort();
+
+  const activeFilterCount =
+    (searchTerm.trim() !== '' ? 1 : 0) +
+    (categoryFilter !== 'all' ? 1 : 0) +
+    (statusFilter !== 'all' ? 1 : 0) +
+    (gateFilter !== 'all' ? 1 : 0) +
+    (foodFilter !== 'all' ? 1 : 0) +
+    (tshirtFilter !== 'all' ? 1 : 0) +
+    (tshirtSizeFilter !== 'all' ? 1 : 0) +
+    (batchFilter !== 'all' ? 1 : 0);
+
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setCategoryFilter('all');
+    setStatusFilter('all');
+    setGateFilter('all');
+    setFoodFilter('all');
+    setTshirtFilter('all');
+    setTshirtSizeFilter('all');
+    setBatchFilter('all');
+    setRegPage(1);
+  };
+
+  // Filtered registrations for selected year with comprehensive column filters
   const filteredRegistrations = registrationsForYear.filter((r) => {
     const matchSearch =
       r.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -585,7 +724,54 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const matchCategory = categoryFilter === 'all' || r.category === categoryFilter;
     const matchStatus = statusFilter === 'all' || r.paymentStatus === statusFilter;
 
-    return matchSearch && matchCategory && matchStatus;
+    // Gate Attendance Filter (ENTRY / BACK / NOT_ENTERED)
+    const gStatus = getStudentGateStatus(r);
+    const matchGate =
+      gateFilter === 'all' ||
+      (gateFilter === 'entry' && gStatus === 'ENTRY') ||
+      (gateFilter === 'in' && gStatus === 'ENTRY') ||
+      (gateFilter === 'back' && gStatus === 'BACK') ||
+      (gateFilter === 'out' && gStatus !== 'ENTRY') ||
+      (gateFilter === 'not_entered' && gStatus === 'NOT_ENTERED');
+
+    // Food Distribution Filter
+    const bTaken = isMealCollected(r, 'breakfast');
+    const lTaken = isMealCollected(r, 'lunch');
+    const dTaken = isMealCollected(r, 'dinner');
+    let matchFood = true;
+    if (foodFilter === 'all_taken') matchFood = bTaken && lTaken && dTaken;
+    else if (foodFilter === 'any_taken') matchFood = bTaken || lTaken || dTaken;
+    else if (foodFilter === 'none_taken') matchFood = !bTaken && !lTaken && !dTaken;
+    else if (foodFilter === 'breakfast_taken') matchFood = bTaken;
+    else if (foodFilter === 'breakfast_pending') matchFood = !bTaken;
+    else if (foodFilter === 'lunch_taken') matchFood = lTaken;
+    else if (foodFilter === 'lunch_pending') matchFood = !lTaken;
+    else if (foodFilter === 'dinner_taken') matchFood = dTaken;
+    else if (foodFilter === 'dinner_pending') matchFood = !dTaken;
+
+    // T-Shirt Distribution Filter
+    const tGiven = isTShirtGiven(r);
+    const matchTShirt =
+      tshirtFilter === 'all' ||
+      (tshirtFilter === 'given' && tGiven) ||
+      (tshirtFilter === 'pending' && !tGiven);
+
+    // T-Shirt Size Filter
+    const matchSize = tshirtSizeFilter === 'all' || r.tShirtSize === tshirtSizeFilter;
+
+    // Batch Filter
+    const matchBatch = batchFilter === 'all' || r.batchName === batchFilter;
+
+    return (
+      matchSearch &&
+      matchCategory &&
+      matchStatus &&
+      matchGate &&
+      matchFood &&
+      matchTShirt &&
+      matchSize &&
+      matchBatch
+    );
   });
 
   // T-shirt size aggregation
@@ -729,24 +915,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const updated = notices.filter((notice) => notice.id !== noticeId);
     AppStore.saveNotices(updated);
     setNotices(updated);
-  };
-
-  const isTShirtGiven = (reg: RegistrationRecord): boolean => {
-    if (reg.isTShirtCollected) return true;
-    return dressDistributions.some(
-      (d) =>
-        (d.registrationId === reg.id || (reg.studentId && d.registrationId === reg.studentId)) &&
-        d.status === 'RECEIVED'
-    );
-  };
-
-  const isMealCollected = (reg: RegistrationRecord, mealType: 'breakfast' | 'lunch' | 'dinner'): boolean => {
-    return foodDistributions.some(
-      (d) =>
-        (d.registrationId === reg.id || (reg.studentId && d.registrationId === reg.studentId)) &&
-        d.mealType === mealType &&
-        d.status === 'COLLECTED'
-    );
   };
 
   const handleToggleTShirtCollected = async (regId: string, current: boolean) => {
@@ -1561,43 +1729,185 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
-          {/* Search & Filter Toolbar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-              <input
-                type="text"
-                placeholder={
-                  language === 'bn'
-                    ? 'নাম, আইডি, মোবাইল বা ব্যাচ দিয়ে খুঁজুন...'
-                    : 'Search by student name, ID, mobile, or batch...'
-                }
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden"
-              />
+          {/* Enhanced Search & Column Filters Toolbar */}
+          <div className="space-y-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  placeholder={
+                    language === 'bn'
+                      ? 'নাম, আইডি, মোবাইল বা ব্যাচ দিয়ে খুঁজুন...'
+                      : 'Search by student name, ID, mobile, or batch...'
+                  }
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs"
+                />
+              </div>
+
+              {/* Category Filter */}
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value as any)}
+                className="px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700"
+              >
+                <option value="all">All Student Categories (সকল ক্যাটাগরি)</option>
+                <option value="former">Former Students (প্রাক্তন অ্যালামনাই)</option>
+                <option value="current">Current Students (বর্তমান শিক্ষার্থী)</option>
+              </select>
+
+              {/* Payment Status Filter */}
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700"
+              >
+                <option value="all">All Payment Statuses (সকল পেমেন্ট স্ট্যাটাস)</option>
+                <option value="paid">PAID & VERIFIED (পরিশোধিত)</option>
+                <option value="pending">PENDING (অপেক্ষমান)</option>
+                <option value="refunded">REFUNDED / CANCELLED (বাতিল)</option>
+              </select>
+
+              {/* Gate Attendance Filter (ENTRY / BACK / NOT_ENTERED) */}
+              <select
+                value={gateFilter}
+                onChange={(e) => setGateFilter(e.target.value as any)}
+                className={`px-3 py-2.5 rounded-xl border text-xs focus:outline-hidden font-bold shadow-2xs ${
+                  gateFilter === 'entry' || gateFilter === 'in'
+                    ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
+                    : gateFilter === 'back'
+                    ? 'border-rose-400 bg-rose-50 text-rose-900'
+                    : gateFilter === 'not_entered'
+                    ? 'border-slate-400 bg-slate-100 text-slate-700'
+                    : 'border-slate-300 bg-white text-slate-700 focus:border-emerald-500'
+                }`}
+              >
+                <option value="all">All Gate Statuses (সকল গেইট স্ট্যাটাস)</option>
+                <option value="entry">Gate: ENTRY (উপস্থিত - সবুজ)</option>
+                <option value="back">Gate: BACK (প্রস্থান - লাল)</option>
+                <option value="not_entered">Gate: NOT ENTERED (প্রবেশ করেনি)</option>
+              </select>
             </div>
 
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value as any)}
-              className="px-3 py-2 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden"
-            >
-              <option value="all">All Student Categories (সকল ক্যাটাগরি)</option>
-              <option value="former">Former Students (প্রাক্তন অ্যালামনাই)</option>
-              <option value="current">Current Students (বর্তমান শিক্ষার্থী)</option>
-            </select>
+            {/* Column-Specific Granular Filters Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {/* Food Distribution Filter */}
+              <select
+                value={foodFilter}
+                onChange={(e) => setFoodFilter(e.target.value)}
+                className="px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700"
+              >
+                <option value="all">Food: All Statuses (সকল খাবার স্ট্যাটাস)</option>
+                <option value="all_taken">All Meals Taken (সকল খাবার গৃহীত: B+L+D)</option>
+                <option value="any_taken">Any Meal Taken (যে কোনো খাবার গৃহীত)</option>
+                <option value="none_taken">No Meals Taken (কোনো খাবার নেয়নি)</option>
+                <option value="breakfast_taken">Breakfast Taken (সকালের নাস্তা নেওয়া)</option>
+                <option value="breakfast_pending">Breakfast Pending (সকালের নাস্তা বাকি)</option>
+                <option value="lunch_taken">Lunch Taken (দুপুরের খাবার নেওয়া)</option>
+                <option value="lunch_pending">Lunch Pending (দুপুরের খাবার বাকি)</option>
+                <option value="dinner_taken">Dinner Taken (রাতের খাবার নেওয়া)</option>
+                <option value="dinner_pending">Dinner Pending (রাতের খাবার বাকি)</option>
+              </select>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="px-3 py-2 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden"
-            >
-              <option value="all">All Payment Statuses (সকল পেমেন্ট স্ট্যাটাস)</option>
-              <option value="paid">PAID & VERIFIED (পরিশোধিত)</option>
-              <option value="pending">PENDING (অপেক্ষমান)</option>
-              <option value="refunded">REFUNDED / CANCELLED (বাতিল)</option>
-            </select>
+              {/* T-Shirt Distribution Filter */}
+              <select
+                value={tshirtFilter}
+                onChange={(e) => setTshirtFilter(e.target.value as any)}
+                className="px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700"
+              >
+                <option value="all">T-Shirt: All Statuses (সকল টি-শার্ট স্ট্যাটাস)</option>
+                <option value="given">T-Shirt Handed Over (টি-শার্ট প্রাপ্ত)</option>
+                <option value="pending">T-Shirt Pending (টি-শার্ট বাকি)</option>
+              </select>
+
+              {/* T-Shirt Size Filter */}
+              <select
+                value={tshirtSizeFilter}
+                onChange={(e) => setTshirtSizeFilter(e.target.value)}
+                className="px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700"
+              >
+                <option value="all">T-Shirt Size: All Sizes (সকল সাইজ)</option>
+                <option value="S">Size: S</option>
+                <option value="M">Size: M</option>
+                <option value="L">Size: L</option>
+                <option value="XL">Size: XL</option>
+                <option value="XXL">Size: XXL</option>
+                <option value="XXXL">Size: XXXL</option>
+                <option value="Oversize 50">Size: Oversize 50</option>
+              </select>
+
+              {/* Batch Filter & Reset Button */}
+              <div className="flex items-center gap-2">
+                <select
+                  value={batchFilter}
+                  onChange={(e) => setBatchFilter(e.target.value)}
+                  className="flex-1 px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700 min-w-0"
+                >
+                  <option value="all">All Batches (সকল ব্যাচ)</option>
+                  {uniqueBatches.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+
+                {activeFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border border-slate-200 shadow-2xs"
+                    title="Reset all filters to default"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Reset ({activeFilterCount})</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Live Filter Indicator Bar */}
+            <div className="flex items-center justify-between flex-wrap gap-2 pt-1 pb-1 text-xs text-slate-500">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-slate-700">
+                  Showing <strong className="text-slate-900 font-black">{filteredRegistrations.length}</strong> of{' '}
+                  <strong className="text-slate-900 font-bold">{registrationsForYear.length}</strong> attendees
+                </span>
+                {gateFilter !== 'all' && (
+                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[11px] font-bold text-slate-700 border border-slate-200">
+                    Gate: {gateFilter.toUpperCase()}
+                  </span>
+                )}
+                {foodFilter !== 'all' && (
+                  <span className="px-2 py-0.5 rounded-md bg-amber-50 text-[11px] font-bold text-amber-800 border border-amber-200">
+                    Food: {foodFilter}
+                  </span>
+                )}
+                {tshirtFilter !== 'all' && (
+                  <span className="px-2 py-0.5 rounded-md bg-teal-50 text-[11px] font-bold text-teal-800 border border-teal-200">
+                    T-Shirt: {tshirtFilter}
+                  </span>
+                )}
+                {batchFilter !== 'all' && (
+                  <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-[11px] font-bold text-indigo-800 border border-indigo-200">
+                    Batch: {batchFilter}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 text-[11px] font-bold">
+                <span className="flex items-center gap-1 text-emerald-700">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block"></span>
+                  IN Campus: {registrationsForYear.filter(isStudentInside).length}
+                </span>
+                <span className="flex items-center gap-1 text-rose-600">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>
+                  OUT: {registrationsForYear.filter((r) => !isStudentInside(r)).length}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Bookings Table: Desktop Responsive View (>= 640px) */}
@@ -1609,6 +1919,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <th className="py-3 px-3">Category & Batch</th>
                   <th className="py-3 px-3">Contact</th>
                   <th className="py-3 px-3">T-Shirt</th>
+                  <th className="py-3 px-3 text-center min-w-[85px]">
+                    <div className="flex items-center justify-center gap-1">
+                      <DoorOpen className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Gate</span>
+                    </div>
+                  </th>
                   <th className="py-3 px-3 text-center min-w-[130px]">
                     <div className="flex items-center justify-center gap-1">
                       <Utensils className="w-3.5 h-3.5 text-slate-500" />
@@ -1624,7 +1940,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <tbody className="divide-y divide-slate-100">
                 {filteredRegistrations.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-slate-400">
+                    <td colSpan={10} className="py-8 text-center text-slate-400">
                       No bookings found for year {selectedYear} matching your criteria.
                     </td>
                   </tr>
@@ -1715,6 +2031,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </>
                           )}
                         </button>
+                      </td>
+
+                      <td className="py-3 px-3 text-center">
+                        {(() => {
+                          const gateStatus = getStudentGateStatus(reg);
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleGateAttendance(reg, gateStatus)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-black cursor-pointer transition-all transform active:scale-95 shadow-xs whitespace-nowrap min-w-[72px] ${
+                                gateStatus === 'ENTRY'
+                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
+                                  : gateStatus === 'BACK'
+                                  ? 'bg-rose-600 hover:bg-rose-700 text-white ring-1 ring-rose-400'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300'
+                              }`}
+                              title={
+                                gateStatus === 'ENTRY'
+                                  ? 'Gate Status: ENTRY (Green Box). Student has entered event. Click to record BACK (Exit).'
+                                  : gateStatus === 'BACK'
+                                  ? 'Gate Status: BACK (Red Box). Student has exited event. Click to record ENTRY (Re-enter).'
+                                  : 'Gate Status: NOT ENTERED (Neutral). Click to record ENTRY.'
+                              }
+                            >
+                              {gateStatus === 'ENTRY'
+                                ? 'ENTRY'
+                                : gateStatus === 'BACK'
+                                ? 'BACK'
+                                : 'NOT ENTERED'}
+                            </button>
+                          );
+                        })()}
                       </td>
 
                       <td className="py-3 px-3">
@@ -1950,7 +2298,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <button
                         type="button"
                         onClick={() => handleToggleTShirtCollected(reg.id, isTShirtGiven(reg))}
-                        className={`mt-0.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all w-full text-center cursor-pointer min-h-[40px] flex items-center justify-center gap-1.5 shadow-xs whitespace-nowrap ${
+                        className={`mt-0.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all w-full text-center cursor-pointer min-h-[38px] flex items-center justify-center gap-1.5 shadow-xs whitespace-nowrap ${
                           isTShirtGiven(reg)
                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-1 ring-emerald-500'
                             : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
@@ -1963,6 +2311,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       >
                         {isTShirtGiven(reg) ? `✓ ${reg.tShirtSize} • Given` : `⏳ ${reg.tShirtSize} • Pending`}
                       </button>
+                    </div>
+
+                    <div className="col-span-2">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                        Gate Status (গেট)
+                      </span>
+                      {(() => {
+                        const gateStatus = getStudentGateStatus(reg);
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleGateAttendance(reg, gateStatus)}
+                            className={`px-3 py-2 rounded-lg text-xs font-black transition-all w-full text-center cursor-pointer min-h-[40px] flex items-center justify-center gap-2 shadow-xs whitespace-nowrap ${
+                              gateStatus === 'ENTRY'
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
+                                : gateStatus === 'BACK'
+                                ? 'bg-rose-600 hover:bg-rose-700 text-white ring-1 ring-rose-400'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                            }`}
+                            title={
+                              gateStatus === 'ENTRY'
+                                ? 'Gate Status: ENTRY (Green Box). Student is inside event. Tap to record BACK (Exit).'
+                                : gateStatus === 'BACK'
+                                ? 'Gate Status: BACK (Red Box). Student has exited event. Tap to record ENTRY (Re-enter).'
+                                : 'Gate Status: NOT ENTERED (Neutral). Tap to record ENTRY.'
+                            }
+                          >
+                            <span className="px-2 py-0.5 rounded bg-black/20 text-xs font-black">
+                              {gateStatus}
+                            </span>
+                            <span>
+                              {gateStatus === 'ENTRY'
+                                ? 'Inside Venue (ভেতরে আছেন - সবুজ)'
+                                : gateStatus === 'BACK'
+                                ? 'Exited / BACK (বাইরে আছেন - লাল)'
+                                : 'Not Entered (এখনও প্রবেশ করেননি)'}
+                            </span>
+                          </button>
+                        );
+                      })()}
                     </div>
 
                     <div className="col-span-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
@@ -2200,18 +2588,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="flex justify-between p-2 rounded-lg bg-emerald-50 text-emerald-900 font-semibold">
                   <span>Approved Entries:</span>
                   <span className="font-bold">
-                    {scanLogs.filter((s) => s.scanType === 'entry' && s.status === 'approved').length}
+                    {gateEvents.filter((e) => e.eventType === 'ENTRY' && e.status === 'APPROVED').length ||
+                      scanLogs.filter((s) => s.scanType === 'entry' && s.status === 'approved').length}
                   </span>
                 </div>
                 <div className="flex justify-between p-2 rounded-lg bg-slate-50 text-slate-700 font-semibold">
                   <span>Approved Exits:</span>
                   <span className="font-bold">
-                    {scanLogs.filter((s) => s.scanType === 'exit' && s.status === 'approved').length}
+                    {gateEvents.filter((e) => e.eventType === 'EXIT' && e.status === 'APPROVED').length ||
+                      scanLogs.filter((s) => s.scanType === 'exit' && s.status === 'approved').length}
                   </span>
                 </div>
                 <div className="flex justify-between p-2 rounded-lg bg-amber-50 text-amber-900 font-semibold">
                   <span>Currently Inside Campus:</span>
-                  <span className="font-bold">2</span>
+                  <span className="font-bold">
+                    {registrationsForYear.filter(isStudentInside).length}
+                  </span>
                 </div>
               </div>
             </div>

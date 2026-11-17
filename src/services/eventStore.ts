@@ -910,6 +910,8 @@ export class EventStore {
     let collectedAt: string | undefined;
     let details: string | undefined;
 
+    const isStudentInsideVenue = this.isStudentCurrentlyInside(student.id) || Boolean(student.isCheckedIn);
+
     if (department === 'BREAKFAST' || department === 'LUNCH' || department === 'DINNER') {
       const meal = department.toLowerCase() as 'breakfast' | 'lunch' | 'dinner';
       const foodRec = this.getMealStatus(student.id, meal);
@@ -926,18 +928,37 @@ export class EventStore {
       }
       details = `Size: ${student.tShirtSize}`;
     } else if (department === 'GATE') {
-      const isInside = this.isStudentCurrentlyInside(student.id);
-      details = isInside ? 'Currently Inside Venue' : 'Outside Venue';
+      details = isStudentInsideVenue ? 'Currently Inside Venue' : 'Outside Venue';
     }
 
-    const canDistribute = student.paymentStatus === 'paid' && !isCollected;
+    const requiresGateCheck = (department === 'BREAKFAST' || department === 'LUNCH' || department === 'DINNER' || department === 'DRESS');
+    const isGateSatisfied = !requiresGateCheck || isStudentInsideVenue;
+
+    const canDistribute = student.paymentStatus === 'paid' && !isCollected && isGateSatisfied;
+
+    let evalStatus: 'AUTHORIZED' | 'UNAUTHORIZED_DEPARTMENT' | 'STUDENT_NOT_FOUND' | 'ALREADY_COLLECTED' | 'NOT_ELIGIBLE' = 'AUTHORIZED';
+    let evalMessage = 'Eligible for service distribution.';
+
+    if (!isGateSatisfied) {
+      evalStatus = 'NOT_ELIGIBLE';
+      const gateStatus = this.getStudentGateStatus(student.id);
+      if (gateStatus === 'BACK') {
+        evalMessage =
+          department === 'DRESS'
+            ? 'Student has exited the event. T-shirt collection is currently blocked. Please ask the student to enter through the gate first.'
+            : 'Student has exited the event. Food collection is not allowed. Please ask the student to enter through the gate first.';
+      } else {
+        evalMessage = 'Student has not entered the event. Please complete gate entry first.';
+      }
+    } else if (isCollected) {
+      evalStatus = 'ALREADY_COLLECTED';
+      evalMessage = `Service already collected at ${collectedAt ? new Date(collectedAt).toLocaleTimeString() : ''}.`;
+    }
 
     return {
       valid: true,
-      status: isCollected ? 'ALREADY_COLLECTED' : 'AUTHORIZED',
-      message: isCollected
-        ? `Service already collected at ${collectedAt ? new Date(collectedAt).toLocaleTimeString() : ''}.`
-        : 'Eligible for service distribution.',
+      status: evalStatus,
+      message: evalMessage,
       student: {
         id: student.id,
         fullName: student.fullName,
@@ -950,7 +971,7 @@ export class EventStore {
           canDistribute,
           isCollected,
           collectedAt,
-          details,
+          details: !isGateSatisfied ? 'Outside Venue - Gate Scan Required' : details,
         },
       },
     };
@@ -1043,6 +1064,21 @@ export class EventStore {
         success: false,
         error: 'REGISTRATION_REJECTED: Registration was rejected by Super Admin. Facility access denied.',
       };
+    }
+
+    // Gate entry check: Student must have ENTRY status to receive food
+    if (studentCheck) {
+      const gateStatus = this.getStudentGateStatus(registrationId);
+      if (gateStatus !== 'ENTRY') {
+        const errorMsg =
+          gateStatus === 'BACK'
+            ? 'Student has exited the event. Food collection is not allowed. Please ask the student to enter through the gate first.'
+            : 'Student has not entered the event. Please complete gate entry first.';
+        return {
+          success: false,
+          error: errorMsg,
+        };
+      }
     }
 
     const existing = this.getFoodDistributions();
@@ -1158,13 +1194,31 @@ export class EventStore {
     saveData(KEY_GATE_EVENTS, events);
   }
 
-  static isStudentCurrentlyInside(registrationId: string): boolean {
+  static getStudentGateStatus(registrationId: string): 'NOT_ENTERED' | 'ENTRY' | 'BACK' {
     const events = this.getGateEvents().filter(
-      (e) => e.registrationId === registrationId && e.status === 'APPROVED'
+      (e) =>
+        (e.registrationId === registrationId || (e as any).studentId === registrationId) &&
+        e.status === 'APPROVED'
     );
-    if (events.length === 0) return false;
-    // events are saved newest first
-    return events[0].eventType === 'ENTRY';
+    if (events.length > 0) {
+      // events are saved newest first
+      const latestType = events[0].eventType;
+      if (latestType === 'ENTRY') return 'ENTRY';
+      if (latestType === 'BACK' || latestType === 'EXIT') return 'BACK';
+    }
+    const student = AppStore.getRegistrations().find(
+      (r) => r.id === registrationId || r.studentId === registrationId
+    );
+    if (student) {
+      if (student.gateStatus === 'BACK') return 'BACK';
+      if (student.gateStatus === 'ENTRY' || student.isCheckedIn) return 'ENTRY';
+      if (student.gateStatus === 'NOT_ENTERED') return 'NOT_ENTERED';
+    }
+    return 'NOT_ENTERED';
+  }
+
+  static isStudentCurrentlyInside(registrationId: string): boolean {
+    return this.getStudentGateStatus(registrationId) === 'ENTRY';
   }
 
   static recordGateEvent(
@@ -1172,7 +1226,7 @@ export class EventStore {
     studentName: string,
     batchName: string,
     photoUrl: string | undefined,
-    eventType: 'ENTRY' | 'EXIT',
+    eventType: 'ENTRY' | 'EXIT' | 'BACK',
     gateId: string,
     scannerId: string | undefined,
     staffId: string,
@@ -1204,19 +1258,22 @@ export class EventStore {
     }
 
     const inside = this.isStudentCurrentlyInside(registrationId);
+    const isEntry = eventType === 'ENTRY';
 
-    if (eventType === 'ENTRY' && inside) {
+    if (isEntry && inside) {
       return {
         success: false,
         error: 'DUPLICATE ENTRY ALERT: Student is already marked as INSIDE the venue!',
       };
     }
-    if (eventType === 'EXIT' && !inside) {
+    if (!isEntry && !inside) {
       return {
         success: false,
         error: 'EXIT MISMATCH ALERT: Student does not have an active entry record!',
       };
     }
+
+    const canonicalEventType: 'ENTRY' | 'BACK' = isEntry ? 'ENTRY' : 'BACK';
 
     const newEvent: GateEventRecord = {
       id: `GATE-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -1224,7 +1281,7 @@ export class EventStore {
       studentName,
       batchName,
       photoUrl,
-      eventType,
+      eventType: canonicalEventType,
       gateId,
       scannerId,
       staffId,
@@ -1238,29 +1295,36 @@ export class EventStore {
     this.saveGateEvents(updated);
 
     // Sync to Supabase gate_events table with snake_case columns
-    supabase.from('gate_events').insert({
-      id: newEvent.id,
-      registration_id: newEvent.registrationId,
-      student_name: newEvent.studentName,
-      batch_name: newEvent.batchName,
-      photo_url: newEvent.photoUrl || null,
-      event_type: newEvent.eventType,
-      gate_id: newEvent.gateId,
-      scanner_id: newEvent.scannerId || null,
-      staff_id: newEvent.staffId,
-      staff_name: newEvent.staffName,
-      timestamp: newEvent.timestamp,
-      status: newEvent.status,
-    }).then(undefined, (err) => {
-      console.warn('[EventStore] Supabase gate event insert notice:', err);
-    });
+    supabase
+      .from('gate_events')
+      .insert({
+        id: newEvent.id,
+        registration_id: newEvent.registrationId,
+        student_name: newEvent.studentName,
+        batch_name: newEvent.batchName,
+        photo_url: newEvent.photoUrl || null,
+        event_type: newEvent.eventType,
+        gate_id: newEvent.gateId,
+        scanner_id: newEvent.scannerId || null,
+        staff_id: newEvent.staffId,
+        staff_name: newEvent.staffName,
+        timestamp: newEvent.timestamp,
+        status: newEvent.status,
+      })
+      .then(undefined, (err) => {
+        console.warn('[EventStore] Supabase gate event insert notice:', err);
+      });
 
     // Atomically synchronize attendance check-in status on student registration
-    const isInside = newEvent.eventType === 'ENTRY';
-    AppStore.updateRegistration(registrationId, { isCheckedIn: isInside }, 2027);
+    AppStore.updateRegistration(
+      registrationId,
+      { isCheckedIn: isEntry, gateStatus: canonicalEventType },
+      2027
+    );
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('plscf_gate_sync', { detail: newEvent }));
+      window.dispatchEvent(new Event('plscf_registration_updated'));
     }
 
     return { success: true, event: newEvent };
@@ -1277,17 +1341,20 @@ export class EventStore {
     studentName: string,
     batchName: string,
     photoUrl: string | undefined,
-    eventType: 'ENTRY' | 'EXIT',
+    eventType: 'ENTRY' | 'EXIT' | 'BACK',
     gateId: string,
     scannerId: string | undefined,
     staffId: string,
     staffName: string,
     staffUser?: StaffAccount
   ): Promise<{ success: boolean; event?: GateEventRecord; error?: string }> {
+    const isEntry = eventType === 'ENTRY';
+    const canonicalEventType: 'ENTRY' | 'BACK' = isEntry ? 'ENTRY' : 'BACK';
+
     try {
       const { data, error } = await supabase.rpc('rpc_confirm_gate_event', {
         p_registration_id: registrationId,
-        p_event_type: eventType,
+        p_event_type: canonicalEventType,
         p_gate_id: gateId,
         p_staff_id: staffId,
         p_staff_name: staffName,
@@ -1300,7 +1367,7 @@ export class EventStore {
           studentName,
           batchName,
           photoUrl,
-          eventType,
+          eventType: canonicalEventType,
           gateId,
           scannerId,
           staffId,
@@ -1310,9 +1377,14 @@ export class EventStore {
         };
         const existing = this.getGateEvents();
         this.saveGateEvents([newEvent, ...existing]);
-        AppStore.updateRegistration(registrationId, { isCheckedIn: eventType === 'ENTRY' }, 2027);
+        AppStore.updateRegistration(
+          registrationId,
+          { isCheckedIn: isEntry, gateStatus: canonicalEventType },
+          2027
+        );
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('plscf_gate_sync', { detail: newEvent }));
+          window.dispatchEvent(new Event('plscf_registration_updated'));
         }
         return { success: true, event: newEvent };
       }
@@ -1329,7 +1401,7 @@ export class EventStore {
       studentName,
       batchName,
       photoUrl,
-      eventType,
+      canonicalEventType,
       gateId,
       scannerId,
       staffId,
@@ -1443,6 +1515,21 @@ export class EventStore {
         success: false,
         error: 'REGISTRATION_REJECTED: Registration was rejected by Super Admin. Facility access denied.',
       };
+    }
+
+    // Gate entry check: Student must have ENTRY status to receive dress kit
+    if (studentCheck) {
+      const gateStatus = this.getStudentGateStatus(registrationId);
+      if (gateStatus !== 'ENTRY') {
+        const errorMsg =
+          gateStatus === 'BACK'
+            ? 'Student has exited the event. T-shirt collection is currently blocked. Please ask the student to enter through the gate first.'
+            : 'Student has not entered the event. Please complete gate entry first.';
+        return {
+          success: false,
+          error: errorMsg,
+        };
+      }
     }
 
     const existing = this.getDressDistributions();

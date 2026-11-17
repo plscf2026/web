@@ -2007,6 +2007,72 @@ export const SupabaseService = {
     }
   },
 
+  /**
+   * Authoritatively toggle Gate Attendance status (IN / OUT) in Supabase.
+   * Calls rpc_toggle_gate_attendance or rpc_confirm_gate_event, and falls back to direct table updates.
+   */
+  async toggleGateAttendance(
+    regId: string,
+    isInside: boolean,
+    staffId: string = 'ADMIN',
+    staffName: string = 'Admin',
+    gateId: string = 'Gate 01 - Main Entrance'
+  ): Promise<{ success: boolean; isInside: boolean; gateStatus: 'ENTRY' | 'BACK'; error?: string }> {
+    const eventType: 'ENTRY' | 'BACK' = isInside ? 'ENTRY' : 'BACK';
+    try {
+      // Attempt specialized RPC toggle
+      const { data, error } = await supabase.rpc('rpc_toggle_gate_attendance', {
+        p_reg_id: regId,
+        p_is_inside: isInside,
+        p_staff_id: staffId,
+        p_staff_name: staffName,
+        p_gate_id: gateId,
+      });
+
+      if (!error && data && data.success) {
+        return { success: true, isInside, gateStatus: eventType };
+      }
+
+      // Try rpc_confirm_gate_event
+      const confirmRes = await supabase.rpc('rpc_confirm_gate_event', {
+        p_registration_id: regId,
+        p_event_type: eventType,
+        p_gate_id: gateId,
+        p_staff_id: staffId,
+        p_staff_name: staffName,
+      });
+
+      if (!confirmRes.error && confirmRes.data?.success) {
+        return { success: true, isInside, gateStatus: eventType };
+      }
+
+      // Direct fallback update on registrations_2027
+      await supabase
+        .from('registrations_2027')
+        .update({ is_checked_in: isInside, gate_status: eventType })
+        .eq('id', regId);
+
+      // Also record event in gate_events table
+      await supabase
+        .from('gate_events')
+        .insert({
+          id: `GATE-${Date.now()}-${Math.floor(Math.random() * 900 + 100)}`,
+          registration_id: regId,
+          event_type: eventType,
+          gate_id: gateId,
+          staff_id: staffId,
+          staff_name: staffName,
+          timestamp: new Date().toISOString(),
+          status: 'APPROVED',
+        });
+
+      return { success: true, isInside, gateStatus: eventType };
+    } catch (err: any) {
+      console.warn('[SupabaseService] toggleGateAttendance notice:', err);
+      return { success: false, isInside: !isInside, gateStatus: !isInside ? 'ENTRY' : 'BACK', error: err?.message };
+    }
+  },
+
   // ==========================================
   // DATABASE BACKUP & RECOVERY (Requirement #12)
   // ==========================================

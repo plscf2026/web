@@ -62,16 +62,25 @@ export function isBreakfastCollectionOpen(now: Date = new Date()): boolean {
  */
 export interface FoodValidationResult {
   canCollect: boolean;
-  status: 'ELIGIBLE' | 'ALREADY_COLLECTED' | 'INVALID_REGISTRATION' | 'UNPAID' | 'CLOSED';
+  status:
+    | 'ELIGIBLE'
+    | 'ALREADY_COLLECTED'
+    | 'INVALID_REGISTRATION'
+    | 'UNPAID'
+    | 'CLOSED'
+    | 'GATE_ENTRY_REQUIRED'
+    | 'BACK_TO_THE_GATE';
   messageEn: string;
   messageBn: string;
+  gateStatus?: 'ENTRY' | 'BACK' | 'NOT_ENTERED';
 }
 
 export function validateMealCollection(
   registration: RegistrationRecord | undefined | null,
   mealType: 'breakfast' | 'lunch' | 'dinner',
   existingDistributions: FoodDistributionRecord[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  gateStatusOrInside?: boolean | 'ENTRY' | 'BACK' | 'NOT_ENTERED'
 ): FoodValidationResult {
   if (!registration) {
     return {
@@ -88,6 +97,47 @@ export function validateMealCollection(
       status: 'UNPAID',
       messageEn: `Registration fee unpaid (Status: ${registration.paymentStatus.toUpperCase()}). Meal collection blocked.`,
       messageBn: `রেজিস্ট্রেশন ফি অপরিশোধিত (${registration.paymentStatus})। খাবার সংগ্রহ নিষিদ্ধ।`,
+    };
+  }
+
+  // Gate Check: Student must have ENTRY status to collect meals
+  let gateStatus: 'ENTRY' | 'BACK' | 'NOT_ENTERED';
+  if (typeof gateStatusOrInside === 'string') {
+    gateStatus = gateStatusOrInside;
+  } else if (typeof gateStatusOrInside === 'boolean') {
+    gateStatus = gateStatusOrInside
+      ? 'ENTRY'
+      : registration.gateStatus === 'BACK'
+      ? 'BACK'
+      : 'NOT_ENTERED';
+  } else if (registration.gateStatus) {
+    gateStatus = registration.gateStatus;
+  } else if (registration.isCheckedIn !== undefined) {
+    gateStatus = registration.isCheckedIn ? 'ENTRY' : 'NOT_ENTERED';
+  } else {
+    gateStatus = 'ENTRY';
+  }
+
+  if (gateStatus === 'BACK') {
+    return {
+      canCollect: false,
+      status: 'BACK_TO_THE_GATE',
+      messageEn:
+        'Student has exited the event. Food collection is not allowed. Please ask the student to enter through the gate first.',
+      messageBn:
+        'শিক্ষার্থী অনুষ্ঠানস্থল ত্যাগ করেছেন। পুনরায় ভেতরে প্রবেশের জন্য অনুগ্রহ করে আগে গেটে যান।',
+      gateStatus: 'BACK',
+    };
+  }
+
+  if (gateStatus === 'NOT_ENTERED') {
+    return {
+      canCollect: false,
+      status: 'GATE_ENTRY_REQUIRED',
+      messageEn: 'Student has not entered the event. Please complete gate entry first.',
+      messageBn:
+        'শিক্ষার্থী এখনও অনুষ্ঠানে প্রবেশ করেননি। অনুগ্রহ করে আগে গেটে প্রবেশ সম্পন্ন করুন।',
+      gateStatus: 'NOT_ENTERED',
     };
   }
 
@@ -137,7 +187,7 @@ export interface GateActionValidation {
 export function validateGateAction(
   registration: RegistrationRecord | undefined | null,
   isCurrentlyInside: boolean,
-  action: 'ENTRY' | 'EXIT'
+  action: 'ENTRY' | 'EXIT' | 'BACK'
 ): GateActionValidation {
   if (!registration) {
     return {
@@ -173,7 +223,7 @@ export function validateGateAction(
       messageBn: 'প্রবেশ অনুমোদিত। ছবি ও তথ্য যাচাই করা হয়েছে।',
     };
   } else {
-    // EXIT
+    // EXIT or BACK
     if (!isCurrentlyInside) {
       return {
         allowed: false,
@@ -185,7 +235,7 @@ export function validateGateAction(
     return {
       allowed: true,
       code: 'APPROVED',
-      messageEn: 'Exit recorded successfully.',
+      messageEn: 'Exit recorded successfully (Status: BACK).',
       messageBn: 'প্রস্থান সফলভাবে লিপিবদ্ধ করা হয়েছে।',
     };
   }
@@ -196,16 +246,24 @@ export function validateGateAction(
  */
 export interface DressValidationResult {
   canReceive: boolean;
-  status: 'ELIGIBLE' | 'ALREADY_RECEIVED' | 'UNPAID' | 'INVALID_TICKET';
+  status:
+    | 'ELIGIBLE'
+    | 'ALREADY_RECEIVED'
+    | 'UNPAID'
+    | 'INVALID_TICKET'
+    | 'GATE_ENTRY_REQUIRED'
+    | 'BACK_TO_THE_GATE';
   messageEn: string;
   messageBn: string;
   registeredSize?: string;
+  gateStatus?: 'ENTRY' | 'BACK' | 'NOT_ENTERED';
 }
 
 export function validateDressDistribution(
   registration: RegistrationRecord | undefined | null,
   itemType: string,
-  existingDistributions: DressDistributionRecord[]
+  existingDistributions: DressDistributionRecord[],
+  gateStatusOrInside?: boolean | 'ENTRY' | 'BACK' | 'NOT_ENTERED'
 ): DressValidationResult {
   if (!registration) {
     return {
@@ -222,6 +280,49 @@ export function validateDressDistribution(
       status: 'UNPAID',
       messageEn: 'Payment unpaid. Dress distribution blocked.',
       messageBn: 'ফি পরিশোধিত নয়। পোশাক বিতরণ সম্ভব নয়।',
+    };
+  }
+
+  // Gate Check: Student must have ENTRY status to collect dress
+  let gateStatus: 'ENTRY' | 'BACK' | 'NOT_ENTERED';
+  if (typeof gateStatusOrInside === 'string') {
+    gateStatus = gateStatusOrInside;
+  } else if (typeof gateStatusOrInside === 'boolean') {
+    gateStatus = gateStatusOrInside
+      ? 'ENTRY'
+      : registration.gateStatus === 'BACK'
+      ? 'BACK'
+      : 'NOT_ENTERED';
+  } else if (registration.gateStatus) {
+    gateStatus = registration.gateStatus;
+  } else if (registration.isCheckedIn !== undefined) {
+    gateStatus = registration.isCheckedIn ? 'ENTRY' : 'NOT_ENTERED';
+  } else {
+    gateStatus = 'ENTRY';
+  }
+
+  if (gateStatus === 'BACK') {
+    return {
+      canReceive: false,
+      status: 'BACK_TO_THE_GATE',
+      messageEn:
+        'Student has exited the event. T-shirt collection is currently blocked. Please ask the student to enter through the gate first.',
+      messageBn:
+        'শিক্ষার্থী অনুষ্ঠানস্থল ত্যাগ করেছেন। পুনরায় ভেতরে প্রবেশের জন্য অনুগ্রহ করে আগে গেটে যান।',
+      registeredSize: registration.tShirtSize,
+      gateStatus: 'BACK',
+    };
+  }
+
+  if (gateStatus === 'NOT_ENTERED') {
+    return {
+      canReceive: false,
+      status: 'GATE_ENTRY_REQUIRED',
+      messageEn: 'Student has not entered the event. Please complete gate entry first.',
+      messageBn:
+        'শিক্ষার্থী এখনও অনুষ্ঠানে প্রবেশ করেননি। অনুগ্রহ করে আগে গেটে প্রবেশ সম্পন্ন করুন।',
+      registeredSize: registration.tShirtSize,
+      gateStatus: 'NOT_ENTERED',
     };
   }
 

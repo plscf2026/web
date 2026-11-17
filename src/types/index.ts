@@ -8,6 +8,8 @@ export type PaymentStatus = 'paid' | 'pending' | 'failed' | 'refunded';
 
 export type Language = 'en' | 'bn';
 
+export type GateStatus = 'NOT_ENTERED' | 'ENTRY' | 'BACK';
+
 export interface RegistrationRecord {
   id: string; // e.g. PLSCF-2026-F8941
   fullName: string;
@@ -37,6 +39,7 @@ export interface RegistrationRecord {
   qrToken: string;
   isTShirtCollected: boolean;
   isCheckedIn?: boolean;
+  gateStatus?: GateStatus;
   gender?: 'male' | 'female';
   bloodGroup?: string;
   hasParent?: boolean;
@@ -640,7 +643,7 @@ export interface GateEventRecord {
   studentName: string;
   batchName: string;
   photoUrl?: string;
-  eventType: 'ENTRY' | 'EXIT';
+  eventType: 'ENTRY' | 'EXIT' | 'BACK';
   gateId: string;
   scannerId?: string;
   staffId: string;
