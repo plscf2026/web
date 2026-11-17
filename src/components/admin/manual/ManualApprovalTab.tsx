@@ -22,6 +22,7 @@ import {
   GraduationCap,
   Phone,
   Camera,
+  DoorOpen,
 } from 'lucide-react';
 import {
   Language,
@@ -831,6 +832,37 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
                           </span>
                         </div>
                       )}
+                    </div>
+
+                    {/* Gate Attendance Status Badge (Live Gate Link in Super Admin) */}
+                    <div className="space-y-1 min-w-[120px]">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                        {language === 'bn' ? 'গেইট স্ট্যাটাস' : 'Gate Status'}
+                      </span>
+                      {(() => {
+                        const gStatus = rec.gateStatus || (rec.isCheckedIn ? 'ENTRY' : 'NOT_ENTERED');
+                        return (
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black shadow-2xs whitespace-nowrap ${
+                              gStatus === 'ENTRY'
+                                ? 'bg-emerald-600 text-white'
+                                : gStatus === 'BACK'
+                                ? 'bg-rose-600 text-white'
+                                : 'bg-slate-100 text-slate-600 border border-slate-200'
+                            }`}
+                            title={`Gate Status: ${gStatus}`}
+                          >
+                            <DoorOpen className="w-3.5 h-3.5" />
+                            <span>
+                              {gStatus === 'ENTRY'
+                                ? 'ENTRY'
+                                : gStatus === 'BACK'
+                                ? 'BACK'
+                                : 'NOT ENTERED'}
+                            </span>
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
 

@@ -36,6 +36,7 @@ import {
   Clock,
   Utensils,
   DoorOpen,
+  DoorClosed,
   RotateCcw,
 } from 'lucide-react';
 import {
@@ -95,6 +96,9 @@ const AdminRmsContainer = lazy(() =>
 );
 const IdCardManagementPortal = lazy(() =>
   import('./admin/idcard/IdCardManagementPortal').then((m) => ({ default: m.IdCardManagementPortal }))
+);
+const GateScannerModule = lazy(() =>
+  import('./GateScannerModule').then((m) => ({ default: m.GateScannerModule }))
 );
 
 const AdminTabFallback = () => (
@@ -295,6 +299,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'staffManagement'
     | 'auditHistory'
     | 'allBookings'
+    | 'gateManagement'
     | 'securityAudit'
     | 'studentIds'
     | 'overview'
@@ -1305,6 +1310,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     { id: 'staffManagement', label: language === 'bn' ? 'স্টাফ ও রোলস' : 'Staff & Roles', icon: Users },
     { id: 'auditHistory', label: language === 'bn' ? 'অডিট হিস্ট্রি' : 'Audit Trail', icon: ShieldAlert },
     { id: 'allBookings', label: language === 'bn' ? 'সকল বুকিং (সুপাবেস)' : 'All Bookings (Supabase)', icon: Database },
+    {
+      id: 'gateManagement',
+      label: language === 'bn' ? '🚪 গেইট কন্ট্রোল ও স্ক্যানার' : '🚪 Gate Access & Scanner',
+      icon: DoorOpen,
+      highlight: true,
+      badge: 'Live Gate',
+    },
     { id: 'studentIds', label: language === 'bn' ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা' : 'Student ID Management', icon: ShieldCheck },
     { id: 'feeSettings', label: t.tabFeeSettings, icon: Settings },
     { id: 'tickets', label: t.tabTickets, icon: QrCode },
@@ -1360,6 +1372,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
+          <button
+            type="button"
+            onClick={() => handleTabChange('gateManagement')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer shadow-xs ${
+              activeTab === 'gateManagement'
+                ? 'bg-emerald-600 text-white ring-2 ring-emerald-400'
+                : 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-200 border border-emerald-600/60'
+            }`}
+            title="Live Gate Entry & Back Scanner Station"
+          >
+            <DoorOpen className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{language === 'bn' ? '🚪 গেইট স্ক্যানার' : '🚪 Gate Scanner'}</span>
+          </button>
+
           <button
             onClick={refreshAll}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition-colors cursor-pointer"
@@ -1612,6 +1638,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           onNavigateTab={(tab) => {
             if (tab === 'dailyRegAnalytics' || tab === 'dailyPayAnalytics') {
               handleTabChange('dailyAnalytics');
+            } else if (tab === 'gateManagement') {
+              handleTabChange('gateManagement');
             } else {
               handleTabChange(tab as any);
             }
@@ -1640,6 +1668,140 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* TAB: PRIVILEGED OPERATIONS AUDIT TRAIL (PART 10) */}
       {activeTab === 'auditHistory' && (
         <AuditHistoryTab />
+      )}
+
+      {/* TAB: LIVE GATE ACCESS & SCANNER MANAGEMENT (Super Admin & Venue Admin) */}
+      {activeTab === 'gateManagement' && (
+        <div className="space-y-6">
+          {/* Top Gate Status Overview Banner */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black shadow-md">
+                  <DoorOpen className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                      Live Gate Control
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono">Grand Reunion 2027</span>
+                  </div>
+                  <h2 className="text-lg font-black text-slate-900 mt-0.5">
+                    {language === 'bn' ? 'গেইট প্রবেশ ও প্রস্থান কন্ট্রোল পোর্টাল' : 'Gate Entry / Back Live Access Control'}
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    {language === 'bn'
+                      ? 'রিয়েল-টাইম গেইট এন্ট্রি (সবুজ) ও ব্যাক (লাল) স্ট্যাটাস পর্যবেক্ষণ ও সুপার অ্যাডমিন সরাসরি স্ক্যানার।'
+                      : 'Authoritative real-time Gate Entry (Green) & Back (Red) monitoring with live QR scanning and audit trail.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Actions to All Bookings filtered by Gate */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGateFilter('entry');
+                    handleTabChange('allBookings');
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                  title="View all students currently inside venue"
+                >
+                  <Users className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{language === 'bn' ? 'ভেতরে উপস্থিত তালিকা (ENTRY)' : 'View Inside List (ENTRY)'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGateFilter('back');
+                    handleTabChange('allBookings');
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                  title="View all students who exited (BACK)"
+                >
+                  <DoorClosed className="w-3.5 h-3.5 text-rose-600" />
+                  <span>{language === 'bn' ? 'প্রস্থানকারী তালিকা (BACK)' : 'View Exited List (BACK)'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* KPI Summary Cards */}
+            {(() => {
+              const insideCount = registrations.filter((r) => getStudentGateStatus(r) === 'ENTRY').length;
+              const backCount = registrations.filter((r) => getStudentGateStatus(r) === 'BACK').length;
+              const notEnteredCount = registrations.filter((r) => getStudentGateStatus(r) === 'NOT_ENTERED').length;
+              const allEvents = EventStore.getGateEvents();
+
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-emerald-800 tracking-wider flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Currently Inside (ENTRY)
+                    </span>
+                    <div className="text-2xl font-black text-emerald-950 font-mono">
+                      {insideCount}
+                    </div>
+                    <span className="text-[10px] text-emerald-700 block font-medium">Eligible for Food & T-Shirts</span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-rose-800 tracking-wider flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-rose-500" />
+                      Exited Campus (BACK)
+                    </span>
+                    <div className="text-2xl font-black text-rose-950 font-mono">
+                      {backCount}
+                    </div>
+                    <span className="text-[10px] text-rose-700 block font-medium">Collection strictly blocked</span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-600 tracking-wider">
+                      Not Yet Entered
+                    </span>
+                    <div className="text-2xl font-black text-slate-800 font-mono">
+                      {notEnteredCount}
+                    </div>
+                    <span className="text-[10px] text-slate-500 block font-medium">Awaiting first arrival</span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-amber-300 tracking-wider">
+                      Total Gate Audit Logs
+                    </span>
+                    <div className="text-2xl font-black text-amber-400 font-mono">
+                      {allEvents.length}
+                    </div>
+                    <span className="text-[10px] text-slate-400 block font-medium">Immutable transitions</span>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Embedded Full Gate Scanner Module */}
+          <ErrorBoundary>
+            <Suspense fallback={<AdminTabFallback />}>
+              <GateScannerModule
+                language={language}
+                staffUser={{
+                  id: effectiveAdmin.id || 'SUPER_ADMIN_01',
+                  username: effectiveAdmin.username || 'admin',
+                  fullName: effectiveAdmin.fullName || 'Super Administrator',
+                  role: 'SUPER_ADMIN',
+                  assignedGate: 'Gate 01 - Main Entrance',
+                  createdAt: effectiveAdmin.createdAt || new Date().toISOString(),
+                  isActive: true,
+                }}
+                isSuperAdmin={true}
+              />
+            </Suspense>
+          </ErrorBoundary>
+        </div>
       )}
 
       {/* TAB 1: ALL BOOKINGS (SUPABASE BACKEND - YEAR SPECIFIC) */}

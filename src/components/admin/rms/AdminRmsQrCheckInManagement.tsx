@@ -12,6 +12,8 @@ import {
   ShieldCheck,
   Building,
   RefreshCw,
+  DoorOpen,
+  DoorClosed,
 } from 'lucide-react';
 import { RegistrationRecord, Language, ScanLog } from '../../../types';
 import { AppStore } from '../../../services/store';
@@ -67,7 +69,8 @@ export const AdminRmsQrCheckInManagement: React.FC<Props> = ({
     setManualSuccessMsg('');
   };
 
-  const handleManualCheckIn = (att: RegistrationRecord) => {
+  const handleManualCheckIn = (att: RegistrationRecord, action: 'ENTRY' | 'BACK' = 'ENTRY') => {
+    const isEntry = action === 'ENTRY';
     const isAlreadyIn = checkedInRegIds.has(att.id);
 
     const newLog: ScanLog = {
@@ -75,22 +78,28 @@ export const AdminRmsQrCheckInManagement: React.FC<Props> = ({
       registrationId: att.id,
       studentName: att.fullName,
       studentCategory: att.category,
-      scanType: 'entry',
+      scanType: isEntry ? 'entry' : 'exit',
       timestamp: new Date().toISOString(),
       staffId: 'STAFF-ADMIN-01',
       staffName: 'Admin Desk Officer',
       gateId: selectedStation,
-      status: isAlreadyIn ? 'supervisor_review' : 'approved',
-      failureReason: isAlreadyIn ? 'Duplicate manual scan attempt' : undefined,
+      status: (isEntry && isAlreadyIn) ? 'supervisor_review' : 'approved',
+      failureReason: (isEntry && isAlreadyIn) ? 'Duplicate manual scan attempt' : undefined,
     };
 
     AppStore.addScanLog(newLog);
+    AppStore.updateRegistration(att.id, { isCheckedIn: isEntry, gateStatus: action });
+    setActiveAttendee({ ...att, isCheckedIn: isEntry, gateStatus: action });
     reloadData();
 
-    if (isAlreadyIn) {
-      setManualSuccessMsg(`Duplicate scan warning: ${att.fullName} was already logged as entered.`);
+    if (isEntry) {
+      if (isAlreadyIn) {
+        setManualSuccessMsg(`Duplicate scan warning: ${att.fullName} was already logged as entered.`);
+      } else {
+        setManualSuccessMsg(`Successfully verified gate ENTRY for ${att.fullName} (${att.id})! Status: ENTRY (Green)`);
+      }
     } else {
-      setManualSuccessMsg(`Successfully verified entry for ${att.fullName} (${att.id})!`);
+      setManualSuccessMsg(`Successfully recorded gate BACK (Exit) for ${att.fullName} (${att.id})! Status: BACK (Red)`);
     }
   };
 
@@ -345,25 +354,37 @@ export const AdminRmsQrCheckInManagement: React.FC<Props> = ({
                   </div>
                 )}
 
-                {/* Actions */}
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200">
+                {/* Actions: Gate Entry (Green) & Back (Red) with Kit Dispatch */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-200">
                   <button
                     type="button"
-                    onClick={() => handleManualCheckIn(activeAttendee)}
+                    onClick={() => handleManualCheckIn(activeAttendee, 'ENTRY')}
                     disabled={activeAttendee.paymentStatus !== 'paid'}
-                    className="py-2.5 px-3 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    className="py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
+                    title="Record Gate ENTRY (Green status)"
                   >
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>Authorize Gate Entry</span>
+                    <DoorOpen className="w-4 h-4" />
+                    <span>ENTRY (Green)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleManualCheckIn(activeAttendee, 'BACK')}
+                    disabled={activeAttendee.paymentStatus !== 'paid'}
+                    className="py-2 px-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
+                    title="Record Gate BACK (Red status - Exited)"
+                  >
+                    <DoorClosed className="w-4 h-4" />
+                    <span>BACK (Red)</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleToggleKitDispatched(activeAttendee)}
-                    className="py-2.5 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    className="py-2 px-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
                   >
                     <Shirt className="w-4 h-4" />
-                    <span>{activeAttendee.isTShirtCollected ? 'Mark Kit Pending' : 'Dispatch Kit'}</span>
+                    <span>{activeAttendee.isTShirtCollected ? 'Kit Pending' : 'Dispatch Kit'}</span>
                   </button>
                 </div>
               </div>

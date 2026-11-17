@@ -296,6 +296,7 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
     defaultTab: 'masterOverview',
     allowedTabs: [
       'masterOverview',
+      'gateManagement',
       'manualApproval',
       'allBookings',
       'staffManagement',
@@ -343,6 +344,7 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
     defaultTab: 'allBookings',
     allowedTabs: [
       'allBookings',
+      'gateManagement',
       'manualRegistration',
       'studentIds',
       'idCardManagement',

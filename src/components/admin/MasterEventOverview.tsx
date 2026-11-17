@@ -284,9 +284,10 @@ export const MasterEventOverview: React.FC<MasterEventOverviewProps> = ({
             </div>
             <button
               onClick={() => onNavigateTab('gateManagement')}
-              className="text-xs text-slate-700 hover:text-slate-900 font-bold flex items-center gap-1 cursor-pointer"
+              className="text-xs text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer"
+              title="Open Gate Entry / Back Live Scanner Station"
             >
-              <span>Logs</span>
+              <span>Gate Scanner</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           </div>
