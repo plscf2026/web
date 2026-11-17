@@ -256,6 +256,9 @@ export default function App() {
           }
           setIsPaymentModalOpen(true);
         } else if (payType === 'donation' || (pendingSession && pendingSession.type === 'donation')) {
+          if (invoiceFromUrl) {
+            sessionStorage.setItem('plscf_returned_donation_invoice', invoiceFromUrl);
+          }
           handleNavigate('donate', true);
         } else {
           handleNavigate('register', true);

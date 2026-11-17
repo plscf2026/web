@@ -737,7 +737,8 @@ export class PayStationService {
   }): string {
     const origin =
       typeof window !== 'undefined' ? window.location.origin : 'https://plscf.org';
-    const url = new URL(origin);
+    const baseUrl = params.type === 'donation' ? `${origin}/donate` : origin;
+    const url = new URL(baseUrl);
     url.searchParams.set('payment_return', '1');
     url.searchParams.set('invoice', params.invoiceNumber);
     url.searchParams.set('type', params.type);

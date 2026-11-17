@@ -42,6 +42,7 @@ import {
   Award,
   Eye,
   EyeOff,
+  Heart,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -418,6 +419,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const [donationsPage, setDonationsPage] = useState(1);
   const [donationsPageSize, setDonationsPageSize] = useState(10);
+  const [donationsSearchQuery, setDonationsSearchQuery] = useState('');
+  const [donationsPurposeFilter, setDonationsPurposeFilter] = useState('ALL');
+  const [isRefreshingDonations, setIsRefreshingDonations] = useState(false);
+
+  useEffect(() => {
+    setDonationsPage(1);
+  }, [donationsSearchQuery, donationsPurposeFilter, selectedYear]);
+
+  const refreshDonationsFromCloud = async () => {
+    setIsRefreshingDonations(true);
+    try {
+      const res = await SupabaseService.fetchDonations(selectedYear);
+      if (res.data) {
+        setDonations(res.data);
+        AppStore.saveDonations(res.data);
+      }
+    } catch (err) {
+      console.warn('Error refreshing donations from Supabase:', err);
+    } finally {
+      setIsRefreshingDonations(false);
+    }
+  };
+
+  const handleDeleteDonation = async (d: DonationRecord) => {
+    const confirmMsg = language === 'bn'
+      ? `আপনি কি নিশ্চিত যে ${d.donorName}-এর অনুদান রেকর্ডটি (${d.id}) ডিলিট করতে চান?`
+      : `Are you sure you want to delete donation ${d.id} from ${d.donorName}?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      await supabase.from('donations').delete().eq('id', d.id);
+      await supabase.from('donations_2027').delete().eq('id', d.id);
+      const updated = donations.filter((item) => item.id !== d.id);
+      setDonations(updated);
+      AppStore.saveDonations(updated);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to delete donation');
+    }
+  };
 
   const [tshirtPage, setTshirtPage] = useState(1);
   const [tshirtPageSize, setTshirtPageSize] = useState(10);
@@ -1394,6 +1434,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       highlight: true,
       badge: 'Live Gate',
     },
+    {
+      id: 'donations',
+      label: language === 'bn' ? '❤️ অনুদান ও ডোনার্স তালিকা' : '❤️ Donations & Patrons',
+      icon: Heart,
+      highlight: true,
+      badge: 'Patrons',
+    },
     { id: 'studentIds', label: language === 'bn' ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা' : 'Student ID Management', icon: ShieldCheck },
     { id: 'feeSettings', label: t.tabFeeSettings, icon: Settings },
     { id: 'tickets', label: t.tabTickets, icon: QrCode },
@@ -1624,6 +1671,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     ? (language === 'bn' ? 'অডিট হিস্ট্রি' : 'Audit Trail')
                     : activeTab === 'allBookings'
                     ? (language === 'bn' ? 'সকল বুকিং (সুপাবেস)' : 'All Bookings (Supabase)')
+                    : activeTab === 'donations'
+                    ? (language === 'bn' ? '❤️ অনুদান ও ডোনার্স তালিকা' : '❤️ Donations & Patrons')
                     : activeTab === 'studentIds'
                     ? (language === 'bn' ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা' : 'Student ID Management')
                     : activeTab === 'feeSettings'
@@ -3267,17 +3316,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* TAB 6: DONATIONS */}
+      {/* TAB 6: DONATIONS & PATRONS MANAGEMENT */}
       {activeTab === 'donations' && (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
+          {/* Header Bar */}
           <div className="flex flex-wrap justify-between items-center gap-3">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">{t.tabDonations}</h2>
-              <p className="text-xs text-slate-500">
-                Patrons and alumni financial contributions (Supabase table: {getDonationsTableName(selectedYear)}).
-              </p>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center">
+                  <Heart className="w-4 h-4 fill-rose-600 text-rose-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-900">
+                    {language === 'bn' ? 'অনুদান ও পৃষ্ঠপোষক তালিকা' : 'Donations & Patrons Ledger'}
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    {language === 'bn'
+                      ? `পুনর্মিলনী উন্নয়ন ও কল্যাণ তহবিলের সম্পূর্ণ হিসাব (সুপাবেস ডাটাবেজ: ${getDonationsTableName(selectedYear)})`
+                      : `Live institutional patronage & welfare contributions (Supabase table: ${getDonationsTableName(selectedYear)})`}
+                  </p>
+                </div>
+              </div>
             </div>
+
             <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={refreshDonationsFromCloud}
+                disabled={isRefreshingDonations}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer border border-slate-300 transition-colors shadow-2xs"
+                title="Refresh donations directly from Supabase cloud database"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingDonations ? 'animate-spin' : ''}`} />
+                <span>{language === 'bn' ? 'ডাটাবেজ রিফ্রেশ' : 'Sync Supabase'}</span>
+              </button>
+
               {isSuperAdminAccount && (
                 <button
                   type="button"
@@ -3302,6 +3375,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   )}
                 </button>
               )}
+
               <button
                 onClick={() => exportToCSV(donations, `PLSCF_Donations_${selectedYear}`)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer"
@@ -3312,100 +3386,306 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
-          {/* Donations Table: Desktop View (>= 640px) */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
-                  <th className="py-2.5 px-3">Donor Name</th>
-                  <th className="py-2.5 px-3">Purpose</th>
-                  <th className="py-2.5 px-3">Amount</th>
-                  <th className="py-2.5 px-3">Method</th>
-                  <th className="py-2.5 px-3">Transaction</th>
-                  <th className="py-2.5 px-3">Date</th>
-                  <th className="py-2.5 px-3 text-right">Thank You Card</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {paginate(donations, donationsPage, donationsPageSize).map((d) => (
-                  <tr key={d.id} className="hover:bg-slate-50">
-                    <td className="py-2.5 px-3">
-                      <span className="font-bold text-slate-900 block">{d.donorName}</span>
-                      <span className="text-[10px] text-slate-400">{d.mobileNumber}</span>
-                    </td>
-                    <td className="py-2.5 px-3 text-slate-600">{d.purpose}</td>
-                    <td className="py-2.5 px-3 font-bold text-emerald-700 whitespace-nowrap tabular-nums">৳{d.amount.toLocaleString()}</td>
-                    <td className="py-2.5 px-3 uppercase text-slate-600">{d.paymentMethod}</td>
-                    <td className="py-2.5 px-3 font-mono text-[10px] text-slate-500">{d.transactionId}</td>
-                    <td className="py-2.5 px-3 text-slate-400">{d.date}</td>
-                    <td className="py-2.5 px-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedCardDonation(d)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
-                        title="View & Download Thank You Card"
-                      >
-                        <Award className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Card</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {/* Top Metric Cards */}
+          {(() => {
+            const totalAmount = donations.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+            const count = donations.length;
+            const avgAmount = count > 0 ? Math.round(totalAmount / count) : 0;
+            const topDonor = donations.reduce<DonationRecord | null>(
+              (max, d) => (!max || Number(d.amount) > Number(max.amount) ? d : max),
+              null
+            );
 
-          {/* Donations Table: Mobile Responsive Cards (< 640px) */}
-          <div className="sm:hidden space-y-3">
-            {paginate(donations, donationsPage, donationsPageSize).map((d) => (
-              <div key={`mobile-don-${d.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <span className="font-bold text-slate-900 block text-sm truncate">{d.donorName}</span>
-                    <a href={`tel:${d.mobileNumber}`} className="text-xs text-slate-500 font-mono hover:underline">{d.mobileNumber}</a>
-                  </div>
-                  <span className="font-black text-emerald-700 whitespace-nowrap inline-block tabular-nums text-sm">
-                    ৳{d.amount.toLocaleString()}
+            return (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#38BDF8] block">
+                    {language === 'bn' ? 'সর্বমোট অনুদান' : 'Total Patronage'}
+                  </span>
+                  <p className="text-xl font-black text-white mt-1 tabular-nums">
+                    ৳{totalAmount.toLocaleString()}
+                  </p>
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    {language === 'bn' ? `${count}টি নিশ্চিত অনুদান` : `${count} verified contributions`}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
-                  <span className="text-slate-600 font-medium truncate max-w-[180px]">{d.purpose}</span>
-                  <span className="text-[10px] uppercase font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                    {d.paymentMethod}
+
+                <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block">
+                    {language === 'bn' ? 'মোট অনুদাতা' : 'Total Donors'}
                   </span>
-                  <span className="text-[11px] text-slate-400">{d.date}</span>
+                  <p className="text-xl font-black text-white mt-1 tabular-nums font-mono">
+                    {count}
+                  </p>
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    {language === 'bn' ? 'সুপাবেস লাইভ রেকর্ড' : 'Supabase Live Records'}
+                  </span>
                 </div>
-                {d.transactionId && (
-                  <div className="text-[11px] text-slate-400 font-mono">
-                    Tx: <strong className="text-slate-700">{d.transactionId}</strong>
-                  </div>
-                )}
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-[11px] text-slate-500 font-mono">
-                    Token: <strong className="text-slate-700">{d.token || d.qrToken || 'N/A'}</strong>
+
+                <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">
+                    {language === 'bn' ? 'গড় অনুদান' : 'Average Donation'}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCardDonation(d)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    <Award className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Thank You Card</span>
-                  </button>
+                  <p className="text-xl font-black text-white mt-1 tabular-nums">
+                    ৳{avgAmount.toLocaleString()}
+                  </p>
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    {language === 'bn' ? 'প্রতি অনুদানে গড়' : 'Per donation average'}
+                  </span>
+                </div>
+
+                <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 block">
+                    {language === 'bn' ? 'সর্বোচ্চ একক অনুদান' : 'Top Contribution'}
+                  </span>
+                  <p className="text-xl font-black text-white mt-1 tabular-nums">
+                    ৳{topDonor ? Number(topDonor.amount).toLocaleString() : 0}
+                  </p>
+                  <span className="text-[10px] text-slate-400 mt-0.5 block truncate" title={topDonor?.donorName}>
+                    {topDonor ? topDonor.donorName : '—'}
+                  </span>
                 </div>
               </div>
-            ))}
+            );
+          })()}
+
+          {/* Search & Filter Toolbar */}
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="relative flex-1 w-full">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={donationsSearchQuery}
+                onChange={(e) => setDonationsSearchQuery(e.target.value)}
+                placeholder={
+                  language === 'bn'
+                    ? 'অনুদাতার নাম, মোবাইল নম্বর, ট্রানজ্যাকশন আইডি বা টোকেন দিয়ে খুঁজুন...'
+                    : 'Search by donor name, phone, transaction ID, or token...'
+                }
+                className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#172554] transition-all"
+              />
+              {donationsSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setDonationsSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            <div className="w-full sm:w-auto flex items-center gap-2">
+              <select
+                value={donationsPurposeFilter}
+                onChange={(e) => setDonationsPurposeFilter(e.target.value)}
+                className="w-full sm:w-auto px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#172554]"
+              >
+                <option value="ALL">{language === 'bn' ? 'সকল খাত (All Causes)' : 'All Causes'}</option>
+                {Array.from(new Set(donations.map((d) => d.purpose).filter(Boolean))).map((purpose) => (
+                  <option key={purpose} value={purpose}>
+                    {purpose}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          {/* Donations Global Pagination */}
-          <GlobalPagination
-            currentPage={donationsPage}
-            totalRecords={donations.length}
-            pageSize={donationsPageSize}
-            onPageChange={setDonationsPage}
-            onPageSizeChange={setDonationsPageSize}
-            language={language}
-          />
+          {/* Donations Table: Desktop View (>= 640px) */}
+          {(() => {
+            const filtered = donations.filter((d) => {
+              const q = donationsSearchQuery.trim().toLowerCase();
+              const matchesSearch =
+                !q ||
+                d.donorName.toLowerCase().includes(q) ||
+                d.mobileNumber.toLowerCase().includes(q) ||
+                (d.email && d.email.toLowerCase().includes(q)) ||
+                d.id.toLowerCase().includes(q) ||
+                (d.token && d.token.toLowerCase().includes(q)) ||
+                (d.qrToken && d.qrToken.toLowerCase().includes(q)) ||
+                (d.transactionId && d.transactionId.toLowerCase().includes(q));
+
+              const matchesPurpose =
+                donationsPurposeFilter === 'ALL' || d.purpose === donationsPurposeFilter;
+
+              return matchesSearch && matchesPurpose;
+            });
+
+            const paginated = paginate(filtered, donationsPage, donationsPageSize);
+
+            return (
+              <>
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold">
+                        <th className="py-3 px-3.5">Donor / Patron</th>
+                        <th className="py-3 px-3.5">Voucher & Token</th>
+                        <th className="py-3 px-3.5">Designated Cause</th>
+                        <th className="py-3 px-3.5">Amount</th>
+                        <th className="py-3 px-3.5">Gateway & Trx</th>
+                        <th className="py-3 px-3.5">Date</th>
+                        <th className="py-3 px-3.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {paginated.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">
+                            {language === 'bn' ? 'কোনো অনুদানের তথ্য পাওয়া যায়নি।' : 'No donation records found matching criteria.'}
+                          </td>
+                        </tr>
+                      ) : (
+                        paginated.map((d) => (
+                          <tr key={d.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="py-3 px-3.5">
+                              <span className="font-bold text-slate-900 block text-xs">{d.donorName}</span>
+                              <a href={`tel:${d.mobileNumber}`} className="text-[11px] text-slate-500 font-mono hover:underline">
+                                {d.mobileNumber}
+                              </a>
+                              {d.email && <span className="text-[10px] text-slate-400 block truncate max-w-[150px]">{d.email}</span>}
+                            </td>
+                            <td className="py-3 px-3.5">
+                              <div className="space-y-1">
+                                <span className="font-mono text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 block w-fit">
+                                  {d.id}
+                                </span>
+                                {(d.token || d.qrToken) && (
+                                  <span className="font-mono text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 block w-fit">
+                                    Token: {d.token || d.qrToken}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-3.5 text-slate-700 font-medium max-w-[180px]">
+                              {d.purpose}
+                            </td>
+                            <td className="py-3 px-3.5 font-black text-emerald-700 whitespace-nowrap tabular-nums text-sm">
+                              ৳{Number(d.amount).toLocaleString('en-US')}
+                            </td>
+                            <td className="py-3 px-3.5">
+                              <span className="inline-block text-[10px] uppercase font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 mb-1">
+                                {d.paymentMethod}
+                              </span>
+                              <span className="font-mono text-[10px] text-slate-500 block truncate max-w-[120px]" title={d.transactionId}>
+                                {d.transactionId}
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                                <span>{d.paymentStatus || 'paid'}</span>
+                              </span>
+                            </td>
+                            <td className="py-3 px-3.5 text-slate-500 whitespace-nowrap text-xs">
+                              {d.date}
+                            </td>
+                            <td className="py-3 px-3.5 text-right whitespace-nowrap space-x-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedCardDonation(d)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                                title="View & Download Official Thank You Card"
+                              >
+                                <Award className="w-3.5 h-3.5 text-amber-600" />
+                                <span>Card</span>
+                              </button>
+                              {isSuperAdminAccount && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteDonation(d)}
+                                  className="inline-flex items-center p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs transition-all cursor-pointer"
+                                  title="Delete Donation Record"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Responsive Cards (< 640px) */}
+                <div className="sm:hidden space-y-3">
+                  {paginated.length === 0 ? (
+                    <div className="p-6 text-center text-slate-400 text-xs">
+                      {language === 'bn' ? 'কোনো অনুদানের তথ্য পাওয়া যায়নি।' : 'No donation records found.'}
+                    </div>
+                  ) : (
+                    paginated.map((d) => (
+                      <div key={`mobile-don-${d.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-900 block text-sm truncate">{d.donorName}</span>
+                            <a href={`tel:${d.mobileNumber}`} className="text-xs text-slate-500 font-mono hover:underline">{d.mobileNumber}</a>
+                            {d.email && <span className="text-[10px] text-slate-400 block truncate">{d.email}</span>}
+                          </div>
+                          <span className="font-black text-emerald-700 whitespace-nowrap inline-block tabular-nums text-sm">
+                            ৳{Number(d.amount).toLocaleString('en-US')}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                          <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                            {d.id}
+                          </span>
+                          {(d.token || d.qrToken) && (
+                            <span className="font-mono text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                              Token: {d.token || d.qrToken}
+                            </span>
+                          )}
+                          <span className="text-[10px] uppercase font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                            {d.paymentMethod}
+                          </span>
+                        </div>
+
+                        <div className="text-xs text-slate-600 pt-2 border-t border-slate-100">
+                          <span className="font-medium">{d.purpose}</span> • <span className="text-slate-400">{d.date}</span>
+                        </div>
+
+                        {d.transactionId && (
+                          <div className="text-[10px] text-slate-400 font-mono truncate">
+                            Tx: <strong className="text-slate-700">{d.transactionId}</strong>
+                          </div>
+                        )}
+
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCardDonation(d)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            <Award className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Thank You Card</span>
+                          </button>
+                          {isSuperAdminAccount && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteDonation(d)}
+                              className="p-1.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Donations Global Pagination */}
+                <GlobalPagination
+                  currentPage={donationsPage}
+                  totalRecords={filtered.length}
+                  pageSize={donationsPageSize}
+                  onPageChange={setDonationsPage}
+                  onPageSizeChange={setDonationsPageSize}
+                  language={language}
+                />
+              </>
+            );
+          })()}
         </div>
       )}
 

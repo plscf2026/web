@@ -1157,6 +1157,8 @@ export const SupabaseService = {
       payment_method: donation.paymentMethod || 'bkash',
       transaction_id: cleanTrx,
       gateway_invoice_number: donation.gatewayInvoiceNumber || null,
+      gateway_provider: donation.gatewayProvider || 'PAYSTATION',
+      registration_id: donation.registrationId || null,
       date: donationDate,
       donation_date: donationDate,
       year: year,

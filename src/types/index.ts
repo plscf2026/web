@@ -159,6 +159,7 @@ export interface DonationRecord {
   createdAt?: string;
   token?: string;
   qrToken?: string;
+  registrationId?: string;
 }
 
 export interface NoticeItem {
@@ -351,6 +352,7 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
       'manualRegistration',
       'studentIds',
       'idCardManagement',
+      'donations',
       'tshirts',
       'tickets',
       'dailyAnalytics',
@@ -621,6 +623,7 @@ export interface StaffAccount {
   department: DepartmentType;
   permissions: StaffPermissionAction[];
   status: 'ACTIVE' | 'DISABLED';
+  isActive?: boolean;
   assignedGate?: string;
   createdAt: string;
   createdBy?: string;
