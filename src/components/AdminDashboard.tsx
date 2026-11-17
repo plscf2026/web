@@ -1415,20 +1415,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
           <button
-            type="button"
-            onClick={() => handleTabChange('gateManagement')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer shadow-xs ${
-              activeTab === 'gateManagement'
-                ? 'bg-emerald-600 text-white ring-2 ring-emerald-400'
-                : 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-200 border border-emerald-600/60'
-            }`}
-            title="Live Gate Entry & Back Scanner Station"
-          >
-            <DoorOpen className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{language === 'bn' ? '🚪 গেইট স্ক্যানার' : '🚪 Gate Scanner'}</span>
-          </button>
-
-          <button
             onClick={refreshAll}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition-colors cursor-pointer"
             title="Refresh local and Supabase data"
