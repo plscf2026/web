@@ -2033,6 +2033,23 @@ export class EventStore {
 
   private static realtimeChannel: any = null;
   private static stationBroadcast: any = null;
+  private static registrationSyncTimer: any = null;
+
+  /**
+   * Debounced cloud sync to avoid flooding Supabase /rest/v1/registrations_2027 during rapid scans
+   */
+  private static debouncedRegistrationSync(): void {
+    if (this.registrationSyncTimer) {
+      clearTimeout(this.registrationSyncTimer);
+    }
+    this.registrationSyncTimer = setTimeout(() => {
+      this.registrationSyncTimer = null;
+      SupabaseService.clearRegistrationCache(2027);
+      AppStore.syncWithSupabase(2027).catch((err) => {
+        console.warn('[EventStore] Debounced registration sync notice:', err);
+      });
+    }, 400);
+  }
 
   /**
    * Broadcast station events across all tabs/windows in the same browser instantly (<5ms)
@@ -2158,10 +2175,9 @@ export class EventStore {
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'dress_distributions' }, () => {
           this.syncDistributionsWithSupabase();
-          AppStore.syncWithSupabase(2027);
+          this.debouncedRegistrationSync();
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('plscf_dress_sync'));
-            window.dispatchEvent(new CustomEvent('plscf_registration_updated'));
           }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'gate_events' }, () => {
@@ -2171,11 +2187,7 @@ export class EventStore {
           }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'registrations_2027' }, () => {
-          AppStore.syncWithSupabase(2027).then(() => {
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('plscf_registration_updated'));
-            }
-          });
+          this.debouncedRegistrationSync();
         })
         .subscribe();
     } catch (err) {

@@ -499,7 +499,88 @@ export function fromDonationDbRow(row: any): DonationRecord {
   };
 }
 
+// Memory cache and in-flight deduplication for fetchRegistrations to prevent redundant egress
+interface CachedRegistrations {
+  data: RegistrationRecord[];
+  tableUsed: string;
+  source: 'supabase' | 'local';
+  timestamp: number;
+}
+
+const REGISTRATION_CACHE_TTL_MS = 10_000; // 10s memory cache to prevent redundant re-fetching
+const registrationCache = new Map<number, CachedRegistrations>();
+const inFlightRegistrationFetches = new Map<number, Promise<{ data: RegistrationRecord[]; source: 'supabase' | 'local'; tableUsed: string; error?: string }>>();
+
+// Selective projection: strictly includes application fields, omits heavy gateway_response JSON blobs
+export const REGISTRATION_SELECT_COLUMNS = [
+  'id',
+  'full_name',
+  'full_name_bn',
+  'photo_url',
+  'photo_storage_path',
+  'parent_photo_storage_path',
+  'photo_updated_at',
+  'photo_updated_by',
+  'mobile_number',
+  'email',
+  'address',
+  'gender',
+  'blood_group',
+  'has_parent',
+  'parent_name',
+  'parent_age',
+  'parent_phone',
+  'parent_relation',
+  'parent_photo_url',
+  'parent_fee',
+  'gateway_charge',
+  'category',
+  'student_id',
+  'passing_year',
+  'last_class_attended',
+  'current_class',
+  'batch_name',
+  'group_or_section',
+  'roll_number',
+  't_shirt_size',
+  'registration_fee',
+  'donation_amount',
+  'total_paid',
+  'payment_status',
+  'transaction_id',
+  'payment_method',
+  'gateway_invoice_number',
+  'server_verification_signature',
+  'verification_timestamp',
+  'verified_by',
+  'registered_at',
+  'qr_token',
+  'is_tshirt_collected',
+  'is_checked_in',
+  'gate_status',
+  'gate_entry_time',
+  'gate_exit_time',
+  'notes',
+  'year',
+  'is_demo',
+  'is_legacy',
+  'migration_source',
+  'is_manual_registration',
+  'registration_approval_status',
+  'financial_approval_status'
+].join(',');
+
 export const SupabaseService = {
+  /**
+   * Clears in-memory registration cache (called on updates, insertions, deletions)
+   */
+  clearRegistrationCache(year?: number): void {
+    if (year) {
+      registrationCache.delete(year);
+    } else {
+      registrationCache.clear();
+    }
+  },
   /**
    * Pending registrations: Per strict system requirement, unpaid drafts are NEVER
    * written to the central database (registrations_2027). They are kept in browser session storage
@@ -616,6 +697,7 @@ export const SupabaseService = {
         details: `Deleted registration ${cleanId}. Reason: ${reason}`,
       }).catch(() => {});
 
+      this.clearRegistrationCache(year);
       return { success: true, deletedId: cleanId };
     } catch (err: any) {
       console.warn(`[SupabaseService] Error in deleteRegistration for ${cleanId}:`, err);
@@ -625,56 +707,128 @@ export const SupabaseService = {
 
   /**
    * Fetch all bookings/registrations for a given year from Supabase.
+   * Employs selective column projection, in-flight deduplication, and a short memory cache
+   * to eradicate redundant egress and eliminate infinite fetch loops.
    */
   async fetchRegistrations(
-    year: number = 2027
+    year: number = 2027,
+    options?: { forceRefresh?: boolean }
   ): Promise<{ data: RegistrationRecord[]; source: 'supabase' | 'local'; tableUsed: string; error?: string }> {
     const yearTableName = getRegistrationsTableName(year);
 
-    try {
-      // Try year-specific table
-      const { data, error } = await supabase
-        .from(yearTableName)
-        .select('*')
-        .order('registered_at', { ascending: false });
-
-      if (!error && Array.isArray(data) && data.length > 0) {
+    // 1. Return short-term cached data if valid and fresh
+    if (!options?.forceRefresh) {
+      const cached = registrationCache.get(year);
+      if (cached && Date.now() - cached.timestamp < REGISTRATION_CACHE_TTL_MS) {
         return {
-          data: data.map(fromRegistrationDbRow),
-          source: 'supabase',
+          data: cached.data,
+          source: cached.source,
+          tableUsed: cached.tableUsed,
+        };
+      }
+    }
+
+    // 2. In-flight request deduplication: reuse active network promise
+    if (inFlightRegistrationFetches.has(year)) {
+      return inFlightRegistrationFetches.get(year)!;
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        // Try year-specific table with selective column projection (omitting gateway_response)
+        let data: any[] | null = null;
+        let error: any = null;
+
+        const res = await supabase
+          .from(yearTableName)
+          .select(REGISTRATION_SELECT_COLUMNS)
+          .order('registered_at', { ascending: false });
+
+        if (res.error) {
+          // Fallback to select('*') in case table schema lacks newly added columns
+          const fallbackRes = await supabase
+            .from(yearTableName)
+            .select('*')
+            .order('registered_at', { ascending: false });
+          data = fallbackRes.data;
+          error = fallbackRes.error;
+        } else {
+          data = res.data;
+          error = res.error;
+        }
+
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const mapped = data.map(fromRegistrationDbRow);
+          registrationCache.set(year, {
+            data: mapped,
+            source: 'supabase',
+            tableUsed: yearTableName,
+            timestamp: Date.now(),
+          });
+          return {
+            data: mapped,
+            source: 'supabase' as const,
+            tableUsed: yearTableName,
+          };
+        }
+
+        // If empty or error, try generic 'registrations' table filtered by year
+        const genericRes = await supabase
+          .from('registrations')
+          .select(REGISTRATION_SELECT_COLUMNS)
+          .eq('year', year)
+          .order('registered_at', { ascending: false });
+
+        let genericData = genericRes.data;
+        let genericError = genericRes.error;
+
+        if (genericError) {
+          const fbGeneric = await supabase
+            .from('registrations')
+            .select('*')
+            .eq('year', year)
+            .order('registered_at', { ascending: false });
+          genericData = fbGeneric.data;
+          genericError = fbGeneric.error;
+        }
+
+        if (!genericError && Array.isArray(genericData) && genericData.length > 0) {
+          const mapped = genericData.map(fromRegistrationDbRow);
+          registrationCache.set(year, {
+            data: mapped,
+            source: 'supabase',
+            tableUsed: 'registrations',
+            timestamp: Date.now(),
+          });
+          return {
+            data: mapped,
+            source: 'supabase' as const,
+            tableUsed: 'registrations',
+          };
+        }
+
+        return {
+          data: [],
+          source: 'supabase' as const,
           tableUsed: yearTableName,
+          error: error?.message || genericError?.message,
         };
-      }
-
-      // If empty or error, try generic 'registrations' table filtered by year
-      const { data: genericData, error: genericError } = await supabase
-        .from('registrations')
-        .select('*')
-        .eq('year', year)
-        .order('registered_at', { ascending: false });
-
-      if (!genericError && Array.isArray(genericData) && genericData.length > 0) {
+      } catch (err: any) {
+        console.warn('Supabase fetchRegistrations error:', err);
         return {
-          data: genericData.map(fromRegistrationDbRow),
-          source: 'supabase',
-          tableUsed: 'registrations',
+          data: [],
+          source: 'local' as const,
+          tableUsed: yearTableName,
+          error: err.message,
         };
       }
+    })();
 
-      return {
-        data: [],
-        source: 'supabase',
-        tableUsed: yearTableName,
-        error: error?.message || genericError?.message,
-      };
-    } catch (err: any) {
-      console.warn('Supabase fetchRegistrations error:', err);
-      return {
-        data: [],
-        source: 'local',
-        tableUsed: yearTableName,
-        error: err.message,
-      };
+    inFlightRegistrationFetches.set(year, fetchPromise);
+    try {
+      return await fetchPromise;
+    } finally {
+      inFlightRegistrationFetches.delete(year);
     }
   },
 
@@ -706,7 +860,7 @@ export const SupabaseService = {
     try {
       let query = supabase
         .from(yearTableName)
-        .select('*', { count: 'exact' });
+        .select(REGISTRATION_SELECT_COLUMNS, { count: 'exact' });
 
       if (options.paymentStatus) {
         query = query.eq('payment_status', options.paymentStatus);
@@ -719,9 +873,35 @@ export const SupabaseService = {
         query = query.or(`full_name.ilike.%${q}%,mobile_number.ilike.%${q}%,id.ilike.%${q}%`);
       }
 
-      const { data, count, error } = await query
+      let { data, count, error } = await query
         .order('registered_at', { ascending: false })
         .range(offset, offset + pageSize - 1);
+
+      if (error) {
+        // Fallback to select('*') in case table schema lacks newly added columns
+        let fallbackQuery = supabase
+          .from(yearTableName)
+          .select('*', { count: 'exact' });
+
+        if (options.paymentStatus) {
+          fallbackQuery = fallbackQuery.eq('payment_status', options.paymentStatus);
+        }
+        if (options.batchYear) {
+          fallbackQuery = fallbackQuery.eq('passing_year', options.batchYear);
+        }
+        if (options.searchQuery?.trim()) {
+          const q = options.searchQuery.trim();
+          fallbackQuery = fallbackQuery.or(`full_name.ilike.%${q}%,mobile_number.ilike.%${q}%,id.ilike.%${q}%`);
+        }
+
+        const fallbackRes = await fallbackQuery
+          .order('registered_at', { ascending: false })
+          .range(offset, offset + pageSize - 1);
+
+        data = fallbackRes.data;
+        count = fallbackRes.count;
+        error = fallbackRes.error;
+      }
 
       if (!error && Array.isArray(data)) {
         const totalCount = count ?? data.length;

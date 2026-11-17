@@ -500,10 +500,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // Fetch registrations from Supabase for selected year
-  const fetchSupabaseRegistrationsForYear = async (year: number) => {
+  const fetchSupabaseRegistrationsForYear = async (year: number, forceRefresh = false) => {
     setIsFetchingFromSupabase(true);
     try {
-      const res = await SupabaseService.fetchRegistrations(year);
+      const res = await SupabaseService.fetchRegistrations(year, { forceRefresh });
       setSupabaseTableUsed(res.tableUsed);
       const deletedIds = AppStore.getDeletedRegistrationIds();
 
@@ -513,9 +513,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         setRegistrations(validCloudData);
         AppStore.saveRegistrations(validCloudData);
         IdCardStore.syncWithRegistrations();
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('plscf_registration_updated'));
-        }
+        // Circular event dispatch removed here: network fetch completion must NEVER re-trigger event listeners
       }
     } catch (err) {
       console.warn('Error fetching registrations from Supabase:', err);
@@ -540,7 +538,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     EventStore.syncDistributionsWithSupabase();
 
     const handleSync = () => {
-      refreshAll();
+      syncLocalState();
     };
 
     window.addEventListener('plscf_all_stations_synced', handleSync);
@@ -575,16 +573,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   }, [adminSession, isSuperAdminAccount, currentPortalConfig, activeTab]);
 
-  // Refresh all state
-  const refreshAll = () => {
-    fetchSupabaseRegistrationsForYear(selectedYear);
-    SupabaseService.fetchDonations(selectedYear).then((res) => {
-      if (res.data && res.data.length > 0) {
-        setDonations(res.data);
-        AppStore.saveDonations(res.data);
-      }
-    }).catch((err) => console.warn('Error fetching donations from Supabase in refreshAll:', err));
-
+  // Synchronize component state with local storage & event stores without network overhead
+  const syncLocalState = () => {
     const freshRegs = AppStore.getRegistrations();
     const freshDonations = AppStore.getDonations();
     const freshExpenses = AppStore.getExpenses();
@@ -614,8 +604,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setSimulateEventCompletedInput(Boolean(freshSettings.simulateEventCompleted));
     setHomePageSectionsInput(freshSettings.homePageSections || DEFAULT_HOME_PAGE_SECTIONS);
     setEndDateInput(freshSettings.endDate || '2026-12-15');
+  };
 
-    fetchSupabaseRegistrationsForYear(selectedYear);
+  // Explicit refresh from Supabase cloud database (e.g. when user clicks Refresh button)
+  const refreshAll = async () => {
+    await fetchSupabaseRegistrationsForYear(selectedYear, true);
+    SupabaseService.fetchDonations(selectedYear).then((res) => {
+      if (res.data && res.data.length > 0) {
+        setDonations(res.data);
+        AppStore.saveDonations(res.data);
+      }
+    }).catch((err) => console.warn('Error fetching donations from Supabase in refreshAll:', err));
+
+    syncLocalState();
   };
 
   const isTShirtGiven = (reg: RegistrationRecord): boolean => {

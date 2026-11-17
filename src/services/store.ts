@@ -352,6 +352,7 @@ export class AppStore {
     if (index === -1) return null;
     list[index] = { ...list[index], ...updates };
     this.saveRegistrations(list);
+    SupabaseService.clearRegistrationCache(year);
 
     // Sync updated fields directly to Supabase cloud table registrations_2027
     const yearTableName = `registrations_${year || 2027}`;
