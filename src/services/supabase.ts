@@ -476,6 +476,29 @@ function fromRegistrationDbRow(row: any): RegistrationRecord {
   };
 }
 
+/**
+ * Normalize database row into application DonationRecord
+ */
+export function fromDonationDbRow(row: any): DonationRecord {
+  return {
+    id: row.id,
+    donorName: row.donor_name || row.donorName || 'Donor',
+    mobileNumber: row.mobile_number || row.mobileNumber || '',
+    email: row.email || '',
+    amount: Number(row.amount || 0),
+    purpose: row.purpose || 'General Reunion Fund',
+    paymentMethod: (row.payment_method || row.paymentMethod || 'bkash') as any,
+    transactionId: row.transaction_id || row.transactionId || 'TRX',
+    gatewayInvoiceNumber: row.gateway_invoice_number || row.gatewayInvoiceNumber || undefined,
+    date: row.donation_date || row.date || (row.created_at ? row.created_at.split('T')[0] : '2027-01-01'),
+    paymentStatus: (row.payment_status || row.paymentStatus || 'paid') as any,
+    year: Number(row.year || 2027),
+    createdAt: row.created_at || row.createdAt || undefined,
+    token: row.token || row.qr_token || undefined,
+    qrToken: row.qr_token || row.token || undefined,
+  };
+}
+
 export const SupabaseService = {
   /**
    * Pending registrations: Per strict system requirement, unpaid drafts are NEVER
@@ -906,59 +929,82 @@ export const SupabaseService = {
 
   /**
    * Save a donation canonically to Supabase backend in public.donations.
-   * Also synchronizes to donations_2027 for backward compatibility.
+   * Uses authoritative SECURITY DEFINER rpc_record_donation to bypass RLS safely,
+   * with fallback upsert to public.donations and donations_2027.
    */
   async saveDonation(
     donation: DonationRecord,
     year: number = 2027
-  ): Promise<{ success: boolean; table: string; error?: string }> {
+  ): Promise<{ success: boolean; table: string; error?: string; donation?: DonationRecord }> {
+    const cleanId = sanitizeInput(donation.id);
+    const cleanDonorName = sanitizeInput(donation.donorName);
+    const cleanMobile = sanitizeInput(donation.mobileNumber);
+    const cleanEmail = sanitizeInput(donation.email);
+    const cleanPurpose = sanitizeInput(donation.purpose) || 'General Reunion Fund';
+    const cleanTrx = sanitizeInput(donation.transactionId);
+    const donationDate = donation.date || new Date().toISOString().split('T')[0];
+    const token = donation.token || donation.qrToken || undefined;
+
+    // 1. Authoritative: Attempt via SECURITY DEFINER rpc_record_donation
+    try {
+      const { data, error: rpcErr } = await supabase.rpc('rpc_record_donation', {
+        p_id: cleanId,
+        p_donor_name: cleanDonorName,
+        p_mobile_number: cleanMobile,
+        p_email: cleanEmail,
+        p_amount: donation.amount,
+        p_purpose: cleanPurpose,
+        p_payment_method: donation.paymentMethod || 'bkash',
+        p_transaction_id: cleanTrx,
+        p_gateway_invoice_number: donation.gatewayInvoiceNumber || null,
+        p_token: token || null,
+        p_year: year,
+      });
+
+      if (!rpcErr && data?.success && data?.donation) {
+        const saved = fromDonationDbRow(data.donation);
+        return { success: true, table: 'donations', donation: saved };
+      }
+      if (rpcErr) {
+        console.warn('[SupabaseService] rpc_record_donation notice:', rpcErr.message);
+      }
+    } catch (rpcEx) {
+      console.warn('[SupabaseService] rpc_record_donation exception:', rpcEx);
+    }
+
+    // 2. Direct Supabase write fallback to canonical public.donations
     const canonicalRow = {
-      id: donation.id,
-      donor_name: sanitizeInput(donation.donorName),
-      mobile_number: sanitizeInput(donation.mobileNumber),
-      email: sanitizeInput(donation.email),
+      id: cleanId,
+      donor_name: cleanDonorName,
+      mobile_number: cleanMobile,
+      email: cleanEmail,
       amount: donation.amount,
-      purpose: sanitizeInput(donation.purpose) || 'General Reunion Fund',
+      purpose: cleanPurpose,
       payment_method: donation.paymentMethod || 'bkash',
-      transaction_id: sanitizeInput(donation.transactionId),
+      transaction_id: cleanTrx,
       gateway_invoice_number: donation.gatewayInvoiceNumber || null,
-      date: donation.date || new Date().toISOString().split('T')[0],
-      donation_date: donation.date || new Date().toISOString().split('T')[0],
+      date: donationDate,
+      donation_date: donationDate,
       year: year,
       payment_status: donation.paymentStatus || 'paid',
+      token: token || null,
+      qr_token: token || null,
     };
 
     try {
-      // 1. Primary write to canonical public.donations
       const { error: canonicalErr } = await supabase
         .from('donations')
         .upsert(canonicalRow, { onConflict: 'id' });
 
-      // 2. Synchronize to donations_2027 for backward compatibility
+      // Synchronize to donations_2027 for backward compatibility
       Promise.resolve(
         supabase
           .from('donations_2027')
-          .upsert(
-            {
-              id: donation.id,
-              donor_name: canonicalRow.donor_name,
-              mobile_number: canonicalRow.mobile_number,
-              email: canonicalRow.email,
-              amount: canonicalRow.amount,
-              purpose: canonicalRow.purpose,
-              payment_method: canonicalRow.payment_method,
-              transaction_id: canonicalRow.transaction_id,
-              gateway_invoice_number: canonicalRow.gateway_invoice_number,
-              date: canonicalRow.date,
-              year: year,
-              payment_status: canonicalRow.payment_status,
-            },
-            { onConflict: 'id' }
-          )
+          .upsert(canonicalRow, { onConflict: 'id' })
       ).catch(() => {});
 
       if (!canonicalErr) {
-        return { success: true, table: 'donations' };
+        return { success: true, table: 'donations', donation };
       }
 
       console.warn('[SupabaseService] Canonical donations write notice:', canonicalErr.message);
@@ -987,19 +1033,7 @@ export const SupabaseService = {
         .order('created_at', { ascending: false });
 
       if (!error && Array.isArray(data) && data.length > 0) {
-        const records: DonationRecord[] = data.map((d: any) => ({
-          id: d.id,
-          donorName: d.donor_name || d.donorName || 'Donor',
-          mobileNumber: d.mobile_number || d.mobileNumber || '',
-          email: d.email || '',
-          amount: Number(d.amount || 0),
-          purpose: d.purpose || 'General Fund',
-          paymentMethod: d.payment_method || d.paymentMethod || 'bkash',
-          transactionId: d.transaction_id || d.transactionId || 'TRX',
-          date: d.donation_date || d.date || (d.created_at ? d.created_at.split('T')[0] : '2027-01-01'),
-          paymentStatus: d.payment_status || 'paid',
-          gatewayInvoiceNumber: d.gateway_invoice_number || undefined,
-        }));
+        const records: DonationRecord[] = data.map(fromDonationDbRow);
         return { data: records, source: 'supabase', tableUsed: 'donations' };
       }
 
@@ -1011,19 +1045,7 @@ export const SupabaseService = {
         .order('date', { ascending: false });
 
       if (!fbErr && Array.isArray(fbData) && fbData.length > 0) {
-        const records: DonationRecord[] = fbData.map((d: any) => ({
-          id: d.id,
-          donorName: d.donor_name || d.donorName || 'Donor',
-          mobileNumber: d.mobile_number || d.mobileNumber || '',
-          email: d.email || '',
-          amount: Number(d.amount || 0),
-          purpose: d.purpose || 'General Fund',
-          paymentMethod: d.payment_method || d.paymentMethod || 'bkash',
-          transactionId: d.transaction_id || d.transactionId || 'TRX',
-          date: d.date || (d.created_at ? d.created_at.split('T')[0] : '2027-01-01'),
-          paymentStatus: d.payment_status || 'paid',
-          gatewayInvoiceNumber: d.gateway_invoice_number || undefined,
-        }));
+        const records: DonationRecord[] = fbData.map(fromDonationDbRow);
         return { data: records, source: 'supabase', tableUsed: fallbackTable };
       }
 
@@ -1033,23 +1055,117 @@ export const SupabaseService = {
     }
   },
 
+  /**
+   * Resilient lookup for patron donations by Registration ID, 6-char Token ID, or Mobile Number.
+   * Authoritative lookup uses rpc_lookup_donation (SECURITY DEFINER), falling back to direct table query and local cache.
+   */
+  async lookupDonation(
+    identifier: string,
+    mobileNumber?: string
+  ): Promise<{ donation?: DonationRecord; error?: string }> {
+    const cleanId = (identifier || '').trim();
+    const cleanMobile = (mobileNumber || '').trim();
+    if (!cleanId && !cleanMobile) {
+      return { error: 'Please enter a Donation Registration ID, Token ID, or Mobile Number.' };
+    }
+
+    // 1. Authoritative: rpc_lookup_donation (SECURITY DEFINER)
+    try {
+      const { data, error } = await supabase.rpc('rpc_lookup_donation', {
+        p_identifier: cleanId || cleanMobile,
+        p_mobile: cleanMobile || null,
+      });
+
+      if (!error && data?.success && data?.donation) {
+        return { donation: fromDonationDbRow(data.donation) };
+      }
+    } catch (rpcErr) {
+      console.warn('[SupabaseService] rpc_lookup_donation fallback notice:', rpcErr);
+    }
+
+    // 2. Direct Supabase query fallback on canonical donations table
+    try {
+      let query = supabase.from('donations').select('*');
+      if (cleanId && cleanMobile) {
+        query = query
+          .or(`id.ilike.%${cleanId}%,token.ilike.%${cleanId}%,qr_token.ilike.%${cleanId}%`)
+          .ilike('mobile_number', `%${cleanMobile}%`);
+      } else if (cleanId) {
+        query = query.or(`id.ilike.%${cleanId}%,token.ilike.%${cleanId}%,qr_token.ilike.%${cleanId}%,mobile_number.ilike.%${cleanId}%`);
+      } else if (cleanMobile) {
+        query = query.ilike('mobile_number', `%${cleanMobile}%`);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false }).limit(1);
+      if (!error && data && data.length > 0) {
+        return { donation: fromDonationDbRow(data[0]) };
+      }
+    } catch (err: any) {
+      console.warn('[SupabaseService] Direct donations lookup fallback notice:', err);
+    }
+
+    // 3. Fallback to local browser storage
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('plscf_reunion_donations_v1') : null;
+      if (raw) {
+        const localList: DonationRecord[] = JSON.parse(raw);
+        const local = localList.find((d: DonationRecord) => {
+          const matchId = cleanId && (
+            d.id?.toLowerCase() === cleanId.toLowerCase() ||
+            (d.token && d.token.toLowerCase() === cleanId.toLowerCase()) ||
+            (d.qrToken && d.qrToken.toLowerCase() === cleanId.toLowerCase())
+          );
+          const matchMobile = cleanMobile && d.mobileNumber?.includes(cleanMobile);
+          if (cleanId && cleanMobile) return matchId && matchMobile;
+          if (cleanId) return matchId || d.mobileNumber === cleanId;
+          if (cleanMobile) return matchMobile;
+          return false;
+        });
+
+        if (local) {
+          return { donation: local };
+        }
+      }
+    } catch {}
+
+    return { error: 'No verified donation found matching those details.' };
+  },
+
   async lookupVerifiedTicket(
     registrationId: string,
     mobileNumber: string,
     year: number = 2027
-  ): Promise<{ registration?: RegistrationRecord; error?: string }> {
+  ): Promise<{ registration?: RegistrationRecord; donation?: DonationRecord; type?: 'registration' | 'donation'; error?: string }> {
+    const cleanId = (registrationId || '').trim();
+    const cleanMobile = (mobileNumber || '').trim();
+
+    // Fast-path: If ID matches donation prefix DON- or INV-DON-, query donation directly
+    if (cleanId.toUpperCase().startsWith('DON-') || cleanId.toUpperCase().startsWith('INV-DON-')) {
+      const donRes = await this.lookupDonation(cleanId, cleanMobile);
+      if (donRes.donation) {
+        return { type: 'donation', donation: donRes.donation };
+      }
+    }
+
     // 1. Primary: Edge Function
     try {
       const { data, error } = await supabase.functions.invoke<{
         success: boolean;
         error?: string;
         ticket?: Record<string, unknown>;
+        donation?: Record<string, unknown>;
+        type?: 'registration' | 'donation';
       }>('secure-ticket-lookup', {
-        body: { registrationId, mobileNumber, year },
+        body: { registrationId: cleanId, mobileNumber: cleanMobile, year },
       });
 
-      if (!error && data?.success && data.ticket) {
-        return { registration: fromRegistrationDbRow(data.ticket) };
+      if (!error && data?.success) {
+        if (data.type === 'donation' && data.donation) {
+          return { type: 'donation', donation: fromDonationDbRow(data.donation) };
+        }
+        if (data.ticket) {
+          return { type: 'registration', registration: fromRegistrationDbRow(data.ticket) };
+        }
       }
     } catch {
       // Edge Function unavailable or network failure; continue to database RPC fallback
@@ -1058,22 +1174,30 @@ export const SupabaseService = {
     // 2. Resilient Database Fallback: rpc_lookup_ticket (SECURITY DEFINER)
     try {
       const { data, error } = await supabase.rpc('rpc_lookup_ticket', {
-        p_registration_id: (registrationId || '').trim(),
-        p_mobile: (mobileNumber || '').trim(),
+        p_identifier: cleanId,
+        p_mobile: cleanMobile,
       });
 
-      if (!error && data?.success && data?.ticket) {
-        return { registration: fromRegistrationDbRow(data.ticket) };
-      }
-      if (data?.error) {
-        return { error: data.error };
+      if (!error && data?.success) {
+        if (data.type === 'donation' && data.donation) {
+          return { type: 'donation', donation: fromDonationDbRow(data.donation) };
+        }
+        if (data.student || data.ticket) {
+          return { type: 'registration', registration: fromRegistrationDbRow(data.student || data.ticket) };
+        }
       }
     } catch (rpcErr) {
       console.warn('[SupabaseService] rpc_lookup_ticket fallback notice:', rpcErr);
     }
 
+    // 3. Fallback: Check if identifier matches a donation record
+    const donFallback = await this.lookupDonation(cleanId, cleanMobile);
+    if (donFallback.donation) {
+      return { type: 'donation', donation: donFallback.donation };
+    }
+
     return {
-      error: 'No verified ticket matched those details.',
+      error: 'No verified ticket or donation matched those details.',
     };
   },
 

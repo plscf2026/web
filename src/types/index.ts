@@ -157,6 +157,8 @@ export interface DonationRecord {
   paymentStatus?: PaymentStatus;
   year?: number;
   createdAt?: string;
+  token?: string;
+  qrToken?: string;
 }
 
 export interface NoticeItem {
@@ -211,6 +213,7 @@ export interface FeeSettings {
   eventTargetDate?: string;
   simulateEventCompleted?: boolean;
   homePageSections?: HomePageSectionSetting[];
+  hideDonationAmounts?: boolean;
 }
 
 export type HomePageSectionId =

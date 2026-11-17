@@ -33,6 +33,7 @@ import {
   Language,
   FeeSettings,
   RegistrationRecord,
+  DonationRecord,
   HomePageSectionId,
   DEFAULT_HOME_PAGE_SECTIONS,
 } from '../types';
@@ -40,6 +41,7 @@ import { translations } from '../i18n/translations';
 import { AppStore } from '../services/store';
 import { SupabaseService } from '../services/supabase';
 import { FinancialTransparencyDashboard } from './financials/FinancialTransparencyDashboard';
+import { ThankYouCardModal } from './ThankYouCardModal';
 
 interface HomePageProps {
   language: Language;
@@ -133,6 +135,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [searchMobile, setSearchMobile] = useState('');
   const [searchAttempted, setSearchAttempted] = useState(false);
   const [foundRegistration, setFoundRegistration] = useState<RegistrationRecord | null>(null);
+  const [foundDonation, setFoundDonation] = useState<DonationRecord | null>(null);
+  const [selectedCardDonation, setSelectedCardDonation] = useState<DonationRecord | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [statusLookupError, setStatusLookupError] = useState('');
 
@@ -140,6 +144,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     e.preventDefault();
     setSearchAttempted(true);
     setFoundRegistration(null);
+    setFoundDonation(null);
     setStatusLookupError('');
 
     if (!searchRegId.trim() || !searchMobile.trim()) return;
@@ -150,13 +155,17 @@ export const HomePage: React.FC<HomePageProps> = ({
         searchRegId.trim(),
         searchMobile.trim()
       );
-      if (result.registration) {
+      if (result.type === 'donation' && result.donation) {
+        setFoundDonation(result.donation);
+      } else if (result.registration) {
         setFoundRegistration(result.registration);
+      } else if (result.donation) {
+        setFoundDonation(result.donation);
       } else {
         setStatusLookupError(result.error || t.statusNotFoundDesc);
       }
     } catch (error) {
-      console.error('Registration status lookup failed:', error);
+      console.error('Registration/Donation status lookup failed:', error);
       setStatusLookupError(
         language === 'bn'
           ? 'যাচাইকরণ সেবা সাময়িকভাবে অনুপলব্ধ। পরে আবার চেষ্টা করুন।'
@@ -786,7 +795,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           </form>
 
-          {/* RESULT CARD IF FOUND */}
+          {/* RESULT CARD IF FOUND (STUDENT REGISTRATION) */}
           {searchAttempted && foundRegistration && (
             <div className="p-5 rounded-2xl bg-[#E2EEF8]/60 border-2 border-[#0284C7] shadow-md animate-fade-in">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -845,8 +854,58 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           )}
 
+          {/* RESULT CARD IF FOUND (PATRON / DONATION) */}
+          {searchAttempted && foundDonation && (
+            <div className="p-5 rounded-2xl bg-amber-50/80 border-2 border-amber-500 shadow-md animate-fade-in">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-700 border-2 border-amber-400 flex items-center justify-center shrink-0 shadow-inner">
+                    <Award className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-amber-600 text-white">
+                        {foundDonation.id}
+                      </span>
+                      <span className="flex items-center gap-1 text-xs font-bold text-amber-800">
+                        <CheckCircle className="w-3.5 h-3.5 text-amber-700" />
+                        {language === 'bn' ? 'যাচাইকৃত অনুদাতা' : 'Verified Patron & Donor'}
+                      </span>
+                    </div>
+
+                    <h4 className="font-extrabold text-[#0F172A] text-base mt-1">
+                      {foundDonation.donorName}
+                    </h4>
+
+                    <div className="text-xs text-slate-600 mt-0.5 flex flex-wrap gap-2">
+                      <span>Token: <strong className="font-mono text-indigo-700">{foundDonation.token || foundDonation.qrToken || 'N/A'}</strong></span>
+                      <span>•</span>
+                      <span>{foundDonation.purpose}</span>
+                      <span>•</span>
+                      <span>
+                        <strong className="text-emerald-700 font-bold">
+                          ৳{foundDonation.amount.toLocaleString()} BDT
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="w-full sm:w-auto pt-2 sm:pt-0">
+                  <button
+                    onClick={() => setSelectedCardDonation(foundDonation)}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Award className="w-4 h-4" />
+                    <span>{language === 'bn' ? 'থ্যাঙ্ক ইউ কার্ড দেখুন' : 'View Thank You Card'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* RESULT ALERT IF NOT FOUND */}
-          {searchAttempted && !foundRegistration && (
+          {searchAttempted && !foundRegistration && !foundDonation && (
             <div className="p-4 rounded-2xl bg-rose-50 border border-rose-300 text-rose-900 flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
               <div className="space-y-1">
@@ -1198,6 +1257,15 @@ export const HomePage: React.FC<HomePageProps> = ({
           ))}
         </div>
       </section>
+
+      {/* Thank You Card Modal for Verified Patron */}
+      {selectedCardDonation && (
+        <ThankYouCardModal
+          donation={selectedCardDonation}
+          language={language}
+          onClose={() => setSelectedCardDonation(null)}
+        />
+      )}
     </div>
   );
 };

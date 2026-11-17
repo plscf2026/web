@@ -39,6 +39,9 @@ import {
   DoorClosed,
   AlertOctagon,
   RotateCcw,
+  Award,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -91,6 +94,7 @@ import { ErrorBoundary } from './common/ErrorBoundary';
 import { ManualRegistrationTab } from './admin/manual/ManualRegistrationTab';
 import { ManualApprovalTab } from './admin/manual/ManualApprovalTab';
 import { AdminStudentPhotoModal } from './admin/photos/AdminStudentPhotoModal';
+import { ThankYouCardModal } from './ThankYouCardModal';
 // Heavy administrative portals loaded lazily to preserve bundle performance
 const AdminRmsContainer = lazy(() =>
   import('./admin/rms/AdminRmsContainer').then((m) => ({ default: m.AdminRmsContainer }))
@@ -478,7 +482,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     () => feeSettings.homePageSections || DEFAULT_HOME_PAGE_SECTIONS
   );
   const [endDateInput, setEndDateInput] = useState(feeSettings.endDate || '2026-12-15');
+  const [hideDonationAmountsInput, setHideDonationAmountsInput] = useState<boolean>(
+    Boolean(feeSettings.hideDonationAmounts)
+  );
+  const [selectedCardDonation, setSelectedCardDonation] = useState<DonationRecord | null>(null);
   const [settingsSuccessNotice, setSettingsSuccessNotice] = useState(false);
+
+  // Super Admin direct privacy toggle for Donors Hall of Fame
+  const handleToggleHideDonationAmounts = () => {
+    const updated: FeeSettings = {
+      ...feeSettings,
+      hideDonationAmounts: !feeSettings.hideDonationAmounts,
+    };
+    AppStore.saveFeeSettings(updated);
+    setFeeSettings(updated);
+    setHideDonationAmountsInput(Boolean(updated.hideDonationAmounts));
+  };
 
   // Fetch registrations from Supabase for selected year
   const fetchSupabaseRegistrationsForYear = async (year: number) => {
@@ -507,6 +526,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   useEffect(() => {
     fetchSupabaseRegistrationsForYear(selectedYear);
+    SupabaseService.fetchDonations(selectedYear).then((res) => {
+      if (res.data && res.data.length > 0) {
+        setDonations(res.data);
+        AppStore.saveDonations(res.data);
+      }
+    }).catch((err) => console.warn('Error fetching donations from Supabase on mount:', err));
   }, [selectedYear]);
 
   // Real-time bidirectional synchronization for staff stations (Food, Dress, Gate, Check-in)
@@ -552,6 +577,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Refresh all state
   const refreshAll = () => {
+    fetchSupabaseRegistrationsForYear(selectedYear);
+    SupabaseService.fetchDonations(selectedYear).then((res) => {
+      if (res.data && res.data.length > 0) {
+        setDonations(res.data);
+        AppStore.saveDonations(res.data);
+      }
+    }).catch((err) => console.warn('Error fetching donations from Supabase in refreshAll:', err));
+
     const freshRegs = AppStore.getRegistrations();
     const freshDonations = AppStore.getDonations();
     const freshExpenses = AppStore.getExpenses();
@@ -814,6 +847,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       simulateEventCompleted: Boolean(simulateEventCompletedInput),
       homePageSections: homePageSectionsInput,
       endDate: endDateInput,
+      hideDonationAmounts: Boolean(hideDonationAmountsInput),
     };
     AppStore.saveFeeSettings(updated);
     setFeeSettings(updated);
@@ -3086,6 +3120,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </ol>
             </section>
 
+            {/* 7. DONORS HALL OF FAME PRIVACY CONTROL */}
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                    <Award className="w-4 h-4 text-amber-600" />
+                    <span>{language === 'bn' ? 'অনুদাতা তালিকার গোপনীয়তা নিয়ন্ত্রণ' : 'Donors Hall of Fame Privacy Control'}</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {language === 'bn'
+                      ? 'অনলাইন অনুদান পেজে শীর্ষ ১০ অনুদাতার টাকার পরিমাণ প্রদর্শন বা গোপন রাখুন।'
+                      : 'Control whether donation amounts are publicly visible or hidden in the Donors Hall of Fame.'}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setHideDonationAmountsInput(!hideDonationAmountsInput)}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 shadow-xs shrink-0 ${
+                    hideDonationAmountsInput
+                      ? 'bg-amber-600 text-white hover:bg-amber-700'
+                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  }`}
+                >
+                  {hideDonationAmountsInput ? (
+                    <>
+                      <EyeOff className="w-3.5 h-3.5" />
+                      <span>{language === 'bn' ? 'টাকার পরিমাণ লুকানো (HIDDEN)' : 'AMOUNTS HIDDEN'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>{language === 'bn' ? 'টাকার পরিমাণ দৃশ্যমান (VISIBLE)' : 'AMOUNTS VISIBLE'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
             <div className="pt-2">
               <button
                 type="submit"
@@ -3196,20 +3269,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* TAB 6: DONATIONS */}
       {activeTab === 'donations' && (
         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-wrap justify-between items-center gap-3">
             <div>
               <h2 className="text-lg font-bold text-slate-900">{t.tabDonations}</h2>
               <p className="text-xs text-slate-500">
                 Patrons and alumni financial contributions (Supabase table: {getDonationsTableName(selectedYear)}).
               </p>
             </div>
-            <button
-              onClick={() => exportToCSV(donations, `PLSCF_Donations_${selectedYear}`)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>{t.btnExportCsv}</span>
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              {isSuperAdminAccount && (
+                <button
+                  type="button"
+                  onClick={handleToggleHideDonationAmounts}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border transition-colors shadow-2xs ${
+                    feeSettings.hideDonationAmounts
+                      ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
+                      : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                  }`}
+                  title="Super Admin Privacy Toggle: Show or Hide donation amounts on public Donors Hall of Fame"
+                >
+                  {feeSettings.hideDonationAmounts ? (
+                    <>
+                      <EyeOff className="w-3.5 h-3.5 text-amber-700" />
+                      <span>{language === 'bn' ? 'অনুদানের পরিমাণ গোপন (Hidden)' : 'Amounts: Hidden in Hall of Fame'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-3.5 h-3.5 text-slate-600" />
+                      <span>{language === 'bn' ? 'অনুদানের পরিমাণ দৃশ্যমান (Visible)' : 'Amounts: Visible in Hall of Fame'}</span>
+                    </>
+                  )}
+                </button>
+              )}
+              <button
+                onClick={() => exportToCSV(donations, `PLSCF_Donations_${selectedYear}`)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{t.btnExportCsv}</span>
+              </button>
+            </div>
           </div>
 
           {/* Donations Table: Desktop View (>= 640px) */}
@@ -3223,6 +3322,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <th className="py-2.5 px-3">Method</th>
                   <th className="py-2.5 px-3">Transaction</th>
                   <th className="py-2.5 px-3">Date</th>
+                  <th className="py-2.5 px-3 text-right">Thank You Card</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -3237,6 +3337,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <td className="py-2.5 px-3 uppercase text-slate-600">{d.paymentMethod}</td>
                     <td className="py-2.5 px-3 font-mono text-[10px] text-slate-500">{d.transactionId}</td>
                     <td className="py-2.5 px-3 text-slate-400">{d.date}</td>
+                    <td className="py-2.5 px-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCardDonation(d)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                        title="View & Download Thank You Card"
+                      >
+                        <Award className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Card</span>
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -3268,6 +3379,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     Tx: <strong className="text-slate-700">{d.transactionId}</strong>
                   </div>
                 )}
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-[11px] text-slate-500 font-mono">
+                    Token: <strong className="text-slate-700">{d.token || d.qrToken || 'N/A'}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCardDonation(d)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <Award className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Thank You Card</span>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -4211,6 +4335,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             setSelectedStudentForPhoto(updatedReg);
             refreshAll();
           }}
+        />
+      )}
+
+      {/* MODAL: OFFICIAL PATRON THANK YOU CARD INSPECTION & DOWNLOAD */}
+      {selectedCardDonation && (
+        <ThankYouCardModal
+          donation={selectedCardDonation}
+          language={language}
+          onClose={() => setSelectedCardDonation(null)}
         />
       )}
     </div>

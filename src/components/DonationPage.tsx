@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Heart,
   ShieldCheck,
@@ -12,13 +12,17 @@ import {
   Landmark,
   ArrowRight,
   TrendingUp,
+  EyeOff,
+  Sparkles,
 } from 'lucide-react';
-import { Language, DonationRecord, PaymentMethod } from '../types';
+import { Language, DonationRecord, PaymentMethod, FeeSettings } from '../types';
 import { translations } from '../i18n/translations';
 import { AppStore } from '../services/store';
+import { SupabaseService } from '../services/supabase';
 import { PayStationService, PayStationPaymentResult } from '../services/paystation';
 import { isValidBangladeshiMobile, normalizeBangladeshiMobileNumber } from '../utils/rules';
 import { sanitizeInput } from '../utils/security';
+import { ThankYouCardBadge } from './ThankYouCardBadge';
 
 interface DonationPageProps {
   language: Language;
@@ -90,15 +94,33 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [completedDonation, setCompletedDonation] = useState<DonationRecord | null>(null);
 
-  // Live community donations list
+  // Live community donations list & fee settings
   const [donationsList, setDonationsList] = useState<DonationRecord[]>([]);
+  const [feeSettings, setFeeSettings] = useState<FeeSettings>(() => AppStore.getFeeSettings());
 
   useEffect(() => {
+    // 1. Initial read from local cache
     setDonationsList(AppStore.getDonations());
+    setFeeSettings(AppStore.getFeeSettings());
+
+    // 2. Fetch live from Supabase canonical public.donations
+    SupabaseService.fetchDonations().then((res) => {
+      if (res.data && res.data.length > 0) {
+        setDonationsList(res.data);
+        AppStore.saveDonations(res.data);
+      }
+    }).catch((err) => console.warn('Error fetching live donations from Supabase:', err));
   }, [completedDonation]);
 
   const effectiveAmount = customAmount ? Math.max(10, Number(customAmount) || 0) : selectedAmount;
   const totalRaised = donationsList.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
+  // Top 10 Donors sorted by donation amount descending (Donors Hall of Fame)
+  const top10Donors = useMemo(() => {
+    return [...donationsList]
+      .sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0))
+      .slice(0, 10);
+  }, [donationsList]);
 
   const selectedCause = DONATION_CAUSES.find((c) => c.id === selectedCauseId) || DONATION_CAUSES[0];
 
@@ -312,6 +334,24 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
             <p className="text-xs text-slate-500">
               Police Lines School & College, Faridpur — Reunion Executive Committee
             </p>
+          </div>
+
+          {/* Official Vector Thank You Card Badge */}
+          <div className="pt-2">
+            <ThankYouCardBadge
+              cardData={{
+                donorName: completedDonation.donorName,
+                registrationId: completedDonation.id,
+                token: completedDonation.token || completedDonation.qrToken,
+                qrToken: completedDonation.qrToken || completedDonation.token,
+                mobileNumber: completedDonation.mobileNumber,
+                amount: completedDonation.amount,
+                purpose: completedDonation.purpose,
+                date: completedDonation.date,
+              }}
+              language={language}
+              showActions={true}
+            />
           </div>
 
           {/* Official Voucher Card */}
@@ -615,47 +655,97 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
             </form>
           </div>
 
-          {/* Right: Verified Donors Roll (Hall of Fame) */}
+          {/* Right: Verified Donors Roll (Donors Hall of Fame - Top 10) */}
           <div className="lg:col-span-4 space-y-6">
-            <div className="bg-slate-900 text-white rounded-3xl p-6 border border-slate-800 shadow-md space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div className="bg-slate-900 text-white rounded-3xl p-6 border border-amber-500/30 shadow-xl space-y-4 relative overflow-hidden">
+              {/* Subtle gold decorative glow */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800 relative z-10">
                 <div className="flex items-center gap-2">
-                  <Award className="w-5 h-5 text-amber-400" />
-                  <h3 className="text-sm font-bold tracking-tight">
-                    {isBangla ? 'সম্মানিত অনুদাতাদের তালিকা' : 'Donors Hall of Fame'}
-                  </h3>
+                  <div className="w-8 h-8 rounded-xl bg-amber-400/20 text-amber-400 border border-amber-400/30 flex items-center justify-center shadow-xs">
+                    <Award className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black tracking-tight text-white flex items-center gap-1.5">
+                      <span>{isBangla ? 'শীর্ষ ১০ অনুদাতা' : 'Donors Hall of Fame'}</span>
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    </h3>
+                    <p className="text-[10px] text-slate-400">
+                      {isBangla ? 'সর্বোচ্চ অনুদানকারীদের সম্মাননা ফ্রেম' : 'Top 10 Generous Patrons'}
+                    </p>
+                  </div>
                 </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 font-bold border border-slate-700">
-                  {donationsList.length} {isBangla ? 'জন' : 'Donors'}
+                <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-black border border-amber-400/30">
+                  TOP 10
                 </span>
               </div>
 
-              <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
-                {donationsList.length === 0 ? (
+              <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1 relative z-10">
+                {top10Donors.length === 0 ? (
                   <p className="text-xs text-slate-400 py-6 text-center">
                     {isBangla ? 'এখনো কোনো অনুদান জমা হয়নি। প্রথম অনুদাতা হোন!' : 'No donations recorded yet. Be the first patron!'}
                   </p>
                 ) : (
-                  donationsList.map((d, i) => (
-                    <div
-                      key={d.id || i}
-                      className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-between text-xs hover:border-amber-400/40 transition-colors"
-                    >
-                      <div className="min-w-0 pr-2">
-                        <p className="font-bold text-white truncate">
-                          {d.donorName.includes('Anonymous')
-                            ? (isBangla ? 'শুভাকাঙ্ক্ষী (গোপনীয়)' : 'Anonymous Well-Wisher')
-                            : d.donorName}
-                        </p>
-                        <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                          {d.purpose} • {d.date}
-                        </p>
+                  top10Donors.map((d, i) => {
+                    const isRank1 = i === 0;
+                    const isRank2 = i === 1;
+                    const isRank3 = i === 2;
+
+                    const rankBadgeStyle = isRank1
+                      ? 'bg-amber-400/20 text-amber-300 border-amber-400/50'
+                      : isRank2
+                      ? 'bg-slate-300/20 text-slate-200 border-slate-300/40'
+                      : isRank3
+                      ? 'bg-amber-700/20 text-amber-400 border-amber-700/40'
+                      : 'bg-slate-800 text-slate-400 border-slate-700';
+
+                    const rankIcon = isRank1 ? '🥇' : isRank2 ? '🥈' : isRank3 ? '🥉' : `#${i + 1}`;
+
+                    return (
+                      <div
+                        key={d.id || i}
+                        className={`p-3 rounded-2xl border transition-all flex items-center justify-between text-xs ${
+                          isRank1
+                            ? 'bg-gradient-to-r from-amber-950/40 to-slate-800/90 border-amber-500/50 shadow-md ring-1 ring-amber-500/20'
+                            : 'bg-slate-800/80 border-slate-700/70 hover:border-amber-400/40'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                          <span
+                            className={`w-7 h-7 rounded-xl font-mono text-[11px] font-black flex items-center justify-center shrink-0 border ${rankBadgeStyle}`}
+                          >
+                            {rankIcon}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="font-bold text-white truncate">
+                              {d.donorName.includes('Anonymous')
+                                ? (isBangla ? 'শুভাকাঙ্ক্ষী (গোপনীয়)' : 'Anonymous Well-Wisher')
+                                : d.donorName}
+                            </p>
+                            <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                              {d.purpose} • {d.date}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Amount or Hidden Privacy Mask */}
+                        {feeSettings?.hideDonationAmounts ? (
+                          <span
+                            className="font-mono text-[11px] text-slate-400 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-700 flex items-center gap-1 shrink-0"
+                            title={isBangla ? 'অনুদানের পরিমাণ লুকানো রয়েছে' : 'Amount hidden by administration'}
+                          >
+                            <EyeOff className="w-3 h-3 text-amber-400" />
+                            <span>{isBangla ? 'গোপন' : 'Hidden'}</span>
+                          </span>
+                        ) : (
+                          <span className="font-mono font-black text-amber-300 shrink-0 bg-slate-900/80 px-2.5 py-1 rounded-lg border border-amber-500/30 tabular-nums">
+                            ৳{Number(d.amount).toLocaleString('en-US')}
+                          </span>
+                        )}
                       </div>
-                      <span className="font-mono font-black text-amber-300 shrink-0 bg-slate-900/60 px-2 py-1 rounded-lg border border-slate-700">
-                        ৳{Number(d.amount).toLocaleString('en-US')}
-                      </span>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>

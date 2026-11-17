@@ -126,6 +126,7 @@ export const INITIAL_FEE_SETTINGS: FeeSettings = {
   closedMessageBn: 'অনলাইন রেজিস্ট্রেশন কার্যক্রম বর্তমানে বন্ধ রয়েছে। জরুরি প্রয়োজনে অনুগ্রহ করে পুনর্মিলনী সচিবালয়ে যোগাযোগ করুন।',
   eventTargetDate: '2027-01-29T09:00:00',
   simulateEventCompleted: false,
+  hideDonationAmounts: false,
   homePageSections: DEFAULT_HOME_PAGE_SECTIONS,
 };
 

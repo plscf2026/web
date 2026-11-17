@@ -1275,9 +1275,17 @@ export class PayStationService {
     const year = AppStore.getActiveEventYear() || 2027;
     const nowIso = new Date().toISOString();
     const donationId = `DON-${year}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const existingTokens = new Set<string>(
+      AppStore.getDonations()
+        .map((d) => d.token || d.qrToken)
+        .filter((t): t is string => Boolean(t))
+    );
+    const token = generateUniqueSixCharToken(existingTokens);
 
     const donation: DonationRecord = {
       id: donationId,
+      token,
+      qrToken: token,
       donorName: sanitizeInput(data.donorName),
       mobileNumber: sanitizeInput(data.mobileNumber),
       email: data.email ? sanitizeInput(data.email) : '',
