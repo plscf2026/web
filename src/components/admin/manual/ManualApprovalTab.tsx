@@ -747,10 +747,18 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
                         </span>
                         <span>•</span>
                         <span>
-                          {new Date(rec.registeredAt).toLocaleDateString(
-                            language === 'bn' ? 'bn-BD' : 'en-US',
-                            { dateStyle: 'medium', timeStyle: 'short' }
-                          )}
+                          {(() => {
+                            try {
+                              const d = rec.registeredAt ? new Date(rec.registeredAt) : null;
+                              if (!d || isNaN(d.getTime())) return rec.registeredAt || '—';
+                              return d.toLocaleString(
+                                language === 'bn' ? 'bn-BD' : 'en-US',
+                                { dateStyle: 'medium', timeStyle: 'short' }
+                              );
+                            } catch {
+                              return rec.registeredAt || '—';
+                            }
+                          })()}
                         </span>
                         {rec.approvalNotes && (
                           <>
