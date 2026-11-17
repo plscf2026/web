@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "cleanUrls": true,
+  "framework": "vite",
   "headers": [
     {
       "source": "/(.*)",
@@ -42,7 +42,7 @@
       "destination": "/api/:path*"
     },
     {
-      "source": "/:path*",
+      "source": "/((?!api/|rest/).*)",
       "destination": "/index.html"
     }
   ]
