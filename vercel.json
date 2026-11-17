@@ -34,6 +34,10 @@
   ],
   "rewrites": [
     {
+      "source": "/rest/v1/:path*",
+      "destination": "https://hnthoszbkhvygoowtvau.supabase.co/rest/v1/:path*"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/:path*"
     },
