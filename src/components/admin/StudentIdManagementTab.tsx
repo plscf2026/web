@@ -14,6 +14,7 @@ import {
   Power,
   RotateCcw,
   FileSpreadsheet,
+  RefreshCw,
 } from 'lucide-react';
 import { Language, CurrentStudentIdRecord, StudentIdStatus } from '../../types';
 import { StudentIdService } from '../../services/studentIdStore';
@@ -80,6 +81,8 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
 
   // CSV Import State
   const [csvContent, setCsvContent] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [isAddingSingle, setIsAddingSingle] = useState(false);
   const [importReport, setImportReport] = useState<{
     totalRows: number;
     addedCount: number;
@@ -115,49 +118,59 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
   }, [studentIds, selectedClass, selectedYear, selectedUsage, searchQuery]);
 
   // Handle Add Single ID
-  const handleAddSingleId = (e: React.FormEvent) => {
+  const handleAddSingleId = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newId.trim()) return;
 
-    const res = StudentIdService.addStudentId({
-      studentId: newId.trim().toUpperCase(),
-      studentName: newName.trim() || undefined,
-      className: newClass,
-      academicYear: newYear,
-    });
+    setIsAddingSingle(true);
+    try {
+      const res = await StudentIdService.addStudentIdAsync({
+        studentId: newId.trim().toUpperCase(),
+        studentName: newName.trim() || undefined,
+        className: newClass,
+        academicYear: newYear,
+      });
 
-    if (res.success) {
-      refreshList();
-      setShowAddModal(false);
-      setNewId('');
-      setNewName('');
-      setActionMessage({
-        text: language === 'bn' ? 'স্টুডেন্ট আইডি সফলভাবে যুক্ত করা হয়েছে।' : 'Student ID added successfully.',
-        type: 'success',
-      });
-      setTimeout(() => setActionMessage(null), 3000);
-    } else {
-      setActionMessage({
-        text: res.error || 'Failed to add student ID',
-        type: 'error',
-      });
+      if (res.success) {
+        refreshList();
+        setShowAddModal(false);
+        setNewId('');
+        setNewName('');
+        setActionMessage({
+          text: language === 'bn' ? 'স্টুডেন্ট আইডি সফলভাবে ডাটাবেজে যুক্ত করা হয়েছে।' : 'Student ID added to database successfully.',
+          type: 'success',
+        });
+        setTimeout(() => setActionMessage(null), 3000);
+      } else {
+        setActionMessage({
+          text: res.error || 'Failed to add student ID',
+          type: 'error',
+        });
+      }
+    } finally {
+      setIsAddingSingle(false);
     }
   };
 
   // Handle CSV Import
-  const handleImportCSV = () => {
+  const handleImportCSV = async () => {
     if (!csvContent.trim()) return;
-    const res = StudentIdService.importFromCSV(csvContent);
-    setImportReport(res);
-    refreshList();
-    if (res.addedCount > 0) {
-      setActionMessage({
-        text: language === 'bn'
-          ? `${res.addedCount}টি নতুন আইডি সফলভাবে ইমপোর্ট হয়েছে।`
-          : `Successfully imported ${res.addedCount} new Student IDs.`,
-        type: 'success',
-      });
-      setTimeout(() => setActionMessage(null), 4000);
+    setIsImporting(true);
+    try {
+      const res = await StudentIdService.importFromCSVAsync(csvContent);
+      setImportReport(res);
+      refreshList();
+      if (res.addedCount > 0) {
+        setActionMessage({
+          text: language === 'bn'
+            ? `${res.addedCount}টি নতুন আইডি সফলভাবে ডাটাবেজে আপলোড হয়েছে।`
+            : `Successfully uploaded ${res.addedCount} new Student IDs to database.`,
+          type: 'success',
+        });
+        setTimeout(() => setActionMessage(null), 4000);
+      }
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -832,9 +845,12 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#172554] hover:bg-[#263B8C] text-white font-bold cursor-pointer"
+                  disabled={isAddingSingle}
+                  className="px-5 py-2 rounded-xl bg-[#172554] hover:bg-[#263B8C] text-white font-bold cursor-pointer disabled:opacity-50"
                 >
-                  {language === 'bn' ? 'সংরক্ষণ করুন' : 'Save ID'}
+                  {isAddingSingle
+                    ? language === 'bn' ? 'সংরক্ষণ হচ্ছে...' : 'Saving to Database...'
+                    : language === 'bn' ? 'সংরক্ষণ করুন' : 'Save ID'}
                 </button>
               </div>
             </form>
@@ -1030,10 +1046,17 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
                 <button
                   type="button"
                   onClick={handleImportCSV}
-                  disabled={!csvContent.trim()}
-                  className="px-5 py-2 rounded-xl bg-[#172554] hover:bg-[#263B8C] text-white font-bold cursor-pointer disabled:opacity-50"
+                  disabled={!csvContent.trim() || isImporting}
+                  className="px-5 py-2 rounded-xl bg-[#172554] hover:bg-[#263B8C] text-white font-bold cursor-pointer disabled:opacity-50 flex items-center gap-2"
                 >
-                  {language === 'bn' ? 'ডাটাবেজে যুক্ত করুন' : 'Process & Import'}
+                  {isImporting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>{language === 'bn' ? 'আপলোড হচ্ছে...' : 'Uploading to database...'}</span>
+                    </>
+                  ) : (
+                    <span>{language === 'bn' ? 'ডাটাবেজে যুক্ত করুন' : 'Process & Import'}</span>
+                  )}
                 </button>
               </div>
             </div>

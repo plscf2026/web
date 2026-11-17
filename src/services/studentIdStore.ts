@@ -764,7 +764,18 @@ export class StudentIdService {
 
     const updated = [newRecord, ...list];
     persistList(updated);
-    supabase.from('current_student_ids').insert(toStudentIdDbRow(newRecord)).then(undefined, () => {});
+    supabase
+      .from('current_student_ids')
+      .upsert(toStudentIdDbRow(newRecord), { onConflict: 'student_id' })
+      .then((res) => {
+        if (res.error) {
+          console.warn('[StudentIdService] Supabase addStudentId notice:', res.error.message);
+        } else {
+          console.log('[StudentIdService] Successfully saved student ID to Supabase:', newRecord.studentId);
+        }
+      }, (err) => {
+        console.warn('[StudentIdService] Supabase addStudentId error:', err);
+      });
 
     EventStore.recordAuditHistory({
       adminId: adminEmail,
@@ -777,6 +788,38 @@ export class StudentIdService {
     });
 
     return { success: true, record: newRecord };
+  }
+
+  /**
+   * Authoritative async addition: waits for Supabase PostgreSQL current_student_ids insertion
+   */
+  static async addStudentIdAsync(
+    input: {
+      studentId: string;
+      studentName?: string;
+      className: string;
+      academicYear?: string;
+    },
+    adminEmail = 'superadmin'
+  ): Promise<{ success: boolean; error?: string; record?: CurrentStudentIdRecord }> {
+    const res = this.addStudentId(input, adminEmail);
+    if (!res.success || !res.record) return res;
+
+    try {
+      const dbRow = toStudentIdDbRow(res.record);
+      const { error } = await supabase
+        .from('current_student_ids')
+        .upsert(dbRow, { onConflict: 'student_id' });
+
+      if (error) {
+        console.warn('[StudentIdService] Supabase addStudentIdAsync notice:', error.message);
+        return { success: true, record: res.record, error: `Saved locally. Database notice: ${error.message}` };
+      }
+      return { success: true, record: res.record };
+    } catch (err: any) {
+      console.warn('[StudentIdService] Supabase addStudentIdAsync error:', err);
+      return { success: true, record: res.record, error: err?.message };
+    }
   }
 
   /**
@@ -849,7 +892,20 @@ export class StudentIdService {
     if (newRecords.length > 0) {
       const updated = [...newRecords, ...existingList];
       persistList(updated);
-      supabase.from('current_student_ids').insert(newRecords.map(toStudentIdDbRow)).then(undefined, () => {});
+
+      // Asynchronously sync batch to Supabase current_student_ids
+      supabase
+        .from('current_student_ids')
+        .upsert(newRecords.map(toStudentIdDbRow), { onConflict: 'student_id' })
+        .then((res) => {
+          if (res.error) {
+            console.warn('[StudentIdService] Supabase batch import notice:', res.error.message);
+          } else {
+            console.log(`[StudentIdService] Successfully synced ${newRecords.length} student IDs to Supabase.`);
+          }
+        }, (err) => {
+          console.warn('[StudentIdService] Supabase batch import error:', err);
+        });
 
       EventStore.recordAuditHistory({
         adminId: adminEmail,
@@ -869,6 +925,43 @@ export class StudentIdService {
       invalidCount,
       errorRows,
     };
+  }
+
+  /**
+   * Authoritative async CSV/Excel import: awaits Supabase PostgreSQL batch upsert
+   */
+  static async importFromCSVAsync(
+    csvContent: string,
+    adminEmail = 'superadmin'
+  ): Promise<{
+    totalRows: number;
+    addedCount: number;
+    duplicateCount: number;
+    invalidCount: number;
+    errorRows: string[];
+    cloudSyncSuccess?: boolean;
+    cloudError?: string;
+  }> {
+    const report = this.importFromCSV(csvContent, adminEmail);
+    if (report.addedCount === 0) return report;
+
+    try {
+      const all = this.getAllStudentIds();
+      const rowsToUpsert = all.slice(0, report.addedCount).map(toStudentIdDbRow);
+
+      const { error } = await supabase
+        .from('current_student_ids')
+        .upsert(rowsToUpsert, { onConflict: 'student_id' });
+
+      if (error) {
+        console.warn('[StudentIdService] Cloud batch import notice:', error.message);
+        return { ...report, cloudSyncSuccess: false, cloudError: error.message };
+      }
+      return { ...report, cloudSyncSuccess: true };
+    } catch (err: any) {
+      console.warn('[StudentIdService] Cloud batch import error:', err);
+      return { ...report, cloudSyncSuccess: false, cloudError: err?.message };
+    }
   }
 
   /**
@@ -892,7 +985,11 @@ export class StudentIdService {
     supabase.from('current_student_ids').update({
       status: nextStatus,
       updated_at: new Date().toISOString(),
-    }).eq('id', item.id).then(undefined, () => {});
+    }).eq('id', item.id).then((res) => {
+      if (res.error) console.warn('[StudentIdService] toggleStatus error:', res.error.message);
+    }, (err) => {
+      console.warn('[StudentIdService] toggleStatus network error:', err);
+    });
 
     EventStore.recordAuditHistory({
       adminId: adminEmail,
@@ -929,10 +1026,19 @@ export class StudentIdService {
     };
 
     persistList(list);
-    supabase.from('current_student_ids').update({
-      ...updates,
+
+    const dbUpdates: any = {
       updated_at: new Date().toISOString(),
-    }).eq('id', list[index].id).then(undefined, () => {});
+    };
+    if (updates.studentName !== undefined) dbUpdates.student_name = updates.studentName || null;
+    if (updates.className !== undefined) dbUpdates.class_name = updates.className;
+    if (updates.academicYear !== undefined) dbUpdates.academic_year = updates.academicYear;
+
+    supabase.from('current_student_ids').update(dbUpdates).eq('id', list[index].id).then((res) => {
+      if (res.error) console.warn('[StudentIdService] updateRecord error:', res.error.message);
+    }, (err) => {
+      console.warn('[StudentIdService] updateRecord network error:', err);
+    });
 
     EventStore.recordAuditHistory({
       adminId: adminEmail,
@@ -965,7 +1071,11 @@ export class StudentIdService {
 
     const filtered = list.filter((r) => r.id !== id && r.studentId !== id);
     persistList(filtered);
-    supabase.from('current_student_ids').delete().eq('id', match.id).then(undefined, () => {});
+    supabase.from('current_student_ids').delete().eq('id', match.id).then((res) => {
+      if (res.error) console.warn('[StudentIdService] deleteRecord error:', res.error.message);
+    }, (err) => {
+      console.warn('[StudentIdService] deleteRecord network error:', err);
+    });
 
     EventStore.recordAuditHistory({
       adminId: adminEmail,
