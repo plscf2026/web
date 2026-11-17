@@ -34,11 +34,11 @@
   ],
   "rewrites": [
     {
-      "source": "/api/:match*",
-      "destination": "/api/:match*"
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
     },
     {
-      "source": "/((?!api/|assets/|favicon\\.png|robots\\.txt|.*\\.[a-zA-Z0-9]+$).*)",
+      "source": "/:path*",
       "destination": "/index.html"
     }
   ]
