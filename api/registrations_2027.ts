@@ -32,7 +32,7 @@ export default async function handler(req: any, res: any) {
 
     let query = supabase
       .from('registrations_2027')
-      .select('id, full_name, mobile_number, email, category, batch_name, t_shirt_size, total_paid, payment_status, is_checked_in, gate_status, registered_at')
+      .select('id, full_name, mobile_number, email, category, batch_name, t_shirt_size, total_paid, payment_status, is_checked_in, registered_at')
       .order('registered_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
