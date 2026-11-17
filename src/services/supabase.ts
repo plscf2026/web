@@ -1935,8 +1935,9 @@ export const SupabaseService = {
         p_staff_name: staffName,
       });
 
-      if (!error && data && data.success) {
-        return { success: true };
+      if (!error && data) {
+        if (data.success) return { success: true };
+        return { success: false, error: data.message || data.error || 'Gate entry required' };
       }
 
       // Direct fallback update
@@ -1973,8 +1974,9 @@ export const SupabaseService = {
         p_staff_name: staffName,
       });
 
-      if (!error && data && data.success) {
-        return { success: true };
+      if (!error && data) {
+        if (data.success) return { success: true };
+        return { success: false, error: data.message || data.error || 'Gate entry required' };
       }
 
       // Direct fallback

@@ -344,3 +344,102 @@ test('Scenario 15: Unauthorized staff account is denied gate approval permission
   assert.equal(res.success, false);
   assert.ok(res.error?.includes('PERMISSION_DENIED'));
 });
+
+// 16. Admin and Super Admin cannot give items (Food / T-Shirt) when student is NOT_ENTERED or BACK
+test('Scenario 16: Admin and Super Admin distribution blocked during NOT_ENTERED and BACK', () => {
+  const unenteredStudent = createMockStudent('STU-SC-16-UNENTERED', false, 'NOT_ENTERED');
+  const exitedStudent = createMockStudent('STU-SC-16-EXITED', false, 'BACK');
+  AppStore.saveRegistrations([unenteredStudent, exitedStudent]);
+
+  // Try Food distribution for unentered student -> BLOCKED
+  const foodResUnentered = EventStore.confirmFoodDistribution(
+    unenteredStudent.id,
+    unenteredStudent.fullName,
+    unenteredStudent.batchName,
+    'breakfast',
+    'ADMIN-01',
+    'Super Admin'
+  );
+  assert.equal(foodResUnentered.success, false);
+  assert.ok(foodResUnentered.error?.includes('Student has not entered the event'));
+
+  // Try Food distribution for exited student (BACK) -> BLOCKED
+  const foodResExited = EventStore.confirmFoodDistribution(
+    exitedStudent.id,
+    exitedStudent.fullName,
+    exitedStudent.batchName,
+    'lunch',
+    'ADMIN-01',
+    'Super Admin'
+  );
+  assert.equal(foodResExited.success, false);
+  assert.ok(foodResExited.error?.includes('Student has exited the event'));
+
+  // Try Dress / T-shirt distribution for unentered student -> BLOCKED
+  const dressResUnentered = EventStore.confirmDressDistribution(
+    unenteredStudent.id,
+    unenteredStudent.fullName,
+    'reunion_tshirt',
+    'L',
+    'ADMIN-01',
+    'Super Admin'
+  );
+  assert.equal(dressResUnentered.success, false);
+  assert.ok(dressResUnentered.error?.includes('Student has not entered the event'));
+
+  // Try Dress / T-shirt distribution for exited student (BACK) -> BLOCKED
+  const dressResExited = EventStore.confirmDressDistribution(
+    exitedStudent.id,
+    exitedStudent.fullName,
+    'reunion_tshirt',
+    'L',
+    'ADMIN-01',
+    'Super Admin'
+  );
+  assert.equal(dressResExited.success, false);
+  assert.ok(dressResExited.error?.includes('Student has exited the event'));
+});
+
+// 17. After ENTRY status is recorded, Admin and Super Admin can distribute items
+test('Scenario 17: Admin and Super Admin can distribute items ONLY AFTER ENTRY status is recorded', () => {
+  const student = createMockStudent('STU-SC-17', true, 'ENTRY');
+  AppStore.saveRegistrations([student]);
+
+  // Record Entry event in EventStore
+  EventStore.recordGateEvent(
+    student.id,
+    student.fullName,
+    student.batchName,
+    student.photoUrl,
+    'ENTRY',
+    'Gate 01',
+    'SC-01',
+    'ADMIN-01',
+    'Super Admin'
+  );
+
+  assert.equal(EventStore.getStudentGateStatus(student.id), 'ENTRY');
+
+  // Distribution now succeeds
+  const foodRes = EventStore.confirmFoodDistribution(
+    student.id,
+    student.fullName,
+    student.batchName,
+    'lunch',
+    'ADMIN-01',
+    'Super Admin'
+  );
+  assert.equal(foodRes.success, true);
+  assert.equal(foodRes.record?.mealType, 'lunch');
+
+  const dressRes = EventStore.confirmDressDistribution(
+    student.id,
+    student.fullName,
+    'reunion_tshirt',
+    'L',
+    'ADMIN-01',
+    'Super Admin'
+  );
+  assert.equal(dressRes.success, true);
+  assert.equal(dressRes.record?.status, 'RECEIVED');
+});

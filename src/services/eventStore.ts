@@ -1044,13 +1044,6 @@ export class EventStore {
       };
     }
 
-    if (mealType === 'breakfast' && !isBreakfastCollectionOpen()) {
-      return {
-        success: false,
-        error: 'Breakfast service is closed after 1:00 PM Bangladesh time.',
-      };
-    }
-
     // Inactive QR Code check for pending/rejected manual registrations
     const studentCheck = AppStore.getRegistrations().find((r) => r.id === registrationId);
     if (studentCheck && studentCheck.registrationApprovalStatus === 'pending') {
@@ -1079,6 +1072,13 @@ export class EventStore {
           error: errorMsg,
         };
       }
+    }
+
+    if (mealType === 'breakfast' && !isBreakfastCollectionOpen()) {
+      return {
+        success: false,
+        error: 'Breakfast service is closed after 1:00 PM Bangladesh time.',
+      };
     }
 
     const existing = this.getFoodDistributions();

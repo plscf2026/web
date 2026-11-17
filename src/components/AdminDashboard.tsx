@@ -37,6 +37,7 @@ import {
   Utensils,
   DoorOpen,
   DoorClosed,
+  AlertOctagon,
   RotateCcw,
 } from 'lucide-react';
 import {
@@ -352,6 +353,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [bookingToDelete, setBookingToDelete] = useState<RegistrationRecord | null>(null);
   const [deleteReason, setDeleteReason] = useState<string>('');
   const [isDeletingBooking, setIsDeletingBooking] = useState<boolean>(false);
+
+  // Gate Access Control Alert Modal for Admin / Super Admin attempting to distribute to NOT_ENTERED or BACK attendees
+  const [gateBlockedAlert, setGateBlockedAlert] = useState<{
+    studentName: string;
+    studentId: string;
+    gateStatus: 'BACK' | 'NOT_ENTERED';
+    itemType: 'T-Shirt' | 'Breakfast' | 'Lunch' | 'Dinner';
+    registration: RegistrationRecord;
+  } | null>(null);
 
   // Consolidated Registration Database Table (registrations_2027)
   const selectedYear = 2027;
@@ -924,6 +934,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleToggleTShirtCollected = async (regId: string, current: boolean) => {
     const nextStatus = !current;
+    const targetReg = registrations.find((r) => r.id === regId);
+
+    // GATE ENTRY ACCESS CONTROL: Admin and Super Admin cannot give T-shirt if student is NOT_ENTERED or BACK
+    if (nextStatus && targetReg) {
+      const gateStatus = getStudentGateStatus(targetReg);
+      if (gateStatus !== 'ENTRY') {
+        setGateBlockedAlert({
+          studentName: targetReg.fullName,
+          studentId: targetReg.id,
+          gateStatus,
+          itemType: 'T-Shirt',
+          registration: targetReg,
+        });
+        return;
+      }
+    }
 
     // 1. Optimistic UI update
     setRegistrations((prev) =>
@@ -987,6 +1013,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   ) => {
     const current = isMealCollected(reg, mealType);
     const nextStatus = !current;
+
+    // GATE ENTRY ACCESS CONTROL: Admin and Super Admin cannot give meals if student is NOT_ENTERED or BACK
+    if (nextStatus) {
+      const gateStatus = getStudentGateStatus(reg);
+      if (gateStatus !== 'ENTRY') {
+        const itemLabel = mealType === 'breakfast' ? 'Breakfast' : mealType === 'lunch' ? 'Lunch' : 'Dinner';
+        setGateBlockedAlert({
+          studentName: reg.fullName,
+          studentId: reg.id,
+          gateStatus,
+          itemType: itemLabel,
+          registration: reg,
+        });
+        return;
+      }
+    }
 
     // 1. Authoritative Supabase toggle via SECURITY DEFINER RPC
     await SupabaseService.toggleFoodDistribution(
@@ -4066,6 +4108,101 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     ? 'বুকিং স্থায়ীভাবে মুছে ফেলুন'
                     : 'Confirm & Delete Booking'}
                 </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: GATE ENTRY REQUIRED ENFORCEMENT POP-UP (Admin & Super Admin) */}
+      {gateBlockedAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 border-2 border-rose-500 space-y-4">
+            <div className="flex items-center gap-3 text-rose-800 border-b border-rose-100 pb-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center shadow-md shrink-0">
+                <AlertOctagon className="w-7 h-7" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full border border-rose-200">
+                  Access Control Blocked
+                </span>
+                <h3 className="font-black text-rose-950 text-lg leading-tight mt-0.5">
+                  GATE ENTRY REQUIRED
+                </h3>
+                <span className="text-xs text-rose-700 font-bold">
+                  {gateBlockedAlert.gateStatus === 'BACK' ? 'Student Exited (BACK)' : 'Student Not Entered Yet'}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-4 bg-rose-50 rounded-2xl border border-rose-200 space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-600 font-medium">Attendee:</span>
+                <span className="font-black text-slate-900">{gateBlockedAlert.studentName}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-600 font-medium">Registration ID:</span>
+                <span className="font-mono font-bold text-slate-900">{gateBlockedAlert.studentId}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-600 font-medium">Attempted Distribution:</span>
+                <span className="font-black text-rose-700 bg-white px-2 py-0.5 rounded border border-rose-300">
+                  {gateBlockedAlert.itemType}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-600 font-medium">Current Gate Status:</span>
+                <span
+                  className={`font-black px-2.5 py-0.5 rounded-full text-[11px] ${
+                    gateBlockedAlert.gateStatus === 'BACK'
+                      ? 'bg-rose-600 text-white'
+                      : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {gateBlockedAlert.gateStatus === 'BACK' ? 'BACK (Exited Venue)' : 'NOT ENTERED'}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-900 text-white rounded-2xl text-xs space-y-1">
+              <p className="font-bold text-amber-300 flex items-center gap-1.5">
+                <DoorOpen className="w-4 h-4 text-amber-400" />
+                <span>Strict Security Protocol Enforced</span>
+              </p>
+              <p className="text-slate-300 leading-relaxed text-[11px]">
+                {language === 'bn'
+                  ? 'অ্যাডমিন এবং সুপার অ্যাডমিন কেউই গেটে প্রবেশের পূর্বে খাবার বা টি-শার্ট বিতরণ করতে পারবেন না। শিক্ষার্থীকে আগে গেটে এন্ট্রি (ENTRY) দিতে হবে।'
+                  : 'Neither Admin nor Super Admin is permitted to distribute items to attendees who have exited (BACK) or not entered. Items can ONLY be given after Gate ENTRY is completed.'}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={async () => {
+                  const reg = gateBlockedAlert.registration;
+                  const item = gateBlockedAlert.itemType;
+                  setGateBlockedAlert(null);
+                  await handleToggleGateAttendance(reg, gateBlockedAlert.gateStatus);
+                  if (item === 'T-Shirt') {
+                    await handleToggleTShirtCollected(reg.id, false);
+                  } else {
+                    const mType = item.toLowerCase() as 'breakfast' | 'lunch' | 'dinner';
+                    await handleToggleFoodDistribution(reg, mType);
+                  }
+                }}
+                className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all"
+              >
+                <DoorOpen className="w-4 h-4" />
+                <span>Record ENTRY & Distribute</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setGateBlockedAlert(null)}
+                className="w-full py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition-colors"
+              >
+                Close / Dismiss
               </button>
             </div>
           </div>

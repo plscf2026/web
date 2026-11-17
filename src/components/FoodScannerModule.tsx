@@ -562,11 +562,11 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                       </span>
                     ) : validationResult?.status === 'BACK_TO_THE_GATE' ? (
                       <span className="text-sm font-black text-rose-600 flex items-center gap-1.5 animate-pulse">
-                        <AlertOctagon className="w-4 h-4 text-rose-600" /> BACK TO THE GATE
+                        <AlertOctagon className="w-4 h-4 text-rose-600" /> GATE ENTRY REQUIRED (BACK)
                       </span>
                     ) : validationResult?.status === 'GATE_ENTRY_REQUIRED' ? (
                       <span className="text-sm font-black text-rose-600 flex items-center gap-1.5">
-                        <DoorOpen className="w-4 h-4 text-rose-600" /> GATE ENTRY REQUIRED
+                        <DoorOpen className="w-4 h-4 text-rose-600" /> GATE ENTRY REQUIRED (NOT ENTERED)
                       </span>
                     ) : (
                       <span className="text-sm font-black text-rose-700 flex items-center gap-1.5">
@@ -986,11 +986,11 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                           </span>
                         ) : validationResult?.status === 'BACK_TO_THE_GATE' ? (
                           <span className="text-xs font-black text-rose-600 flex items-center gap-1 animate-pulse">
-                            <AlertOctagon className="w-4 h-4 text-rose-600" /> BACK TO THE GATE
+                            <AlertOctagon className="w-4 h-4 text-rose-600" /> GATE ENTRY REQUIRED (BACK)
                           </span>
                         ) : validationResult?.status === 'GATE_ENTRY_REQUIRED' ? (
                           <span className="text-xs font-black text-rose-600 flex items-center gap-1">
-                            <DoorOpen className="w-4 h-4 text-rose-600" /> GATE ENTRY REQUIRED
+                            <DoorOpen className="w-4 h-4 text-rose-600" /> GATE ENTRY REQUIRED (NOT ENTERED)
                           </span>
                         ) : (
                           <span className="text-xs font-black text-amber-700 flex items-center gap-1">
@@ -1025,29 +1025,29 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                       <span>[ CONFIRM {mealType.toUpperCase()} COLLECTED ]</span>
                     </button>
                   ) : validationResult?.status === 'BACK_TO_THE_GATE' ? (
-                    <div className="p-3.5 rounded-2xl bg-rose-50 border-2 border-rose-500 text-rose-950 text-center font-bold text-xs space-y-2 shadow-sm">
-                      <div className="flex items-center justify-center gap-1.5 text-rose-700 text-xs font-black uppercase tracking-wider">
-                        <AlertOctagon className="w-4 h-4 text-rose-600" />
-                        <span>BACK TO THE GATE</span>
+                    <div className="p-4 rounded-2xl bg-rose-600 text-white text-center font-bold text-xs space-y-1.5 shadow-md">
+                      <div className="flex items-center justify-center gap-1.5 text-amber-300 text-sm font-black tracking-wider uppercase">
+                        <AlertOctagon className="w-5 h-5 text-amber-300" />
+                        <span>GATE ENTRY REQUIRED (BACK TO THE GATE)</span>
                       </div>
-                      <p className="text-xs text-rose-900 font-extrabold leading-snug">
+                      <p className="text-xs text-white font-extrabold leading-snug">
                         Student has exited the event. Food collection is not allowed. Please ask the student to enter through the gate first.
                       </p>
-                      <p className="text-[11px] font-medium text-rose-700">
-                        শিক্ষার্থী অনুষ্ঠানস্থল ত্যাগ করেছেন। পুনরায় ভেতরে প্রবেশের জন্য অনুগ্রহ করে আগে গেটে যান।
+                      <p className="text-[11px] font-medium text-rose-100">
+                        গেট এন্ট্রি আবশ্যক: শিক্ষার্থী অনুষ্ঠানস্থল ত্যাগ করেছেন (BACK)। পুনরায় খাবার নিতে হলে আগে গেট দিয়ে প্রবেশ (ENTRY) করতে হবে।
                       </p>
                     </div>
                   ) : validationResult?.status === 'GATE_ENTRY_REQUIRED' ? (
-                    <div className="p-3.5 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-900 text-center font-bold text-xs space-y-1.5 shadow-xs">
-                      <div className="flex items-center justify-center gap-1.5 text-rose-700 text-xs font-black">
-                        <DoorOpen className="w-4 h-4 text-rose-600" />
+                    <div className="p-4 rounded-2xl bg-rose-600 text-white text-center font-bold text-xs space-y-1.5 shadow-md">
+                      <div className="flex items-center justify-center gap-1.5 text-amber-300 text-sm font-black tracking-wider uppercase">
+                        <DoorOpen className="w-5 h-5 text-amber-300" />
                         <span>GATE ENTRY REQUIRED</span>
                       </div>
-                      <p className="text-xs text-rose-800 font-bold">
+                      <p className="text-xs text-white font-extrabold leading-snug">
                         Student has not entered the event. Please complete gate entry first.
                       </p>
-                      <p className="text-[11px] font-medium text-rose-700">
-                        শিক্ষার্থী এখনও অনুষ্ঠানে প্রবেশ করেননি। অনুগ্রহ করে আগে গেটে প্রবেশ সম্পন্ন করুন।
+                      <p className="text-[11px] font-medium text-rose-100">
+                        গেট এন্ট্রি আবশ্যক: শিক্ষার্থী এখনও অনুষ্ঠানে প্রবেশ করেননি। খাবার নেওয়ার আগে গেট দিয়ে প্রবেশ (ENTRY) সম্পন্ন করুন।
                       </p>
                     </div>
                   ) : validationResult?.status === 'ALREADY_COLLECTED' ? (

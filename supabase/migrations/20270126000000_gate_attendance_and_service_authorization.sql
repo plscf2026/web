@@ -452,3 +452,165 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.rpc_confirm_dress_distribution(TEXT, TEXT, TEXT, TEXT, TEXT) TO anon, authenticated, service_role;
+
+-- 7. REINFORCE RPC_TOGGLE_FOOD_DISTRIBUTION WITH MANDATORY GATE ENTRY ENFORCEMENT FOR ADMIN / SUPER ADMIN
+CREATE OR REPLACE FUNCTION public.rpc_toggle_food_distribution(
+  p_reg_id TEXT,
+  p_meal_type TEXT,
+  p_collected BOOLEAN,
+  p_staff_id TEXT DEFAULT 'ADMIN',
+  p_staff_name TEXT DEFAULT 'Admin'
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_reg RECORD;
+  v_meal TEXT := lower(trim(p_meal_type));
+  v_gate_status TEXT;
+BEGIN
+  IF v_meal NOT IN ('breakfast', 'lunch', 'dinner') THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Invalid meal type: must be breakfast, lunch, or dinner');
+  END IF;
+
+  SELECT id, full_name, batch_name, is_checked_in, gate_status INTO v_reg
+  FROM public.registrations_2027
+  WHERE id = p_reg_id OR student_id = p_reg_id
+  LIMIT 1
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Student not found in registrations_2027: ' || p_reg_id);
+  END IF;
+
+  v_gate_status := COALESCE(v_reg.gate_status, CASE WHEN v_reg.is_checked_in THEN 'ENTRY' ELSE 'NOT_ENTERED' END);
+
+  -- Admin & Super Admin Gate Check: Cannot give food if student is NOT_ENTERED or BACK
+  IF p_collected AND v_gate_status <> 'ENTRY' THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'GATE_ENTRY_REQUIRED',
+      'gate_status', v_gate_status,
+      'message', 'GATE ENTRY REQUIRED: Cannot distribute food. Student must have ENTRY status through the gate first.'
+    );
+  END IF;
+
+  IF p_collected THEN
+    INSERT INTO public.food_distributions (
+      id, registration_id, student_name, batch_name, meal_type,
+      status, collected_at, staff_id, staff_name
+    ) VALUES (
+      'FOOD-' || floor(extract(epoch from now()) * 1000)::text || '-' || floor(random() * 900 + 100)::text,
+      v_reg.id,
+      v_reg.full_name,
+      COALESCE(v_reg.batch_name, 'General'),
+      v_meal,
+      'COLLECTED',
+      now(),
+      COALESCE(p_staff_id, 'ADMIN'),
+      COALESCE(p_staff_name, 'Admin')
+    )
+    ON CONFLICT (registration_id, meal_type)
+    DO UPDATE SET
+      status = 'COLLECTED',
+      collected_at = now(),
+      staff_id = EXCLUDED.staff_id,
+      staff_name = EXCLUDED.staff_name;
+  ELSE
+    DELETE FROM public.food_distributions
+    WHERE registration_id = v_reg.id AND meal_type = v_meal;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'registration_id', v_reg.id,
+    'meal_type', v_meal,
+    'collected', p_collected
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_toggle_food_distribution(TEXT, TEXT, BOOLEAN, TEXT, TEXT) TO anon, authenticated, service_role;
+
+-- 8. REINFORCE RPC_TOGGLE_TSHIRT_DISTRIBUTION WITH MANDATORY GATE ENTRY ENFORCEMENT FOR ADMIN / SUPER ADMIN
+CREATE OR REPLACE FUNCTION public.rpc_toggle_tshirt_distribution(
+  p_reg_id TEXT,
+  p_collected BOOLEAN,
+  p_staff_id TEXT DEFAULT 'ADMIN',
+  p_staff_name TEXT DEFAULT 'Admin'
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_reg RECORD;
+  v_gate_status TEXT;
+BEGIN
+  SELECT id, full_name, t_shirt_size, batch_name, is_checked_in, gate_status INTO v_reg
+  FROM public.registrations_2027
+  WHERE id = p_reg_id OR student_id = p_reg_id
+  LIMIT 1
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Student not found in registrations_2027: ' || p_reg_id);
+  END IF;
+
+  v_gate_status := COALESCE(v_reg.gate_status, CASE WHEN v_reg.is_checked_in THEN 'ENTRY' ELSE 'NOT_ENTERED' END);
+
+  -- Admin & Super Admin Gate Check: Cannot give T-shirt if student is NOT_ENTERED or BACK
+  IF p_collected AND v_gate_status <> 'ENTRY' THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'GATE_ENTRY_REQUIRED',
+      'gate_status', v_gate_status,
+      'message', 'GATE ENTRY REQUIRED: Cannot distribute T-shirt. Student must have ENTRY status through the gate first.'
+    );
+  END IF;
+
+  UPDATE public.registrations_2027
+  SET is_tshirt_collected = p_collected
+  WHERE id = v_reg.id;
+
+  IF p_collected THEN
+    INSERT INTO public.dress_distributions (
+      id, registration_id, student_name, item_type, registered_size,
+      status, received_at, staff_id, staff_name
+    ) VALUES (
+      'DRS-' || floor(extract(epoch from now()) * 1000)::text || '-' || floor(random() * 900 + 100)::text,
+      v_reg.id,
+      v_reg.full_name,
+      'reunion_tshirt',
+      COALESCE(v_reg.t_shirt_size, 'L'),
+      'RECEIVED',
+      now(),
+      COALESCE(p_staff_id, 'ADMIN'),
+      COALESCE(p_staff_name, 'Admin')
+    )
+    ON CONFLICT (registration_id, item_type)
+    DO UPDATE SET
+      status = 'RECEIVED',
+      received_at = now(),
+      staff_id = EXCLUDED.staff_id,
+      staff_name = EXCLUDED.staff_name,
+      registered_size = COALESCE(v_reg.t_shirt_size, dress_distributions.registered_size);
+  ELSE
+    UPDATE public.dress_distributions
+    SET status = 'RETURNED',
+        corrected_by = COALESCE(p_staff_name, 'Admin'),
+        correction_reason = 'Admin toggled to Pending',
+        corrected_at = now()
+    WHERE registration_id = v_reg.id AND item_type = 'reunion_tshirt';
+  END IF;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'registration_id', v_reg.id,
+    'is_tshirt_collected', p_collected
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_toggle_tshirt_distribution(TEXT, BOOLEAN, TEXT, TEXT) TO anon, authenticated, service_role;

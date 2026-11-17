@@ -204,8 +204,8 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
         type: 'error',
         message:
           gateStatus === 'BACK'
-            ? 'BACK TO THE GATE: Student has exited the event. Food collection is not allowed. Please ask the student to enter through the gate first.'
-            : 'Student has not entered the event. Please complete gate entry first.',
+            ? 'GATE ENTRY REQUIRED: Student has exited the event. Food collection is not allowed. Please ask the student to enter through the gate first.'
+            : 'GATE ENTRY REQUIRED: Student has not entered the event. Please complete gate entry first.',
       });
       return;
     }
@@ -246,8 +246,8 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
         type: 'error',
         message:
           gateStatus === 'BACK'
-            ? 'BACK TO THE GATE: Student has exited the event. T-shirt collection is currently blocked. Please ask the student to enter through the gate first.'
-            : 'Student has not entered the event. Please complete gate entry first.',
+            ? 'GATE ENTRY REQUIRED: Student has exited the event. T-shirt collection is currently blocked. Please ask the student to enter through the gate first.'
+            : 'GATE ENTRY REQUIRED: Student has not entered the event. Please complete gate entry first.',
       });
       return;
     }

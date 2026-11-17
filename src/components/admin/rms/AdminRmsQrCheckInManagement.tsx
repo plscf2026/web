@@ -105,6 +105,21 @@ export const AdminRmsQrCheckInManagement: React.FC<Props> = ({
 
   const handleToggleKitDispatched = (att: RegistrationRecord) => {
     const newStatus = !att.isTShirtCollected;
+
+    // GATE ENTRY ACCESS CONTROL: Cannot dispatch kit if student is NOT_ENTERED or BACK
+    if (newStatus) {
+      const gStatus = att.gateStatus || (att.isCheckedIn ? 'ENTRY' : 'NOT_ENTERED');
+      if (gStatus !== 'ENTRY') {
+        const errorMsg =
+          gStatus === 'BACK'
+            ? 'GATE ENTRY REQUIRED: Student has exited the event (BACK). Kit / T-shirt distribution is blocked. Authorize Gate Entry first.'
+            : 'GATE ENTRY REQUIRED: Student has NOT entered the event. Kit / T-shirt distribution is blocked. Authorize Gate Entry first.';
+        alert(errorMsg);
+        setManualSuccessMsg(errorMsg);
+        return;
+      }
+    }
+
     AppStore.updateRegistration(att.id, { isTShirtCollected: newStatus });
     // Update local active attendee state
     setActiveAttendee({ ...att, isTShirtCollected: newStatus });
