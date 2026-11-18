@@ -3540,7 +3540,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <tr key={d.id} className="hover:bg-slate-50/80 transition-colors">
                             <td className="py-3 px-3.5">
                               <span className="font-bold text-slate-900 block text-xs">{d.donorName}</span>
-                              <a href={`tel:${d.mobileNumber}`} className="text-[11px] text-slate-500 font-mono hover:underline">
+                              <a href={`tel:${d.mobileNumber}`} className="text-[11px] text-slate-500 font-mono hover:underline" aria-label={`Call donor ${d.donorName} at ${d.mobileNumber}`}>
                                 {d.mobileNumber}
                               </a>
                               {d.email && <span className="text-[10px] text-slate-400 block truncate max-w-[150px]">{d.email}</span>}
@@ -3618,7 +3618,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <span className="font-bold text-slate-900 block text-sm truncate">{d.donorName}</span>
-                            <a href={`tel:${d.mobileNumber}`} className="text-xs text-slate-500 font-mono hover:underline">{d.mobileNumber}</a>
+                            <a href={`tel:${d.mobileNumber}`} className="text-xs text-slate-500 font-mono hover:underline" aria-label={`Call donor ${d.donorName} at ${d.mobileNumber}`}>{d.mobileNumber}</a>
                             {d.email && <span className="text-[10px] text-slate-400 block truncate">{d.email}</span>}
                           </div>
                           <span className="font-black text-emerald-700 whitespace-nowrap inline-block tabular-nums text-sm">

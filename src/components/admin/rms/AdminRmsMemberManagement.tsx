@@ -375,7 +375,7 @@ export const AdminRmsMemberManagement: React.FC<Props> = ({
                   <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                     <div>
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">Phone</span>
-                      <a href={`tel:${member.mobileNumber}`} className="font-semibold text-slate-800 flex items-center gap-1 font-mono">
+                      <a href={`tel:${member.mobileNumber}`} className="font-semibold text-slate-800 flex items-center gap-1 font-mono" aria-label={`Call ${member.mobileNumber}`}>
                         <Phone className="w-3 h-3 text-slate-400 shrink-0" />
                         <span className="truncate">{member.mobileNumber}</span>
                       </a>

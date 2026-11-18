@@ -13,6 +13,10 @@ export default defineConfig(() => {
     },
     build: {
       chunkSizeWarningLimit: 1000,
+      // Source maps enable Lighthouse Best Practices audit to pass
+      sourcemap: false,
+      minify: 'esbuild',
+      target: 'es2020',
       rollupOptions: {
         output: {
           manualChunks(id) {
@@ -23,6 +27,10 @@ export default defineConfig(() => {
             if (id.includes('node_modules/lucide-react')) return 'vendor-icons';
             if (id.includes('node_modules/jsqr') || id.includes('node_modules/qrcode')) return 'vendor-qr';
             if (id.includes('idCardTemplateAssets')) return 'assets-idcard';
+            // Additional splits for better performance
+            if (id.includes('node_modules/dompurify')) return 'vendor-dompurify';
+            if (id.includes('node_modules/react-dom')) return 'vendor-react-dom';
+            if (id.includes('node_modules/react/')) return 'vendor-react';
           },
         },
       },
@@ -38,6 +46,7 @@ export default defineConfig(() => {
         'X-Frame-Options': 'DENY',
         'Referrer-Policy': 'strict-origin-when-cross-origin',
         'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()',
+        'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
       },
       // PayStation API reverse proxy — avoids CORS during local development.
       // In production, Supabase Edge Functions handle server-side PayStation calls
@@ -63,6 +72,7 @@ export default defineConfig(() => {
         'X-Frame-Options': 'DENY',
         'Referrer-Policy': 'strict-origin-when-cross-origin',
         'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()',
+        'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
       },
     },
   };

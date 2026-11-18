@@ -195,6 +195,8 @@ export const HomePage: React.FC<HomePageProps> = ({
             src="/assets/homepage/hero_panorama.jpg"
             alt="Police Lines High School & College, Faridpur Campus"
             className="w-full h-full object-cover object-[70%_center] sm:object-center select-none"
+            fetchPriority="high"
+            decoding="async"
           />
         </div>
 
@@ -460,7 +462,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                   src="/assets/homepage/memory_1.jpg"
                   alt="School Campus Memory"
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                />
+                
+            loading="lazy"
+            decoding="async"/>
               </div>
               <div
                 onClick={() => onNavigate('gallery')}
@@ -470,7 +474,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                   src="/assets/homepage/memory_2.jpg"
                   alt="Students Group Memory"
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                />
+                
+            loading="lazy"
+            decoding="async"/>
               </div>
               <div
                 onClick={() => onNavigate('gallery')}
@@ -480,7 +486,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                   src="/assets/homepage/memory_3.jpg"
                   alt="School Assembly Memory"
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                />
+                
+            loading="lazy"
+            decoding="async"/>
               </div>
             </div>
           </div>
@@ -509,7 +517,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                   src="/assets/homepage/video_thumb.jpg"
                   alt="Reunion Promo Video"
                   className="w-full h-36 sm:h-40 object-cover group-hover:scale-105 transition-transform duration-500"
-                />
+                
+            loading="lazy"
+            decoding="async"/>
                 {/* Perfectly Centered Play Button */}
                 <div className="absolute inset-0 bg-black/35 group-hover:bg-black/25 flex items-center justify-center transition-colors">
                   <div className="w-14 h-14 rounded-full bg-white/95 text-[#0284C7] shadow-2xl flex items-center justify-center transition-all group-hover:scale-110">
@@ -572,16 +582,22 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* Video Modal Preview */}
       {isVideoModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="video-modal-title"
+        >
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full overflow-hidden shadow-2xl relative text-white">
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-              <h3 className="font-bold text-sm sm:text-base flex items-center gap-2">
+              <h2 id="video-modal-title" className="font-bold text-sm sm:text-base flex items-center gap-2">
                 <Play className="w-4 h-4 text-[#fbb03b]" />
                 <span>PLS Reunion 2027 – Official Promo</span>
-              </h3>
+              </h2>
               <button
                 onClick={() => setIsVideoModalOpen(false)}
                 className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
+                aria-label="Close video modal"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -592,7 +608,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                   src="/assets/homepage/video_thumb.jpg"
                   alt="Video Preview"
                   className="w-full h-full object-cover opacity-60"
-                />
+                
+            loading="lazy"
+            decoding="async"/>
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
                   <div className="w-16 h-16 rounded-full bg-[#fbb03b] text-slate-950 flex items-center justify-center pl-1 shadow-xl">
                     <Play className="w-8 h-8 fill-current" />

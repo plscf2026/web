@@ -1,0 +1,30 @@
+{
+  "$schema": "https://ai-catalog.schema.org/v1/schema.json",
+  "name": "Police Lines School & College Faridpur — Reunion 2026",
+  "description": "Official bilingual (Bengali & English) grand reunion registration and event management platform for alumni of Police Lines School and College, Faridpur, Bangladesh (Est. 1962).",
+  "url": "https://plscf65.vercel.app",
+  "logo": "https://plscf65.vercel.app/assets/school_logo.png",
+  "language": ["en", "bn"],
+  "category": "Education / Event Management",
+  "keywords": ["reunion", "alumni", "Bangladesh", "school", "registration", "ticket", "donation"],
+  "contact": {
+    "url": "https://plscf65.vercel.app/about"
+  },
+  "capabilities": [
+    {
+      "name": "Alumni Registration",
+      "description": "Register as an alumni attendee for the Grand Reunion 2026 with digital ticket issuance.",
+      "url": "https://plscf65.vercel.app/register"
+    },
+    {
+      "name": "Donation Portal",
+      "description": "Donate to the reunion fund and receive an official Thank You card with unique token ID.",
+      "url": "https://plscf65.vercel.app/donate"
+    },
+    {
+      "name": "Ticket Status Check",
+      "description": "Check registration and ticket status using Registration ID and phone number.",
+      "url": "https://plscf65.vercel.app/register"
+    }
+  ]
+}
