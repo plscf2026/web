@@ -142,11 +142,16 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
       const invoice = params.get('invoice') || params.get('invoice_number') || sessionStorage.getItem('plscf_returned_donation_invoice');
       const isReturn = params.get('payment_return') === '1' || Boolean(invoice);
 
-      const pendingRaw = sessionStorage.getItem('plscf_pending_donation');
-      if (!isReturn || !pendingRaw) return;
+      const pendingRaw = sessionStorage.getItem('plscf_pending_donation') || localStorage.getItem('plscf_pending_donation');
+      const pendingSession = PayStationService.getPendingSession();
+      const pending = pendingRaw
+        ? JSON.parse(pendingRaw)
+        : (pendingSession && pendingSession.type === 'donation' && pendingSession.donationData
+            ? pendingSession.donationData
+            : null);
+      if (!isReturn || !pending) return;
 
       try {
-        const pending = JSON.parse(pendingRaw);
         const activeInvoice = invoice || pending.invoiceNumber;
         if (!activeInvoice) return;
 
@@ -171,6 +176,8 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
           setCompletedDonation(donation);
           setDonationsList(AppStore.getDonations());
           sessionStorage.removeItem('plscf_pending_donation');
+          localStorage.removeItem('plscf_pending_donation');
+          PayStationService.clearPendingSession();
           setPendingPayment(null);
         } else {
           // If in test/dev environment, fallback to complete immediately
@@ -198,6 +205,8 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
             setCompletedDonation(donation);
             setDonationsList(AppStore.getDonations());
             sessionStorage.removeItem('plscf_pending_donation');
+            localStorage.removeItem('plscf_pending_donation');
+            PayStationService.clearPendingSession();
             setPendingPayment(null);
           } else {
             setErrorMessage(verifyRes.error || (isBangla ? 'পেমেন্ট এখনও সম্পন্ন হয়নি।' : 'Payment verification could not be completed.'));
@@ -382,17 +391,26 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
         amount: effectiveAmount,
       });
 
-      // Store donor info in sessionStorage so we can complete the record after return
+      // Store donor info in sessionStorage & localStorage & service session so we can complete the record after return
+      const donationSessionPayload = {
+        invoiceNumber,
+        amount: effectiveAmount,
+        donorName: finalDonorName,
+        mobileNumber: normalizedMobile,
+        email: email.trim(),
+        purpose: causeTitle,
+        paymentMethod,
+      };
       try {
-        sessionStorage.setItem('plscf_pending_donation', JSON.stringify({
+        sessionStorage.setItem('plscf_pending_donation', JSON.stringify(donationSessionPayload));
+        localStorage.setItem('plscf_pending_donation', JSON.stringify(donationSessionPayload));
+        PayStationService.savePendingSession({
+          type: 'donation',
           invoiceNumber,
           amount: effectiveAmount,
-          donorName: finalDonorName,
-          mobileNumber: normalizedMobile,
-          email: email.trim(),
-          purpose: causeTitle,
-          paymentMethod,
-        }));
+          donationData: donationSessionPayload,
+          createdAt: new Date().toISOString(),
+        });
       } catch {}
 
       // Create PayStation hosted checkout session
@@ -419,7 +437,12 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
       if (createRes.paymentUrl) {
         const isSandboxSim = createRes.paymentUrl.includes('checkout/pay?invoice=');
         if (!isSandboxSim) {
-          window.open(createRes.paymentUrl, '_blank', 'noopener,noreferrer');
+          const popup = window.open(createRes.paymentUrl, '_blank', 'noopener,noreferrer');
+          if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+            // Popup was blocked by browser or on mobile device — redirect directly
+            window.location.href = createRes.paymentUrl;
+            return;
+          }
           setPendingPayment({
             invoiceNumber,
             amount: effectiveAmount,
