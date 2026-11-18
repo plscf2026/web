@@ -4,7 +4,7 @@
  * Independent Verification Engine for On-Site Registrations, QR Code Activation & Treasury Approvals
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   ShieldCheck,
   Check,
@@ -33,6 +33,7 @@ import {
 } from '../../../types';
 import { ManualRegistrationService } from '../../../services/manualRegistrationService';
 import { AppStore } from '../../../services/store';
+import { SupabaseService } from '../../../services/supabase';
 import { TicketView } from '../../TicketView';
 import { AdminStudentPhotoModal } from '../photos/AdminStudentPhotoModal';
 import { DEFAULT_STUDENT_AVATAR_PLACEHOLDER } from '../../../services/studentPhotoStorageService';
@@ -46,15 +47,47 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
   language,
   currentAdmin,
 }) => {
-  // Local list refresh trigger
+  // Cloud & local list refresh trigger
   const [refreshKey, setRefreshKey] = useState(0);
-  const handleRefresh = () => setRefreshKey((prev) => prev + 1);
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
+  const [allRegistrations, setAllRegistrations] = useState<RegistrationRecord[]>(() =>
+    AppStore.getRegistrations()
+  );
 
-  // Retrieve all registrations from AppStore
-  const allRegistrations = useMemo(() => {
-    return AppStore.getRegistrations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshKey]);
+  const syncRegistrationsFromCloud = useCallback(async () => {
+    setIsCloudSyncing(true);
+    try {
+      // 1. Backfill local manual registrations to Supabase if any were created offline
+      const localManual = AppStore.getRegistrations().filter((r) => r.isManualRegistration);
+      for (const lm of localManual) {
+        try {
+          await SupabaseService.saveRegistration(lm, 2027);
+        } catch {}
+      }
+
+      // 2. Fetch authoritative registrations from Supabase
+      const res = await SupabaseService.fetchRegistrations(2027, { forceRefresh: true });
+      if (res.data && res.data.length > 0) {
+        res.data.forEach((item) => {
+          AppStore.addRegistration(item, 2027);
+        });
+        setAllRegistrations(AppStore.getRegistrations());
+      } else {
+        setAllRegistrations(AppStore.getRegistrations());
+      }
+    } catch (err) {
+      console.warn('[ManualApprovalTab] Cloud sync warning:', err);
+      setAllRegistrations(AppStore.getRegistrations());
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    syncRegistrationsFromCloud();
+  }, [syncRegistrationsFromCloud, refreshKey]);
+
+  const handleRefresh = () => setRefreshKey((prev) => prev + 1);
 
   // Filter to manual venue registrations
   const manualRegistrations = useMemo(() => {
@@ -404,10 +437,20 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={handleRefresh}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/15 shadow-xs"
+              disabled={isCloudSyncing}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/15 shadow-xs cursor-pointer disabled:opacity-60"
+              title="Sync registrations across all devices via Supabase cloud"
             >
-              <RefreshCw className="w-4 h-4" />
-              <span>{language === 'bn' ? 'রিফ্রেশ' : 'Refresh'}</span>
+              <RefreshCw className={`w-4 h-4 ${isCloudSyncing ? 'animate-spin' : ''}`} />
+              <span>
+                {isCloudSyncing
+                  ? language === 'bn'
+                    ? 'ক্লাউড সিঙ্ক হচ্ছে...'
+                    : 'Syncing Cloud...'
+                  : language === 'bn'
+                  ? 'ক্লাউড রিফ্রেশ'
+                  : 'Cloud Refresh'}
+              </span>
             </button>
           </div>
         </div>
@@ -780,10 +823,10 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
                     </div>
                   </div>
 
-                  {/* Middle Column: Status Badges (Strictly Independent) */}
-                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0">
+                  {/* Middle Column: Status Badges (Strictly Independent & Mobile-Optimized) */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-nowrap items-start lg:items-center gap-3 w-full lg:w-auto">
                     {/* Registration Approval Badge */}
-                    <div className="space-y-1 min-w-[130px]">
+                    <div className="space-y-1 min-w-0 sm:min-w-[130px]">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                         {language === 'bn' ? 'রেজিস্ট্রেশন স্ট্যাটাস' : 'Reg & QR Status'}
                       </span>
@@ -806,7 +849,7 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
                     </div>
 
                     {/* Financial Approval Badge */}
-                    <div className="space-y-1 min-w-[140px]">
+                    <div className="space-y-1 min-w-0 sm:min-w-[140px]">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                         {language === 'bn' ? 'ফান্ড ও অর্থ প্রদান' : 'Treasury & Finance'}
                       </span>
@@ -843,7 +886,7 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
                     </div>
 
                     {/* Gate Attendance Status Badge (Live Gate Link in Super Admin) */}
-                    <div className="space-y-1 min-w-[120px]">
+                    <div className="space-y-1 min-w-0 sm:min-w-[120px] col-span-2 sm:col-span-1">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                         {language === 'bn' ? 'গেইট স্ট্যাটাস' : 'Gate Status'}
                       </span>
@@ -874,8 +917,8 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
                     </div>
                   </div>
 
-                  {/* Right Column: Independent Actions */}
-                  <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                  {/* Right Column: Independent Actions (Mobile Full-Width Responsive) */}
+                  <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100 justify-start lg:justify-end">
                     {/* View Ticket / QR */}
                     <button
                       type="button"

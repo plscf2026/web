@@ -245,8 +245,19 @@ export class ManualRegistrationService {
         return { success: false, error: `Registration "${cleanId}" not found.` };
       }
 
+      const hasPendingOrRejectedFin =
+        Number(existing.financialAmount) > 0 &&
+        (existing.financialApprovalStatus === 'pending' || existing.financialApprovalStatus === 'rejected');
+      const paidAmt = hasPendingOrRejectedFin
+        ? 0
+        : existing.totalPaid > 0
+        ? existing.totalPaid
+        : existing.registrationFee || (existing.category === 'current' ? 500 : 1500);
+
       const updates: Partial<RegistrationRecord> = {
         registrationApprovalStatus: 'approved',
+        paymentStatus: 'paid',
+        totalPaid: paidAmt,
         approvedBy: superAdminUser.name,
         approvedAt: new Date().toISOString(),
         approvalNotes: sanitizeInput(notes),
@@ -303,6 +314,7 @@ export class ManualRegistrationService {
 
       const updates: Partial<RegistrationRecord> = {
         registrationApprovalStatus: 'rejected',
+        paymentStatus: 'rejected' as any,
         rejectedBy: superAdminUser.name,
         rejectedAt: new Date().toISOString(),
         rejectionReason: cleanReason,
@@ -434,6 +446,7 @@ export class ManualRegistrationService {
         financialApprovalStatus: 'rejected',
         financialRejectedBy: superAdminUser.name,
         financialRejectedAt: new Date().toISOString(),
+        totalPaid: 0,
       };
 
       const updated = AppStore.updateRegistration(existing.id, updates, 2027);

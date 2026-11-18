@@ -484,8 +484,9 @@ export class AppStore {
   ): Promise<{
     success: boolean;
     verified: boolean;
+    status?: 'VERIFIED' | 'PENDING_APPROVAL' | 'REGISTRATION_REJECTED' | 'UNPAID' | 'TOKEN_MISMATCH' | 'NOT_FOUND' | 'GUARDIAN_NOT_REGISTERED' | 'NETWORK_ERROR' | 'INVALID_INPUT';
     student?: RegistrationRecord;
-    errorType?: 'NOT_FOUND' | 'UNPAID' | 'TOKEN_MISMATCH' | 'NETWORK_ERROR' | 'INVALID_INPUT';
+    errorType?: 'NOT_FOUND' | 'UNPAID' | 'TOKEN_MISMATCH' | 'NETWORK_ERROR' | 'INVALID_INPUT' | 'PENDING_APPROVAL' | 'REGISTRATION_REJECTED';
     error?: string;
   }> {
     if (!input || !input.trim()) {
@@ -494,27 +495,60 @@ export class AppStore {
     const clean = input.trim();
     const parsed = parseScannedInput(clean);
     const safeToken = tokenInput?.trim().toUpperCase() || parsed.token;
+    const isGuardian = Boolean(parsed.isGuardianPass || clean.toUpperCase().startsWith('PAR-') || (tokenInput && tokenInput.toUpperCase().startsWith('P-')));
 
     // 1. Instant check in local cache
     const local = this.findRegistration(clean);
     if (local) {
-      if (local.paymentStatus !== 'paid') {
+      if (isGuardian && !local.hasParent) {
         return {
           success: false,
           verified: false,
+          status: 'GUARDIAN_NOT_REGISTERED',
+          errorType: 'NOT_FOUND',
+          error: `Parent/Guardian pass not registered for student "${local.id}".`,
+        };
+      }
+      if (local.registrationApprovalStatus === 'pending') {
+        return {
+          success: false,
+          verified: false,
+          status: 'PENDING_APPROVAL',
+          errorType: 'PENDING_APPROVAL',
+          error: `PENDING APPROVAL: Manual registration "${local.id}" is awaiting Super Admin approval. QR Code is currently inactive.`,
+        };
+      }
+      if (local.registrationApprovalStatus === 'rejected') {
+        return {
+          success: false,
+          verified: false,
+          status: 'REGISTRATION_REJECTED',
+          errorType: 'REGISTRATION_REJECTED',
+          error: `REGISTRATION REJECTED: Registration "${local.id}" was rejected by Super Admin. Facility access denied.`,
+        };
+      }
+      if (local.paymentStatus !== 'paid' && local.registrationApprovalStatus !== 'approved') {
+        return {
+          success: false,
+          verified: false,
+          status: 'UNPAID',
           errorType: 'UNPAID',
           error: `Payment Pending: Registration "${local.id}" is in "${local.paymentStatus}" status.`,
         };
       }
-      if (safeToken && local.qrToken && local.qrToken.toUpperCase() !== safeToken) {
-        return {
-          success: false,
-          verified: false,
-          errorType: 'TOKEN_MISMATCH',
-          error: `Cryptographic QR token mismatch for registration "${local.id}".`,
-        };
+      if (safeToken && local.qrToken) {
+        const rawToken = safeToken.replace(/^P-/i, '');
+        if (local.qrToken.toUpperCase() !== safeToken && local.qrToken.toUpperCase() !== rawToken) {
+          return {
+            success: false,
+            verified: false,
+            status: 'TOKEN_MISMATCH',
+            errorType: 'TOKEN_MISMATCH',
+            error: `Cryptographic QR token mismatch for registration "${local.id}".`,
+          };
+        }
       }
-      return { success: true, verified: true, student: local };
+      return { success: true, verified: true, status: 'VERIFIED', student: local };
     }
 
     // 2. Authoritative verification via cloud
@@ -525,7 +559,11 @@ export class AppStore {
       if (!current.some((r) => r.id === cloudRes.student!.id)) {
         this.saveRegistrations([cloudRes.student, ...current]);
       }
-      return cloudRes;
+      return { ...cloudRes, status: 'VERIFIED' };
+    }
+
+    if ((cloudRes as any).errorType === 'PENDING_APPROVAL') {
+      return { ...cloudRes, status: 'PENDING_APPROVAL' };
     }
 
     // Fallback check against lookupRegistrationByIdOrToken (for test mocks)
@@ -537,7 +575,7 @@ export class AppStore {
           if (!current.some((r) => r.id === fallbackRecord.id)) {
             this.saveRegistrations([fallbackRecord, ...current]);
           }
-          return { success: true, verified: true, student: fallbackRecord };
+          return { success: true, verified: true, status: 'VERIFIED', student: fallbackRecord };
         }
       } catch (_) {}
     }

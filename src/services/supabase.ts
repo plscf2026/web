@@ -306,7 +306,7 @@ function toRegistrationDbRow(reg: RegistrationRecord, year: number = 2027) {
     id: reg.id,
     full_name: sanitizeInput(reg.fullName),
     full_name_bn: sanitizeInput(reg.fullNameBn || ''),
-    photo_url: photoUrl,
+    photo_url: photoUrl || '',
     photo_storage_path: photoStoragePath,
     mobile_number: sanitizeInput(reg.mobileNumber),
     email: sanitizeInput(reg.email),
@@ -560,8 +560,28 @@ export const REGISTRATION_SELECT_COLUMNS = [
   'notes',
   'year',
   'is_manual_registration',
+  'registration_type',
   'registration_approval_status',
-  'financial_approval_status'
+  'approval_notes',
+  'approved_by',
+  'approved_at',
+  'rejected_by',
+  'rejected_at',
+  'rejection_reason',
+  'created_by_admin_id',
+  'created_by_admin_name',
+  'financial_amount',
+  'financial_description',
+  'financial_method',
+  'financial_reference',
+  'financial_notes',
+  'financial_approval_status',
+  'financial_approved_by',
+  'financial_approved_at',
+  'financial_rejected_by',
+  'financial_rejected_at',
+  'document_url',
+  'document_name'
 ].join(',');
 
 export const SupabaseService = {
@@ -599,7 +619,24 @@ export const SupabaseService = {
     year: number = 2027
   ): Promise<{ success: boolean; table: string; error?: string }> {
     if (reg.paymentStatus === 'pending') {
-      // Invariant: Unpaid registrations are never persisted to Supabase database.
+      if (reg.isManualRegistration || reg.registrationType === 'manual_venue') {
+        // Authoritative: Venue manual registrations MUST be persisted to Supabase so Super Admin can review & approve across all devices
+        const yearTableName = getRegistrationsTableName(year);
+        const row = toRegistrationDbRow(reg, year);
+        try {
+          const { error } = await supabase.from(yearTableName).upsert(row, { onConflict: 'id' });
+          if (error) {
+            console.error('[SupabaseService] saveRegistration manual venue error:', error);
+            return { success: false, table: yearTableName, error: error.message };
+          }
+          this.clearRegistrationCache(year);
+          return { success: true, table: yearTableName };
+        } catch (err: any) {
+          console.error('[SupabaseService] saveRegistration manual venue exception:', err);
+          return { success: false, table: yearTableName, error: err.message };
+        }
+      }
+      // Invariant: Online unpaid registrations are never persisted to Supabase database.
       return { success: true, table: getRegistrationsTableName(year) };
     }
 
@@ -1444,8 +1481,25 @@ export const SupabaseService = {
             email: null,
             address: '',
             tShirtSize: 'L',
+            // Guardian / Accompanying Parent Details
+            hasParent: Boolean(s.hasParent),
+            parentName: s.parentName || undefined,
+            parentRelation: s.parentRelation || undefined,
+            parentPhone: s.parentPhone || undefined,
+            parentPhotoUrl: s.parentPhotoUrl || undefined,
+            isManualRegistration: Boolean(s.isManualRegistration),
+            registrationApprovalStatus: s.registrationApprovalStatus || 'approved',
           };
           return { success: true, verified: true, student: regRecord };
+        }
+
+        if (res.status === 'GUARDIAN_NOT_REGISTERED') {
+          return {
+            success: false,
+            verified: false,
+            errorType: 'NOT_FOUND',
+            error: res.error || `Parent/Guardian pass not registered for this student.`,
+          };
         }
 
         if (res.status === 'PENDING_APPROVAL') {

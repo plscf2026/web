@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   Clock,
   XCircle,
+  Lock,
 } from 'lucide-react';
 import { RegistrationRecord, Language } from '../types';
 import { translations } from '../i18n/translations';
@@ -461,21 +462,28 @@ export const TicketView: React.FC<TicketViewProps> = ({
             <div
               className={`p-3 bg-white rounded-2xl shadow-md border-2 inline-block relative ${
                 isPendingApproval
-                  ? 'border-amber-400 ring-2 ring-amber-200'
+                  ? 'border-amber-400 ring-4 ring-amber-100'
                   : isRejected
                   ? 'border-rose-400 opacity-60'
                   : 'border-slate-200'
               }`}
             >
-              <canvas ref={qrCanvasRef} className="rounded-lg" />
+              <canvas
+                ref={qrCanvasRef}
+                className={`rounded-lg ${
+                  isPendingApproval ? 'filter grayscale opacity-30 contrast-75' : ''
+                }`}
+              />
               {isPendingApproval && (
-                <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex flex-col items-center justify-center rounded-2xl p-2 text-center">
-                  <Clock className="w-7 h-7 text-amber-600 mb-1 animate-pulse" />
-                  <span className="text-[9px] font-black text-amber-900 uppercase tracking-tight">
-                    {language === 'bn' ? 'অযাচাইকৃত কিউআর' : 'INACTIVE QR'}
+                <div className="absolute inset-0 bg-white/80 backdrop-blur-[1.5px] flex flex-col items-center justify-center rounded-2xl p-2 text-center select-none">
+                  <div className="w-10 h-10 rounded-full bg-amber-100 border-2 border-amber-300 flex items-center justify-center mb-1.5 shadow-xs">
+                    <Lock className="w-5 h-5 text-amber-800" />
+                  </div>
+                  <span className="text-[10px] font-black text-amber-950 uppercase tracking-tight">
+                    {language === 'bn' ? 'কিউআর নিষ্ক্রিয়' : 'QR INACTIVE'}
                   </span>
-                  <span className="text-[8px] text-amber-800 font-semibold leading-tight">
-                    {language === 'bn' ? 'অনুমোদন বাকি' : 'Pending Approval'}
+                  <span className="text-[8px] text-amber-800 font-bold leading-tight mt-0.5">
+                    {language === 'bn' ? 'অনুমোদনের অপেক্ষায়' : 'Awaiting Approval'}
                   </span>
                 </div>
               )}
@@ -495,9 +503,18 @@ export const TicketView: React.FC<TicketViewProps> = ({
               </span>
             </div>
             {isPendingApproval ? (
-              <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-2.5 py-1 rounded-full border border-amber-300">
-                {language === 'bn' ? '⚠️ কিউআর কোড এখনো সক্রিয় নয়' : '⚠️ QR Code Inactive (Pending Approval)'}
-              </span>
+              <div className="flex flex-col items-center gap-1 max-w-[210px] mt-1">
+                <span className="text-[11px] text-rose-800 font-black bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-300 shadow-2xs text-center leading-tight">
+                  {language === 'bn'
+                    ? '⚠️ কিউআর কাজ করছে না — সুপার অ্যাডমিন অনুমোদনের অপেক্ষায়'
+                    : '⚠️ QR Code Not Working — Pending Super Admin Approval'}
+                </span>
+                <span className="text-[9px] text-slate-500 font-medium text-center">
+                  {language === 'bn'
+                    ? 'সুপার অ্যাডমিন অনুমতি দেওয়ার পর কিউআর সক্রিয় হবে'
+                    : 'QR will only become active after Super Admin permission'}
+                </span>
+              </div>
             ) : isRejected ? (
               <span className="text-[10px] text-rose-800 font-bold bg-rose-100 px-2.5 py-1 rounded-full border border-rose-300">
                 {language === 'bn' ? '❌ কিউআর অকার্যকর' : '❌ QR Code Deactivated'}
