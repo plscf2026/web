@@ -18,7 +18,8 @@ import { GlobalPagination } from '../common/GlobalPagination';
 import { paginate } from '../../utils/pagination';
 
 export const AuditHistoryTab: React.FC = () => {
-  const [history, setHistory] = useState<AdminAuditHistoryItem[]>([]);
+  const [history, setHistory] = useState<AdminAuditHistoryItem[]>(() => EventStore.getAuditHistory());
+  const [isSyncing, setIsSyncing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [entityFilter, setEntityFilter] = useState<string>('ALL');
 
@@ -31,14 +32,35 @@ export const AuditHistoryTab: React.FC = () => {
     setCurrentPage(1);
   }, [searchQuery, entityFilter]);
 
-  const loadHistory = () => {
-    const records = EventStore.getAuditHistory();
-    setHistory(records);
+  const loadHistory = async (forceRefresh = false) => {
+    setIsSyncing(true);
+    try {
+      const records = await EventStore.syncAuditHistoryWithSupabase(forceRefresh);
+      setHistory(records);
+    } catch {
+      setHistory(EventStore.getAuditHistory());
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   useEffect(() => {
-    loadHistory();
+    void loadHistory(true);
   }, []);
+
+  const formatDhakaTime = (ts: string) => {
+    try {
+      const d = ts ? new Date(ts) : null;
+      if (!d || isNaN(d.getTime())) return ts || '—';
+      return d.toLocaleString('en-US', {
+        timeZone: 'Asia/Dhaka',
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      });
+    } catch {
+      return ts || '—';
+    }
+  };
 
   const filteredHistory = history.filter((item) => {
     const matchesSearch =
@@ -132,11 +154,13 @@ export const AuditHistoryTab: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={loadHistory}
-            className="p-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors"
-            title="Refresh Audit Trail"
+            onClick={() => loadHistory(true)}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 px-3 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors disabled:opacity-60 cursor-pointer"
+            title="Sync Audit Trail directly with Supabase database"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-indigo-600' : ''}`} />
+            <span className="text-xs font-semibold">{isSyncing ? 'Syncing...' : 'Sync DB'}</span>
           </button>
           <button
             onClick={exportAuditCSV}
@@ -205,11 +229,7 @@ export const AuditHistoryTab: React.FC = () => {
                 </tr>
               ) : (
                 paginate(filteredHistory, currentPage, pageSize).map((item) => {
-                  const dhakaTime = new Date(item.timestamp).toLocaleString('en-US', {
-                    timeZone: 'Asia/Dhaka',
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                  });
+                  const dhakaTime = formatDhakaTime(item.timestamp);
                   return (
                     <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3 px-4 whitespace-nowrap text-xs text-slate-600">
@@ -285,11 +305,7 @@ export const AuditHistoryTab: React.FC = () => {
             </div>
           ) : (
             paginate(filteredHistory, currentPage, pageSize).map((item) => {
-              const dhakaTime = new Date(item.timestamp).toLocaleString('en-US', {
-                timeZone: 'Asia/Dhaka',
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              });
+              const dhakaTime = formatDhakaTime(item.timestamp);
               return (
                 <div key={`mobile-audit-${item.id}`} className="bg-slate-50/70 rounded-2xl p-4 border border-slate-200 shadow-xs space-y-2.5">
                   <div className="flex items-start justify-between gap-2">

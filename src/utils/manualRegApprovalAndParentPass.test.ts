@@ -1,19 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ManualRegistrationService } from '../services/manualRegistrationService';
-import { SupabaseService } from '../services/supabase';
 import { AppStore } from '../services/store';
-import { AdminAccount, RegistrationRecord } from '../types';
+import { AdminAccount } from '../types';
 
 test('Manual Registration Cross-Device Persistence, Deactivated QR & Parent Pass Verification', async (t) => {
   const superAdmin: AdminAccount = {
     id: 'ADM-SUPER-01',
     username: 'superadmin',
     fullName: 'Spider-Man Super Admin',
+    email: 'superadmin@plscf.edu.bd',
     role: 'super_admin',
-    department: 'central_admin',
-    permissions: ['VIEW', 'SCAN', 'VERIFY', 'APPROVE', 'REJECT', 'EXPORT', 'MANAGE'],
-    isActive: true,
     createdAt: new Date().toISOString(),
   };
 
@@ -21,12 +18,13 @@ test('Manual Registration Cross-Device Persistence, Deactivated QR & Parent Pass
     id: 'ADM-VENUE-01',
     username: 'venuedesk',
     fullName: 'Venue Desk Admin',
-    role: 'receptionist',
-    department: 'gate_security',
-    permissions: ['VIEW', 'SCAN', 'VERIFY'],
-    isActive: true,
+    email: 'venuedesk@plscf.edu.bd',
+    role: 'registration_officer',
     createdAt: new Date().toISOString(),
   };
+
+  const deskUser = { id: deskAdmin.id, name: deskAdmin.fullName };
+  const superUser = { id: superAdmin.id, name: superAdmin.fullName };
 
   let manualRegId = '';
   let manualQrToken = '';
@@ -44,7 +42,7 @@ test('Manual Registration Cross-Device Persistence, Deactivated QR & Parent Pass
         parentRelation: 'Father',
         parentPhone: '01811223344',
       },
-      deskAdmin
+      deskUser
     );
 
     assert.equal(res.success, true);
@@ -74,7 +72,7 @@ test('Manual Registration Cross-Device Persistence, Deactivated QR & Parent Pass
   await t.test('3. Super Admin approves registration -> Sets status APPROVED & PAID', async () => {
     const approveRes = await ManualRegistrationService.approveRegistration(
       manualRegId,
-      superAdmin,
+      superUser,
       'Approved at venue by Spider-Man'
     );
 
@@ -116,14 +114,14 @@ test('Manual Registration Cross-Device Persistence, Deactivated QR & Parent Pass
         tShirtSize: 'M',
         hasParent: false,
       },
-      deskAdmin
+      deskUser
     );
     assert.equal(soloRes.success, true);
     const soloId = soloRes.registration!.id;
     const soloToken = soloRes.registration!.qrToken;
 
     // Approve the solo student
-    await ManualRegistrationService.approveRegistration(soloId, superAdmin);
+    await ManualRegistrationService.approveRegistration(soloId, superUser);
 
     // Student themselves scans fine
     const studentVerify = await AppStore.verifyStudentTicketAsync(soloId, soloToken, 'GATE_SCANNER_01');

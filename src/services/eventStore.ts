@@ -2023,8 +2023,142 @@ export class EventStore {
     };
     const updated = [newEntry, ...history].slice(0, 500);
     saveData(KEY_AUDIT_HISTORY, updated);
-    supabase.from('admin_audit_history').insert(newEntry).then(undefined, () => { });
+
+    // Persist to Supabase database with snake_case and camelCase compatibility
+    const dbRow = {
+      id: newEntry.id,
+      admin_id: newEntry.adminId,
+      admin_name: newEntry.adminName,
+      entity_type: newEntry.entityType,
+      entity_id: newEntry.entityId,
+      action: newEntry.action,
+      previous_value: newEntry.previousValue || null,
+      new_value: newEntry.newValue || null,
+      reason: newEntry.reason,
+      timestamp: newEntry.timestamp,
+      adminId: newEntry.adminId,
+      adminName: newEntry.adminName,
+      entityType: newEntry.entityType,
+      entityId: newEntry.entityId,
+      previousValue: newEntry.previousValue || null,
+      newValue: newEntry.newValue || null,
+    };
+
+    supabase
+      .from('admin_audit_history')
+      .insert(dbRow)
+      .then(
+        (res) => {
+          if (res.error) {
+            console.warn('[EventStore] admin_audit_history insert notice:', res.error);
+          }
+        },
+        (err: unknown) => {
+          console.warn('[EventStore] admin_audit_history insert error:', err);
+        }
+      );
+
+    // Also mirror to admin_audit_logs for global system trace
+    supabase
+      .from('admin_audit_logs')
+      .insert({
+        id: `AUDIT-${newEntry.id}`,
+        admin_id: newEntry.adminId,
+        admin_username: newEntry.adminName,
+        admin_role: 'admin',
+        action: newEntry.action,
+        target_type: newEntry.entityType,
+        target_id: newEntry.entityId,
+        details: `${newEntry.action} on ${newEntry.entityType} (${newEntry.entityId}): ${newEntry.reason}`,
+        created_at: newEntry.timestamp,
+      })
+      .then(undefined, () => {});
+
     return newEntry;
+  }
+
+  /**
+   * Authoritatively fetch and synchronize audit trail from Supabase database.
+   * Calls rpc_fetch_unified_audit_trail to pull unified events from
+   * admin_audit_history, admin_audit_logs, and financial_audit_logs.
+   */
+  static async syncAuditHistoryWithSupabase(_forceRefresh = false): Promise<AdminAuditHistoryItem[]> {
+    try {
+      // 1. Authoritative RPC query
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('rpc_fetch_unified_audit_trail', {
+        p_limit: 400,
+      });
+
+      if (!rpcErr && Array.isArray(rpcData) && rpcData.length > 0) {
+        const unified: AdminAuditHistoryItem[] = rpcData.map((d: any) => ({
+          id: d.id,
+          adminId: d.adminId || d.admin_id || 'ADMIN',
+          adminName: d.adminName || d.admin_name || 'Administrator',
+          entityType: (d.entityType || d.entity_type || 'REGISTRATION') as any,
+          entityId: d.entityId || d.entity_id || 'ID',
+          action: d.action || 'OPERATION',
+          previousValue: d.previousValue || d.previous_value || undefined,
+          newValue: d.newValue || d.new_value || undefined,
+          reason: d.reason || '',
+          timestamp: d.timestamp || new Date().toISOString(),
+        }));
+
+        // Merge with local uncommitted records if any
+        const local = this.getAuditHistory();
+        const dbIds = new Set(unified.map((u) => u.id));
+        const merged = [...unified];
+        for (const loc of local) {
+          if (!dbIds.has(loc.id)) {
+            merged.push(loc);
+            // Backfill to database
+            supabase.from('admin_audit_history').insert({
+              id: loc.id,
+              admin_id: loc.adminId,
+              admin_name: loc.adminName,
+              entity_type: loc.entityType,
+              entity_id: loc.entityId,
+              action: loc.action,
+              previous_value: loc.previousValue || null,
+              new_value: loc.newValue || null,
+              reason: loc.reason,
+              timestamp: loc.timestamp,
+            }).then(undefined, () => {});
+          }
+        }
+
+        saveData(KEY_AUDIT_HISTORY, merged.slice(0, 500));
+        return merged;
+      }
+
+      // 2. Direct table fallback if RPC fails
+      const { data: rows, error: tblErr } = await supabase
+        .from('admin_audit_history')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(300);
+
+      if (!tblErr && Array.isArray(rows) && rows.length > 0) {
+        const mapped: AdminAuditHistoryItem[] = rows.map((r: any) => ({
+          id: r.id,
+          adminId: r.admin_id || r.adminId || 'ADMIN',
+          adminName: r.admin_name || r.adminName || 'Administrator',
+          entityType: (r.entity_type || r.entityType || 'REGISTRATION') as any,
+          entityId: r.entity_id || r.entityId || 'ID',
+          action: r.action || 'OPERATION',
+          previousValue: r.previous_value || r.previousValue || undefined,
+          newValue: r.new_value || r.newValue || undefined,
+          reason: r.reason || '',
+          timestamp: r.timestamp || new Date().toISOString(),
+        }));
+
+        saveData(KEY_AUDIT_HISTORY, mapped);
+        return mapped;
+      }
+    } catch (err) {
+      console.warn('[EventStore] syncAuditHistoryWithSupabase notice:', err);
+    }
+
+    return this.getAuditHistory();
   }
 
   // ==========================================
