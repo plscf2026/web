@@ -363,6 +363,7 @@ export class UserManagementService {
       assignedStation?: string;
       permissions: StaffPermissionAction[];
       authUserId?: string;
+      initialPassword?: string;
     },
     adminSession: AdminAccount
   ): Promise<{ success: boolean; userId?: string; error?: string }> {
@@ -377,6 +378,7 @@ export class UserManagementService {
         p_assigned_station: payload.assignedStation?.trim() || null,
         p_permissions: payload.permissions,
         p_auth_user_id: payload.authUserId?.trim() || null,
+        p_initial_password: payload.initialPassword?.trim() || null,
         p_admin_id: adminSession.id,
         p_admin_name: adminSession.fullName || adminSession.username,
       });
@@ -397,6 +399,44 @@ export class UserManagementService {
     }
 
     return { success: false, error: 'Unknown creation error' };
+  }
+
+  /**
+   * Authoritatively set or update password for any user directly in Supabase Auth
+   */
+  static async setUserPassword(
+    email: string,
+    newPassword: string,
+    adminSession: AdminAccount
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (!newPassword || newPassword.trim().length < 6) {
+        return { success: false, error: 'Password must be at least 6 characters long.' };
+      }
+
+      const { data, error } = await supabase.rpc('rpc_set_user_password', {
+        p_email: email.trim().toLowerCase(),
+        p_new_password: newPassword.trim(),
+        p_admin_id: adminSession.id,
+        p_admin_name: adminSession.fullName || adminSession.username,
+      });
+
+      if (!error && data?.success) {
+        return { success: true };
+      }
+
+      if (data?.error) {
+        return { success: false, error: data.error };
+      }
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update user password' };
+    }
+
+    return { success: true };
   }
 
   /**

@@ -3,8 +3,6 @@ import assert from 'node:assert/strict';
 import {
   UserManagementService,
   UnifiedSystemUser,
-  RoleCategory,
-  UserStatus,
 } from '../services/userManagementService';
 
 const mockUsers: UnifiedSystemUser[] = [
@@ -192,4 +190,19 @@ test('Role category filtering filters users strictly to their assigned group', (
   const staffOnly = mockUsers.filter((u) => u.roleCategory === 'STAFF');
   assert.equal(staffOnly.length, 2);
   assert.ok(staffOnly.every((u) => u.roleCategory === 'STAFF'));
+});
+
+test('setUserPassword rejects passwords shorter than 6 characters', async () => {
+  const adminAccount = {
+    id: 'admin-001',
+    fullName: 'Super Administrator',
+    username: 'admin',
+    email: 'admin@gmail.com',
+    role: 'super_admin' as const,
+    createdAt: new Date().toISOString(),
+  };
+
+  const shortRes = await UserManagementService.setUserPassword('test@gmail.com', '123', adminAccount);
+  assert.strictEqual(shortRes.success, false);
+  assert.match(shortRes.error || '', /at least 6 characters/i);
 });

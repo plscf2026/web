@@ -18,7 +18,6 @@ import {
   Activity,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
   Crown,
   DollarSign,
   Briefcase,
@@ -29,6 +28,8 @@ import {
   Mail,
   Building,
   MapPin,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { AdminAccount, Language, StaffPermissionAction } from '../../types';
 import {
@@ -83,6 +84,13 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Password Management State
+  const [passwordModalUser, setPasswordModalUser] = useState<UnifiedSystemUser | null>(null);
+  const [directNewPassword, setDirectNewPassword] = useState('');
+  const [directConfirmPassword, setDirectConfirmPassword] = useState('');
+  const [showDirectPassword, setShowDirectPassword] = useState(false);
+  const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
+
   // Create Form State
   const [createForm, setCreateForm] = useState({
     userType: 'STAFF' as UserType,
@@ -94,7 +102,9 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
     assignedStation: 'Gate 01 - Main Entrance',
     permissions: ['VIEW', 'SCAN', 'VERIFY', 'APPROVE'] as StaffPermissionAction[],
     authUserId: '',
+    initialPassword: '',
   });
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
 
   // Edit Form State
   const [editForm, setEditForm] = useState({
@@ -106,6 +116,9 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
     assignedStation: '',
     permissions: [] as StaffPermissionAction[],
   });
+  const [editPassword, setEditPassword] = useState('');
+  const [confirmEditPassword, setConfirmEditPassword] = useState('');
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
     setFeedbackNotice({ type, message });
@@ -240,6 +253,7 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
       assignedStation: defaultType === 'ADMIN' ? 'Super Admin Command Center' : 'Operational Booth 01',
       permissions: ['VIEW', 'SCAN', 'VERIFY', 'APPROVE'],
       authUserId: '',
+      initialPassword: '',
     });
     setIsCreateModalOpen(true);
   };
@@ -249,6 +263,11 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
     e.preventDefault();
     if (!createForm.fullName.trim() || !createForm.username.trim() || !createForm.email.trim()) {
       showNotification('error', 'Please fill in all mandatory fields.');
+      return;
+    }
+
+    if (createForm.initialPassword && createForm.initialPassword.trim().length < 6) {
+      showNotification('error', 'Initial password must be at least 6 characters long.');
       return;
     }
 
@@ -265,6 +284,7 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
           assignedStation: createForm.assignedStation,
           permissions: createForm.permissions,
           authUserId: createForm.authUserId || undefined,
+          initialPassword: createForm.initialPassword.trim() || undefined,
         },
         currentAdmin
       );
@@ -275,6 +295,18 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
           `Successfully created ${createForm.userType} user "${createForm.fullName}" with role ${createForm.role}!`
         );
         setIsCreateModalOpen(false);
+        setCreateForm({
+          userType: 'STAFF',
+          fullName: '',
+          username: '',
+          email: '',
+          role: 'GATE_STAFF',
+          department: 'GATE',
+          assignedStation: 'Gate 01 - Main Entrance',
+          permissions: ['VIEW', 'SCAN', 'VERIFY', 'APPROVE'],
+          authUserId: '',
+          initialPassword: '',
+        });
         await loadUsers();
       } else {
         showNotification('error', res.error || 'Failed to create user account.');
@@ -298,12 +330,26 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
       assignedStation: user.assignedStation,
       permissions: user.permissions || [],
     });
+    setEditPassword('');
+    setConfirmEditPassword('');
+    setShowEditPassword(false);
   };
 
   // Execute Edit User
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
+
+    if (editPassword.trim()) {
+      if (editPassword.trim().length < 6) {
+        showNotification('error', 'New password must be at least 6 characters long.');
+        return;
+      }
+      if (editPassword !== confirmEditPassword) {
+        showNotification('error', 'New passwords do not match.');
+        return;
+      }
+    }
 
     setIsSubmitting(true);
     try {
@@ -323,13 +369,32 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
         'Profile update via User & Access Management portal'
       );
 
-      if (res.success) {
-        showNotification('success', `Updated profile for "${editForm.fullName}".`);
-        setEditingUser(null);
-        await loadUsers();
-      } else {
+      if (!res.success) {
         showNotification('error', res.error || 'Failed to update user profile.');
+        setIsSubmitting(false);
+        return;
       }
+
+      // If new password provided, update directly in Supabase Auth
+      if (editPassword.trim()) {
+        const pwRes = await UserManagementService.setUserPassword(
+          editForm.email,
+          editPassword.trim(),
+          currentAdmin
+        );
+        if (!pwRes.success) {
+          showNotification('error', `Profile saved, but password update failed: ${pwRes.error}`);
+          await loadUsers();
+          return;
+        }
+      }
+
+      showNotification(
+        'success',
+        `Updated profile for "${editForm.fullName}"${editPassword.trim() ? ' and password changed successfully' : ''}.`
+      );
+      setEditingUser(null);
+      await loadUsers();
     } catch (err: any) {
       showNotification('error', err?.message || 'Update failed.');
     } finally {
@@ -370,7 +435,53 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
     }
   };
 
-  // Password Reset Trigger
+  // Open Direct Password Modal
+  const handleOpenPasswordModal = (user: UnifiedSystemUser) => {
+    setPasswordModalUser(user);
+    setDirectNewPassword('');
+    setDirectConfirmPassword('');
+    setShowDirectPassword(false);
+  };
+
+  // Direct Password Update Execution
+  const handleExecuteDirectPasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordModalUser) return;
+    if (directNewPassword.length < 6) {
+      showNotification('error', 'Password must be at least 6 characters long.');
+      return;
+    }
+    if (directNewPassword !== directConfirmPassword) {
+      showNotification('error', 'Passwords do not match.');
+      return;
+    }
+
+    setIsPasswordSubmitting(true);
+    try {
+      const res = await UserManagementService.setUserPassword(
+        passwordModalUser.email,
+        directNewPassword.trim(),
+        currentAdmin
+      );
+      if (res.success) {
+        showNotification(
+          'success',
+          `Password successfully updated in Supabase Auth for "${passwordModalUser.fullName}" (${passwordModalUser.email}).`
+        );
+        setPasswordModalUser(null);
+        setDirectNewPassword('');
+        setDirectConfirmPassword('');
+      } else {
+        showNotification('error', res.error || 'Failed to update user password.');
+      }
+    } catch (err: any) {
+      showNotification('error', err?.message || 'Password update failed.');
+    } finally {
+      setIsPasswordSubmitting(false);
+    }
+  };
+
+  // Password Reset Trigger via Email
   const handleResetPassword = async (user: UnifiedSystemUser) => {
     const confirmed = window.confirm(
       `Send official password reset email to ${user.fullName} (${user.email})?`
@@ -861,9 +972,9 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                               {/* Reset Password */}
                               <button
                                 type="button"
-                                onClick={() => handleResetPassword(u)}
+                                onClick={() => handleOpenPasswordModal(u)}
                                 className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition cursor-pointer"
-                                title="Reset User Password"
+                                title="Set / Reset User Password"
                               >
                                 <Key className="w-3.5 h-3.5" />
                               </button>
@@ -998,10 +1109,10 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleResetPassword(u)}
+                        onClick={() => handleOpenPasswordModal(u)}
                         className="px-3 py-1.5 rounded-xl bg-indigo-100 text-indigo-800 text-xs font-bold"
                       >
-                        Reset Pwd
+                        Password
                       </button>
                       <button
                         type="button"
@@ -1200,12 +1311,33 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                 />
               </div>
 
-              {/* Notice */}
-              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2.5">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>
-                  Passwords are authenticated securely via Supabase Auth. Enter the user's Auth UID if already created, or invite them via email.
-                </span>
+              {/* Account Password */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  {language === 'bn' ? 'অ্যাকাউন্ট পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর) *' : 'ACCOUNT LOGIN PASSWORD (MIN 6 CHARACTERS) *'}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showCreatePassword ? 'text' : 'password'}
+                    required
+                    value={createForm.initialPassword}
+                    onChange={(e) => setCreateForm({ ...createForm, initialPassword: e.target.value })}
+                    placeholder="Enter login password (e.g. Staff@2027)"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-bold pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCreatePassword(!showCreatePassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showCreatePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  {language === 'bn'
+                    ? '🔒 পাসওয়ার্ডটি সরাসরি সুপাবেস অথ এ এনক্রিপ্ট হবে এবং ইউজার অবিলম্বে লগইন করতে পারবে।'
+                    : '🔒 The password is encrypted in Supabase Auth and the user can sign in immediately.'}
+                </p>
               </div>
 
               {/* Buttons */}
@@ -1359,6 +1491,54 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                       );
                     }
                   )}
+                </div>
+              </div>
+
+              {/* Security & Password Credentials */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="font-black text-slate-800 flex items-center gap-1.5 uppercase tracking-wider text-xs">
+                    <Key className="w-4 h-4 text-indigo-600" />
+                    {language === 'bn' ? 'পাসওয়ার্ড পরিবর্তন করুন (ঐচ্ছিক)' : 'CHANGE ACCOUNT PASSWORD (OPTIONAL)'}
+                  </label>
+                  <span className="text-[10px] text-slate-500 font-semibold">
+                    {language === 'bn' ? 'পরিবর্তন না করতে চাইলে ফাঁকা রাখুন' : 'Leave blank to keep unchanged'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                      {language === 'bn' ? 'নতুন পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)' : 'New Password (min 6 characters)'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showEditPassword ? 'text' : 'password'}
+                        value={editPassword}
+                        onChange={(e) => setEditPassword(e.target.value)}
+                        placeholder="Enter new password"
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs pr-9"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEditPassword(!showEditPassword)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        {showEditPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                      {language === 'bn' ? 'পাসওয়ার্ড নিশ্চিত করুন' : 'Confirm New Password'}
+                    </label>
+                    <input
+                      type={showEditPassword ? 'text' : 'password'}
+                      value={confirmEditPassword}
+                      onChange={(e) => setConfirmEditPassword(e.target.value)}
+                      placeholder="Repeat new password"
+                      className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1521,6 +1701,112 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
               >
                 Close Audit View
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 9. MODAL: DIRECT PASSWORD MANAGEMENT & CREDENTIAL DISPATCH                */}
+      {/* ========================================================================= */}
+      {passwordModalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    {language === 'bn' ? 'ইউজার পাসওয়ার্ড সেট / রিসেট' : 'Set or Reset User Password'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {passwordModalUser.fullName} • <span className="font-mono text-indigo-600 font-semibold">{passwordModalUser.email}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPasswordModalUser(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleExecuteDirectPasswordChange} className="space-y-4 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 block">
+                  {language === 'bn' ? 'সরাসরি নতুন পাসওয়ার্ড দিন *' : 'ENTER NEW PASSWORD DIRECTLY *'}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showDirectPassword ? 'text' : 'password'}
+                    required
+                    value={directNewPassword}
+                    onChange={(e) => setDirectNewPassword(e.target.value)}
+                    placeholder="Min 6 characters (e.g. Admin@2027)"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-bold pr-10 text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDirectPassword(!showDirectPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showDirectPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 block">
+                  {language === 'bn' ? 'পাসওয়ার্ড নিশ্চিত করুন *' : 'CONFIRM NEW PASSWORD *'}
+                </label>
+                <input
+                  type={showDirectPassword ? 'text' : 'password'}
+                  required
+                  value={directConfirmPassword}
+                  onChange={(e) => setDirectConfirmPassword(e.target.value)}
+                  placeholder="Repeat new password"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-bold text-xs"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isPasswordSubmitting}
+                className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-md cursor-pointer disabled:opacity-60 transition"
+              >
+                {isPasswordSubmitting
+                  ? (language === 'bn' ? 'আপডেট হচ্ছে...' : 'Updating Password...')
+                  : (language === 'bn' ? '🔒 সরাসরি পাসওয়ার্ড আপডেট করুন' : '🔒 Set Password in Supabase Now')}
+              </button>
+            </form>
+
+            <div className="relative flex items-center justify-center my-2">
+              <div className="border-t border-slate-200 w-full" />
+              <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase">
+                {language === 'bn' ? 'অথবা' : 'OR'}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const target = passwordModalUser;
+                  setPasswordModalUser(null);
+                  handleResetPassword(target);
+                }}
+                className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Mail className="w-4 h-4 text-indigo-600" />
+                <span>{language === 'bn' ? '📧 ইমেইলে পাসওয়ার্ড রিসেট লিংক পাঠান' : '📧 Send Password Reset Link to Email'}</span>
+              </button>
+              <p className="text-[10px] text-slate-400 text-center">
+                Dispatches a secure Supabase Auth recovery link to {passwordModalUser.email}.
+              </p>
             </div>
           </div>
         </div>
