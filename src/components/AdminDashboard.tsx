@@ -94,6 +94,7 @@ import { paginate } from '../utils/pagination';
 import { ErrorBoundary } from './common/ErrorBoundary';
 import { ManualRegistrationTab } from './admin/manual/ManualRegistrationTab';
 import { ManualApprovalTab } from './admin/manual/ManualApprovalTab';
+import { UserAccessManagementTab } from './admin/UserAccessManagementTab';
 import { AdminStudentPhotoModal } from './admin/photos/AdminStudentPhotoModal';
 import { ThankYouCardModal } from './ThankYouCardModal';
 // Heavy administrative portals loaded lazily to preserve bundle performance
@@ -296,6 +297,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // ==========================================
   type AdminTab =
     | 'reunionManagement'
+    | 'userAccessManagement'
     | 'idCardManagement'
     | 'manualRegistration'
     | 'manualApproval'
@@ -1399,6 +1401,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       highlight: true,
       badge: 'ERP 2027',
     },
+    ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('userAccessManagement' as any)
+      ? [
+          {
+            id: 'userAccessManagement' as const,
+            label: language === 'bn' ? '👥 ইউজার ও এক্সেস ম্যানেজমেন্ট' : '👥 User & Access Management',
+            icon: Users,
+            highlight: true,
+            badge: 'RBAC Suite',
+          },
+        ]
+      : []),
     {
       id: 'idCardManagement',
       label: language === 'bn' ? '🪪 আইডি কার্ড পোর্টাল' : '🪪 Student ID Cards',
@@ -1656,6 +1669,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <span className="text-xs font-black text-slate-900 truncate block">
                   {activeTab === 'reunionManagement'
                     ? (language === 'bn' ? '🏛️ পুনর্মিলনী ইআরপি (RMS)' : '🏛️ Reunion Management (RMS)')
+                    : activeTab === 'userAccessManagement'
+                    ? (language === 'bn' ? '👥 ইউজার ও এক্সেস ম্যানেজমেন্ট' : '👥 User & Access Management')
                     : activeTab === 'idCardManagement'
                     ? (language === 'bn' ? '🪪 আইডি কার্ড পোর্টাল' : '🪪 Student ID Cards')
                     : activeTab === 'manualRegistration'
@@ -1739,6 +1754,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {activeTab === 'manualApproval' && isSuperAdmin && (
         <ErrorBoundary>
           <ManualApprovalTab
+            language={language}
+            currentAdmin={effectiveAdmin}
+          />
+        </ErrorBoundary>
+      )}
+
+      {/* TAB: CENTRALIZED ROLE-BASED USER MANAGEMENT DASHBOARD (SUPER ADMIN EXCLUSIVE) */}
+      {activeTab === 'userAccessManagement' && isSuperAdmin && (
+        <ErrorBoundary>
+          <UserAccessManagementTab
             language={language}
             currentAdmin={effectiveAdmin}
           />

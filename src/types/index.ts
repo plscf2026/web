@@ -299,6 +299,7 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
     iconName: 'Crown',
     defaultTab: 'masterOverview',
     allowedTabs: [
+      'userAccessManagement',
       'masterOverview',
       'gateManagement',
       'manualApproval',
