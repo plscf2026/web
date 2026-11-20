@@ -648,7 +648,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Explicit refresh from Supabase cloud database (e.g. when user clicks Refresh button)
   const refreshAll = async () => {
-    await fetchSupabaseRegistrationsForYear(selectedYear, true);
+    await Promise.allSettled([
+      fetchSupabaseRegistrationsForYear(selectedYear, true),
+      EventStore.syncDistributionsWithSupabase(),
+    ]);
     SupabaseService.fetchDonations(selectedYear).then((res) => {
       if (res.data && res.data.length > 0) {
         setDonations(res.data);

@@ -121,15 +121,16 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
 
     const student = verifyRes.student;
     playScanSuccessSound();
-    const inside = EventStore.isStudentCurrentlyInside(student.id);
-    setScannedStudent(student);
+    const liveStatus = student.gateStatus || (EventStore.isStudentCurrentlyInside(student.id) ? 'ENTRY' : (student.isCheckedIn ? 'ENTRY' : 'NOT_ENTERED'));
+    const inside = liveStatus === 'ENTRY';
+    setScannedStudent({ ...student, gateStatus: liveStatus as any, isCheckedIn: inside });
     setIsInside(inside);
     setActionNotice(null);
     setIsResultPopupOpen(true);
   };
 
   // Perform Entry or Back (Exit)
-  const handleGateAction = (eventType: 'ENTRY' | 'BACK') => {
+  const handleGateAction = async (eventType: 'ENTRY' | 'BACK') => {
     if (!scannedStudent) return;
 
     // Check Department RBAC permission
@@ -152,7 +153,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
       return;
     }
 
-    const res = EventStore.recordGateEvent(
+    const res = await EventStore.confirmGateScanAsync(
       scannedStudent.id,
       scannedStudent.fullName,
       scannedStudent.batchName,
@@ -168,8 +169,9 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
     if (res.success && res.event) {
       playScanSuccessSound();
       refreshEvents();
-      const updatedInside = EventStore.isStudentCurrentlyInside(scannedStudent.id);
+      const updatedInside = eventType === 'ENTRY';
       setIsInside(updatedInside);
+      setScannedStudent((prev) => (prev ? { ...prev, isCheckedIn: updatedInside, gateStatus: eventType } : null));
       setActionNotice({
         type: 'success',
         message: `SUCCESS: ${scannedStudent.fullName} marked as ${eventType} (${eventType === 'ENTRY' ? 'GREEN' : 'RED'}) at ${new Date().toLocaleTimeString()}.`,

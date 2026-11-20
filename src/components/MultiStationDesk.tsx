@@ -162,11 +162,11 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
   const dressRecord = scannedStudent ? EventStore.getDressStatus(scannedStudent.id) : undefined;
 
   // Gate Action
-  const handleGateAction = (type: 'ENTRY' | 'BACK' | 'EXIT') => {
+  const handleGateAction = async (type: 'ENTRY' | 'BACK' | 'EXIT') => {
     if (!scannedStudent) return;
     const gateId = activeStation === 'GATE_02' ? 'Gate 02 - East Gate' : 'Gate 01 - Main Entrance';
 
-    const res = EventStore.recordGateEvent(
+    const res = await EventStore.confirmGateScanAsync(
       scannedStudent.id,
       scannedStudent.fullName,
       scannedStudent.batchName,
@@ -182,6 +182,8 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
     if (res.success) {
       playScanSuccessSound();
       refreshAllState();
+      const nextInside = type === 'ENTRY';
+      setScannedStudent((prev) => (prev ? { ...prev, isCheckedIn: nextInside, gateStatus: type === 'ENTRY' ? 'ENTRY' : 'BACK' } : null));
       setActionNotice({
         type: 'success',
         message: `${type === 'ENTRY' ? 'ENTRY APPROVED (GREEN)' : 'BACK RECORDED (RED)'} for ${scannedStudent.fullName}`,

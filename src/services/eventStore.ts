@@ -1315,6 +1315,20 @@ export class EventStore {
         console.warn('[EventStore] Supabase gate event insert notice:', err);
       });
 
+    // Atomically synchronize attendance flag and gate status in Supabase database
+    supabase
+      .from('registrations_2027')
+      .update({
+        is_checked_in: isEntry,
+        gate_status: canonicalEventType,
+      })
+      .eq('id', registrationId)
+      .then(undefined, (err) => {
+        console.warn('[EventStore] Supabase registration gate_status update notice:', err);
+      });
+
+    SupabaseService.clearRegistrationCache(2027);
+
     // Atomically synchronize attendance check-in status on student registration
     AppStore.updateRegistration(
       registrationId,
@@ -1326,6 +1340,13 @@ export class EventStore {
       window.dispatchEvent(new CustomEvent('plscf_gate_sync', { detail: newEvent }));
       window.dispatchEvent(new Event('plscf_registration_updated'));
     }
+
+    this.broadcastStationEvent('plscf_gate_sync', {
+      regId: registrationId,
+      isInside: isEntry,
+      gateStatus: canonicalEventType,
+      event: newEvent,
+    });
 
     return { success: true, event: newEvent };
   }
@@ -1377,6 +1398,7 @@ export class EventStore {
         };
         const existing = this.getGateEvents();
         this.saveGateEvents([newEvent, ...existing]);
+        SupabaseService.clearRegistrationCache(2027);
         AppStore.updateRegistration(
           registrationId,
           { isCheckedIn: isEntry, gateStatus: canonicalEventType },
@@ -1386,6 +1408,12 @@ export class EventStore {
           window.dispatchEvent(new CustomEvent('plscf_gate_sync', { detail: newEvent }));
           window.dispatchEvent(new Event('plscf_registration_updated'));
         }
+        this.broadcastStationEvent('plscf_gate_sync', {
+          regId: registrationId,
+          isInside: isEntry,
+          gateStatus: canonicalEventType,
+          event: newEvent,
+        });
         return { success: true, event: newEvent };
       }
 

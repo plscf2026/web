@@ -335,6 +335,7 @@ function toRegistrationDbRow(reg: RegistrationRecord, year: number = 2027) {
     qr_token: reg.qrToken,
     is_tshirt_collected: reg.isTShirtCollected ?? false,
     is_checked_in: reg.isCheckedIn ?? false,
+    gate_status: reg.gateStatus || (reg.isCheckedIn ? 'ENTRY' : 'NOT_ENTERED'),
     gender: reg.gender || 'male',
     blood_group: reg.bloodGroup || null,
     has_parent: reg.hasParent ?? false,
@@ -443,6 +444,7 @@ function fromRegistrationDbRow(row: any): RegistrationRecord {
     qrToken: row.qr_token || row.qrToken || `${row.id}-TOKEN`,
     isTShirtCollected: Boolean(row.is_tshirt_collected ?? row.isTShirtCollected ?? false),
     isCheckedIn: Boolean(row.is_checked_in ?? row.isCheckedIn ?? false),
+    gateStatus: (row.gate_status || row.gateStatus || (row.is_checked_in ? 'ENTRY' : 'NOT_ENTERED')) as any,
     notes: row.notes || undefined,
     year: Number(row.year || 2027),
     isDemo: Boolean(row.is_demo ?? false),
@@ -557,6 +559,7 @@ export const REGISTRATION_SELECT_COLUMNS = [
   'qr_token',
   'is_tshirt_collected',
   'is_checked_in',
+  'gate_status',
   'notes',
   'year',
   'is_manual_registration',
@@ -1476,6 +1479,8 @@ export const SupabaseService = {
             transactionId: '',
             paymentMethod: 'bkash',
             isTShirtCollected: false,
+            isCheckedIn: Boolean(s.isCheckedIn ?? s.isInside ?? (s.gateStatus === 'ENTRY')),
+            gateStatus: (s.gateStatus || (s.isCheckedIn || s.isInside ? 'ENTRY' : 'NOT_ENTERED')) as any,
             // STRICT PRIVACY: Zero PII returned to scanner clients
             mobileNumber: '',
             email: null,
@@ -2386,6 +2391,7 @@ export const SupabaseService = {
       });
 
       if (!error && data && data.success) {
+        this.clearRegistrationCache(2027);
         return { success: true, isInside, gateStatus: eventType };
       }
 
@@ -2399,6 +2405,7 @@ export const SupabaseService = {
       });
 
       if (!confirmRes.error && confirmRes.data?.success) {
+        this.clearRegistrationCache(2027);
         return { success: true, isInside, gateStatus: eventType };
       }
 
@@ -2422,6 +2429,7 @@ export const SupabaseService = {
           status: 'APPROVED',
         });
 
+      this.clearRegistrationCache(2027);
       return { success: true, isInside, gateStatus: eventType };
     } catch (err: any) {
       console.warn('[SupabaseService] toggleGateAttendance notice:', err);
