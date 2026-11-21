@@ -44,6 +44,8 @@ import { PayStationService } from '../services/paystation';
 import { StudentPhotoStorageService, extractStoragePathFromPublicUrl } from '../services/studentPhotoStorageService';
 import { StudentIdCardRecord } from '../types/idcard';
 import { SynchronizedCameraCardModal } from './idcard/SynchronizedCameraCardModal';
+import { VoiceAssistant, RegistrationStepKey } from '../services/voiceRegistrationAssistant';
+import { VoiceAssistantPanel, FieldVoiceButton } from './voice/VoiceAssistantPanel';
 
 interface RegistrationPageProps {
   language: Language;
@@ -146,6 +148,32 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
       setIsSubmitting(false);
     }
   }, [isProcessingPayment]);
+
+  // Active Field Tracking for Voice Assistant & Visual Highlighting (Requirement 7 & 9)
+  const [activeStep, setActiveStep] = useState<RegistrationStepKey>('welcome');
+
+  // Initialize Voice Assistant on mount and handle automatic welcome (Requirement 2 & 6)
+  useEffect(() => {
+    VoiceAssistant.initialize(language);
+
+    if (lastRegisteredName) {
+      VoiceAssistant.speakStep('thankYou');
+    } else {
+      const timer = setTimeout(() => {
+        VoiceAssistant.playWelcome();
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+
+    return () => {
+      VoiceAssistant.stopSpeaking(false);
+    };
+  }, []);
+
+  // Synchronize Voice Assistant language on change
+  useEffect(() => {
+    VoiceAssistant.setLanguage(language);
+  }, [language]);
 
   // Comprehensive form reset — clears all input fields, previews, file input, and state
   const resetForm = () => {
@@ -375,6 +403,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           delete next.photoUrl;
           return next;
         });
+        VoiceAssistant.speakFieldCompletion('photoUrl', 'mobileNumber');
+        setActiveStep('mobileNumber');
       } else {
         const message =
           uploadRes.error ||
@@ -509,6 +539,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
         setParentPhotoStoragePath(uploadRes.storagePath);
         setParentPhotoSizeKb(Math.round((uploadRes.sizeBytes || 0) / 1024) || sizeKb);
         clearValidationError('parentPhotoUrl');
+        VoiceAssistant.speakFieldCompletion('parentPhotoUrl', 'parentAge');
+        setActiveStep('parentAge');
       } else {
         const message =
           uploadRes.error ||
@@ -587,6 +619,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           delete next.studentId;
           setValidationErrors(next);
         }
+        VoiceAssistant.speakFieldCompletion('academicInfo', 'tShirtSize');
+        setActiveStep('tShirtSize');
       }
     }, 150);
   };
@@ -686,10 +720,31 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
         field?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         field?.focus({ preventScroll: true });
       });
+
+      // Intelligent Missing Field Voice Announcement (Requirement 4)
+      const stepMap: Record<string, RegistrationStepKey> = {
+        fullName: 'fullName',
+        photoUrl: 'photoUrl',
+        mobileNumber: 'mobileNumber',
+        bloodGroup: 'bloodGroup',
+        passingYear: 'academicInfo',
+        studentId: 'academicInfo',
+        currentClass: 'academicInfo',
+        parentName: 'parentName',
+        parentPhotoUrl: 'parentPhotoUrl',
+        parentAge: 'parentAge',
+        parentPhone: 'parentPhone',
+        tShirtSize: 'tShirtSize',
+        termsAccepted: 'termsAccepted',
+      };
+      const targetStep = stepMap[firstInvalidField] || 'fullName';
+      setActiveStep(targetStep);
+      VoiceAssistant.speakMissingField(targetStep);
       return;
     }
 
     setValidationErrors({});
+    VoiceAssistant.speakStep('allCompleted');
     onInitiatePayment(formData, fees);
   };
 
@@ -793,10 +848,15 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
       <form onSubmit={handleSubmit} className="space-y-8" noValidate>
         {/* Category Selector Card - RAW FORM tokens */}
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#E2EEF8]">
-          <label className="block text-sm font-bold text-[#0F172A] mb-3">
-            {t.categoryLabel} *
-          </label>
+        <div className={`bg-white rounded-3xl p-6 shadow-sm border border-[#E2EEF8] transition-all ${
+          activeStep === 'category' ? 'ring-2 ring-indigo-500/30' : ''
+        }`}>
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-sm font-bold text-[#0F172A]">
+              {t.categoryLabel} *
+            </label>
+            <FieldVoiceButton stepKey="category" />
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button
               type="button"
@@ -809,6 +869,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   delete next.studentId;
                   setValidationErrors(next);
                 }
+                VoiceAssistant.speakFieldCompletion('category', 'fullName');
+                setActiveStep('fullName');
               }}
               className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
                 category === 'former'
@@ -840,6 +902,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   delete next.currentClass;
                   setValidationErrors(next);
                 }
+                VoiceAssistant.speakFieldCompletion('category', 'fullName');
+                setActiveStep('fullName');
               }}
               className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
                 category === 'current'
@@ -875,15 +939,37 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Full Name */}
-            <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                {t.fullNameLabel} <span className="text-rose-600">*</span>
-              </label>
+            <div className={`md:col-span-2 p-3.5 rounded-2xl transition-all ${
+              activeStep === 'fullName' ? 'ring-2 ring-indigo-500/30 bg-indigo-50/15' : ''
+            }`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <span>{t.fullNameLabel}</span>
+                  <span className="text-rose-600">*</span>
+                  {fullName.trim().length >= 2 && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      <span>{language === 'bn' ? 'পূরণ হয়েছে' : 'Filled'}</span>
+                    </span>
+                  )}
+                </label>
+                <FieldVoiceButton stepKey="fullName" />
+              </div>
               <input
                 name="fullName"
                 aria-invalid={Boolean(validationErrors.fullName)}
                 type="text"
                 value={fullName}
+                onFocus={() => {
+                  setActiveStep('fullName');
+                  VoiceAssistant.speakStep('fullName', false);
+                }}
+                onBlur={() => {
+                  if (fullName.trim().length >= 2 && activeStep === 'fullName') {
+                    VoiceAssistant.speakFieldCompletion('fullName', 'gender');
+                    setActiveStep('gender');
+                  }
+                }}
                 onChange={(e) => {
                   setFullName(e.target.value);
                   clearValidationError('fullName');
@@ -904,14 +990,24 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             </div>
 
             {/* Gender Selection */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                {language === 'bn' ? 'লিঙ্গ / Gender' : 'Gender'} <span className="text-rose-600">*</span>
-              </label>
+            <div className={`p-3.5 rounded-2xl transition-all ${
+              activeStep === 'gender' ? 'ring-2 ring-indigo-500/30 bg-indigo-50/15' : ''
+            }`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <span>{language === 'bn' ? 'লিঙ্গ / Gender' : 'Gender'}</span>
+                  <span className="text-rose-600">*</span>
+                </label>
+                <FieldVoiceButton stepKey="gender" />
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => setGender('male')}
+                  onClick={() => {
+                    setGender('male');
+                    VoiceAssistant.speakFieldCompletion('gender', 'bloodGroup');
+                    setActiveStep('bloodGroup');
+                  }}
                   className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     gender === 'male'
                       ? 'border-[#172554] bg-[#172554] text-white shadow-xs'
@@ -923,7 +1019,11 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setGender('female')}
+                  onClick={() => {
+                    setGender('female');
+                    VoiceAssistant.speakFieldCompletion('gender', 'bloodGroup');
+                    setActiveStep('bloodGroup');
+                  }}
                   className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     gender === 'female'
                       ? 'border-pink-600 bg-pink-600 text-white shadow-xs'
@@ -937,20 +1037,39 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             </div>
 
             {/* Blood Group Selection */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                <Droplet className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                <span>{language === 'bn' ? 'রক্তের গ্রুপ (Blood Group)' : 'Blood Group'}</span>
-                <span className="text-rose-600">*</span>
-              </label>
+            <div className={`p-3.5 rounded-2xl transition-all ${
+              activeStep === 'bloodGroup' ? 'ring-2 ring-indigo-500/30 bg-indigo-50/15' : ''
+            }`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Droplet className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span>{language === 'bn' ? 'রক্তের গ্রুপ (Blood Group)' : 'Blood Group'}</span>
+                  <span className="text-rose-600">*</span>
+                  {bloodGroup && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      <span>{language === 'bn' ? 'পূরণ হয়েছে' : 'Filled'}</span>
+                    </span>
+                  )}
+                </label>
+                <FieldVoiceButton stepKey="bloodGroup" />
+              </div>
               <div>
                 <select
                   name="bloodGroup"
                   aria-invalid={Boolean(validationErrors.bloodGroup)}
                   value={bloodGroup}
+                  onFocus={() => {
+                    setActiveStep('bloodGroup');
+                    VoiceAssistant.speakStep('bloodGroup', false);
+                  }}
                   onChange={(e) => {
                     setBloodGroup(e.target.value);
                     clearValidationError('bloodGroup');
+                    if (e.target.value) {
+                      VoiceAssistant.speakFieldCompletion('bloodGroup', 'photoUrl');
+                      setActiveStep('photoUrl');
+                    }
                   }}
                   className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
                     validationErrors.bloodGroup
@@ -975,15 +1094,27 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             </div>
 
             {/* Profile Photo Upload & Live Camera Capture (Requirement 4) */}
-            <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
-                <span>
-                  {t.photoLabel} <span className="text-rose-600">*</span>
-                </span>
-                <span className="text-[10px] text-sky-700 font-medium bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
-                  {language === 'bn' ? 'সর্বোচ্চ ২০০ কেবিতে কম্প্রেসড হবে' : 'Auto-compressed to ≤ 200 KB'}
-                </span>
-              </label>
+            <div className={`md:col-span-2 p-3.5 rounded-2xl transition-all ${
+              activeStep === 'photoUrl' ? 'ring-2 ring-indigo-500/30 bg-indigo-50/15' : ''
+            }`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <span>{t.photoLabel}</span>
+                  <span className="text-rose-600">*</span>
+                  {photoUrl && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      <span>{language === 'bn' ? 'আপলোড সম্পন্ন' : 'Uploaded'}</span>
+                    </span>
+                  )}
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-sky-700 font-medium bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
+                    {language === 'bn' ? 'সর্বোচ্চ ২০০ কেবিতে কম্প্রেসড হবে' : 'Auto-compressed to ≤ 200 KB'}
+                  </span>
+                  <FieldVoiceButton stepKey="photoUrl" />
+                </div>
+              </div>
 
               <div
                 data-validation-field="photoUrl"
@@ -1107,10 +1238,22 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             />
 
             {/* Mobile number must be unique for each registration */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                {t.mobileLabel} <span className="text-rose-600">*</span>
-              </label>
+            <div className={`p-3.5 rounded-2xl transition-all ${
+              activeStep === 'mobileNumber' ? 'ring-2 ring-indigo-500/30 bg-indigo-50/15' : ''
+            }`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <span>{t.mobileLabel}</span>
+                  <span className="text-rose-600">*</span>
+                  {mobileNumber.length === 11 && mobileNumber.startsWith('01') && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      <span>{language === 'bn' ? 'সঠিক নম্বর' : 'Verified'}</span>
+                    </span>
+                  )}
+                </label>
+                <FieldVoiceButton stepKey="mobileNumber" />
+              </div>
               <div className="relative">
                 <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
@@ -1119,6 +1262,10 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   type="tel"
                   inputMode="tel"
                   value={mobileNumber}
+                  onFocus={() => {
+                    setActiveStep('mobileNumber');
+                    VoiceAssistant.speakStep('mobileNumber', false);
+                  }}
                   onChange={(e) => {
                     const raw = e.target.value;
                     const normalized = normalizeBangladeshiMobileNumber(raw);
@@ -1147,6 +1294,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                     } else if (cleaned.length === 11 && cleaned.startsWith('01')) {
                       // Full length & correct prefix — clear any error
                       clearValidationError('mobileNumber');
+                      VoiceAssistant.speakFieldCompletion('mobileNumber', 'academicInfo');
+                      setActiveStep('academicInfo');
                     } else if (validationErrors.mobileNumber && cleaned.startsWith('01')) {
                       // Prefix is now correct, clear the prefix error while still typing
                       clearValidationError('mobileNumber');
@@ -1189,7 +1338,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             </div>
 
             {/* Email Address - COMPLETELY OPTIONAL */}
-            <div>
+            <div className="p-3.5 rounded-2xl">
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-semibold text-slate-700">
                   {t.emailLabel}{' '}
@@ -1197,9 +1346,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                     ({language === 'bn' ? 'ঐচ্ছিক' : 'Optional'})
                   </span>
                 </label>
-                <span className="text-[10px] text-slate-400">
-                  {language === 'bn' ? 'ইমেইল ছাড়াও টিকিট সংগ্রহ সম্ভব' : 'Ticket available without email'}
-                </span>
+                <FieldVoiceButton stepKey="email" />
               </div>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -1230,10 +1377,13 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             </div>
 
             {/* Address */}
-            <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                {t.addressLabel}
-              </label>
+            <div className="md:col-span-2 p-3.5 rounded-2xl">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700">
+                  {t.addressLabel}
+                </label>
+                <FieldVoiceButton stepKey="address" />
+              </div>
               <div className="relative">
                 <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
@@ -1582,12 +1732,17 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
 
         {/* Section 2: Academic Information & Current Student ID Verification */}
-        <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <GraduationCap className="w-5 h-5 text-[#263B8C]" />
-            <h2 className="text-lg font-bold text-slate-900">
-              {t.academicInfoHeading}
-            </h2>
+        <div className={`bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6 transition-all ${
+          activeStep === 'academicInfo' ? 'ring-2 ring-indigo-500/30' : ''
+        }`}>
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <GraduationCap className="w-5 h-5 text-[#263B8C]" />
+              <h2 className="text-lg font-bold text-slate-900">
+                {t.academicInfoHeading}
+              </h2>
+            </div>
+            <FieldVoiceButton stepKey="academicInfo" />
           </div>
 
           {/* CURRENT STUDENT SPECIFIC: MANDATORY VERIFIED STUDENT ID */}
@@ -1729,17 +1884,33 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               /* Former Student: Graduation / Last Attended Year is MANDATORY */
               <>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    {language === 'bn' ? 'পাস বা অধ্যয়নের শেষ বছর *' : 'Graduation / Last Attended Year *'}{' '}
-                    <span className="text-rose-600">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                      <span>{language === 'bn' ? 'পাস বা অধ্যয়নের শেষ বছর *' : 'Graduation / Last Attended Year *'}</span>
+                      <span className="text-rose-600">*</span>
+                      {passingYear && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>{language === 'bn' ? 'বাছাই হয়েছে' : 'Selected'}</span>
+                        </span>
+                      )}
+                    </label>
+                  </div>
                   <select
                     name="passingYear"
                     aria-invalid={Boolean(validationErrors.passingYear)}
                     value={passingYear}
+                    onFocus={() => {
+                      setActiveStep('academicInfo');
+                      VoiceAssistant.speakStep('academicInfo', false);
+                    }}
                     onChange={(e) => {
                       setPassingYear(e.target.value);
                       clearValidationError('passingYear');
+                      if (e.target.value) {
+                        VoiceAssistant.speakFieldCompletion('academicInfo', 'tShirtSize');
+                        setActiveStep('tShirtSize');
+                      }
                     }}
                     className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
                       validationErrors.passingYear
@@ -1882,11 +2053,19 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
         </div>
 
         {/* Section 3: T-shirt Selection */}
-        <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-4">
+        <div
+          data-validation-field="tShirtSize"
+          className={`bg-white rounded-2xl p-6 sm:p-8 shadow-sm border transition-all ${
+            activeStep === 'tShirtSize'
+              ? 'border-indigo-400 ring-2 ring-indigo-500/20 shadow-indigo-100'
+              : 'border-slate-200'
+          } space-y-4`}
+        >
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
               <Shirt className="w-5 h-5 text-[#263B8C]" />
               <h2 className="text-lg font-bold text-slate-900">{t.tshirtHeading}</h2>
+              <FieldVoiceButton stepKey="tShirtSize" />
             </div>
             <button
               type="button"
@@ -1901,8 +2080,6 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           <p className="text-xs text-slate-600">{t.tshirtDesc}</p>
 
           <div
-            data-validation-field="tShirtSize"
-            aria-invalid={Boolean(validationErrors.tShirtSize)}
             tabIndex={-1}
             className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-3"
           >
@@ -1913,6 +2090,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                 onClick={() => {
                   setTShirtSize(size);
                   clearValidationError('tShirtSize');
+                  VoiceAssistant.speakFieldCompletion('tShirtSize', 'termsAccepted');
+                  setActiveStep('termsAccepted');
                 }}
                 className={`py-3 px-2 rounded-xl border-2 font-bold text-sm transition-all cursor-pointer ${
                   tShirtSize === size
@@ -1938,6 +2117,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <Heart className="w-5 h-5 text-rose-600" />
             <h2 className="text-lg font-bold text-slate-900">{t.donationHeading}</h2>
+            <FieldVoiceButton stepKey="donation" />
           </div>
           <p className="text-xs text-slate-600">{t.donationDesc}</p>
 
@@ -2015,7 +2195,18 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           </div>
 
           {/* Terms checkbox */}
-          <div className="pt-2">
+          <div
+            data-validation-field="termsAccepted"
+            className={`pt-2 rounded-xl p-2 transition-all ${
+              activeStep === 'termsAccepted' ? 'ring-2 ring-indigo-400/50 bg-white/5' : ''
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                <span>{language === 'bn' ? 'শর্তাবলী সম্মতি' : 'Terms & Conditions'}</span>
+                <FieldVoiceButton stepKey="termsAccepted" />
+              </span>
+            </div>
             <label className="flex items-start gap-3 cursor-pointer select-none">
               <input
                 name="termsAccepted"
@@ -2023,12 +2214,17 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                 type="checkbox"
                 checked={termsAccepted}
                 onChange={(e) => {
-                  setTermsAccepted(e.target.checked);
+                  const checked = e.target.checked;
+                  setTermsAccepted(checked);
                   clearValidationError('termsAccepted');
                   if (validationErrors.termsAccepted) {
                     const next = { ...validationErrors };
                     delete next.termsAccepted;
                     setValidationErrors(next);
+                  }
+                  if (checked) {
+                    VoiceAssistant.speakFieldCompletion('termsAccepted', 'allCompleted');
+                    setActiveStep('allCompleted');
                   }
                 }}
                 className="mt-1 w-4 h-4 rounded border-slate-700 text-[#263B8C] focus:ring-[#263B8C]"
@@ -2124,6 +2320,9 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           </div>
         </div>
       )}
+
+      {/* Floating Bengali Voice Assistant Controller */}
+      <VoiceAssistantPanel />
     </div>
   );
 };
