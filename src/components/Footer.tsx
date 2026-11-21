@@ -344,7 +344,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
             </div>
 
             {/* Dedicated Role Portals: 6 Separate Portals for Each User Role */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {/* 1. Super Admin */}
               <button
                 type="button"
@@ -469,55 +469,66 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
                   </p>
                 </div>
               </button>
-            </div>
 
-            {/* Field Staff Station Bar with Expandable Popover */}
-            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-slate-900/60 border border-slate-800 relative mb-4">
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>
-                  {language === 'bn'
-                    ? 'অন-সাইট ফিল্ড স্ক্যানার স্টেশন (গেট, ফুড, টি-শার্ট ও কার্ড ম্যানেজমেন্ট)'
-                    : 'On-Site Field Scanner Stations (Gate, Lunch, Kit & ID Card Scanners)'}
-                </span>
-              </div>
-
-              {/* Smart Staff Button with Expandable Popover / Dropdown */}
+              {/* 6. Field Scanner Stations */}
               <div className="relative" ref={staffMenuRef}>
                 <button
                   type="button"
                   onClick={() => setIsStaffOpen((prev) => !prev)}
+                  className={`group flex flex-col justify-between p-3.5 rounded-xl transition-all text-left cursor-pointer shadow-md w-full h-full ${
+                    isStaffOpen
+                      ? 'bg-rose-950/90 border border-rose-500 shadow-rose-950/60'
+                      : 'bg-slate-900/90 hover:bg-slate-800/90 border border-rose-500/30 hover:border-rose-400 hover:shadow-rose-950/40'
+                  }`}
+                  title="Field Scanner Stations • Gate, Meal, Dress & ID Card Desk"
                   aria-expanded={isStaffOpen}
                   aria-haspopup="true"
-                  className={`group flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all cursor-pointer text-xs font-bold ${
-                    isStaffOpen
-                      ? 'bg-rose-950 text-rose-300 border border-rose-500/80 shadow-rose-950/50'
-                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-                  }`}
-                  title="Staff Stations • Gate, Meal, Dress, Card Desk"
                 >
-                  <QrCode className="w-3.5 h-3.5 text-rose-400" />
-                  <span>{language === 'bn' ? 'ফিল্ড স্ক্যানার স্টেশনসমূহ' : 'Field Scanner Stations'}</span>
-                  <ChevronDown
-                    className={`w-3.5 h-3.5 text-rose-400 transition-transform duration-200 ${
-                      isStaffOpen ? 'rotate-180' : ''
-                    }`}
-                  />
+                  <div className="flex items-center justify-between gap-1.5 mb-2">
+                    <div className="w-7 h-7 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 group-hover:scale-105 transition-transform">
+                      <QrCode className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-rose-300/80 bg-rose-900/30 px-2 py-0.5 rounded-full border border-rose-800/40 flex items-center gap-1">
+                      <span>Scanner</span>
+                      <ChevronDown
+                        className={`w-3 h-3 text-rose-400 transition-transform duration-200 ${
+                          isStaffOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </span>
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold text-white group-hover:text-rose-200 transition-colors">
+                      {language === 'bn' ? '৬. ফিল্ড স্ক্যানার' : '6. Field Scanner'}
+                    </h5>
+                    <p className="text-[11px] text-slate-400 leading-tight mt-0.5">
+                      {language === 'bn' ? 'গেট ও ফিল্ড স্টেশনসমূহ' : 'Gate & Meal Stations'}
+                    </p>
+                  </div>
                 </button>
 
-                {/* Smart Popover for the 5 Staff Stations */}
+                {/* Smart Popover for the Field Staff Stations */}
                 {isStaffOpen && (
-                  <div className="absolute right-0 sm:right-auto sm:left-0 lg:right-0 lg:left-auto bottom-full mb-3 w-80 sm:w-96 bg-[#0B132B] border-2 border-rose-500/60 rounded-2xl shadow-2xl p-3.5 z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl">
+                  <div className="absolute right-0 bottom-full mb-3 w-80 sm:w-96 bg-[#0B132B] border-2 border-rose-500/60 rounded-2xl shadow-2xl p-3.5 z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl">
                     <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-800">
                       <div className="flex items-center gap-2">
                         <Layers className="w-4 h-4 text-rose-400" />
                         <span className="text-xs font-bold text-white uppercase tracking-wider">
-                          {language === 'bn' ? 'অপারেশনাল স্টাফ স্টেশন (৫টি)' : 'Operational Staff Stations (5)'}
+                          {language === 'bn' ? 'অপারেশনাল স্টাফ স্টেশন' : 'Operational Staff Stations'}
                         </span>
                       </div>
-                      <span className="text-[10px] text-rose-300 font-mono bg-rose-950/80 px-2 py-0.5 rounded border border-rose-800/60 font-bold">
-                        ONE-CLICK DISPATCH
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsStaffOpen(false);
+                          handleDirectPortalNav('scanner');
+                        }}
+                        className="text-[10px] text-rose-300 font-mono bg-rose-950/80 hover:bg-rose-900/90 px-2 py-0.5 rounded border border-rose-800/60 font-bold transition-colors cursor-pointer flex items-center gap-1"
+                        title="Open Scanner Portal Direct"
+                      >
+                        <QrCode className="w-3 h-3 text-rose-300" />
+                        <span>PORTAL ↗</span>
+                      </button>
                     </div>
 
                     <div className="space-y-2">
