@@ -219,6 +219,8 @@ export interface FeeSettings {
 
 export type HomePageSectionId =
   | 'hero'
+  | 'featureCards'
+  | 'pillarsRibbon'
   | 'countdown'
   | 'status'
   | 'fees'
@@ -234,6 +236,8 @@ export interface HomePageSectionSetting {
 
 export const DEFAULT_HOME_PAGE_SECTIONS: HomePageSectionSetting[] = [
   { id: 'hero', visible: true },
+  { id: 'featureCards', visible: true },
+  { id: 'pillarsRibbon', visible: true },
   { id: 'countdown', visible: true },
   { id: 'status', visible: true },
   { id: 'fees', visible: true },
@@ -242,6 +246,34 @@ export const DEFAULT_HOME_PAGE_SECTIONS: HomePageSectionSetting[] = [
   { id: 'gallery', visible: true },
   { id: 'committee', visible: true },
 ];
+
+export function reconcileHomePageSections(
+  saved?: HomePageSectionSetting[] | null
+): HomePageSectionSetting[] {
+  if (!Array.isArray(saved) || saved.length === 0) {
+    return [...DEFAULT_HOME_PAGE_SECTIONS];
+  }
+  const knownIds = new Set<HomePageSectionId>();
+  const reconciled: HomePageSectionSetting[] = [];
+
+  for (const item of saved) {
+    if (item && DEFAULT_HOME_PAGE_SECTIONS.some((def) => def.id === item.id)) {
+      if (!knownIds.has(item.id)) {
+        reconciled.push({ id: item.id, visible: item.visible !== false });
+        knownIds.add(item.id);
+      }
+    }
+  }
+
+  for (const def of DEFAULT_HOME_PAGE_SECTIONS) {
+    if (!knownIds.has(def.id)) {
+      reconciled.push({ id: def.id, visible: true });
+      knownIds.add(def.id);
+    }
+  }
+
+  return reconciled;
+}
 
 export type PortalRole =
   | 'super_admin'

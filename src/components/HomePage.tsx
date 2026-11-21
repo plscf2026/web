@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Calendar,
   MapPin,
@@ -35,7 +35,8 @@ import {
   RegistrationRecord,
   DonationRecord,
   HomePageSectionId,
-  DEFAULT_HOME_PAGE_SECTIONS,
+  HomePageSectionSetting,
+  reconcileHomePageSections,
 } from '../types';
 import { translations } from '../i18n/translations';
 import { AppStore } from '../services/store';
@@ -67,12 +68,13 @@ export const HomePage: React.FC<HomePageProps> = ({
   const t = translations[language];
   const registrations = AppStore.getRegistrations();
   const notices = AppStore.getNotices();
-  const homePageSections = feeSettings.homePageSections?.length
-    ? feeSettings.homePageSections
-    : DEFAULT_HOME_PAGE_SECTIONS;
+  const homePageSections = useMemo(
+    () => reconcileHomePageSections(feeSettings.homePageSections),
+    [feeSettings.homePageSections]
+  );
 
   const getHomePageSectionStyle = (sectionId: HomePageSectionId): React.CSSProperties => {
-    const index = homePageSections.findIndex((section) => section.id === sectionId);
+    const index = homePageSections.findIndex((section: HomePageSectionSetting) => section.id === sectionId);
     const section = homePageSections[index];
     return {
       display: section?.visible === false ? 'none' : 'block',
@@ -364,7 +366,10 @@ export const HomePage: React.FC<HomePageProps> = ({
       </div>
 
       {/* THREE MAIN FEATURE CARDS */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 w-full -mt-6">
+      <section
+        className="max-w-6xl mx-auto px-4 sm:px-6 w-full -mt-6"
+        style={getHomePageSectionStyle('featureCards')}
+      >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Card 1: Latest Notices */}
           <div className="bg-white rounded-2xl shadow-md border border-[#E2EEF8] overflow-hidden flex flex-col">
@@ -538,7 +543,10 @@ export const HomePage: React.FC<HomePageProps> = ({
       </section>
 
       {/* BOTTOM NAVY WAVE RIBBON */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 w-full -mt-6">
+      <section
+        className="max-w-6xl mx-auto px-4 sm:px-6 w-full -mt-6"
+        style={getHomePageSectionStyle('pillarsRibbon')}
+      >
         <div className="relative overflow-hidden rounded-3xl bg-[#0F172A] text-white p-6 sm:p-8 shadow-xl border border-[#0284C7]/30">
           {/* Subtle watermark illustration of campus */}
           <div className="absolute right-0 bottom-0 top-0 w-96 opacity-15 pointer-events-none overflow-hidden">

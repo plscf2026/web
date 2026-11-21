@@ -7,6 +7,7 @@ import {
   FeeSettings,
   ScanLog,
   DEFAULT_HOME_PAGE_SECTIONS,
+  reconcileHomePageSections,
 } from '../types';
 import { SupabaseService, supabase } from './supabase';
 import { isValidSixCharToken, generateUniqueSixCharToken, findRegistrationByTokenOrId, parseScannedInput } from '../utils/tokenGenerator';
@@ -657,7 +658,11 @@ export class AppStore {
   }
 
   static getFeeSettings(): FeeSettings {
-    return getStored<FeeSettings>(STORAGE_KEY_SETTINGS, INITIAL_FEE_SETTINGS);
+    const settings = getStored<FeeSettings>(STORAGE_KEY_SETTINGS, INITIAL_FEE_SETTINGS);
+    return {
+      ...settings,
+      homePageSections: reconcileHomePageSections(settings.homePageSections),
+    };
   }
 
   static getActiveEventYear(): number {

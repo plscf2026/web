@@ -58,6 +58,7 @@ import {
   HomePageSectionId,
   HomePageSectionSetting,
   DEFAULT_HOME_PAGE_SECTIONS,
+  reconcileHomePageSections,
   PortalRole,
   normalizePortalRole,
   getPortalRoleFromSlug,
@@ -522,7 +523,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     Boolean(feeSettings.simulateEventCompleted)
   );
   const [homePageSectionsInput, setHomePageSectionsInput] = useState<HomePageSectionSetting[]>(
-    () => feeSettings.homePageSections || DEFAULT_HOME_PAGE_SECTIONS
+    () => reconcileHomePageSections(feeSettings.homePageSections)
   );
   const [endDateInput, setEndDateInput] = useState(feeSettings.endDate || '2026-12-15');
   const [hideDonationAmountsInput, setHideDonationAmountsInput] = useState<boolean>(
@@ -645,7 +646,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setClosedMessageBnInput(freshSettings.closedMessageBn || '');
     setEventTargetDateInput(freshSettings.eventTargetDate || '2027-01-29T09:00:00');
     setSimulateEventCompletedInput(Boolean(freshSettings.simulateEventCompleted));
-    setHomePageSectionsInput(freshSettings.homePageSections || DEFAULT_HOME_PAGE_SECTIONS);
+    setHomePageSectionsInput(reconcileHomePageSections(freshSettings.homePageSections));
     setEndDateInput(freshSettings.endDate || '2026-12-15');
   };
 
@@ -771,14 +772,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const genuineRegistrations = registrationsForYear.filter((r) => !r.isDemo);
   const financial = calculateFinancialSummary(genuineRegistrations, donations, expenses);
   const homePageSectionLabels: Record<HomePageSectionId, string> = {
-    hero: 'Main event banner',
-    countdown: 'Countdown',
-    status: 'Registration status lookup',
-    fees: 'Registration fees',
-    financials: 'Financial Transparency Dashboard',
-    notices: 'Latest notices',
-    gallery: 'Photo and video preview',
-    committee: 'Organizing committee',
+    hero: language === 'bn' ? 'মূল ইভেন্ট ব্যানার (Main event banner)' : 'Main event banner',
+    featureCards: language === 'bn' ? 'কুইক ফিচার কার্ডসমূহ (Quick Feature Cards)' : 'Quick Feature Cards (Notices, Gallery, Helpdesk)',
+    pillarsRibbon: language === 'bn' ? 'পুনর্মিলনী বার্তা ও ক্যাম্পাস রিবন' : 'Reunion Core Pillars & Campus Ribbon',
+    countdown: language === 'bn' ? 'কাউন্টডাউন (Countdown)' : 'Countdown',
+    status: language === 'bn' ? 'নিবন্ধন স্ট্যাটাস অনুসন্ধান (Registration status lookup)' : 'Registration status lookup',
+    fees: language === 'bn' ? 'নিবন্ধন ফি (Registration fees)' : 'Registration fees',
+    financials: language === 'bn' ? 'আর্থিক স্বচ্ছতা ড্যাশবোর্ড (Financial Transparency Dashboard)' : 'Financial Transparency Dashboard',
+    notices: language === 'bn' ? 'সর্বশেষ নোটিশ (Latest notices)' : 'Latest notices',
+    gallery: language === 'bn' ? 'ফটো ও ভিডিও প্রিভিউ (Photo and video preview)' : 'Photo and video preview',
+    committee: language === 'bn' ? 'আয়োজক পরিচালনা কমিটি (Organizing committee)' : 'Organizing committee',
   };
 
   const uniqueBatches = Array.from(
@@ -3143,13 +3146,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  Home page sections
-                </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Hide sections or change their display order, then save the settings.
-                </p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    Home page sections
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Hide sections or change their display order, then save the settings.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHomePageSectionsInput([...DEFAULT_HOME_PAGE_SECTIONS])}
+                  className="px-2.5 py-1 text-[11px] font-semibold text-[#0284C7] hover:text-[#0EA5E9] border border-slate-200 hover:border-sky-300 rounded-lg bg-white transition cursor-pointer self-start sm:self-auto shadow-2xs"
+                >
+                  {language === 'bn' ? 'ডিফল্ট সাজান' : 'Reset to Default Order'}
+                </button>
               </div>
               <ol className="space-y-2">
                 {homePageSectionsInput.map((section, index) => (
