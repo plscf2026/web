@@ -37,7 +37,7 @@ const NotFoundPage = lazy(() => import('./components/common/NotFoundPage').then(
 
 const PageLoadingFallback = () => (
   <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center" role="status" aria-label="Loading page">
-    <div className="w-12 h-12 rounded-full border-4 border-emerald-100 border-t-emerald-600 animate-spin mb-4 shadow-xs" />
+    <div className="w-12 h-12 rounded-full border-4 border-[#E2EEF8] border-t-[#0284C7] animate-spin mb-4 shadow-xs" />
     <p className="text-sm font-semibold text-slate-600 animate-pulse tracking-wide">Loading...</p>
   </div>
 );
@@ -84,7 +84,7 @@ export default function App() {
 
     // Role-based session isolation: returning to public Home Page terminates administrative/staff sessions
     if (view === 'home' && (activeView === 'dashboard' || activeView === 'admin' || activeView === 'login' || activeView === 'scanner')) {
-      SupabaseService.terminateAdministrativeSession({ forceLocal: true }).catch(() => {});
+      SupabaseService.terminateAdministrativeSession({ forceLocal: true }).catch(() => { });
     }
 
     if (extraParams?.role) {
@@ -119,7 +119,7 @@ export default function App() {
     const handlePopState = () => {
       const resolved = resolveRouteFromLocation();
       if (resolved.view === 'home') {
-        SupabaseService.terminateAdministrativeSession({ forceLocal: true }).catch(() => {});
+        SupabaseService.terminateAdministrativeSession({ forceLocal: true }).catch(() => { });
       }
       setActiveView(resolved.view);
       setCurrentPortalRole(resolved.portalRole);
@@ -152,7 +152,7 @@ export default function App() {
     try {
       const raw = localStorage.getItem('plscf_registration_draft');
       if (raw) return JSON.parse(raw);
-    } catch {}
+    } catch { }
     const session = PayStationService.getPendingSession();
     return session?.formData || null;
   });
@@ -176,7 +176,7 @@ export default function App() {
 
   // Synchronize registrations bidirectionally with Supabase on startup
   useEffect(() => {
-    AppStore.syncWithSupabase(2027).catch(() => {});
+    AppStore.syncWithSupabase(2027).catch(() => { });
   }, []);
 
   // Deep-link routing: auto-handle QR scans, verification URLs, and PayStation payment returns
@@ -339,7 +339,7 @@ export default function App() {
   const handleStartNewRegistration = () => {
     try {
       localStorage.removeItem('plscf_registration_draft');
-    } catch {}
+    } catch { }
     setPendingRegistrationData(null);
     setPreservedRegistrationData(null);
     setLastRegisteredName('');
@@ -375,59 +375,40 @@ export default function App() {
           onNavigateHome={() => handleNavigate('home')}
         >
           <Suspense fallback={<PageLoadingFallback />}>
-          {activeView === 'home' && (
-            <HomePage
-              language={language}
-              feeSettings={feeSettings}
-              onNavigate={handleNavigate}
-              onSelectTicket={(reg) => {
-                setActiveTicket(reg);
-                handleNavigate('ticket');
-              }}
-            />
-          )}
+            {activeView === 'home' && (
+              <HomePage
+                language={language}
+                feeSettings={feeSettings}
+                onNavigate={handleNavigate}
+                onSelectTicket={(reg) => {
+                  setActiveTicket(reg);
+                  handleNavigate('ticket');
+                }}
+              />
+            )}
 
-          {activeView === 'register' && (
-            <RegistrationPage
-              key={`registration-form-${registrationFormKey}`}
-              language={language}
-              feeSettings={feeSettings}
-              initialData={preservedRegistrationData}
-              isProcessingPayment={isPaymentModalOpen}
-              onInitiatePayment={handleInitiatePayment}
-              onNavigate={handleNavigate}
-              lastRegisteredName={lastRegisteredName}
-              onViewLastTicket={
-                activeTicket && lastRegisteredName
-                  ? () => {
+            {activeView === 'register' && (
+              <RegistrationPage
+                key={`registration-form-${registrationFormKey}`}
+                language={language}
+                feeSettings={feeSettings}
+                initialData={preservedRegistrationData}
+                isProcessingPayment={isPaymentModalOpen}
+                onInitiatePayment={handleInitiatePayment}
+                onNavigate={handleNavigate}
+                lastRegisteredName={lastRegisteredName}
+                onViewLastTicket={
+                  activeTicket && lastRegisteredName
+                    ? () => {
                       setLastRegisteredName('');
                       handleNavigate('ticket');
                     }
-                  : undefined
-              }
-            />
-          )}
-
-          {activeView === 'find-ticket' && (
-            <TicketLookupModal
-              language={language}
-              onSelectRegistration={(registration) => {
-                setActiveTicket(registration);
-                handleNavigate('ticket');
-              }}
-              onNavigateRegister={handleStartNewRegistration}
-            />
-          )}
-
-          {(activeView === 'ticket' || activeView === 'profile') && (
-            activeTicket ? (
-              <TicketView
-                registration={activeTicket}
-                language={language}
-                onNavigateHome={() => handleNavigate('home')}
-                onRegisterAnother={handleStartNewRegistration}
+                    : undefined
+                }
               />
-            ) : (
+            )}
+
+            {activeView === 'find-ticket' && (
               <TicketLookupModal
                 language={language}
                 onSelectRegistration={(registration) => {
@@ -436,48 +417,67 @@ export default function App() {
                 }}
                 onNavigateRegister={handleStartNewRegistration}
               />
-            )
-          )}
+            )}
 
-          {activeView === 'donate' && <DonationPage language={language} />}
+            {(activeView === 'ticket' || activeView === 'profile') && (
+              activeTicket ? (
+                <TicketView
+                  registration={activeTicket}
+                  language={language}
+                  onNavigateHome={() => handleNavigate('home')}
+                  onRegisterAnother={handleStartNewRegistration}
+                />
+              ) : (
+                <TicketLookupModal
+                  language={language}
+                  onSelectRegistration={(registration) => {
+                    setActiveTicket(registration);
+                    handleNavigate('ticket');
+                  }}
+                  onNavigateRegister={handleStartNewRegistration}
+                />
+              )
+            )}
 
-          {activeView === 'notices' && <NoticeBoardPage language={language} />}
+            {activeView === 'donate' && <DonationPage language={language} />}
 
-          {activeView === 'gallery' && <GalleryPage language={language} />}
+            {activeView === 'notices' && <NoticeBoardPage language={language} />}
 
-          {activeView === 'about' && <AboutContactPage language={language} />}
+            {activeView === 'gallery' && <GalleryPage language={language} />}
 
-          {activeView === 'scanner' && <ScannerPortal language={language} />}
+            {activeView === 'about' && <AboutContactPage language={language} />}
 
-          {(activeView === 'admin' || activeView === 'login' || activeView === 'dashboard') && (
-            <AdminDashboard
-              language={language}
-              portalRole={currentPortalRole}
-              activeView={activeView}
-              onSwitchPortal={(targetRole, toDashboard = false) => {
-                setCurrentPortalRole(targetRole);
-                const slug = PORTAL_ROLE_CONFIGS[targetRole]?.slug || targetRole;
-                handleNavigate(toDashboard || activeView === 'dashboard' ? 'dashboard' : 'login', false, { role: slug });
-              }}
-              onNavigateHome={() => handleNavigate('home')}
-              onNavigateScanner={() => handleNavigate('scanner')}
-              onSelectTicket={(reg) => {
-                setActiveTicket(reg);
-                handleNavigate('ticket');
-              }}
-            />
-          )}
+            {activeView === 'scanner' && <ScannerPortal language={language} />}
 
-          {activeView === '404' && (
-            <NotFoundPage
-              language={language}
-              notFoundPath={notFoundPath || (typeof window !== 'undefined' ? window.location.pathname : '')}
-              onNavigate={handleNavigate}
-            />
-          )}
-        </Suspense>
-      </ErrorBoundary>
-    </main>
+            {(activeView === 'admin' || activeView === 'login' || activeView === 'dashboard') && (
+              <AdminDashboard
+                language={language}
+                portalRole={currentPortalRole}
+                activeView={activeView}
+                onSwitchPortal={(targetRole, toDashboard = false) => {
+                  setCurrentPortalRole(targetRole);
+                  const slug = PORTAL_ROLE_CONFIGS[targetRole]?.slug || targetRole;
+                  handleNavigate(toDashboard || activeView === 'dashboard' ? 'dashboard' : 'login', false, { role: slug });
+                }}
+                onNavigateHome={() => handleNavigate('home')}
+                onNavigateScanner={() => handleNavigate('scanner')}
+                onSelectTicket={(reg) => {
+                  setActiveTicket(reg);
+                  handleNavigate('ticket');
+                }}
+              />
+            )}
+
+            {activeView === '404' && (
+              <NotFoundPage
+                language={language}
+                notFoundPath={notFoundPath || (typeof window !== 'undefined' ? window.location.pathname : '')}
+                onNavigate={handleNavigate}
+              />
+            )}
+          </Suspense>
+        </ErrorBoundary>
+      </main>
 
       {/* Universal Footer */}
       <div className="no-print">
@@ -512,7 +512,7 @@ export default function App() {
               PayStationService.clearPendingSession();
               try {
                 localStorage.removeItem('plscf_registration_draft');
-              } catch {}
+              } catch { }
               // Store the just-completed ticket so TicketView can be accessed via header or button
               setActiveTicket(ticket);
               // Remember last registered name for the success banner
