@@ -195,7 +195,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         <div className="absolute inset-0 z-0">
           <img
             src="/assets/homepage/hero_panorama.jpg"
-            alt="Police Lines High School & College, Faridpur Campus"
+            alt="Police Lines School and College, Faridpur Campus"
             className="w-full h-full object-cover object-[70%_center] sm:object-center select-none"
             fetchPriority="high"
             decoding="async"
@@ -217,8 +217,8 @@ export const HomePage: React.FC<HomePageProps> = ({
             {/* Institution Title */}
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-[#0F172A] tracking-tight leading-tight drop-shadow-xs">
               {language === 'bn'
-                ? 'পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজ, ফরিদপুর'
-                : 'Police Lines High School & College, Faridpur'}
+                ? 'পুলিশ লাইনস স্কুল অ্যান্ড কলেজ, ফরিদপুর'
+                : 'Police Lines School and College, Faridpur'}
             </h1>
 
             {/* Deep Navy Pill Badge: Grand Reunion 2027 */}

@@ -1,7 +1,7 @@
 export const translations = {
   en: {
     // Top banner & Header
-    institutionName: 'Police Lines High School & College, Faridpur',
+    institutionName: 'Police Lines School and College, Faridpur',
     institutionSubtitle: 'Established in 1962 • Faridpur, Bangladesh',
     reunionTitle: 'Grand Reunion 2027',
     reunionDates: 'January 28 - 29, 2027',
@@ -24,7 +24,7 @@ export const translations = {
     // Hero & Home
     heroHeading: 'Relive the Memories, Celebrate the Heritage',
     heroSubheading:
-      'Join thousands of alumni and students as we mark the historic Grand Reunion 2027 of Police Lines High School & College, Faridpur.',
+      'Join thousands of alumni and students as we mark the historic Grand Reunion 2027 of Police Lines School and College, Faridpur.',
     btnRegisterNow: 'Register for Reunion',
     btnMakeDonation: 'Contribute / Donate',
     btnDownloadTicket: 'Download Ticket',
@@ -263,7 +263,7 @@ export const translations = {
   },
   bn: {
     // Top banner & Header
-    institutionName: 'ফরিদপুর পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজ',
+    institutionName: 'পুলিশ লাইনস স্কুল অ্যান্ড কলেজ, ফরিদপুর',
     institutionSubtitle: 'প্রতিষ্ঠিত: ১৯৬২ • ফরিদপুর, বাংলাদেশ',
     reunionTitle: 'গ্র্যান্ড পুনর্মিলনী ২০২৭',
     reunionDates: '২৮ - ২৯ জানুয়ারি, ২০২৭',

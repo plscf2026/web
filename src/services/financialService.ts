@@ -589,7 +589,7 @@ export class FinancialService {
    */
   static generateFinancialReportCsv(summary: FinancialTransparencySummary): string {
     const lines: string[] = [];
-    lines.push('Police Lines High School & College, Faridpur — Grand Reunion 2027');
+    lines.push('Police Lines School and College, Faridpur — Grand Reunion 2027');
     lines.push('Authoritative Financial Transparency Report');
     lines.push(`Generated: ${new Date().toLocaleString()}`);
     lines.push('');
