@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   Globe,
   Sparkles,
+  QrCode,
 } from 'lucide-react';
 import {
   PortalRole,
@@ -23,6 +24,7 @@ interface RoleDirectoryPortalProps {
   onLanguageChange?: (lang: Language) => void;
   onSelectRole: (role: PortalRole) => void;
   onNavigateHome: () => void;
+  onNavigateScanner?: () => void;
 }
 
 export const RoleDirectoryPortal: React.FC<RoleDirectoryPortalProps> = ({
@@ -30,6 +32,7 @@ export const RoleDirectoryPortal: React.FC<RoleDirectoryPortalProps> = ({
   onLanguageChange,
   onSelectRole,
   onNavigateHome,
+  onNavigateScanner,
 }) => {
   const isBn = language === 'bn';
 
@@ -170,6 +173,67 @@ export const RoleDirectoryPortal: React.FC<RoleDirectoryPortalProps> = ({
             </div>
           );
         })}
+
+        {/* 6. Field Scanner Portal */}
+        <div className="bg-slate-900/80 backdrop-blur-md rounded-3xl border border-slate-800 hover:border-rose-500/50 p-6 flex flex-col justify-between transition-all hover:scale-[1.01] hover:shadow-2xl hover:shadow-black/60 group relative overflow-hidden">
+          {/* Subtle top role accent line */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-pink-500" />
+
+          <div className="space-y-4">
+            {/* Header with Icon and Badge */}
+            <div className="flex items-center justify-between">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 shadow-xs">
+                <QrCode className="w-6 h-6" />
+              </div>
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/5 text-slate-300 border border-white/10 font-mono">
+                /scanner
+              </span>
+            </div>
+
+            {/* Role Badge & Portal Title */}
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-rose-400 block mb-1">
+                FIELD SCANNER PORTAL
+              </span>
+              <h2 className="text-base sm:text-lg font-black text-white group-hover:text-rose-300 transition-colors leading-snug">
+                {isBn
+                  ? 'পুলিশ লাইন্স স্কুল অ্যান্ড কলেজ পুনর্মিলনী স্ক্যানার পোর্টাল'
+                  : 'Police Lines School & College Reunion Scanner Portal'}
+              </h2>
+            </div>
+
+            {/* Tagline & Description */}
+            <p className="text-xs text-slate-300 font-medium">
+              {isBn
+                ? 'অন-সাইট গেট, ফুড, কিট ও আইডি কার্ড যাচাইকরণ অপারেশন'
+                : 'On-Site Gate, Meal, Kit & ID Card Verification Operations'}
+            </p>
+            <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">
+              {isBn
+                ? 'ফিল্ড স্টাফ ও স্বেচ্ছাসেবকদের জন্য দ্রুতগতির কিউআর যাচাইকরণ স্টেশন। ডিজিটাল পাস স্ক্যান, শিক্ষার্থী তথ্য যাচাই এবং খাবার ও উপহার সামগ্রী বিতরণ রেকর্ড করুন।'
+                : 'High-speed QR validation station for field staff and volunteers. Scan attendee digital passes, authenticate student credentials, verify meal distributions, and record gate attendance.'}
+            </p>
+          </div>
+
+          {/* Action Button */}
+          <div className="pt-6 border-t border-slate-800/80 mt-6">
+            <button
+              type="button"
+              onClick={() => {
+                if (onNavigateScanner) {
+                  onNavigateScanner();
+                } else {
+                  window.history.pushState({}, '', '/scanner');
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }
+              }}
+              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md shadow-rose-950/50 group-hover:scale-[1.02]"
+            >
+              <span>{isBn ? 'ফিল্ড স্ক্যানার পোর্টালে প্রবেশ' : 'Enter FIELD SCANNER Portal'}</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       </main>
 
       {/* Security Footer Note */}

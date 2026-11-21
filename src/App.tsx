@@ -460,6 +460,7 @@ export default function App() {
                 handleNavigate(toDashboard || activeView === 'dashboard' ? 'dashboard' : 'login', false, { role: slug });
               }}
               onNavigateHome={() => handleNavigate('home')}
+              onNavigateScanner={() => handleNavigate('scanner')}
               onSelectTicket={(reg) => {
                 setActiveTicket(reg);
                 handleNavigate('ticket');

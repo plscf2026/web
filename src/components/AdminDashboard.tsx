@@ -118,6 +118,7 @@ interface AdminDashboardProps {
   portalRole?: PortalRole;
   activeView?: string;
   onNavigateHome?: () => void;
+  onNavigateScanner?: () => void;
   onSwitchPortal?: (targetRole: PortalRole, toDashboard?: boolean) => void;
 }
 
@@ -127,6 +128,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   portalRole,
   activeView,
   onNavigateHome,
+  onNavigateScanner,
   onSwitchPortal,
 }) => {
   const t = translations[language];
@@ -1354,6 +1356,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           handleSwitchPortalWithIsolation(role, false);
         }}
         onNavigateHome={handleNavigateHomeWithIsolation}
+        onNavigateScanner={onNavigateScanner}
       />
     );
   }
