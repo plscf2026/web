@@ -443,7 +443,9 @@ export default function App() {
 
             {activeView === 'notices' && <NoticeBoardPage language={language} />}
 
-            {activeView === 'gallery' && <GalleryPage language={language} />}
+            {activeView === 'gallery' && (
+              <GalleryPage language={language} onNavigate={handleNavigate} />
+            )}
 
             {activeView === 'about' && <AboutContactPage language={language} />}
 

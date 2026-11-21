@@ -6,6 +6,7 @@ import {
   Shirt,
   DollarSign,
   ArrowUpRight,
+  Camera,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -108,6 +109,17 @@ export const MasterEventOverview: React.FC<MasterEventOverviewProps> = ({
             <p className="text-xs text-slate-300 max-w-2xl mt-1">
               Authoritative centralized operations hub: real-time monitoring across Registration, Payments, Food distribution, Gate security, Dress kits, and Digital cash ledger.
             </p>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onNavigateTab('galleryManagement')}
+                className="px-4 py-2 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white text-xs font-bold transition-all shadow-md shadow-sky-600/30 flex items-center gap-2 cursor-pointer"
+              >
+                <Camera className="w-4 h-4" />
+                <span>📸 Edit Photo Gallery & Video Memories</span>
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md p-2 rounded-2xl border border-white/10">

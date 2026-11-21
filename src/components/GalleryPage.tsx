@@ -5,146 +5,83 @@ import {
   Play,
   X,
   Sparkles,
+  Edit,
+  ExternalLink,
 } from 'lucide-react';
 import { Language } from '../types';
 import { translations } from '../i18n/translations';
 import { GlobalPagination } from './common/GlobalPagination';
 import { paginate, DEFAULT_PAGE_SIZE } from '../utils/pagination';
+import { GalleryService, GalleryMediaItem } from '../services/galleryService';
 
 interface GalleryPageProps {
   language: Language;
+  onNavigate?: (view: string, replace?: boolean, extraParams?: Record<string, string>) => void;
 }
 
-interface MediaItem {
-  id: string;
-  type: 'photo' | 'video';
-  titleEn: string;
-  titleBn: string;
-  album: 'heritage' | 'alumni' | 'modern' | 'campus' | 'cultural';
-  year: string;
-  thumbnail: string;
-  videoUrl?: string;
-  descriptionEn: string;
-  descriptionBn: string;
+function getEmbedUrl(url?: string): string | null {
+  if (!url) return null;
+  const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+  if (ytMatch && ytMatch[1]) {
+    return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1`;
+  }
+  const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vimeoMatch && vimeoMatch[1]) {
+    return `https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=1`;
+  }
+  return null;
 }
 
-const MEDIA_ITEMS: MediaItem[] = [
-  {
-    id: 'M1',
-    type: 'photo',
-    titleEn: 'Founding Batch of Police Lines High School (1962)',
-    titleBn: 'বিদ্যালয় প্রতিষ্ঠার উদ্বোধনী ব্যাচ ও শিক্ষকবৃন্দ (১৯৬২)',
-    album: 'heritage',
-    year: '1962',
-    thumbnail: 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=800&auto=format&fit=crop&q=80',
-    descriptionEn: 'The historic first gathering of students and teachers under the banyan tree of Faridpur Police Ground.',
-    descriptionBn: 'ফরিদপুর পুলিশ লাইন্স মাঠে প্রতিষ্ঠিত বিদ্যালয়ের প্রথম শিক্ষক ও শিক্ষার্থী সমাবেশের ঐতিহাসিক মুহূর্ত।',
-  },
-  {
-    id: 'M2',
-    type: 'photo',
-    titleEn: 'SSC 1978 Batch Celebration',
-    titleBn: 'এসএসসি ১৯৭৮ ব্যাচের বিদায় সংবর্ধনা',
-    album: 'heritage',
-    year: '1978',
-    thumbnail: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800&auto=format&fit=crop&q=80',
-    descriptionEn: 'Memorable batch photo of SSC 1978 after academic board triumph.',
-    descriptionBn: 'বোর্ড পরীক্ষায় অভাবনীয় সাফল্যের পর ১৯৭৮ সালের এসএসসি ব্যাচ।',
-  },
-  {
-    id: 'M3',
-    type: 'photo',
-    titleEn: 'Silver Jubilee Celebration (1987)',
-    titleBn: 'রজত জয়ন্তী উদ্‌যাপন (১৯৮৭)',
-    album: 'alumni',
-    year: '1987',
-    thumbnail: 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=800&auto=format&fit=crop&q=80',
-    descriptionEn: '25 years celebration gala held at the central district stadium.',
-    descriptionBn: '২৫ বছর পূর্তিতে আয়োজিত বর্ণাঢ্য রজত জয়ন্তী উৎসব।',
-  },
-  {
-    id: 'M4',
-    type: 'photo',
-    titleEn: 'Science Lab & Robotic Fair',
-    titleBn: 'বিজ্ঞান মেলা ও ল্যাবরেটরি প্রদর্শনী',
-    album: 'modern',
-    year: '2016',
-    thumbnail: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=80',
-    descriptionEn: 'Innovative science projects built by high school students.',
-    descriptionBn: 'শিক্ষার্থীদের উদ্ভাবনী বিজ্ঞান ও রোবোটিক্স প্রকল্প প্রদর্শনী।',
-  },
-  {
-    id: 'M5',
-    type: 'video',
-    titleEn: 'Historic Reunion Documentary: 64 Years of Legacy',
-    titleBn: 'ঐতিহাসিক প্রামাণ্যচিত্র: গৌরবের ৬৪ বছর',
-    album: 'cultural',
-    year: '2026',
-    thumbnail: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80',
-    descriptionEn: 'Documentary recounting the transformation from a police school to a premier college.',
-    descriptionBn: 'বিদ্যালয় প্রতিষ্ঠার ইতিহাস ও দেশসেরা প্রতিষ্ঠানে রূপান্তরের গল্প।',
-  },
-  {
-    id: 'M6',
-    type: 'video',
-    titleEn: 'Teacher Interviews: Golden Memories of Faridpur',
-    titleBn: 'গুরুজনদের স্মৃতিকথা: প্রবীণ শিক্ষকদের স্মৃতিচারণ',
-    album: 'cultural',
-    year: '2025',
-    thumbnail: 'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=800&auto=format&fit=crop&q=80',
-    descriptionEn: 'Heartwarming interviews with former headmasters and senior faculty.',
-    descriptionBn: 'প্রাক্তন প্রধান শিক্ষক ও বর্ষীয়ান শিক্ষকদের আন্তরিক সাক্ষাৎকার।',
-  },
-  {
-    id: 'M7',
-    type: 'photo',
-    titleEn: 'Modern Academic Building & Campus Grounds',
-    titleBn: 'আধুনিক একাডেমিক ভবন ও সবুজ প্রাঙ্গণ',
-    album: 'campus',
-    year: '2024',
-    thumbnail: 'https://images.unsplash.com/photo-1562774053-701939374585?w=800&auto=format&fit=crop&q=80',
-    descriptionEn: 'Aerial view of the renovated high school and college facilities in Joyrampur, Faridpur.',
-    descriptionBn: 'জয়রামপুরে অবস্থিত দৃষ্টিনন্দন বহুতল কলেজ ভবন ও খেলার মাঠ।',
-  },
-  {
-    id: 'M8',
-    type: 'photo',
-    titleEn: 'Annual Sports Parade & Police March Past',
-    titleBn: 'বার্ষিক ক্রীড়া প্রতিযোগিতা ও বর্ণাঢ্য মার্চপাস্ট',
-    album: 'campus',
-    year: '2023',
-    thumbnail: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=800&auto=format&fit=crop&q=80',
-    descriptionEn: 'Cadet drill and athletic sprint finals on sports day.',
-    descriptionBn: 'শৃঙ্খলাপরায়ণ প্যারেড ও ক্রীড়া প্রতিযোগিতার রোমাঞ্চকর মুহূর্ত।',
-  },
-];
-
-export const GalleryPage: React.FC<GalleryPageProps> = ({ language }) => {
+export const GalleryPage: React.FC<GalleryPageProps> = ({ language, onNavigate }) => {
   const t = translations[language];
 
+  const [mediaItems, setMediaItems] = useState<GalleryMediaItem[]>(GalleryService.getLocalCache());
   const [activeTab, setActiveTab] = useState<'photos' | 'videos'>('photos');
   const [activeAlbum, setActiveAlbum] = useState<string>('all');
-  const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<GalleryMediaItem | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+
+  useEffect(() => {
+    // Load dynamically from database/file/local storage
+    GalleryService.loadItems().then((items) => {
+      setMediaItems(items);
+    });
+
+    // Real-time subscription to admin updates
+    const unsubscribe = GalleryService.subscribe((updated) => {
+      setMediaItems(updated);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     setPage(1);
   }, [activeTab, activeAlbum]);
 
-  const filteredItems = MEDIA_ITEMS.filter((item) => {
+  const filteredItems = mediaItems.filter((item) => {
     const matchType = activeTab === 'photos' ? item.type === 'photo' : item.type === 'video';
     const matchAlbum = activeAlbum === 'all' || item.album === activeAlbum;
     return matchType && matchAlbum;
   });
 
+  const embedUrl = selectedItem?.videoUrl ? getEmbedUrl(selectedItem.videoUrl) : null;
+  const isDirectVideo =
+    selectedItem?.videoUrl &&
+    (selectedItem.videoUrl.endsWith('.mp4') ||
+      selectedItem.videoUrl.endsWith('.webm') ||
+      selectedItem.videoUrl.startsWith('blob:') ||
+      selectedItem.videoUrl.startsWith('data:video/'));
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-10 space-y-8">
-      {/* Title */}
-      <div className="text-center space-y-2">
+      {/* Title & Super Admin Edit Shortcut */}
+      <div className="text-center space-y-3 relative">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2EEF8] text-[#0284C7] text-xs font-semibold">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>{language === 'bn' ? 'সোনালী স্মৃতির সংগ্রহশালা' : 'Heritage Archive 1962-2026'}</span>
+          <span>{language === 'bn' ? 'সোনালী স্মৃতির সংগ্রহশালা' : 'Heritage Archive 1962-2027'}</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
           {t.galleryHeading}
@@ -152,6 +89,20 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language }) => {
         <p className="text-xs sm:text-sm text-slate-600 max-w-xl mx-auto">
           {t.gallerySubtitle}
         </p>
+
+        {/* Quick Admin Edit Button */}
+        {onNavigate && (
+          <div className="pt-1 flex justify-center">
+            <button
+              type="button"
+              onClick={() => onNavigate('admin', false, { role: 'super_admin' })}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-slate-900 hover:bg-[#0284C7] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              <Edit className="w-3.5 h-3.5" />
+              <span>{language === 'bn' ? '📸 গ্যালারি এডিটিং প্যানেল' : '📸 Admin Gallery Editor'}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tabs: Photos vs Videos */}
@@ -198,6 +149,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language }) => {
             { id: 'alumni', label: t.albumAlumni },
             { id: 'modern', label: t.albumModern },
             { id: 'campus', label: t.albumCampus },
+            { id: 'cultural', label: language === 'bn' ? 'সাংস্কৃতিক উৎসব' : 'Cultural' },
           ].map((alb) => (
             <button
               key={alb.id}
@@ -227,6 +179,10 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language }) => {
                 src={item.thumbnail}
                 alt={item.titleEn}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src =
+                    'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=800&auto=format&fit=crop&q=80';
+                }}
               />
 
               {item.type === 'video' && (
@@ -247,7 +203,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language }) => {
                 {language === 'bn' ? item.titleBn : item.titleEn}
               </h3>
               <p className="text-[11px] text-slate-500 line-clamp-2">
-                {language === 'bn' ? item.descriptionBn : item.descriptionEn}
+                {language === 'bn' ? item.descriptionBn || item.descriptionEn : item.descriptionEn || item.descriptionBn}
               </p>
             </div>
           </div>
@@ -274,12 +230,38 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language }) => {
                   alt={selectedItem.titleEn}
                   className="w-full h-full object-contain"
                 />
+              ) : embedUrl ? (
+                <iframe
+                  src={embedUrl}
+                  title={selectedItem.titleEn}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="w-full h-full border-0"
+                />
+              ) : isDirectVideo ? (
+                <video
+                  src={selectedItem.videoUrl}
+                  controls
+                  autoPlay
+                  className="w-full h-full"
+                />
               ) : (
                 <div className="text-center p-8 text-white space-y-3">
                   <Play className="w-16 h-16 text-[#38BDF8] mx-auto animate-pulse" />
                   <p className="text-sm font-semibold">
-                    {language === 'bn' ? 'ভিডিও স্ট্রিম চালু হচ্ছে...' : 'Playing High-Definition Video Stream...'}
+                    {language === 'bn' ? 'ভিডিও স্ট্রিম প্লেয়ার' : 'Video Memory Stream'}
                   </p>
+                  {selectedItem.videoUrl && (
+                    <a
+                      href={selectedItem.videoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#0284C7] text-white text-xs font-bold hover:bg-[#0EA5E9]"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>{language === 'bn' ? 'ভিডিও প্লে করুন' : 'Watch Video'}</span>
+                    </a>
+                  )}
                   <p className="text-xs text-slate-400">
                     Police Lines School and College Faridpur Media Archive
                   </p>

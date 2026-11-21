@@ -103,6 +103,9 @@ const IdCardManagementPortal = lazy(() =>
 const GateScannerModule = lazy(() =>
   import('./GateScannerModule').then((m) => ({ default: m.GateScannerModule }))
 );
+const GalleryManagementTab = lazy(() =>
+  import('./admin/GalleryManagementTab').then((m) => ({ default: m.GalleryManagementTab }))
+);
 
 const AdminTabFallback = () => (
   <div className="bg-white rounded-2xl p-12 border border-slate-200 text-center flex flex-col items-center justify-center my-6" role="status">
@@ -317,6 +320,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'staff'
     | 'finances'
     | 'notices'
+    | 'galleryManagement'
     | 'reports';
 
   const isSuperAdmin = adminSession?.role === 'super_admin';
@@ -1453,6 +1457,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     { id: 'feeSettings', label: t.tabFeeSettings, icon: Settings },
     { id: 'tickets', label: t.tabTickets, icon: QrCode },
     { id: 'notices', label: t.tabNoticesAdmin, icon: FileText },
+    {
+      id: 'galleryManagement',
+      label: language === 'bn' ? '📸 ফটো ও ভিডিও মেমোরিজ' : '📸 Photo & Video Gallery',
+      icon: Camera,
+      highlight: true,
+      badge: 'Media CMS',
+    },
     { id: 'reports', label: t.tabReports, icon: Download },
   ];
 
@@ -1689,6 +1700,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     ? t.tabTickets
                     : activeTab === 'notices'
                     ? t.tabNoticesAdmin
+                    : activeTab === 'galleryManagement'
+                    ? (language === 'bn' ? '📸 ফটো ও ভিডিও মেমোরিজ' : '📸 Photo & Video Gallery')
                     : activeTab === 'reports'
                     ? t.tabReports
                     : activeTab}
@@ -4124,6 +4137,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* TAB 13: PHOTO GALLERY & VIDEO MEMORIES MANAGEMENT */}
+      {activeTab === 'galleryManagement' && (
+        <Suspense fallback={<AdminTabFallback />}>
+          <GalleryManagementTab language={language} />
+        </Suspense>
       )}
 
         </main>

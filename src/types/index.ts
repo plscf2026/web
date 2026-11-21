@@ -319,6 +319,7 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
       'staff',
       'finances',
       'notices',
+      'galleryManagement',
       'reports',
     ],
     demoCredentials: {
@@ -357,6 +358,7 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
       'tickets',
       'dailyAnalytics',
       'notices',
+      'galleryManagement',
       'reports',
     ],
     demoCredentials: {
