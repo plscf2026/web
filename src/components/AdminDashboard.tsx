@@ -1340,6 +1340,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             handleSwitchPortalWithIsolation(targetRole, false);
           }}
           onNavigateHome={handleNavigateHomeWithIsolation}
+          onNavigateScanner={onNavigateScanner}
           onNavigateAuthorized={() => {
             const authorizedRole = userAccountRole || 'admin';
             setActivePortalRole(authorizedRole);

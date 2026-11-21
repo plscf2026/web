@@ -33,6 +33,7 @@ interface RoleLoginPageProps {
   onLoginSuccess: (account: AdminAccount) => void;
   onSwitchPortal: (targetRole: PortalRole) => void;
   onNavigateHome: () => void;
+  onNavigateScanner?: () => void;
   onNavigateAuthorized?: () => void;
 }
 
@@ -44,6 +45,7 @@ export const RoleLoginPage: React.FC<RoleLoginPageProps> = ({
   onLoginSuccess,
   onSwitchPortal,
   onNavigateHome,
+  onNavigateScanner,
   onNavigateAuthorized,
 }) => {
   const isBn = language === 'bn';
@@ -360,6 +362,27 @@ export const RoleLoginPage: React.FC<RoleLoginPageProps> = ({
               </button>
             );
           })}
+
+          {/* 6. Field Scanner Portal */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onNavigateScanner) {
+                onNavigateScanner();
+              } else {
+                window.history.pushState({}, '', '/scanner');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }
+            }}
+            className="p-2.5 rounded-xl border text-left transition-all cursor-pointer bg-white/5 hover:bg-rose-500/15 border-white/10 hover:border-rose-500/40 text-slate-400 hover:text-rose-300 group"
+          >
+            <span className="text-[10px] font-black uppercase tracking-wider block truncate text-rose-400 group-hover:text-rose-300">
+              FIELD SCANNER PORTAL
+            </span>
+            <span className="text-[11px] font-bold text-white block truncate mt-0.5">
+              {isBn ? 'ফিল্ড স্ক্যানার' : 'FIELD SCANNER'}
+            </span>
+          </button>
         </div>
       </footer>
     </div>
