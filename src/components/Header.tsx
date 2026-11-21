@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   Home,
   UserPlus,
-  QrCode,
   Globe,
   Menu,
   X,
@@ -56,48 +55,6 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-50 bg-[#F0F6FA]/95 backdrop-blur-md border-b border-[#E2EEF8] shadow-xs">
-      {/* Top emergency announcement & quick portals bar */}
-      <div className="bg-[#0F172A] text-white text-xs py-1.5 px-3 sm:px-4 border-b border-[#1E293B]">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-1.5">
-          <div className="flex items-center gap-2 max-w-full overflow-hidden">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-[#0284C7] text-white uppercase shrink-0 tracking-wide">
-              {language === 'bn' ? 'অফিসিয়াল' : 'OFFICIAL'}
-            </span>
-            <span className="font-semibold text-[11px] sm:text-xs truncate text-[#E2EEF8]">
-              {language === 'bn'
-                ? 'পুলিশ লাইন্স উচ্চ বিদ্যালয় ও কলেজ, ফরিদপুর পুনর্মিলনী ২০২৭ • ২৮-২৯ জানুয়ারি ২০২৭'
-                : 'Police Lines High School & College, Faridpur Reunion 2027 • Jan 28-29, 2027'}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-center gap-2 sm:gap-3 text-[11px] w-full md:w-auto">
-            {/* Quick Scanner Portal Switcher */}
-            <button
-              onClick={() => handleNav('scanner')}
-              className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-colors cursor-pointer ${
-                activeView === 'scanner'
-                  ? 'bg-[#0EA5E9] text-white font-bold'
-                  : 'bg-[#0F172A] hover:bg-[#1E293B] text-[#38BDF8] border border-[#0284C7]/40'
-              }`}
-              title="QR Scanner Gate Portal"
-            >
-              <QrCode className="w-3 h-3 text-[#38BDF8]" />
-              <span>{t.navScannerPortal}</span>
-            </button>
-
-            {/* Bilingual Switcher */}
-            <button
-              onClick={() => onLanguageChange(language === 'en' ? 'bn' : 'en')}
-              className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#E2EEF8] hover:bg-white text-[#0F172A] border border-[#0284C7]/30 font-bold transition-all shadow-2xs cursor-pointer text-[11px]"
-              aria-label="Toggle language between Bangla and English"
-            >
-              <Globe className="w-3 h-3 text-[#0284C7]" />
-              <span>{t.switchLanguage}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Main Institution Branding Navigation */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-18 sm:h-20">
@@ -145,6 +102,16 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               );
             })}
+
+            {/* Bilingual Switcher */}
+            <button
+              onClick={() => onLanguageChange(language === 'en' ? 'bn' : 'en')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#E2EEF8] hover:bg-white text-[#0F172A] border border-[#0284C7]/30 font-bold transition-all shadow-2xs cursor-pointer text-xs ml-1.5"
+              aria-label="Toggle language between Bangla and English"
+            >
+              <Globe className="w-3.5 h-3.5 text-[#0284C7]" />
+              <span>{t.switchLanguage}</span>
+            </button>
           </nav>
 
           {/* Mobile hamburger button */}
@@ -190,16 +157,6 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </button>
           ))}
-
-          <div className="pt-3 border-t border-[#E2EEF8] flex flex-col gap-2">
-            <button
-              onClick={() => handleNav('scanner')}
-              className="w-full flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium bg-[#E2EEF8] text-[#0F172A] hover:bg-white cursor-pointer"
-            >
-              <QrCode className="w-4 h-4 text-[#0284C7]" />
-              <span>{t.navScannerPortal}</span>
-            </button>
-          </div>
         </div>
       )}
     </header>
