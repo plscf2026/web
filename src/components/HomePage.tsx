@@ -43,11 +43,12 @@ import { AppStore } from '../services/store';
 import { SupabaseService } from '../services/supabase';
 import { FinancialTransparencyDashboard } from './financials/FinancialTransparencyDashboard';
 import { ThankYouCardModal } from './ThankYouCardModal';
+import { CommitteeSection } from './committee/CommitteeSection';
 
 interface HomePageProps {
   language: Language;
   feeSettings: FeeSettings;
-  onNavigate: (view: string) => void;
+  onNavigate: (view: string, replace?: boolean, extraParams?: Record<string, string>) => void;
   onSelectTicket?: (reg: RegistrationRecord) => void;
 }
 
@@ -72,6 +73,13 @@ export const HomePage: React.FC<HomePageProps> = ({
     () => reconcileHomePageSections(feeSettings.homePageSections),
     [feeSettings.homePageSections]
   );
+
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  useEffect(() => {
+    SupabaseService.getActiveAdminSession().then((session) => {
+      setIsSuperAdmin(session?.role === 'super_admin');
+    }).catch(() => {});
+  }, []);
 
   const getHomePageSectionStyle = (sectionId: HomePageSectionId): React.CSSProperties => {
     const index = homePageSections.findIndex((section: HomePageSectionSetting) => section.id === sectionId);
@@ -1223,65 +1231,16 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </section>
 
-      {/* ORGANIZING COMMITTEE */}
+      {/* ORGANIZING COMMITTEE (Responsive CSS Grid & Infinite Carousel with Super Admin Sync) */}
       <section
         className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
         style={getHomePageSectionStyle('committee')}
       >
-        <div className="text-center max-w-2xl mx-auto mb-10 space-y-2">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            {t.committeeHeading}
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-600">
-            {language === 'bn'
-              ? 'জেলা পুলিশ প্রশাসন ও অ্যালামনাই নেতৃবৃন্দের সমন্বয়ে গঠিত পরিচালনা পর্ষদ।'
-              : 'Joint organizing leadership by District Police Administration and Senior Alumni.'}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            {
-              name: 'Dr. M. A. Kashem',
-              role: 'Convenor (আহ্বায়ক)',
-              desc: '1974 SSC Batch • Senior Civil Servant',
-              img: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&auto=format&fit=crop&q=80',
-            },
-            {
-              name: 'Superintendent of Police',
-              role: 'Chief Patron (প্রধান পৃষ্ঠপোষক)',
-              desc: 'Faridpur District Police Administration',
-              img: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80',
-            },
-            {
-              name: 'Prof. Anwara Begum',
-              role: 'Faculty Advisor (উপদেষ্টা)',
-              desc: 'Former Principal, Police Lines College',
-              img: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=300&auto=format&fit=crop&q=80',
-            },
-            {
-              name: 'Md. Shafiqul Alam',
-              role: 'Member Secretary (সদস্য সচিব)',
-              desc: '1988 SSC Batch • Alumni Association',
-              img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
-            },
-          ].map((member, idx) => (
-            <div key={idx} className="bg-white rounded-2xl p-6 border border-slate-200 text-center shadow-xs space-y-3">
-              <img
-                src={member.img}
-                alt={member.name}
-                className="w-20 h-20 rounded-full object-cover mx-auto border-2 border-[#0284C7] shadow-sm"
-              />
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm">{member.name}</h4>
-                <span className="text-xs font-semibold text-[#0284C7] block mt-0.5">
-                  {member.role}
-                </span>
-                <p className="text-[11px] text-slate-500 mt-1">{member.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+        <CommitteeSection
+          language={language}
+          onNavigateAdminTab={(tab) => onNavigate('admin', false, { tab })}
+          isSuperAdmin={isSuperAdmin}
+        />
       </section>
 
       {/* Thank You Card Modal for Verified Patron */}

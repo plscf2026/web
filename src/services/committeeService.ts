@@ -1,0 +1,438 @@
+/**
+ * Committee Service
+ * Manages Organizing Committee members and carousel/grid display settings.
+ * Supports LocalStorage, JSON file seeding, and cloud synchronization.
+ */
+
+import { CommitteeMember, CommitteeSettings } from '../types';
+import { supabase } from './supabase';
+
+const STORAGE_KEY_MEMBERS = 'plscf_committee_members_v1';
+const STORAGE_KEY_SETTINGS = 'plscf_committee_settings_v1';
+const DATA_FILE_URL = '/data/committee_members.json';
+
+export const DEFAULT_COMMITTEE_SETTINGS: CommitteeSettings = {
+  displayMode: 'carousel',
+  autoScrollSpeedMs: 3500,
+  sectionTitleEn: 'Reunion 2026 Organizing Committee',
+  sectionTitleBn: 'পুনর্মিলনী ২০২৬ পরিচালনা পরিষদ',
+  sectionSubtitleEn: 'Joint organizing leadership by District Police Administration and Senior Alumni.',
+  sectionSubtitleBn: 'জেলা পুলিশ প্রশাসন ও অ্যালামনাই নেতৃবৃন্দের সমন্বয়ে গঠিত পরিচালনা পর্ষদ।',
+};
+
+export const DEFAULT_COMMITTEE_MEMBERS: CommitteeMember[] = [
+  {
+    id: 'COM-01',
+    name: 'Dr. M. A. Kashem',
+    nameBn: 'ড. এম. এ. কাশেম',
+    role: 'Convenor (আহ্বায়ক)',
+    roleBn: 'আহ্বায়ক',
+    desc: '1974 SSC Batch • Senior Civil Servant',
+    descBn: '১৯৭৪ এসএসসি ব্যাচ • সাবেক সচিব',
+    batch: '1974',
+    img: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&auto=format&fit=crop&q=80',
+    order: 1,
+    isActive: true,
+  },
+  {
+    id: 'COM-02',
+    name: 'Superintendent of Police',
+    nameBn: 'পুলিশ সুপার, ফরিদপুর',
+    role: 'Chief Patron (প্রধান পৃষ্ঠপোষক)',
+    roleBn: 'প্রধান পৃষ্ঠপোষক',
+    desc: 'Faridpur District Police Administration',
+    descBn: 'ফরিদপুর জেলা পুলিশ প্রশাসন',
+    batch: 'Administration',
+    img: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80',
+    order: 2,
+    isActive: true,
+  },
+  {
+    id: 'COM-03',
+    name: 'Prof. Anwara Begum',
+    nameBn: 'প্রফেসর আনোয়ার বেগম',
+    role: 'Faculty Advisor (উপদেষ্টা)',
+    roleBn: 'উপদেষ্টা',
+    desc: 'Former Principal, Police Lines College',
+    descBn: 'সাবেক অধ্যক্ষ, পুলিশ লাইন্স কলেজ',
+    batch: 'Faculty',
+    img: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=300&auto=format&fit=crop&q=80',
+    order: 3,
+    isActive: true,
+  },
+  {
+    id: 'COM-04',
+    name: 'Md. Shafiqul Alam',
+    nameBn: 'মো. শফিকুল আলম',
+    role: 'Member Secretary (সদস্য সচিব)',
+    roleBn: 'সদস্য সচিব',
+    desc: '1988 SSC Batch • Alumni Association',
+    descBn: '১৯৮৮ এসএসসি ব্যাচ • অ্যালামনাই অ্যাসোসিয়েশন',
+    batch: '1988',
+    img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+    order: 4,
+    isActive: true,
+  },
+  {
+    id: 'COM-05',
+    name: 'Engr. Kazi Mahbubur Rahman',
+    nameBn: 'প্রকৌশলী কাজী মাহবুবুর রহমান',
+    role: 'Joint Convenor (যুগ্ম আহ্বায়ক)',
+    roleBn: 'যুগ্ম আহ্বায়ক',
+    desc: '1982 SSC Batch • Chief Engineer (Rtd.)',
+    descBn: '১৯৮২ এসএসসি ব্যাচ • সাবেক প্রধান প্রকৌশলী',
+    batch: '1982',
+    img: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
+    order: 5,
+    isActive: true,
+  },
+  {
+    id: 'COM-06',
+    name: 'Advocate Farzana Yasmin',
+    nameBn: 'অ্যাডভোকেট ফারজানা ইয়াসমিন',
+    role: 'Legal & Protocol Advisor (আইন ও প্রটোকল)',
+    roleBn: 'আইন ও প্রটোকল উপদেষ্টা',
+    desc: '1985 SSC Batch • District Bar Association',
+    descBn: '১৯৮৫ এসএসসি ব্যাচ • জেলা আইনজীবী সমিতি',
+    batch: '1985',
+    img: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
+    order: 6,
+    isActive: true,
+  },
+  {
+    id: 'COM-07',
+    name: 'Brigadier General (Rtd.) Zahirul Islam',
+    nameBn: 'ব্রিগেডিয়ার জেনারেল (অব.) জহিরুল ইসলাম',
+    role: 'Chief Security Advisor (নিরাপত্তা ও শৃঙ্খলা)',
+    roleBn: 'প্রধান নিরাপত্তা উপদেষ্টা',
+    desc: '1978 SSC Batch • Veteran Alumni',
+    descBn: '১৯৭৮ এসএসসি ব্যাচ • বীর মুক্তিযোদ্ধা অ্যালামনাই',
+    batch: '1978',
+    img: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=300&auto=format&fit=crop&q=80',
+    order: 7,
+    isActive: true,
+  },
+  {
+    id: 'COM-08',
+    name: 'Dr. Tanveer Ahmed',
+    nameBn: 'ডা. তানভীর আহমেদ',
+    role: 'Medical & Welfare Secretary (চিকিৎসা ও কল্যাণ)',
+    roleBn: 'চিকিৎসা ও কল্যাণ সম্পাদক',
+    desc: '1992 SSC Batch • Associate Professor, FMCH',
+    descBn: '১৯৯২ এসএসসি ব্যাচ • সহযোগী অধ্যাপক, এফএমসিএইচ',
+    batch: '1992',
+    img: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300&auto=format&fit=crop&q=80',
+    order: 8,
+    isActive: true,
+  },
+  {
+    id: 'COM-09',
+    name: 'Syed Nazrul Islam',
+    nameBn: 'সৈয়দ নজরুল ইসলাম',
+    role: 'Finance Secretary (অর্থ ও হিসাব সম্পাদক)',
+    roleBn: 'অর্থ ও হিসাব সম্পাদক',
+    desc: '1989 SSC Batch • Head of Treasury, Bank',
+    descBn: '১৯৮৯ এসএসসি ব্যাচ • বিভাগীয় প্রধান, কমার্শিয়াল ব্যাংক',
+    batch: '1989',
+    img: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    order: 9,
+    isActive: true,
+  },
+  {
+    id: 'COM-10',
+    name: 'Nasreen Akter Banu',
+    nameBn: 'নাসরিন আক্তার বানু',
+    role: 'Cultural Secretary (সাংস্কৃতিক ও সংবর্ধনা)',
+    roleBn: 'সাংস্কৃতিক ও সংবর্ধনা সম্পাদক',
+    desc: '1994 SSC Batch • Cultural Activist & Educator',
+    descBn: '১৯৯৪ এসএসসি ব্যাচ • সংস্কৃতিসেবী ও শিক্ষক',
+    batch: '1994',
+    img: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=300&auto=format&fit=crop&q=80',
+    order: 10,
+    isActive: true,
+  },
+  {
+    id: 'COM-11',
+    name: 'Mirza Golam Rabbani',
+    nameBn: 'মির্জা গোলাম রব্বানী',
+    role: 'IT & Registration Lead (নিবন্ধন ও প্রযুক্তি)',
+    roleBn: 'নিবন্ধন ও প্রযুক্তি সমন্বয়ক',
+    desc: '2002 SSC Batch • Enterprise Software Architect',
+    descBn: '২০০২ এসএসসি ব্যাচ • এন্টারপ্রাইজ সফটওয়্যার স্থপতি',
+    batch: '2002',
+    img: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&auto=format&fit=crop&q=80',
+    order: 11,
+    isActive: true,
+  },
+  {
+    id: 'COM-12',
+    name: 'Tahmina Sultana',
+    nameBn: 'তাহমিনা সুলতানা',
+    role: 'Souvenir & Publication (স্মরণিকা ও প্রকাশনা)',
+    roleBn: 'স্মরণিকা ও প্রকাশনা সম্পাদক',
+    desc: '1996 SSC Batch • Senior Journalist & Writer',
+    descBn: '১৯৯৬ এসএসসি ব্যাচ • জ্যেষ্ঠ সাংবাদিক ও লেখক',
+    batch: '1996',
+    img: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop&q=80',
+    order: 12,
+    isActive: true,
+  },
+  {
+    id: 'COM-13',
+    name: 'Kamrul Hasan Jewel',
+    nameBn: 'কামরুল হাসান জুয়েল',
+    role: 'Food & Catering Lead (খাদ্য ও আপ্যায়ন)',
+    roleBn: 'খাদ্য ও আপ্যায়ন সম্পাদক',
+    desc: '1998 SSC Batch • Hospitality Entrepreneur',
+    descBn: '১৯৯৮ এসএসসি ব্যাচ • আতিথেয়তা উদ্যোক্তা',
+    batch: '1998',
+    img: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=300&auto=format&fit=crop&q=80',
+    order: 13,
+    isActive: true,
+  },
+  {
+    id: 'COM-14',
+    name: 'Asaduzzaman Ripon',
+    nameBn: 'আসাদুজ্জামান রিপন',
+    role: 'Logistics & Venue (লজিস্টিকস ও ভেন্যু)',
+    roleBn: 'লজিস্টিকস ও ভেন্যু সম্পাদক',
+    desc: '1995 SSC Batch • Event Management Specialist',
+    descBn: '১৯৯৫ এসএসসি ব্যাচ • ইভেন্ট ম্যানেজমেন্ট বিশেষজ্ঞ',
+    batch: '1995',
+    img: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80',
+    order: 14,
+    isActive: true,
+  },
+  {
+    id: 'COM-15',
+    name: 'Rezaul Karim Babul',
+    nameBn: 'রেজাউল করিম বাবুল',
+    role: 'Public Relations & Media (জনসংযোগ ও গণমাধ্যম)',
+    roleBn: 'জনসংযোগ ও গণমাধ্যম সমন্বয়ক',
+    desc: '1991 SSC Batch • Senior News Editor',
+    descBn: '১৯৯১ এসএসসি ব্যাচ • জ্যেষ্ঠ বার্তা সম্পাদক',
+    batch: '1991',
+    img: 'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=300&auto=format&fit=crop&q=80',
+    order: 15,
+    isActive: true,
+  },
+  {
+    id: 'COM-16',
+    name: 'Mahmudul Hasan Shuvo',
+    nameBn: 'মাহমুদুল হাসান শুভ',
+    role: 'Youth & Volunteers Lead (যুব ও স্বেচ্ছাসেবক)',
+    roleBn: 'যুব ও স্বেচ্ছাসেবক সমন্বয়ক',
+    desc: '2012 SSC Batch • Alumni Volunteer Brigade Lead',
+    descBn: '২০১২ এসএসসি ব্যাচ • অ্যালামনাই স্বেচ্ছাসেবী দলনেতা',
+    batch: '2012',
+    img: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80',
+    order: 16,
+    isActive: true,
+  },
+];
+
+// In-memory fallback
+const memoryStore: Record<string, string> = {};
+
+function getLocalStore<T>(key: string, defaultValue: T): T {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const item = window.localStorage.getItem(key);
+      if (!item) return defaultValue;
+      return JSON.parse(item);
+    }
+    const item = memoryStore[key];
+    if (!item) return defaultValue;
+    return JSON.parse(item);
+  } catch {
+    return defaultValue;
+  }
+}
+
+function setLocalStore<T>(key: string, value: T): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, JSON.stringify(value));
+      return;
+    }
+    memoryStore[key] = JSON.stringify(value);
+  } catch (err) {
+    try {
+      memoryStore[key] = JSON.stringify(value);
+    } catch (_) {}
+  }
+}
+
+export class CommitteeService {
+  /**
+   * Returns current committee members sorted by order.
+   */
+  static getMembers(): CommitteeMember[] {
+    const members = getLocalStore<CommitteeMember[]>(STORAGE_KEY_MEMBERS, []);
+    if (Array.isArray(members) && members.length > 0) {
+      return [...members].sort((a, b) => (a.order || 0) - (b.order || 0));
+    }
+    // Return default 16 members
+    return [...DEFAULT_COMMITTEE_MEMBERS].sort((a, b) => (a.order || 0) - (b.order || 0));
+  }
+
+  /**
+   * Asynchronously loads members, pulling from file/cloud if local cache is not populated.
+   */
+  static async loadMembers(): Promise<CommitteeMember[]> {
+    const cached = getLocalStore<CommitteeMember[]>(STORAGE_KEY_MEMBERS, []);
+    if (Array.isArray(cached) && cached.length > 0) {
+      return [...cached].sort((a, b) => (a.order || 0) - (b.order || 0));
+    }
+
+    try {
+      if (typeof fetch !== 'undefined') {
+        const resp = await fetch(DATA_FILE_URL);
+        if (resp.ok) {
+          const data: CommitteeMember[] = await resp.json();
+          if (Array.isArray(data) && data.length > 0) {
+            this.saveMembers(data);
+            return [...data].sort((a, b) => (a.order || 0) - (b.order || 0));
+          }
+        }
+      }
+    } catch (_) {}
+
+    this.saveMembers(DEFAULT_COMMITTEE_MEMBERS);
+    return [...DEFAULT_COMMITTEE_MEMBERS].sort((a, b) => (a.order || 0) - (b.order || 0));
+  }
+
+  /**
+   * Saves committee members and dispatches realtime update events.
+   */
+  static saveMembers(members: CommitteeMember[]): void {
+    const sorted = [...members].sort((a, b) => (a.order || 0) - (b.order || 0));
+    setLocalStore(STORAGE_KEY_MEMBERS, sorted);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('plscf_committee_updated', { detail: sorted }));
+      if ('BroadcastChannel' in window) {
+        try {
+          const bc = new (window as any).BroadcastChannel('plscf_realtime_events');
+          bc.postMessage({ type: 'plscf_committee_updated', payload: sorted, timestamp: Date.now() });
+          bc.close();
+        } catch (_) {}
+      }
+    }
+
+    // Try cloud sync in background (non-blocking)
+    try {
+      supabase
+        .from('committee_members')
+        .upsert(sorted as any)
+        .then(() => {}, () => {});
+    } catch (_) {}
+  }
+
+  /**
+   * Adds a new member.
+   */
+  static addMember(member: Omit<CommitteeMember, 'id'> & { id?: string }): CommitteeMember {
+    const current = this.getMembers();
+    const newId = member.id || `COM-${Date.now().toString().slice(-4)}`;
+    const maxOrder = current.reduce((max, m) => Math.max(max, m.order || 0), 0);
+    const newMember: CommitteeMember = {
+      ...member,
+      id: newId,
+      order: member.order !== undefined ? member.order : maxOrder + 1,
+      isActive: member.isActive !== false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const updated = [...current, newMember];
+    this.saveMembers(updated);
+    return newMember;
+  }
+
+  /**
+   * Updates an existing member.
+   */
+  static updateMember(id: string, updates: Partial<CommitteeMember>): CommitteeMember | null {
+    const current = this.getMembers();
+    const idx = current.findIndex((m) => m.id === id);
+    if (idx === -1) return null;
+    current[idx] = {
+      ...current[idx],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    this.saveMembers(current);
+    return current[idx];
+  }
+
+  /**
+   * Deletes a member.
+   */
+  static deleteMember(id: string): boolean {
+    const current = this.getMembers();
+    const filtered = current.filter((m) => m.id !== id);
+    if (filtered.length === current.length) return false;
+    this.saveMembers(filtered);
+    return true;
+  }
+
+  /**
+   * Reorders member upwards or downwards.
+   */
+  static reorderMember(id: string, direction: 'up' | 'down'): boolean {
+    const current = this.getMembers();
+    const idx = current.findIndex((m) => m.id === id);
+    if (idx === -1) return false;
+
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= current.length) return false;
+
+    // Swap positions
+    const temp = current[idx];
+    current[idx] = current[targetIdx];
+    current[targetIdx] = temp;
+
+    // Renumber orders sequentially
+    current.forEach((m, i) => {
+      m.order = i + 1;
+    });
+
+    this.saveMembers(current);
+    return true;
+  }
+
+  /**
+   * Resets committee members to the initial 16 seed members.
+   */
+  static resetToDefault(): CommitteeMember[] {
+    const fresh = JSON.parse(JSON.stringify(DEFAULT_COMMITTEE_MEMBERS));
+    this.saveMembers(fresh);
+    return fresh;
+  }
+
+  /**
+   * Returns committee display settings.
+   */
+  static getSettings(): CommitteeSettings {
+    const saved = getLocalStore<Partial<CommitteeSettings>>(STORAGE_KEY_SETTINGS, {});
+    return {
+      ...DEFAULT_COMMITTEE_SETTINGS,
+      ...saved,
+    };
+  }
+
+  /**
+   * Saves committee display settings.
+   */
+  static saveSettings(settings: Partial<CommitteeSettings>): CommitteeSettings {
+    const current = this.getSettings();
+    const updated: CommitteeSettings = { ...current, ...settings };
+    setLocalStore(STORAGE_KEY_SETTINGS, updated);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('plscf_committee_settings_updated', { detail: updated }));
+    }
+
+    return updated;
+  }
+}

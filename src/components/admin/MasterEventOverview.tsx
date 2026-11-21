@@ -119,6 +119,14 @@ export const MasterEventOverview: React.FC<MasterEventOverviewProps> = ({
                 <Camera className="w-4 h-4" />
                 <span>📸 Edit Photo Gallery & Video Memories</span>
               </button>
+              <button
+                type="button"
+                onClick={() => onNavigateTab('committeeManagement')}
+                className="px-4 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer border border-slate-600"
+              >
+                <Users className="w-4 h-4 text-sky-400" />
+                <span>👥 Edit Committee Members (16)</span>
+              </button>
             </div>
           </div>
 

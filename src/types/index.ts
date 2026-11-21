@@ -201,6 +201,33 @@ export interface ExpenseRecord {
   receiptRef: string;
 }
 
+export interface CommitteeMember {
+  id: string;
+  name: string;
+  nameBn?: string;
+  role: string;
+  roleBn?: string;
+  desc: string;
+  descBn?: string;
+  batch?: string;
+  img: string;
+  order: number;
+  phone?: string;
+  email?: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CommitteeSettings {
+  displayMode: 'carousel' | 'grid';
+  autoScrollSpeedMs: number;
+  sectionTitleEn: string;
+  sectionTitleBn: string;
+  sectionSubtitleEn: string;
+  sectionSubtitleBn: string;
+}
+
 export interface FeeSettings {
   formerStudentFee: number;
   currentStudentFee: number;

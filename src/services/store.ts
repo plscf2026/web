@@ -737,5 +737,7 @@ export class AppStore {
     localStorage.removeItem(STORAGE_KEY_NOTICES);
     localStorage.removeItem(STORAGE_KEY_SETTINGS);
     localStorage.removeItem(STORAGE_KEY_SCAN_LOGS);
+    localStorage.removeItem('plscf_committee_members_v1');
+    localStorage.removeItem('plscf_committee_settings_v1');
   }
 }

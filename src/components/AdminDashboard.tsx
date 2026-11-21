@@ -107,6 +107,9 @@ const GateScannerModule = lazy(() =>
 const GalleryManagementTab = lazy(() =>
   import('./admin/GalleryManagementTab').then((m) => ({ default: m.GalleryManagementTab }))
 );
+const CommitteeManagementTab = lazy(() =>
+  import('./admin/CommitteeManagementTab').then((m) => ({ default: m.CommitteeManagementTab }))
+);
 
 const AdminTabFallback = () => (
   <div className="bg-white rounded-2xl p-12 border border-slate-200 text-center flex flex-col items-center justify-center my-6" role="status">
@@ -322,6 +325,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'finances'
     | 'notices'
     | 'galleryManagement'
+    | 'committeeManagement'
     | 'reports';
 
   const isSuperAdmin = adminSession?.role === 'super_admin';
@@ -1467,6 +1471,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       highlight: true,
       badge: 'Media CMS',
     },
+    {
+      id: 'committeeManagement',
+      label: language === 'bn' ? '👥 পরিচালনা পরিষদ (১৬ জন)' : '👥 Committee Members (16)',
+      icon: Users,
+      highlight: true,
+      badge: '16 Cards',
+    },
     { id: 'reports', label: t.tabReports, icon: Download },
   ];
 
@@ -1705,6 +1716,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     ? t.tabNoticesAdmin
                     : activeTab === 'galleryManagement'
                     ? (language === 'bn' ? '📸 ফটো ও ভিডিও মেমোরিজ' : '📸 Photo & Video Gallery')
+                    : activeTab === 'committeeManagement'
+                    ? (language === 'bn' ? '👥 পরিচালনা পরিষদ (১৬ জন)' : '👥 Committee Members (16)')
                     : activeTab === 'reports'
                     ? t.tabReports
                     : activeTab}
@@ -3169,14 +3182,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3"
                     key={section.id}
                   >
-                    <label className="flex items-center gap-2 text-sm text-slate-700">
-                      <input
-                        checked={section.visible}
-                        onChange={() => toggleHomePageSection(section.id)}
-                        type="checkbox"
-                      />
-                      <span>{homePageSectionLabels[section.id]}</span>
-                    </label>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                        <input
+                          checked={section.visible}
+                          onChange={() => toggleHomePageSection(section.id)}
+                          type="checkbox"
+                        />
+                        <span>{homePageSectionLabels[section.id]}</span>
+                      </label>
+                      {section.id === 'committee' && (
+                        <button
+                          type="button"
+                          onClick={() => handleTabChange('committeeManagement')}
+                          className="px-2 py-0.5 rounded-md bg-sky-50 text-[#0284C7] hover:bg-sky-100 border border-sky-200 text-[11px] font-bold cursor-pointer transition-colors"
+                        >
+                          {language === 'bn' ? '👥 ১৬ সদস্য ও ক্যারোসেল পরিচালনা' : '👥 Edit 16 Members & Carousel'}
+                        </button>
+                      )}
+                    </div>
                     <div className="flex items-center gap-1">
                       <button
                         aria-label={`Move ${homePageSectionLabels[section.id]} up`}
@@ -4155,6 +4179,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {activeTab === 'galleryManagement' && (
         <Suspense fallback={<AdminTabFallback />}>
           <GalleryManagementTab language={language} />
+        </Suspense>
+      )}
+
+      {/* TAB 13.5: ORGANIZING COMMITTEE MANAGEMENT */}
+      {activeTab === 'committeeManagement' && (
+        <Suspense fallback={<AdminTabFallback />}>
+          <CommitteeManagementTab language={language} onNavigateHome={onNavigateHome} />
         </Suspense>
       )}
 
