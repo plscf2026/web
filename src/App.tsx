@@ -83,14 +83,14 @@ export default function App() {
     }
 
     // Role-based session isolation: returning to public Home Page terminates administrative/staff sessions
-    if (view === 'home' && (activeView === 'dashboard' || activeView === 'admin' || activeView === 'login' || activeView === 'scanner')) {
+    if (view === 'home' && (activeView === 'dashboard' || activeView === 'admin' || activeView === 'scanner')) {
       SupabaseService.terminateAdministrativeSession({ forceLocal: true }).catch(() => { });
     }
 
     if (extraParams?.role) {
       const parsedRole = getPortalRoleFromSlug(extraParams.role);
       setCurrentPortalRole(parsedRole || undefined);
-    } else if (view !== 'login' && view !== 'dashboard' && view !== 'admin') {
+    } else if (view !== 'dashboard' && view !== 'admin') {
       setCurrentPortalRole(undefined);
     }
     setActiveView(view);
@@ -451,7 +451,7 @@ export default function App() {
 
             {activeView === 'scanner' && <ScannerPortal language={language} />}
 
-            {(activeView === 'admin' || activeView === 'login' || activeView === 'dashboard') && (
+            {(activeView === 'admin' || activeView === 'dashboard') && (
               <AdminDashboard
                 language={language}
                 portalRole={currentPortalRole}
@@ -459,7 +459,7 @@ export default function App() {
                 onSwitchPortal={(targetRole, toDashboard = false) => {
                   setCurrentPortalRole(targetRole);
                   const slug = PORTAL_ROLE_CONFIGS[targetRole]?.slug || targetRole;
-                  handleNavigate(toDashboard || activeView === 'dashboard' ? 'dashboard' : 'login', false, { role: slug });
+                  handleNavigate(toDashboard || activeView === 'dashboard' ? 'dashboard' : 'admin', false, { role: slug });
                 }}
                 onNavigateHome={() => handleNavigate('home')}
                 onNavigateScanner={() => handleNavigate('scanner')}

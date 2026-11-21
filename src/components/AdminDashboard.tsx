@@ -1319,16 +1319,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     );
   }
 
-  // Check if current route is a login view (/login or /login/:role)
-  const isLoginRoute =
-    activeView === 'login' ||
-    (typeof window !== 'undefined' && window.location.pathname.startsWith('/login'));
+  // Check if current route is an admin portal/gate view (/admin or /admin/:role)
+  const isAdminGateRoute =
+    activeView === 'admin' ||
+    (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin'));
 
   // ==========================================
   // VIEW 1: AUTHENTICATION GATE (ROLE-SPECIFIC LOGIN PORTAL)
-  // Shown when not logged in, OR when explicitly visiting a /login route for a role not yet authorized
+  // Shown when not logged in, OR when visiting an /admin gate for a role not yet authorized
   // ==========================================
-  const shouldShowLoginPage = !adminSession || (isLoginRoute && !isAuthorizedForPortal);
+  const shouldShowLoginPage = !adminSession || (isAdminGateRoute && !isAuthorizedForPortal);
 
   if (shouldShowLoginPage) {
     if (activePortalRole) {
@@ -1339,7 +1339,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           currentAccount={adminSession || undefined}
           onLoginSuccess={(account) => {
             setAdminSession(account);
-            if (isLoginRoute) {
+            if (isAdminGateRoute) {
               onSwitchPortal?.(activePortalRole, true);
             }
           }}

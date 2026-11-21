@@ -7,7 +7,6 @@ import {
   Heart,
   ArrowUpRight,
   Lock,
-  Key,
   QrCode,
 } from 'lucide-react';
 import { Language } from '../types';
@@ -149,11 +148,11 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
                   <div className="flex items-center gap-2">
                     <Lock className="w-4 h-4 text-[#38BDF8]" />
                     <span className="font-bold">
-                      {language === 'bn' ? 'অ্যাডমিন সাইন-আপ / লগইন' : 'Admin Sign-up / Login'}
+                      {language === 'bn' ? 'অ্যাডমিন পোর্টাল' : 'Admin Portal'}
                     </span>
                   </div>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#0284C7] text-white font-mono font-bold">
-                    Single Slot
+                    Admin
                   </span>
                 </button>
               </li>
@@ -198,25 +197,10 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
             {language === 'bn' ? 'সর্বস্বত্ব সংরক্ষিত।' : 'All Rights Reserved.'}
           </div>
 
-          {/* Admin link in bottom bar */}
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => handleDirectPortalNav('login')}
-              className="text-slate-400 hover:text-[#38BDF8] flex items-center gap-1.5 transition-colors cursor-pointer text-xs"
-            >
-              <Key className="w-3.5 h-3.5 text-[#0EA5E9]" />
-              <span>
-                {language === 'bn' ? 'অ্যাডমিন ও রোল পোর্টাল ডিরেক্টরি' : 'Role Portals Directory (Login)'}
-              </span>
-            </button>
-
-            <span className="text-slate-700">•</span>
-
-            <div className="flex items-center gap-1 text-slate-400">
-              <span>{language === 'bn' ? 'ঐতিহ্যের ৬৪ বছর উদ্‌যাপনে' : 'Celebrating 64 Years with'}</span>
-              <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500 inline" />
-              <span>{language === 'bn' ? 'সকল শিক্ষক ও শিক্ষার্থী' : 'Alumni & Students'}</span>
-            </div>
+          <div className="flex items-center gap-1 text-slate-400">
+            <span>{language === 'bn' ? 'ঐতিহ্যের ৬৪ বছর উদ্‌যাপনে' : 'Celebrating 64 Years with'}</span>
+            <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500 inline" />
+            <span>{language === 'bn' ? 'সকল শিক্ষক ও শিক্ষার্থী' : 'Alumni & Students'}</span>
           </div>
         </div>
       </div>

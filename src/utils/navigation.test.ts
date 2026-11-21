@@ -16,10 +16,10 @@ test('1. Navigation: getUrlForView formats URLs correctly', () => {
   assert.equal(getUrlForView('portal'), '/portal');
   assert.equal(getUrlForView('register'), '/register');
   assert.equal(getUrlForView('donate'), '/donate');
-  assert.equal(getUrlForView('login'), '/login');
   assert.equal(getUrlForView('dashboard'), '/dashboard');
   assert.equal(getUrlForView('profile'), '/profile');
   assert.equal(getUrlForView('admin', { tab: 'allBookings' }), '/admin?tab=allBookings');
+  assert.equal(getUrlForView('admin', { role: 'super-admin' }), '/admin/super-admin');
 });
 
 test('2. Navigation: resolveRouteFromLocation resolves from standard pathnames', () => {
@@ -72,7 +72,7 @@ test('2. Navigation: resolveRouteFromLocation resolves from standard pathnames',
   }
 });
 
-test('3. Navigation: resolveRouteFromLocation handles route aliases (login, dashboard, profile, contact)', () => {
+test('3. Navigation: resolveRouteFromLocation handles route aliases (dashboard, profile, contact) and deleted login route returns 404', () => {
   const originalWindow = globalThis.window;
   const mockStorage: Record<string, string> = {};
 
@@ -94,7 +94,12 @@ test('3. Navigation: resolveRouteFromLocation handles route aliases (login, dash
   };
 
   try {
-    assert.equal(resolveRouteFromLocation().view, 'login');
+    // /login has been deleted and must return 404
+    assert.equal(resolveRouteFromLocation().view, '404');
+    assert.equal(resolveRouteFromLocation().notFoundPath, '/login');
+
+    (globalThis as any).window.location.pathname = '/login/super-admin';
+    assert.equal(resolveRouteFromLocation().view, '404');
 
     (globalThis as any).window.location.pathname = '/dashboard';
     assert.equal(resolveRouteFromLocation().view, 'dashboard');
@@ -235,7 +240,7 @@ test('6. Navigation: resolveRouteFromLocation falls back to query param and sess
     assert.ok(VALID_VIEWS.includes('admin'));
     assert.ok(VALID_VIEWS.includes('scanner'));
     assert.ok(VALID_VIEWS.includes('home'));
-    assert.ok(VALID_VIEWS.includes('login'));
+    assert.equal((VALID_VIEWS as readonly string[]).includes('login'), false);
     assert.ok(VALID_VIEWS.includes('dashboard'));
     assert.ok(VALID_VIEWS.includes('profile'));
     assert.ok(VALID_VIEWS.includes('404'));

@@ -17,7 +17,6 @@ export const VALID_VIEWS = [
   'scanner',
   'admin',
   'portal',
-  'login',
   'dashboard',
   'profile',
   '404',
@@ -44,7 +43,6 @@ export const ROUTE_ALIASES: Record<string, AppView> = {
   'registration': 'register',
   'donation': 'donate',
   'lookup': 'find-ticket',
-  'login': 'login',
   'dashboard': 'dashboard',
   'profile': 'profile',
 };
@@ -135,16 +133,6 @@ export function resolveRouteFromLocation(): ResolvedRoute {
     const subSegment = segments[1] || '';
     const cleanPathLower = cleanPath.toLowerCase();
 
-    // Nested login role route: /login/:role (e.g. /login/super-admin, /login/finance)
-    if (primarySegment === 'login') {
-      const parsedRole = subSegment ? getPortalRoleFromSlug(subSegment) : null;
-      return {
-        view: 'login',
-        portalRole: parsedRole || undefined,
-        tab: searchParams.get('tab') || undefined,
-      };
-    }
-
     // Nested dashboard role route: /dashboard/:role (e.g. /dashboard/super-admin, /dashboard/finance)
     if (primarySegment === 'dashboard') {
       const parsedRole = subSegment ? getPortalRoleFromSlug(subSegment) : null;
@@ -187,11 +175,13 @@ export function resolveRouteFromLocation(): ResolvedRoute {
       };
     }
 
-    // Nested admin route: /admin/:tab
+    // Nested admin route: /admin/:roleOrTab (e.g. /admin/super-admin, /admin/finance, /admin/allBookings)
     if (primarySegment === 'admin') {
+      const parsedRole = subSegment ? getPortalRoleFromSlug(subSegment) : null;
       return {
         view: 'admin',
-        tab: subSegment || searchParams.get('tab') || undefined,
+        portalRole: parsedRole || undefined,
+        tab: !parsedRole ? subSegment || searchParams.get('tab') || undefined : searchParams.get('tab') || undefined,
       };
     }
 
@@ -277,8 +267,8 @@ export function getUrlForView(view: string, extraParams?: Record<string, string>
   let basePath = view === 'home' ? '/' : `/${view}`;
   const queryParams: Record<string, string> = { ...(extraParams || {}) };
 
-  // Format dedicated role login and dashboard URLs cleanly (e.g. /login/super-admin, /dashboard/finance)
-  if ((view === 'login' || view === 'dashboard') && queryParams.role) {
+  // Format dedicated role admin and dashboard URLs cleanly (e.g. /admin/super-admin, /dashboard/finance)
+  if ((view === 'admin' || view === 'dashboard') && queryParams.role) {
     const roleSlug = queryParams.role.replace(/_/g, '-');
     delete queryParams.role;
     basePath = `/${view}/${roleSlug}`;

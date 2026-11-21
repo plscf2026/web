@@ -47,12 +47,12 @@ test('2. Role Slug Normalization and URL Resolution', () => {
   assert.equal(getPortalRoleFromSlug('finance'), 'finance_manager');
   assert.equal(getPortalRoleFromSlug('registration'), 'registration_officer');
 
-  // getUrlForView generates clean, dedicated URLs
-  assert.equal(getUrlForView('login', { role: 'super-admin' }), '/login/super-admin');
-  assert.equal(getUrlForView('login', { role: 'admin' }), '/login/admin');
-  assert.equal(getUrlForView('login', { role: 'moderator' }), '/login/moderator');
-  assert.equal(getUrlForView('login', { role: 'finance' }), '/login/finance');
-  assert.equal(getUrlForView('login', { role: 'registration' }), '/login/registration');
+  // getUrlForView generates clean, dedicated admin URLs
+  assert.equal(getUrlForView('admin', { role: 'super-admin' }), '/admin/super-admin');
+  assert.equal(getUrlForView('admin', { role: 'admin' }), '/admin/admin');
+  assert.equal(getUrlForView('admin', { role: 'moderator' }), '/admin/moderator');
+  assert.equal(getUrlForView('admin', { role: 'finance' }), '/admin/finance');
+  assert.equal(getUrlForView('admin', { role: 'registration' }), '/admin/registration');
 
   assert.equal(getUrlForView('dashboard', { role: 'finance' }), '/dashboard/finance');
   assert.equal(getUrlForView('dashboard', { role: 'super-admin' }), '/dashboard/super-admin');
