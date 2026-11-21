@@ -5,7 +5,6 @@ import {
   UserCheck,
   DollarSign,
   UserPlus,
-  Users,
   ArrowRight,
   ShieldCheck,
   Lock,
@@ -40,7 +39,6 @@ export const RoleDirectoryPortal: React.FC<RoleDirectoryPortalProps> = ({
     'moderator',
     'finance_manager',
     'registration_officer',
-    'committee_member',
   ];
 
   const getRoleIcon = (role: PortalRole) => {
@@ -55,8 +53,6 @@ export const RoleDirectoryPortal: React.FC<RoleDirectoryPortalProps> = ({
         return <DollarSign className="w-6 h-6 text-amber-500" />;
       case 'registration_officer':
         return <UserPlus className="w-6 h-6 text-sky-400" />;
-      case 'committee_member':
-        return <Users className="w-6 h-6 text-purple-400" />;
       default:
         return <Shield className="w-6 h-6" />;
     }

@@ -10,8 +10,6 @@ import {
   ArrowUpRight,
   Lock,
   Key,
-  Building,
-  Users,
   Utensils,
   Shirt,
   CreditCard,
@@ -88,9 +86,6 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
     } else if (role === 'finance_manager') {
       sessionStorage.setItem('plscf_admin_active_tab', 'budgetManagement');
       sessionStorage.setItem('plscf_admin_prefill_user', 'finance@gmail.com');
-    } else if (role === 'committee_member') {
-      sessionStorage.setItem('plscf_admin_active_tab', 'reunionManagement');
-      sessionStorage.setItem('plscf_admin_prefill_user', 'committee@gmail.com');
     }
     sessionStorage.setItem('plscf_current_portal_role', slug);
     onNavigate('login', false, { role: slug });
@@ -99,7 +94,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
 
   // Staff Station Navigation Handler (Role 5 stations) with strict session isolation
   const handleSelectStaffStation = async (
-    station: 'gate' | 'meal' | 'dress' | 'card' | 'committee'
+    station: 'gate' | 'meal' | 'dress' | 'card'
   ) => {
     setIsStaffOpen(false);
     try {
@@ -125,8 +120,6 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
       sessionStorage.setItem('plscf_admin_prefill_user', 'idcard.staff@gmail.com');
       sessionStorage.setItem('plscf_admin_auto_login', 'true');
       onNavigate('admin');
-    } else if (station === 'committee') {
-      onNavigate('portal');
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -240,23 +233,6 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
               {language === 'bn' ? 'অপারেশনাল পোর্টাল' : 'Event Operations'}
             </h4>
             <ul className="space-y-2 text-xs">
-              <li>
-                <button
-                  onClick={() => handleDirectPortalNav('portal')}
-                  className="flex items-center justify-between px-3 py-2 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] border border-[#0284C7]/60 text-white w-full transition-all cursor-pointer group shadow-xs"
-                  title="Central Organizing Committee RMS Portal"
-                >
-                  <div className="flex items-center gap-2">
-                    <Building className="w-4 h-4 text-[#38BDF8] group-hover:scale-110 transition-transform" />
-                    <span className="font-bold">
-                      {language === 'bn' ? 'আরএমএস ইআরপি পোর্টাল' : 'RMS Management ERP'}
-                    </span>
-                  </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#0284C7] text-white font-mono font-bold">
-                    2027
-                  </span>
-                </button>
-              </li>
               <li>
                 <button
                   onClick={() => handleDirectPortalNav('scanner')}
@@ -493,31 +469,6 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
                   </p>
                 </div>
               </button>
-
-              {/* 6. Committee Member */}
-              <button
-                type="button"
-                onClick={() => handleSelectExecutiveRole('committee_member')}
-                className="group flex flex-col justify-between p-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-purple-500/30 hover:border-purple-400 transition-all text-left cursor-pointer shadow-md hover:shadow-purple-950/40"
-                title="Committee Member Portal • Collaboration & Task Board"
-              >
-                <div className="flex items-center justify-between gap-1.5 mb-2">
-                  <div className="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300 group-hover:scale-105 transition-transform">
-                    <Users className="w-4 h-4" />
-                  </div>
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-purple-300/80 bg-purple-900/30 px-2 py-0.5 rounded-full border border-purple-800/40">
-                    Committee
-                  </span>
-                </div>
-                <div>
-                  <h5 className="text-xs font-bold text-white group-hover:text-purple-200 transition-colors">
-                    {language === 'bn' ? '৬. কমিটি পোর্টাল' : '6. Committee'}
-                  </h5>
-                  <p className="text-[11px] text-slate-400 leading-tight mt-0.5">
-                    {language === 'bn' ? 'সমন্বয় ও টাস্ক ম্যানেজমেন্ট' : 'RMS & Planning'}
-                  </p>
-                </div>
-              </button>
             </div>
 
             {/* Field Staff Station Bar with Expandable Popover */}
@@ -663,30 +614,6 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
                         </div>
                         <span className="text-[10px] font-mono text-indigo-400 bg-indigo-950/80 px-2 py-0.5 rounded border border-indigo-800/60 font-semibold">
                           idcard.staff
-                        </span>
-                      </button>
-
-                      {/* Station 5: Committee Dir */}
-                      <button
-                        type="button"
-                        onClick={() => handleSelectStaffStation('committee')}
-                        className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-900/90 hover:bg-purple-950/40 border border-slate-800 hover:border-purple-500/50 text-left transition-colors cursor-pointer group"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-400 shrink-0 group-hover:scale-105 transition-transform">
-                            <Building className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <div className="text-xs font-bold text-white group-hover:text-purple-300">
-                              {language === 'bn' ? 'কমিটি ডিরেক্টর (Committee Dir)' : 'Committee Dir'}
-                            </div>
-                            <div className="text-[11px] text-slate-400 leading-tight">
-                              Central RMS Directorate ERP Portal
-                            </div>
-                          </div>
-                        </div>
-                        <span className="text-[10px] font-mono text-purple-400 bg-purple-950/80 px-2 py-0.5 rounded border border-purple-800/60 font-semibold">
-                          director ERP
                         </span>
                       </button>
                     </div>

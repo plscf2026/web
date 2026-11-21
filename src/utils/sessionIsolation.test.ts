@@ -133,7 +133,7 @@ test('Scenario 3: Finance -> Moderator Login terminates session & isolates roles
   assert.equal(sessionStore['plscf_current_portal_role'], undefined);
 });
 
-test('Scenario 4: Moderator -> Committee Login terminates session & isolates roles', async () => {
+test('Scenario 4: Moderator -> Registration Login terminates session & isolates roles', async () => {
   const { localStore, sessionStore } = setupMockBrowser();
 
   localStore['plscf_test_admin_session'] = JSON.stringify({
@@ -143,9 +143,9 @@ test('Scenario 4: Moderator -> Committee Login terminates session & isolates rol
   });
   sessionStore['plscf_current_portal_role'] = 'moderator';
 
-  const targetRole: PortalRole = 'committee_member';
+  const targetRole: PortalRole = 'registration_officer';
   const targetSlug = PORTAL_ROLE_CONFIGS[targetRole].slug;
-  assert.equal(targetSlug, 'committee');
+  assert.equal(targetSlug, 'registration');
 
   const result = await SupabaseService.terminateAdministrativeSession({ forceLocal: true });
   assert.equal(result.success, true);
@@ -457,7 +457,6 @@ test('Scenario 15: Strict preservation of unrelated application data during logo
   sessionStore['plscf_scanner_module'] = 'gate_scanner';
   sessionStore['plscf_scanner_prefill_user'] = 'gate@gmail.com';
   sessionStore['plscf_scanner_auto_login'] = 'true';
-  sessionStore['plscf_rms_active_tab'] = 'tasks';
 
   // Populate CRITICAL NON-AUTH data that MUST be preserved
   const sampleRegistrations = JSON.stringify([{ id: 'PLSCF-2027-0001', name: 'Alumni 1' }]);
@@ -479,7 +478,6 @@ test('Scenario 15: Strict preservation of unrelated application data during logo
   localStore['plscf_scan_logs_2027'] = '[]';
   localStore['plscf_verified_student_ids'] = '["STD-100"]';
   localStore['plscf_idcard_records_2027'] = '[]';
-  localStore['plscf_rms_cache'] = '{"cached":true}';
 
   // Perform session termination
   const res = await SupabaseService.terminateAdministrativeSession({ forceLocal: true });
@@ -495,7 +493,6 @@ test('Scenario 15: Strict preservation of unrelated application data during logo
   assert.equal(sessionStore['plscf_scanner_module'], undefined);
   assert.equal(sessionStore['plscf_scanner_prefill_user'], undefined);
   assert.equal(sessionStore['plscf_scanner_auto_login'], undefined);
-  assert.equal(sessionStore['plscf_rms_active_tab'], undefined);
 
   // 2. Verify ALL non-auth keys are strictly preserved
   assert.equal(localStore['plscf_lang'], 'bn');
@@ -512,5 +509,4 @@ test('Scenario 15: Strict preservation of unrelated application data during logo
   assert.equal(localStore['plscf_scan_logs_2027'], '[]');
   assert.equal(localStore['plscf_verified_student_ids'], '["STD-100"]');
   assert.equal(localStore['plscf_idcard_records_2027'], '[]');
-  assert.equal(localStore['plscf_rms_cache'], '{"cached":true}');
 });

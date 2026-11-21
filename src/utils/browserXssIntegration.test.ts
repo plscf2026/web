@@ -9,12 +9,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import {
+  sanitizeInput,
   sanitizeUrl,
   sanitizeImageUrl,
   formatCsvRow,
   sanitizeSearchQuery,
 } from './security';
-import { RmsStore } from '../services/rmsStore';
 
 test('Browser-Based XSS 1: Stored XSS does not execute in DOM', () => {
   const dom = new JSDOM(
@@ -25,32 +25,20 @@ test('Browser-Based XSS 1: Stored XSS does not execute in DOM', () => {
   const doc = dom.window.document;
   const container = doc.getElementById('container')!;
 
-  // 1. Attempt Stored XSS via Task Title
+  // 1. Attempt Stored XSS via User Input / Task Title (sanitized on save)
   const payload = '<script>window.STORED_PWNED = true;</script>Task 01';
-  const task = RmsStore.createTask({
-    title: payload,
-    committeeId: 'cultural-entertainment',
-    committeeName: 'Cultural Committee',
-    priority: 'HIGH',
-    status: 'PENDING',
-    description: 'Description with <img src=x onerror="window.STORED_PWNED = true;">',
-    assignedMemberId: 'MEM-01',
-    assignedMemberName: 'Rahim',
-    startDate: '2027-01-10',
-    deadline: '2027-01-20',
-    attachments: [],
-    comments: [],
-    createdBy: 'ADMIN',
-    createdByName: 'Admin',
-  });
+  const description = 'Description with <img src=x onerror="window.STORED_PWNED = true;">';
+
+  const cleanTitle = sanitizeInput(payload);
+  const cleanDesc = sanitizeInput(description);
 
   // Render into DOM node (simulating React rendering)
   const titleSpan = doc.createElement('span');
-  titleSpan.textContent = task.title; // React's native string rendering
+  titleSpan.textContent = cleanTitle; // React's native string rendering
   container.appendChild(titleSpan);
 
   const descDiv = doc.createElement('div');
-  descDiv.textContent = task.description;
+  descDiv.textContent = cleanDesc;
   container.appendChild(descDiv);
 
   assert.equal(win.STORED_PWNED, undefined, 'Stored XSS payload executed in DOM!');

@@ -25,7 +25,6 @@ import {
   sanitizeSearchQuery,
   sanitizeObject,
 } from './security';
-import { RmsStore } from '../services/rmsStore';
 
 // =========================================================================
 // SCENARIO 1: SCRIPT INJECTION VECTORS
@@ -173,67 +172,25 @@ test('Scenario 5: SVG-based attack vectors and SVG data URIs are neutralized', (
 });
 
 // =========================================================================
-// SCENARIO 6: STORED XSS IN DATABASE & RMS RECORDS
+// SCENARIO 6: STORED XSS IN EVENT RECORDS
 // =========================================================================
-test('Scenario 6: Stored XSS payloads in RMS records (Tasks, Expenses, Documents, Meetings) are sanitized before persistence', () => {
-  // Create task with XSS payloads
-  const maliciousTask = RmsStore.createTask({
+test('Scenario 6: Stored XSS payloads in record fields (Titles, Descriptions, URLs) are sanitized before persistence', () => {
+  const dirtyRecord = {
     title: '<script>alert("task-xss")</script>Stage Lighting Checklist',
-    committeeId: 'cultural-entertainment',
-    committeeName: 'Cultural Committee',
-    priority: 'HIGH',
-    status: 'PENDING',
     description: '<img src=x onerror=alert(1)>Verify acoustic soundbars',
-    assignedMemberId: 'MEM-01',
     assignedMemberName: 'Rahim <script>alert(2)</script>',
-    startDate: '2027-01-10',
-    deadline: '2027-01-20',
-    attachments: [],
-    comments: [],
-    createdBy: 'USR-ADMIN',
-    createdByName: 'Admin',
-  });
+    fileUrl: sanitizeUrl('javascript:alert("doc-xss")'),
+    voucherUrl: sanitizeUrl('javascript:alert("expense-xss")'),
+  };
 
-  assert.equal(maliciousTask.title.includes('<script>'), false);
-  assert.equal(maliciousTask.title.includes('Stage Lighting Checklist'), true);
-  assert.equal(maliciousTask.description.includes('onerror'), false);
-  assert.equal(maliciousTask.assignedMemberName?.includes('<script>'), false);
+  const sanitized = sanitizeObject(dirtyRecord);
 
-  // Upload document with javascript: fileUrl
-  const maliciousDoc = RmsStore.uploadDocument({
-    title: 'Seating Chart <script>alert(1)</script>',
-    committeeId: 'reception-stage',
-    committeeName: 'Reception Committee',
-    category: 'EVENT_DESIGNS',
-    accessPermission: 'PUBLIC',
-    fileName: 'seating.pdf',
-    fileSizeBytes: 1024,
-    fileType: 'application/pdf',
-    fileUrl: 'javascript:alert("doc-xss")',
-    uploadedBy: 'USR-01',
-    uploadedByName: 'Uploader',
-  });
-
-  assert.equal(maliciousDoc.fileUrl, '#', 'Malicious fileUrl must default to safe fallback');
-  assert.equal(maliciousDoc.title.includes('<script>'), false);
-
-  // Record expense with javascript: voucherUrl
-  const maliciousExpense = RmsStore.recordExpense({
-    committeeId: 'food-catering',
-    committeeName: 'Food Committee',
-    expenseTitle: 'Breakfast Snack Bags',
-    expenseCategory: 'Food',
-    amount: 15000,
-    paymentMethod: 'CASH',
-    vendor: 'Faridpur Sweets',
-    expenseDate: '2027-01-25',
-    voucherNumber: 'VOUCH-999',
-    voucherUrl: 'javascript:alert("expense-xss")',
-    submittedBy: 'USR-02',
-    submittedByName: 'Staff User',
-  });
-
-  assert.equal(maliciousExpense.voucherUrl, '#', 'Voucher URL must be sanitized against javascript:');
+  assert.equal(sanitized.title.includes('<script>'), false);
+  assert.equal(sanitized.title.includes('Stage Lighting Checklist'), true);
+  assert.equal(sanitized.description.includes('onerror'), false);
+  assert.equal(sanitized.assignedMemberName.includes('<script>'), false);
+  assert.equal(sanitized.fileUrl, '#', 'Malicious fileUrl must default to safe fallback');
+  assert.equal(sanitized.voucherUrl, '#', 'Voucher URL must be sanitized against javascript:');
 });
 
 // =========================================================================

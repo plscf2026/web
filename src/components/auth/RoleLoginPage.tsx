@@ -123,7 +123,6 @@ export const RoleLoginPage: React.FC<RoleLoginPageProps> = ({
     'moderator',
     'finance_manager',
     'registration_officer',
-    'committee_member',
   ];
 
   return (

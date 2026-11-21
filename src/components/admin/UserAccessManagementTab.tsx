@@ -1267,7 +1267,6 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                       <option value="finance_manager">Finance Manager</option>
                       <option value="moderator">System Moderator</option>
                       <option value="registration_officer">Registration Officer</option>
-                      <option value="committee_member">Committee Member</option>
                     </select>
                   ) : (
                     <select

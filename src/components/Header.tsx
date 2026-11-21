@@ -11,7 +11,6 @@ import {
   Bell,
   Image as ImageIcon,
   Info,
-  Building,
 } from 'lucide-react';
 import { Language } from '../types';
 import { translations } from '../i18n/translations';
@@ -72,20 +71,6 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div className="flex items-center justify-center gap-2 sm:gap-3 text-[11px] w-full md:w-auto">
-            {/* RMS ERP Management Portal Button */}
-            <button
-              onClick={() => handleNav('portal')}
-              className={`flex items-center gap-1 px-3 py-0.5 rounded-full text-[11px] font-bold transition-all shadow-xs cursor-pointer ${
-                activeView === 'portal'
-                  ? 'bg-[#0EA5E9] text-white'
-                  : 'bg-[#0284C7] hover:bg-[#0EA5E9] text-white'
-              }`}
-              title="Central Organizing Committee ERP Portal"
-            >
-              <Building className="w-3.5 h-3.5" />
-              <span>{language === 'bn' ? 'আরএমএস পোর্টাল' : 'RMS Portal'}</span>
-            </button>
-
             {/* Quick Scanner Portal Switcher */}
             <button
               onClick={() => handleNav('scanner')}

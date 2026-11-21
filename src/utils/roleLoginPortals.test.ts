@@ -36,10 +36,6 @@ test('1. Exact Official Portal Titles for All 6 Roles', () => {
     PORTAL_ROLE_CONFIGS.registration_officer.titleEn,
     'Police Lines School & College Reunion Registration Portal'
   );
-  assert.equal(
-    PORTAL_ROLE_CONFIGS.committee_member.titleEn,
-    'Police Lines School & College Reunion Committee Portal'
-  );
 });
 
 test('2. Role Slug Normalization and URL Resolution', () => {
@@ -50,7 +46,6 @@ test('2. Role Slug Normalization and URL Resolution', () => {
   assert.equal(getPortalRoleFromSlug('moderator'), 'moderator');
   assert.equal(getPortalRoleFromSlug('finance'), 'finance_manager');
   assert.equal(getPortalRoleFromSlug('registration'), 'registration_officer');
-  assert.equal(getPortalRoleFromSlug('committee'), 'committee_member');
 
   // getUrlForView generates clean, dedicated URLs
   assert.equal(getUrlForView('login', { role: 'super-admin' }), '/login/super-admin');
@@ -58,7 +53,6 @@ test('2. Role Slug Normalization and URL Resolution', () => {
   assert.equal(getUrlForView('login', { role: 'moderator' }), '/login/moderator');
   assert.equal(getUrlForView('login', { role: 'finance' }), '/login/finance');
   assert.equal(getUrlForView('login', { role: 'registration' }), '/login/registration');
-  assert.equal(getUrlForView('login', { role: 'committee' }), '/login/committee');
 
   assert.equal(getUrlForView('dashboard', { role: 'finance' }), '/dashboard/finance');
   assert.equal(getUrlForView('dashboard', { role: 'super-admin' }), '/dashboard/super-admin');
@@ -77,8 +71,6 @@ test('3. Synonym Role Normalization across Database and API', () => {
   assert.equal(normalizePortalRole('registration'), 'registration_officer');
   assert.equal(normalizePortalRole('registration_officer'), 'registration_officer');
   assert.equal(normalizePortalRole('reg_team'), 'registration_officer');
-  assert.equal(normalizePortalRole('committee'), 'committee_member');
-  assert.equal(normalizePortalRole('committee_member'), 'committee_member');
   assert.equal(normalizePortalRole('unknown_role'), null);
 });
 
@@ -114,10 +106,6 @@ test('5. Strict Role Authentication - Allowed vs Unauthorized Mismatch', async (
   assert.equal(modLogin.success, true);
   assert.equal(modLogin.account?.role, 'moderator');
 
-  const comLogin = await SupabaseService.loginAdmin('committee@gmail.com', 'admin@123', 'committee_member');
-  assert.equal(comLogin.success, true);
-  assert.equal(comLogin.account?.role, 'committee_member');
-
   // 5.2 Mismatched role is strictly REJECTED (Requirement 6: prevent accessing another portal)
   const rejectedAttempt1 = await SupabaseService.loginAdmin('finance@gmail.com', 'admin@123', 'super_admin');
   assert.equal(rejectedAttempt1.success, false);
@@ -128,10 +116,6 @@ test('5. Strict Role Authentication - Allowed vs Unauthorized Mismatch', async (
   assert.equal(rejectedAttempt2.success, false);
   assert.ok(rejectedAttempt2.error?.includes('Access Denied'));
   assert.ok(rejectedAttempt2.error?.includes('Finance Portal'));
-
-  const rejectedAttempt3 = await SupabaseService.loginAdmin('registration@gmail.com', 'admin@123', 'committee_member');
-  assert.equal(rejectedAttempt3.success, false);
-  assert.ok(rejectedAttempt3.error?.includes('Access Denied'));
 
   // 5.3 Super Admin account can access any portal view (global oversight)
   const superOnFinance = await SupabaseService.loginAdmin('admin@gmail.com', 'admin@123', 'finance_manager');
@@ -145,7 +129,6 @@ test('6. Role Module Permission Isolation (Allowed Tabs)', () => {
   assert.ok(financeTabs.includes('budgetManagement'));
   assert.ok(financeTabs.includes('dailyAnalytics'));
   assert.ok(financeTabs.includes('manualApproval'));
-  assert.equal(financeTabs.includes('reunionManagement'), false);
   assert.equal(financeTabs.includes('tickets'), false);
 
   const regTabs = PORTAL_ROLE_CONFIGS.registration_officer.allowedTabs;
@@ -154,13 +137,6 @@ test('6. Role Module Permission Isolation (Allowed Tabs)', () => {
   assert.ok(regTabs.includes('allBookings'));
   assert.equal(regTabs.includes('budgetManagement'), false);
   assert.equal(regTabs.includes('dailyAnalytics'), false);
-
-  const comTabs = PORTAL_ROLE_CONFIGS.committee_member.allowedTabs;
-  assert.ok(comTabs.includes('reunionManagement'));
-  assert.ok(comTabs.includes('notices'));
-  assert.equal(comTabs.includes('budgetManagement'), false);
-  assert.equal(comTabs.includes('studentIds'), false);
-  assert.equal(comTabs.includes('manualRegistration'), false);
 
   const modTabs = PORTAL_ROLE_CONFIGS.moderator.allowedTabs;
   assert.ok(modTabs.includes('tickets'));

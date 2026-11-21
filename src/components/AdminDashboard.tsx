@@ -25,7 +25,6 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronRight,
-  Landmark,
   CreditCard,
   Layers,
   Menu,
@@ -98,9 +97,6 @@ import { UserAccessManagementTab } from './admin/UserAccessManagementTab';
 import { AdminStudentPhotoModal } from './admin/photos/AdminStudentPhotoModal';
 import { ThankYouCardModal } from './ThankYouCardModal';
 // Heavy administrative portals loaded lazily to preserve bundle performance
-const AdminRmsContainer = lazy(() =>
-  import('./admin/rms/AdminRmsContainer').then((m) => ({ default: m.AdminRmsContainer }))
-);
 const IdCardManagementPortal = lazy(() =>
   import('./admin/idcard/IdCardManagementPortal').then((m) => ({ default: m.IdCardManagementPortal }))
 );
@@ -296,7 +292,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // DASHBOARD DATA STATE
   // ==========================================
   type AdminTab =
-    | 'reunionManagement'
+    | 'overview'
     | 'userAccessManagement'
     | 'idCardManagement'
     | 'manualRegistration'
@@ -310,7 +306,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'gateManagement'
     | 'securityAudit'
     | 'studentIds'
-    | 'overview'
     | 'registrations'
     | 'feeSettings'
     | 'payments'
@@ -337,12 +332,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       try {
         const sp = new URLSearchParams(window.location.search);
         const tabParam = sp.get('tab');
-        if (tabParam) return tabParam as AdminTab;
+        if (tabParam && tabParam !== 'reunionManagement') return tabParam as AdminTab;
         const saved = sessionStorage.getItem('plscf_admin_active_tab');
-        if (saved) return saved as AdminTab;
+        if (saved && saved !== 'reunionManagement') return saved as AdminTab;
       } catch (_) {}
     }
-    return 'reunionManagement';
+    return 'overview';
   });
 
   const handleTabChange = (tabId: AdminTab) => {
@@ -1394,13 +1389,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }
 
   const allNavigationTabs = [
-    {
-      id: 'reunionManagement',
-      label: language === 'bn' ? '🏛️ পুনর্মিলনী ইআরপি (RMS)' : '🏛️ Reunion Management (RMS)',
-      icon: Landmark,
-      highlight: true,
-      badge: 'ERP 2027',
-    },
     ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('userAccessManagement' as any)
       ? [
           {
@@ -1667,9 +1655,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   {language === 'bn' ? 'বর্তমান সেকশন' : 'Current Section'}
                 </span>
                 <span className="text-xs font-black text-slate-900 truncate block">
-                  {activeTab === 'reunionManagement'
-                    ? (language === 'bn' ? '🏛️ পুনর্মিলনী ইআরপি (RMS)' : '🏛️ Reunion Management (RMS)')
-                    : activeTab === 'userAccessManagement'
+                  {activeTab === 'userAccessManagement'
                     ? (language === 'bn' ? '👥 ইউজার ও এক্সেস ম্যানেজমেন্ট' : '👥 User & Access Management')
                     : activeTab === 'idCardManagement'
                     ? (language === 'bn' ? '🪪 আইডি কার্ড পোর্টাল' : '🪪 Student ID Cards')
@@ -1715,17 +1701,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>{language === 'bn' ? 'সকল মেনু' : 'All Modules'}</span>
             </button>
           </div>
-
-      {/* TAB: REUNION MANAGEMENT SYSTEM (RMS - 12 INTEGRATED MODULES) */}
-      {activeTab === 'reunionManagement' && (
-        <Suspense fallback={<AdminTabFallback />}>
-          <AdminRmsContainer
-            language={language}
-            registrations={registrations}
-            adminSession={adminSession}
-          />
-        </Suspense>
-      )}
 
       {/* TAB: STUDENT ID CARD MANAGEMENT SYSTEM */}
       {activeTab === 'idCardManagement' && (

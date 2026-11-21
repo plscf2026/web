@@ -1903,7 +1903,6 @@ export const SupabaseService = {
         normalizedEmail === 'moderator@gmail.com' ||
         normalizedEmail === 'registration@gmail.com' ||
         normalizedEmail === 'finance@gmail.com' ||
-        normalizedEmail === 'committee@gmail.com' ||
         normalizedEmail === 'idcard.staff@gmail.com' ||
         normalizedEmail === 'supervisor@gmail.com'
       )
@@ -1928,10 +1927,6 @@ export const SupabaseService = {
         role = 'finance_manager';
         fullName = 'Md. Shafiqul Alam (Finance Secretary)';
         id = 'admin-fin-001';
-      } else if (normalizedEmail === 'committee@gmail.com') {
-        role = 'committee_member';
-        fullName = 'Executive Committee Member';
-        id = 'admin-comm-001';
       } else if (normalizedEmail === 'idcard.staff@gmail.com') {
         role = 'super_admin';
         fullName = 'Kamrul Hasan (ID Card Coordinator)';
@@ -2150,7 +2145,6 @@ export const SupabaseService = {
         sessionStorage.removeItem('plscf_scanner_module');
         sessionStorage.removeItem('plscf_scanner_prefill_user');
         sessionStorage.removeItem('plscf_scanner_auto_login');
-        sessionStorage.removeItem('plscf_rms_active_tab');
       } catch (_) {}
     }
 

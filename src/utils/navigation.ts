@@ -177,13 +177,6 @@ export function resolveRouteFromLocation(): ResolvedRoute {
         tab: subSegment || searchParams.get('tab') || undefined,
       };
     }
-    if (primarySegment === 'committee') {
-      return {
-        view: 'dashboard',
-        portalRole: 'committee_member',
-        tab: subSegment || searchParams.get('tab') || undefined,
-      };
-    }
 
     // Dynamic ticket route: /ticket/:idOrToken
     if (primarySegment === 'ticket') {

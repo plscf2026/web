@@ -248,8 +248,7 @@ export type PortalRole =
   | 'admin'
   | 'moderator'
   | 'finance_manager'
-  | 'registration_officer'
-  | 'committee_member';
+  | 'registration_officer';
 
 export interface PortalRoleConfig {
   role: PortalRole;
@@ -459,32 +458,6 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
       fullName: 'Registration Desk Officer',
     },
   },
-  committee_member: {
-    role: 'committee_member',
-    slug: 'committee',
-    titleEn: 'Police Lines School & College Reunion Committee Portal',
-    titleBn: 'পুলিশ লাইন্স স্কুল অ্যান্ড কলেজ পুনর্মিলনী কমিটি পোর্টাল',
-    taglineEn: 'Organizing Committee Collaboration & Task Management',
-    taglineBn: 'আয়োজক কমিটি সমন্বয় ও টাস্ক ম্যানেজমেন্ট',
-    descriptionEn: 'Collaborative workspace for Reunion Executive Committee members, subcommittees, directors, and volunteers. Plan schedules, manage agendas, task boards, and sponsors.',
-    descriptionBn: 'নির্বাহী কমিটি সদস্য ও উপকমিটির জন্য কার্যক্রম সমন্বয় ও মিটিং রেজুলেশন পোর্টাল।',
-    badgeLabelEn: 'COMMITTEE PORTAL',
-    badgeLabelBn: 'কমিটি পোর্টাল',
-    themeColor: 'purple',
-    bgGradient: 'from-slate-950 via-slate-900 to-purple-950',
-    headerBg: 'bg-slate-900 border-purple-500/30',
-    accentBorder: 'border-purple-500',
-    accentText: 'text-purple-400',
-    accentButton: 'bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-purple-500/20',
-    iconName: 'Users',
-    defaultTab: 'reunionManagement',
-    allowedTabs: ['reunionManagement', 'notices', 'reports'],
-    demoCredentials: {
-      email: 'committee@gmail.com',
-      password: 'admin@123',
-      fullName: 'Executive Committee Member',
-    },
-  },
 };
 
 /**
@@ -498,7 +471,6 @@ export function normalizePortalRole(raw: string | undefined | null): PortalRole 
   if (clean === 'moderator' || clean === 'mod') return 'moderator';
   if (clean === 'finance' || clean === 'finance_manager' || clean === 'finance_team') return 'finance_manager';
   if (clean === 'registration' || clean === 'registration_officer' || clean === 'reg_team') return 'registration_officer';
-  if (clean === 'committee' || clean === 'committee_member') return 'committee_member';
   return null;
 }
 
@@ -513,7 +485,6 @@ export function getPortalRoleFromSlug(slug: string | undefined | null): PortalRo
   if (clean === 'moderator') return 'moderator';
   if (clean === 'finance') return 'finance_manager';
   if (clean === 'registration') return 'registration_officer';
-  if (clean === 'committee') return 'committee_member';
   return null;
 }
 
@@ -783,5 +754,3 @@ export interface ContactInquiry {
   createdAt: string;
   status: 'NEW' | 'RESOLVED';
 }
-
-export * from './rms';

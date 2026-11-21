@@ -81,7 +81,7 @@ export class UserManagementService {
           let cat: RoleCategory = 'ADMIN';
           if (roleLower.includes('super')) cat = 'SUPER_ADMIN';
           else if (roleLower.includes('finance')) cat = 'FINANCE';
-          else if (roleLower.includes('moderator') || roleLower.includes('officer') || roleLower.includes('committee')) cat = 'MANAGER';
+          else if (roleLower.includes('moderator') || roleLower.includes('officer')) cat = 'MANAGER';
 
           const st: UserStatus = a.is_locked ? 'INACTIVE' : (a.status || 'ACTIVE');
 
@@ -213,7 +213,7 @@ export class UserManagementService {
       MANAGER: {
         titleEn: 'Manager Management',
         titleBn: 'ম্যানেজার ও মডারেটর ব্যবস্থাপনা',
-        descEn: 'Committee members, venue managers, registration desk officers, and module moderators.',
+        descEn: 'Venue managers, registration desk officers, and module moderators.',
         themeColor: 'indigo',
         accentBg: 'bg-indigo-500/10 hover:bg-indigo-500/15',
         accentBorder: 'border-indigo-400',

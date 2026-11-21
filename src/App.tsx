@@ -33,7 +33,6 @@ const GalleryPage = lazy(() => import('./components/GalleryPage').then((m) => ({
 const AboutContactPage = lazy(() => import('./components/AboutContactPage').then((m) => ({ default: m.AboutContactPage })));
 const ScannerPortal = lazy(() => import('./components/ScannerPortal').then((m) => ({ default: m.ScannerPortal })));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard').then((m) => ({ default: m.AdminDashboard })));
-const RmsManagementPortal = lazy(() => import('./components/rms/RmsManagementPortal').then((m) => ({ default: m.RmsManagementPortal })));
 const NotFoundPage = lazy(() => import('./components/common/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
 const PageLoadingFallback = () => (
@@ -84,7 +83,7 @@ export default function App() {
     }
 
     // Role-based session isolation: returning to public Home Page terminates administrative/staff sessions
-    if (view === 'home' && (activeView === 'dashboard' || activeView === 'admin' || activeView === 'login' || activeView === 'scanner' || activeView === 'portal')) {
+    if (view === 'home' && (activeView === 'dashboard' || activeView === 'admin' || activeView === 'login' || activeView === 'scanner')) {
       SupabaseService.terminateAdministrativeSession({ forceLocal: true }).catch(() => {});
     }
 
@@ -350,27 +349,6 @@ export default function App() {
     handleNavigate('register');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
-  if (activeView === 'portal') {
-    return (
-      <ErrorBoundary
-        fallbackTitle={language === 'bn' ? 'আরএমএস পোর্টাল লোড করতে সমস্যা হয়েছে' : 'RMS Portal Notice'}
-        fallbackMessage={
-          language === 'bn'
-            ? 'আরএমএস পোর্টাল লোড করতে একটি ত্রুটি ঘটেছে। দয়া করে পুনরায় চেষ্টা করুন অথবা হোমে ফিরে যান।'
-            : 'An unexpected issue occurred while rendering the RMS portal. Please try again or return home.'
-        }
-        showHomeButton
-        onNavigateHome={() => handleNavigate('home')}
-      >
-        <Suspense fallback={<PageLoadingFallback />}>
-          <RmsManagementPortal
-            onBackToPublic={() => handleNavigate('home')}
-          />
-        </Suspense>
-      </ErrorBoundary>
-    );
-  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f0f6fa] text-[#0f172a] antialiased selection:bg-[#0284c7] selection:text-white font-satoshi">
