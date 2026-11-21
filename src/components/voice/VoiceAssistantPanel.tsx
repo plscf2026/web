@@ -185,8 +185,11 @@ export const VoiceAssistantPanel: React.FC<VoiceAssistantPanelProps> = ({ classN
                     <button
                       type="button"
                       onClick={() => {
+                        VoiceAssistant.unlockAudioAndStart();
                         if (state.isPaused) {
                           VoiceAssistant.resume();
+                        } else if (state.currentStep === 'welcome') {
+                          VoiceAssistant.playWelcome(true);
                         } else {
                           VoiceAssistant.repeatCurrent();
                         }
@@ -201,12 +204,29 @@ export const VoiceAssistantPanel: React.FC<VoiceAssistantPanelProps> = ({ classN
                   {/* Repeat Current */}
                   <button
                     type="button"
-                    onClick={() => VoiceAssistant.repeatCurrent()}
+                    onClick={() => {
+                      VoiceAssistant.unlockAudioAndStart();
+                      VoiceAssistant.repeatCurrent();
+                    }}
                     className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 flex items-center gap-1.5 transition cursor-pointer"
                     title="Repeat Current Field Instruction"
                   >
                     <RotateCcw className="w-3.5 h-3.5 text-indigo-400" />
                     <span>{state.language === 'bn' ? 'পুনরায় শুনুন' : 'Repeat'}</span>
+                  </button>
+
+                  {/* Welcome Message Replay */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      VoiceAssistant.unlockAudioAndStart();
+                      VoiceAssistant.playWelcome(true);
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold border border-amber-500/40 flex items-center gap-1 transition cursor-pointer"
+                    title="Play Official Bengali Welcome Greeting"
+                  >
+                    <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{state.language === 'bn' ? 'স্বাগতম' : 'Welcome'}</span>
                   </button>
                 </div>
 
@@ -239,13 +259,14 @@ export const FieldVoiceButton: React.FC<FieldVoiceButtonProps> = ({ stepKey, lab
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
+        VoiceAssistant.unlockAudioAndStart();
         VoiceAssistant.speakStep(stepKey, true);
       }}
       className={`inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-full transition-all cursor-pointer active:scale-95 ${className}`}
       title="Tap to hear voice guidance for this field"
     >
       <Volume2 className="w-3 h-3 text-indigo-600 shrink-0" />
-      <span>{label || 'শুনুন'}</span>
+      <span>{label || '🔊 শুনুন'}</span>
     </button>
   );
 };

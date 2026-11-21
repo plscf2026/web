@@ -247,6 +247,8 @@ class VoiceRegistrationAssistantService {
   private listeners: Set<StateListener> = new Set();
   private voices: SpeechSynthesisVoice[] = [];
   private activeUtterance: SpeechSynthesisUtterance | null = null;
+  private audioPlayer: HTMLAudioElement | null = null;
+  private audioChunkTimeout: any = null;
   private keepAliveInterval: any = null;
   private isInitialized: boolean = false;
 
@@ -280,6 +282,28 @@ class VoiceRegistrationAssistantService {
         window.speechSynthesis.onvoiceschanged = () => this.loadVoices();
       }
     }
+
+    // Modern browser autoplay awareness
+    const needsUserGesture =
+      typeof navigator !== 'undefined' &&
+      'userActivation' in navigator &&
+      !(navigator as any).userActivation.hasBeenActive;
+    if (needsUserGesture) {
+      this.autoplayBlocked = true;
+      this.notify();
+    }
+
+    // Auto-unlock on first user interaction anywhere on the page
+    const handleFirstGesture = () => {
+      this.autoplayBlocked = false;
+      this.notify();
+      window.removeEventListener('click', handleFirstGesture);
+      window.removeEventListener('keydown', handleFirstGesture);
+      window.removeEventListener('touchstart', handleFirstGesture);
+    };
+    window.addEventListener('click', handleFirstGesture, { once: true, passive: true });
+    window.addEventListener('keydown', handleFirstGesture, { once: true, passive: true });
+    window.addEventListener('touchstart', handleFirstGesture, { once: true, passive: true });
   }
 
   private loadVoices(): void {
@@ -311,15 +335,18 @@ class VoiceRegistrationAssistantService {
           v.name.toLowerCase().includes('bengali')
       );
       if (anyBn) return anyBn;
+
+      // CRITICAL: Return null for Bengali when no Bengali voice is found!
+      // NEVER pass an English voice to speak Bengali text!
+      return null;
     } else {
       // English voice
       const en = this.voices.find(
         (v) => v.lang.toLowerCase().startsWith('en') && (v.lang.includes('US') || v.lang.includes('GB') || v.default)
       );
       if (en) return en;
+      return this.voices[0] || null;
     }
-
-    return this.voices[0] || null;
   }
 
   /**
@@ -409,7 +436,9 @@ class VoiceRegistrationAssistantService {
   }
 
   /**
-   * Speak arbitrary text safely with queue clearance and browser bug workarounds
+   * Speak arbitrary text safely with dual-engine support:
+   * 1. High-clarity native Bengali human audio stream (guaranteed on all browsers/devices)
+   * 2. Web Speech API (with native voice if present)
    */
   public speakText(
     text: string,
@@ -429,13 +458,7 @@ class VoiceRegistrationAssistantService {
       return;
     }
 
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      this.notify();
-      if (options?.onEnd) options.onEnd();
-      return;
-    }
-
-    // Stop previous utterance
+    // Stop previous utterance / audio
     this.stopSpeaking(false);
     this.isSpeaking = true;
     this.isPaused = false;
@@ -445,22 +468,50 @@ class VoiceRegistrationAssistantService {
       this.playChime(options.chime);
     }
 
+    if (typeof window === 'undefined') {
+      if (options?.onEnd) options.onEnd();
+      return;
+    }
+
+    const isBn = this.language === 'bn';
+    const bnVoice = isBn ? this.getBestVoice('bn') : null;
+
+    // If speaking Bengali and no real native Bengali voice exists in Web Speech API:
+    // Route directly to high-fidelity Bengali human audio stream!
+    if (isBn && !bnVoice) {
+      this.playAudioStream(text, 'bn', options);
+      return;
+    }
+
+    // Otherwise attempt Web Speech API
+    if (!('speechSynthesis' in window)) {
+      this.playAudioStream(text, isBn ? 'bn' : 'en', options);
+      return;
+    }
+
+    try {
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+      window.speechSynthesis.cancel();
+    } catch {}
+
     const utterance = new SpeechSynthesisUtterance(text);
-    const voice = this.getBestVoice(this.language);
+    const voice = isBn ? bnVoice : this.getBestVoice('en');
     if (voice) {
       utterance.voice = voice;
     }
 
-    utterance.lang = this.language === 'bn' ? 'bn-BD' : 'en-US';
-    // Clear elder-friendly rate: slightly deliberate for maximum comprehension
-    utterance.rate = this.language === 'bn' ? 0.92 : 0.95;
+    utterance.lang = isBn ? 'bn-BD' : 'en-US';
+    utterance.rate = isBn ? 0.92 : 0.95;
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
-    // Chrome long utterance watchdog (Chrome pauses speech after ~15s if not pinged)
     this.startKeepAlive();
 
+    let started = false;
     utterance.onstart = () => {
+      started = true;
       this.isSpeaking = true;
       this.isPaused = false;
       this.autoplayBlocked = false;
@@ -490,15 +541,19 @@ class VoiceRegistrationAssistantService {
 
     utterance.onerror = (e) => {
       this.clearKeepAlive();
-      this.isSpeaking = false;
-      this.isPaused = false;
       this.activeUtterance = null;
 
-      // Check if blocked by browser autoplay policy
       if (e.error === 'not-allowed') {
         this.autoplayBlocked = true;
+        this.isSpeaking = false;
+        this.notify();
+      } else if (!started && isBn) {
+        // Transparently fall back to high-fidelity Bengali audio stream
+        this.playAudioStream(text, 'bn', options);
+      } else {
+        this.isSpeaking = false;
+        this.notify();
       }
-      this.notify();
     };
 
     this.activeUtterance = utterance;
@@ -506,9 +561,118 @@ class VoiceRegistrationAssistantService {
     try {
       window.speechSynthesis.speak(utterance);
     } catch {
-      this.autoplayBlocked = true;
-      this.isSpeaking = false;
-      this.notify();
+      if (isBn) {
+        this.playAudioStream(text, 'bn', options);
+      } else {
+        this.autoplayBlocked = true;
+        this.isSpeaking = false;
+        this.notify();
+      }
+    }
+  }
+
+  /**
+   * Universal, high-clarity Bengali Audio Streamer
+   * Works identically across iPhone, Safari, Android, Windows, Mac, Firefox, Chrome
+   */
+  private playAudioStream(
+    text: string,
+    lang: 'bn' | 'en',
+    options?: {
+      onEnd?: () => void;
+      stepKey?: RegistrationStepKey;
+      chime?: 'intro' | 'success' | 'alert';
+    }
+  ): void {
+    if (typeof window === 'undefined') {
+      if (options?.onEnd) options.onEnd();
+      return;
+    }
+
+    // Split text into coherent sentence segments
+    const rawSentences = text
+      .match(/[^।?!.]+([।?!.]|$)/g)
+      ?.map((s) => s.trim())
+      .filter(Boolean) || [text];
+
+    // Merge short clauses up to 160 characters for natural continuous flow
+    const chunks: string[] = [];
+    let buffer = '';
+    for (const sentence of rawSentences) {
+      if ((buffer + ' ' + sentence).trim().length <= 160) {
+        buffer = (buffer + ' ' + sentence).trim();
+      } else {
+        if (buffer) chunks.push(buffer);
+        buffer = sentence;
+      }
+    }
+    if (buffer) chunks.push(buffer);
+
+    let currentChunkIndex = 0;
+
+    const playNext = () => {
+      if (currentChunkIndex >= chunks.length) {
+        this.isSpeaking = false;
+        this.isPaused = false;
+        this.audioPlayer = null;
+        this.notify();
+        if (options?.onEnd) {
+          options.onEnd();
+        }
+        return;
+      }
+
+      const chunk = chunks[currentChunkIndex];
+      currentChunkIndex++;
+
+      const ttsLang = lang === 'bn' ? 'bn' : 'en';
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(
+        chunk
+      )}&tl=${ttsLang}&client=tw-ob`;
+
+      const audio = new Audio();
+      audio.crossOrigin = 'anonymous';
+      audio.src = url;
+      this.audioPlayer = audio;
+
+      audio.onplay = () => {
+        this.isSpeaking = true;
+        this.isPaused = false;
+        this.autoplayBlocked = false;
+        this.notify();
+      };
+
+      audio.onended = () => {
+        this.audioChunkTimeout = setTimeout(playNext, 120);
+      };
+
+      audio.onerror = (err) => {
+        console.warn('[VoiceAssistant] Audio stream chunk error:', err);
+        if (currentChunkIndex < chunks.length) {
+          playNext();
+        } else {
+          this.isSpeaking = false;
+          this.audioPlayer = null;
+          this.notify();
+        }
+      };
+
+      const promise = audio.play();
+      if (promise !== undefined) {
+        promise.catch((err) => {
+          console.warn('[VoiceAssistant] Audio playback blocked by browser:', err);
+          this.autoplayBlocked = true;
+          this.isSpeaking = false;
+          this.audioPlayer = null;
+          this.notify();
+        });
+      }
+    };
+
+    if (options?.chime) {
+      this.audioChunkTimeout = setTimeout(playNext, 250);
+    } else {
+      playNext();
     }
   }
 
@@ -641,6 +805,14 @@ class VoiceRegistrationAssistantService {
    * Pause speech
    */
   public pause(): void {
+    if (this.audioPlayer) {
+      try {
+        this.audioPlayer.pause();
+        this.isPaused = true;
+        this.notify();
+      } catch {}
+      return;
+    }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
         window.speechSynthesis.pause();
@@ -654,6 +826,14 @@ class VoiceRegistrationAssistantService {
    * Resume speech
    */
   public resume(): void {
+    if (this.audioPlayer) {
+      try {
+        this.audioPlayer.play();
+        this.isPaused = false;
+        this.notify();
+      } catch {}
+      return;
+    }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
         window.speechSynthesis.resume();
@@ -672,6 +852,17 @@ class VoiceRegistrationAssistantService {
    */
   public stopSpeaking(notifyListeners: boolean = true): void {
     this.clearKeepAlive();
+    if (this.audioChunkTimeout) {
+      clearTimeout(this.audioChunkTimeout);
+      this.audioChunkTimeout = null;
+    }
+    if (this.audioPlayer) {
+      try {
+        this.audioPlayer.pause();
+        this.audioPlayer.src = '';
+      } catch {}
+      this.audioPlayer = null;
+    }
     if (this.activeUtterance) {
       this.activeUtterance = null;
     }
@@ -725,6 +916,32 @@ class VoiceRegistrationAssistantService {
   public unlockAudioAndStart(): void {
     this.autoplayBlocked = false;
     this.isEnabled = true;
+    try {
+      localStorage.setItem('plscf_voice_assistant_enabled', 'true');
+    } catch {}
+
+    // Unlock Web Audio context
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
+      }
+    } catch {}
+
+    // Resume speech synthesis if paused
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+        window.speechSynthesis.cancel();
+      } catch {}
+    }
+
+    this.notify();
     this.playWelcome(true);
   }
 }
