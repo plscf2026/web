@@ -54,7 +54,6 @@ export const FinancialTransparencyDashboard: React.FC<FinancialTransparencyDashb
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'breakdown' | 'donations' | 'myDonations'>('breakdown');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
-  const [expenseSearch, setExpenseSearch] = useState('');
   const [donationSearch, setDonationSearch] = useState('');
   const [selectedVoucher, setSelectedVoucher] = useState<TransparencyExpenseItem | null>(null);
 
@@ -102,18 +101,9 @@ export const FinancialTransparencyDashboard: React.FC<FinancialTransparencyDashb
   const filteredExpenses = useMemo(() => {
     if (!summary?.recent_expenses) return [];
     return summary.recent_expenses.filter((exp) => {
-      const matchCat = selectedCategoryId === 'all' || exp.category_id === selectedCategoryId;
-      const q = expenseSearch.toLowerCase().trim();
-      const matchSearch =
-        !q ||
-        exp.description.toLowerCase().includes(q) ||
-        (exp.description_bn && exp.description_bn.toLowerCase().includes(q)) ||
-        (exp.vendor_name && exp.vendor_name.toLowerCase().includes(q)) ||
-        (exp.responsible_person && exp.responsible_person.toLowerCase().includes(q)) ||
-        (exp.voucher_number && exp.voucher_number.toLowerCase().includes(q));
-      return matchCat && matchSearch;
+      return selectedCategoryId === 'all' || exp.category_id === selectedCategoryId;
     });
-  }, [summary?.recent_expenses, selectedCategoryId, expenseSearch]);
+  }, [summary?.recent_expenses, selectedCategoryId]);
 
   // ── Aggregated Top 10 Donors Ledger ─────────────────────────────────────────
   // Unifies multiple donations from the same number/ID into one cumulative sum
@@ -576,48 +566,6 @@ export const FinancialTransparencyDashboard: React.FC<FinancialTransparencyDashb
                     </div>
                   );
                 })}
-              </div>
-            </div>
-
-            {/* Filter & Search Bar */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategoryId('all')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors whitespace-nowrap cursor-pointer ${
-                    selectedCategoryId === 'all'
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {isBangla ? 'সকল খাত' : 'All Categories'}
-                </button>
-                {summary?.categories.map((c) => (
-                  <button
-                    key={`pill-${c.id}`}
-                    type="button"
-                    onClick={() => setSelectedCategoryId(c.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors whitespace-nowrap cursor-pointer ${
-                      selectedCategoryId === c.id
-                        ? 'bg-slate-900 text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    {isBangla ? c.name_bn : c.name_en}
-                  </button>
-                ))}
-              </div>
-
-              <div className="relative min-w-[240px]">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
-                <input
-                  type="text"
-                  value={expenseSearch}
-                  onChange={(e) => setExpenseSearch(e.target.value)}
-                  placeholder={isBangla ? 'ভাউচার বা দায়িত্বশীল খুঁজুন...' : 'Search vouchers, officers...'}
-                  className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs border border-slate-200 bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-slate-900/10"
-                />
               </div>
             </div>
 
