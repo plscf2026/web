@@ -4,12 +4,10 @@ import {
   ShieldCheck,
   CheckCircle2,
   Lock,
-  Gift,
   Award,
   AlertCircle,
   Printer,
   CreditCard,
-  Landmark,
   ArrowRight,
   TrendingUp,
   EyeOff,
@@ -33,56 +31,15 @@ interface DonationPageProps {
 
 const PRESET_AMOUNTS = [500, 1000, 2500, 5000, 10000, 25000];
 
-interface DonationCause {
-  id: string;
-  titleEn: string;
-  titleBn: string;
-  descEn: string;
-  descBn: string;
-  icon: typeof Heart;
-}
-
-const DONATION_CAUSES: DonationCause[] = [
-  {
-    id: 'needy_students',
-    titleEn: 'Needy Student Scholarship Fund',
-    titleBn: 'অসচ্ছল মেধাবী শিক্ষার্থী কল্যাণ তহবিল',
-    descEn: 'Educational scholarships, books, and exam fee assistance for underprivileged students.',
-    descBn: 'অসচ্ছল ও মেধাবী শিক্ষার্থীদের মাসিক উপবৃত্তি, বই ও পরীক্ষার ফি সহায়তা।',
-    icon: Award,
-  },
-  {
-    id: 'campus_development',
-    titleEn: 'Campus Beautification & Library Modernization',
-    titleBn: 'ক্যাম্পাস উন্নয়ন ও ডিজিটাল লাইব্রেরি সংস্কার',
-    descEn: 'Upgrading campus greenery, science laboratory facilities, and the central library.',
-    descBn: 'বিদ্যালয়ের চত্বরের সৌন্দর্যবর্ধন, বিজ্ঞানাগার ও ডিজিটাল লাইব্রেরি আধুনিকায়ন।',
-    icon: Landmark,
-  },
-  {
-    id: 'medical_welfare',
-    titleEn: 'Alumni & Teacher Emergency Medical Welfare',
-    titleBn: 'জরুরি শিক্ষক ও অ্যালামনাই চিকিৎসা সহায়তা তহবিল',
-    descEn: 'Emergency healthcare and welfare assistance for retired teachers, staff, and alumni.',
-    descBn: 'শ্রদ্ধেয় প্রবীণ শিক্ষক, কর্মচারী ও প্রাক্তনী ভাই-বোনদের জরুরি চিকিৎসা অনুদান।',
-    icon: Heart,
-  },
-  {
-    id: 'general_fund',
-    titleEn: 'General Reunion Patronage Fund',
-    titleBn: 'সাধারণ পুনর্মিলনী পৃষ্ঠপোষকতা তহবিল',
-    descEn: 'Unrestricted fund for overall event success, souvenirs, and permanent alumni archive.',
-    descBn: 'পুনর্মিলনী উৎসবের সার্বিক আয়োজন ও স্থায়ী অ্যালামনাই আর্কাইভ তহবিল।',
-    icon: Gift,
-  },
-];
-
 export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
   const t = translations[language];
   const isBangla = language === 'bn';
 
+  const defaultCauseTitle = isBangla
+    ? 'পুনর্মিলনী উন্নয়ন ও কল্যাণ তহবিল'
+    : 'Reunion Patronage & Welfare Fund';
+
   // Form states
-  const [selectedCauseId, setSelectedCauseId] = useState<string>('needy_students');
   const [selectedAmount, setSelectedAmount] = useState<number>(2500);
   const [customAmount, setCustomAmount] = useState<string>('');
   const [donorName, setDonorName] = useState<string>('');
@@ -272,8 +229,6 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
       .slice(0, 10);
   }, [donationsList]);
 
-  const selectedCause = DONATION_CAUSES.find((c) => c.id === selectedCauseId) || DONATION_CAUSES[0];
-
   const handleSelectPreset = (amount: number) => {
     setSelectedAmount(amount);
     setCustomAmount('');
@@ -308,7 +263,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
             mobileNumber: pending?.mobileNumber || pendingPayment.mobileNumber || mobileNumber || '01700000000',
             email: pending?.email || pendingPayment.email || email,
             amount: pendingPayment.amount,
-            purpose: pending?.purpose || pendingPayment.purpose || (isBangla ? selectedCause.titleBn : selectedCause.titleEn),
+            purpose: pending?.purpose || pendingPayment.purpose || defaultCauseTitle,
           },
           simRes
         );
@@ -332,7 +287,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
             mobileNumber: pending?.mobileNumber || pendingPayment.mobileNumber || mobileNumber || '01700000000',
             email: pending?.email || pendingPayment.email || email,
             amount: verifyRes.result.amount || pendingPayment.amount,
-            purpose: pending?.purpose || pendingPayment.purpose || (isBangla ? selectedCause.titleBn : selectedCause.titleEn),
+            purpose: pending?.purpose || pendingPayment.purpose || defaultCauseTitle,
           },
           verifyRes.result
         );
@@ -378,7 +333,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
     try {
       const sanitizedDonor = sanitizeInput(donorName.trim());
       const normalizedMobile = normalizeBangladeshiMobileNumber(mobileNumber);
-      const causeTitle = isBangla ? selectedCause.titleBn : selectedCause.titleEn;
+      const causeTitle = defaultCauseTitle;
       const donorLabel = batchName.trim() ? `${sanitizedDonor} (${sanitizeInput(batchName.trim())})` : sanitizedDonor;
       const finalDonorName = isAnonymous ? `${donorLabel} [Anonymous]` : donorLabel;
 
@@ -419,15 +374,15 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
         currency: 'BDT',
         payment_amount: effectiveAmount,
         pay_with_charge: 0,
-        reference: `Donation: ${selectedCause.titleEn.slice(0, 30)}`,
+        reference: 'Donation: Reunion Welfare Fund',
         cust_name: sanitizedDonor,
         cust_phone: normalizedMobile,
         cust_email: email.trim() || undefined,
         cust_address: 'Faridpur',
         callback_url: callbackUrl,
-        checkout_items: JSON.stringify({ type: 'donation', cause: selectedCause.id }),
+        checkout_items: JSON.stringify({ type: 'donation', cause: 'general_fund' }),
         opt_a: 'donation',
-        opt_b: selectedCause.id,
+        opt_b: 'general_fund',
       });
 
       if (!createRes.success) {
@@ -647,52 +602,10 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
           {/* Left: Donation Causes & Form */}
           <div className="lg:col-span-8 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
             <form onSubmit={handleInitiateDonation} className="space-y-6">
-              {/* Step 1: Cause Selection */}
+              {/* Step 1: Amount Selector */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                   <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">1</span>
-                  <span>{isBangla ? 'অনুদানের খাত নির্বাচন করুন *' : 'Select Designated Cause *'}</span>
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {DONATION_CAUSES.map((cause) => {
-                    const Icon = cause.icon;
-                    const isSelected = selectedCauseId === cause.id;
-                    return (
-                      <button
-                        key={cause.id}
-                        type="button"
-                        onClick={() => setSelectedCauseId(cause.id)}
-                        className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
-                          isSelected
-                            ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-500/20'
-                            : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
-                        }`}
-                      >
-                        <div
-                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                            isSelected ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          <Icon className="w-5 h-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className={`text-xs font-bold leading-tight ${isSelected ? 'text-indigo-950' : 'text-slate-900'}`}>
-                            {isBangla ? cause.titleBn : cause.titleEn}
-                          </p>
-                          <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">
-                            {isBangla ? cause.descBn : cause.descEn}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Step 2: Amount Selector */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">2</span>
                   <span>{isBangla ? 'অনুদানের পরিমাণ নির্বাচন করুন (টাকা) *' : 'Select Donation Amount (BDT) *'}</span>
                 </label>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-3">
@@ -730,10 +643,10 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
                 </div>
               </div>
 
-              {/* Step 3: Donor Details */}
+              {/* Step 2: Donor Details */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">3</span>
+                  <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">2</span>
                   <span>{isBangla ? 'আপনার তথ্য দিন' : 'Donor Information'}</span>
                 </label>
 
@@ -811,10 +724,10 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
                 </div>
               </div>
 
-              {/* Step 4: Payment Method Selection */}
+              {/* Step 3: Payment Method Selection */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">4</span>
+                  <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">3</span>
                   <span>{isBangla ? 'পেমেন্ট মাধ্যম (PayStation Gateway)' : 'Payment Method (PayStation Gateway)'}</span>
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
