@@ -128,7 +128,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   // T-shirt & Donation
   const [tShirtSize, setTShirtSize] = useState<TShirtSize>(() => draft?.tShirtSize || 'L');
   const [donationInput, setDonationInput] = useState<number | ''>(() => (typeof draft?.donationInput === 'number' ? draft.donationInput : ''));
-  const [termsAccepted, setTermsAccepted] = useState(() => Boolean(draft?.termsAccepted));
+  const [termsAccepted, setTermsAccepted] = useState(true);
 
   // Submission & File Input States (Requirement 3 & 10)
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -180,7 +180,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     setRollNumber('');
     setTShirtSize('L');
     setDonationInput('');
-    setTermsAccepted(false);
+    setTermsAccepted(true);
     setPhotoSizeKb(null);
     setIsCompressingPhoto(false);
     setIsCameraModalOpen(false);
@@ -637,7 +637,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
       rollNumber: category === 'current' ? rollNumber : undefined,
       tShirtSize,
       donationAmount,
-      termsAccepted,
+      termsAccepted: true,
     };
 
     const result = validateRegistrationData(formData);
@@ -2012,37 +2012,6 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               <span>{t.totalPayable}</span>
               <span>৳ {fees.totalPayable} BDT</span>
             </div>
-          </div>
-
-          {/* Terms checkbox */}
-          <div className="pt-2">
-            <label className="flex items-start gap-3 cursor-pointer select-none">
-              <input
-                name="termsAccepted"
-                aria-invalid={Boolean(validationErrors.termsAccepted)}
-                type="checkbox"
-                checked={termsAccepted}
-                onChange={(e) => {
-                  setTermsAccepted(e.target.checked);
-                  clearValidationError('termsAccepted');
-                  if (validationErrors.termsAccepted) {
-                    const next = { ...validationErrors };
-                    delete next.termsAccepted;
-                    setValidationErrors(next);
-                  }
-                }}
-                className="mt-1 w-4 h-4 rounded border-slate-700 text-[#263B8C] focus:ring-[#263B8C]"
-              />
-              <span className="text-xs text-slate-300 leading-relaxed">
-                {t.termsText}
-              </span>
-            </label>
-            {validationErrors.termsAccepted && (
-              <p className="mt-1.5 text-xs text-rose-300 flex items-center gap-1 font-medium">
-                <AlertCircle className="w-3.5 h-3.5" />
-                <span>{validationErrors.termsAccepted[language]}</span>
-              </p>
-            )}
           </div>
 
           {feeSettings.registrationOpen ? (

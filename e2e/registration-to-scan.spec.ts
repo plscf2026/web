@@ -42,8 +42,11 @@ test.describe('E2E: Complete Student Journey & Gate Flow', () => {
       buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64'),
     });
 
-    // Accept Terms & Conditions
-    await page.check('input[name="termsAccepted"]');
+    // Accept Terms & Conditions (if field is present)
+    const termsCheckbox = page.locator('input[name="termsAccepted"]');
+    if ((await termsCheckbox.count()) > 0) {
+      await termsCheckbox.check();
+    }
 
     // 3. Submit and Proceed to Payment
     await page.click('button[type="submit"]:has-text("Proceed to Payment"), button[type="submit"]:has-text("পেমেন্টে এগিয়ে যান")');
