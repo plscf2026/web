@@ -882,7 +882,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
                       type="button"
                       onClick={() => handleVerifyPendingDonation(false)}
                       disabled={isVerifyingPending}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0EA5E9] text-white text-xs font-black transition-all cursor-pointer shadow-xs disabled:opacity-50"
                     >
                       {isVerifyingPending ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -949,12 +949,12 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
 
               <div className="flex items-center justify-center gap-4 text-[11px] text-slate-500 pt-1">
                 <span className="flex items-center gap-1">
-                  <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                  <Lock className="w-3.5 h-3.5 text-[#0284C7]" />
                   <span>256-Bit SSL Encrypted</span>
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#0284C7]" />
                   <span>PayStation Official Verified Gateway</span>
                 </span>
               </div>

@@ -867,7 +867,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
         {/* Section 1: Personal Information */}
         <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <User className="w-5 h-5 text-[#263B8C]" />
+            <User className="w-5 h-5 text-[#0284C7]" />
             <h2 className="text-lg font-bold text-slate-900">
               {t.personalInfoHeading}
             </h2>
@@ -892,7 +892,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                 className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
                   validationErrors.fullName
                     ? 'border-rose-500 bg-rose-50/30 focus:ring-2 focus:ring-rose-500'
-                    : 'border-slate-300 focus:border-[#172554] focus:ring-2 focus:ring-[#172554]/20'
+                    : 'border-slate-300 focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20'
                 }`}
               />
               {validationErrors.fullName && (
@@ -914,7 +914,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   onClick={() => setGender('male')}
                   className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     gender === 'male'
-                      ? 'border-[#172554] bg-[#172554] text-white shadow-xs'
+                      ? 'border-[#0F172A] bg-[#0F172A] text-white shadow-xs'
                       : 'border-slate-300 text-slate-700 hover:bg-slate-50'
                   }`}
                 >
@@ -955,7 +955,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
                     validationErrors.bloodGroup
                       ? 'border-rose-500 bg-rose-50/30'
-                      : 'border-slate-300 focus:border-[#172554] focus:ring-2 focus:ring-[#172554]/20'
+                      : 'border-slate-300 focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20'
                   }`}
                 >
                   <option value="">{language === 'bn' ? 'রক্তের গ্রুপ নির্বাচন করুন' : 'Select Blood Group'}</option>
@@ -980,7 +980,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                 <span>
                   {t.photoLabel} <span className="text-rose-600">*</span>
                 </span>
-                <span className="text-[10px] text-sky-700 font-medium bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
+                <span className="text-[10px] text-[#0284C7] font-medium bg-[#E2EEF8] px-2 py-0.5 rounded-full border border-[#0284C7]/20">
                   {language === 'bn' ? 'সর্বোচ্চ ২০০ কেবিতে কম্প্রেসড হবে' : 'Auto-compressed to ≤ 200 KB'}
                 </span>
               </label>
@@ -996,7 +996,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                     <img
                       src={photoUrl}
                       alt="Uploaded profile"
-                      className="w-24 h-24 rounded-xl object-cover border-2 border-[#172554] shadow-sm mx-auto"
+                      className="w-24 h-24 rounded-xl object-cover border-2 border-[#0284C7] shadow-sm mx-auto"
                     />
                     <button
                       type="button"
@@ -1041,14 +1041,14 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                     <button
                       type="button"
                       onClick={() => openLiveCamera()}
-                      className="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs cursor-pointer transition-colors inline-flex items-center gap-1.5"
+                      className="px-4 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0EA5E9] text-white text-xs font-semibold shadow-xs cursor-pointer transition-colors inline-flex items-center gap-1.5"
                     >
                       <Camera className="w-3.5 h-3.5" />
                       <span>{language === 'bn' ? '📷 ক্যামেরা দিয়ে ছবি তুলুন' : '📷 Take Photo'}</span>
                     </button>
 
                     {/* 2. Upload File Button */}
-                    <label className="px-4 py-2 rounded-lg bg-[#172554] hover:bg-[#263B8C] text-white text-xs font-semibold shadow-xs cursor-pointer transition-colors inline-flex items-center gap-1.5">
+                    <label className="px-4 py-2 rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-semibold shadow-xs cursor-pointer transition-colors inline-flex items-center gap-1.5">
                       <Upload className="w-3.5 h-3.5" />
                       <span>{language === 'bn' ? '📁 ফাইল আপলোড করুন' : '📁 Upload Photo'}</span>
                       <input
@@ -1159,7 +1159,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                       ? 'border-rose-500 bg-rose-50/30 focus:ring-2 focus:ring-rose-500'
                       : mobileNumber.length === 11 && mobileNumber.startsWith('01')
                       ? 'border-emerald-500 bg-emerald-50/20 focus:ring-2 focus:ring-emerald-500'
-                      : 'border-slate-300 focus:border-[#172554] focus:ring-2 focus:ring-[#172554]/20'
+                      : 'border-slate-300 focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20'
                   }`}
                 />
                 {/* Live digit counter badge */}
@@ -1217,7 +1217,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
                     validationErrors.email
                       ? 'border-rose-500 bg-rose-50/30 focus:ring-2 focus:ring-rose-500'
-                      : 'border-slate-300 focus:border-[#172554] focus:ring-2 focus:ring-[#172554]/20'
+                      : 'border-slate-300 focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20'
                   }`}
                 />
               </div>
@@ -1242,7 +1242,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder={t.addressPlaceholder}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#172554] focus:ring-2 focus:ring-[#172554]/20 focus:outline-hidden"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
                 />
               </div>
             </div>
@@ -1584,7 +1584,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
         {/* Section 2: Academic Information & Current Student ID Verification */}
         <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <GraduationCap className="w-5 h-5 text-[#263B8C]" />
+            <GraduationCap className="w-5 h-5 text-[#0284C7]" />
             <h2 className="text-lg font-bold text-slate-900">
               {t.academicInfoHeading}
             </h2>
@@ -1617,7 +1617,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   {language === 'bn' ? 'স্টুডেন্ট আইডি নম্বর *' : 'Student ID Number *'}{' '}
                   <span className="text-rose-600">*</span>
                 </label>
-                <span className="text-[11px] text-[#263B8C] font-semibold flex items-center gap-1">
+                <span className="text-[11px] text-[#0284C7] font-semibold flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5" />
                   {language === 'bn' ? 'প্রতিষ্ঠানিক আইডি ভেরিফিকেশন' : 'Institutional ID Verification'}
                 </span>
@@ -1646,7 +1646,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                         ? 'border-emerald-500 bg-emerald-50/40'
                         : idVerificationResult && !idVerificationResult.success
                         ? 'border-rose-500 bg-rose-50/40'
-                        : 'border-slate-300 focus:border-[#172554] focus:ring-2 focus:ring-[#172554]/20'
+                        : 'border-slate-300 focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20'
                     }`}
                   />
                 </div>
@@ -1655,7 +1655,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   type="button"
                   onClick={() => handleVerifyStudentId(studentId)}
                   disabled={!studentId.trim() || isVerifyingId}
-                  className="px-4 py-2.5 rounded-xl bg-[#172554] hover:bg-[#263B8C] text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                  className="px-4 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
                 >
                   <Search className="w-3.5 h-3.5" />
                   <span>{isVerifyingId ? (language === 'bn' ? 'যাচাই হচ্ছে...' : 'Verifying...') : (language === 'bn' ? 'যাচাই করুন' : 'Verify ID')}</span>
@@ -1744,7 +1744,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                     className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
                       validationErrors.passingYear
                         ? 'border-rose-500 bg-rose-50/30'
-                        : 'border-slate-300 focus:border-[#172554] focus:ring-2 focus:ring-[#172554]/20'
+                        : 'border-slate-300 focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20'
                     }`}
                   >
                     <option value="">{t.passingYearPlaceholder}</option>
@@ -1770,7 +1770,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   <select
                     value={lastClassAttended}
                     onChange={(e) => setLastClassAttended(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#172554] focus:ring-2 focus:ring-[#172554]/20 focus:outline-hidden"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
                   >
                     <option value="SSC">SSC (মাধ্যমিক)</option>
                     <option value="HSC">HSC (উচ্চ মাধ্যমিক)</option>
@@ -1805,7 +1805,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                     className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
                       validationErrors.currentClass
                         ? 'border-rose-500 bg-rose-50/30'
-                        : 'border-slate-300 focus:border-[#172554] focus:ring-2 focus:ring-[#172554]/20'
+                        : 'border-slate-300 focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20'
                     }`}
                   >
                     <option value="">{t.currentClassPlaceholder}</option>
@@ -1831,7 +1831,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   <select
                     value={groupOrSection}
                     onChange={(e) => setGroupOrSection(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#172554] focus:ring-2 focus:ring-[#172554]/20 focus:outline-hidden"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
                   >
                     <option value="Section A">Section A (ক শাখা)</option>
                     <option value="Section B">Section B (খ শাখা)</option>
@@ -1854,7 +1854,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                 value={batchName}
                 onChange={(e) => setBatchName(e.target.value)}
                 placeholder={getComputedBatch()}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#172554] focus:ring-2 focus:ring-[#172554]/20 focus:outline-hidden"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
               />
               <span className="text-[10px] text-slate-500 mt-1 block">
                 {language === 'bn'
@@ -1874,7 +1874,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   value={rollNumber}
                   onChange={(e) => setRollNumber(e.target.value)}
                   placeholder="e.g. 05"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#172554] focus:ring-2 focus:ring-[#172554]/20 focus:outline-hidden"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
                 />
               </div>
             )}
@@ -1885,13 +1885,13 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
         <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
-              <Shirt className="w-5 h-5 text-[#263B8C]" />
+              <Shirt className="w-5 h-5 text-[#0284C7]" />
               <h2 className="text-lg font-bold text-slate-900">{t.tshirtHeading}</h2>
             </div>
             <button
               type="button"
               onClick={() => setShowSizeModal(true)}
-              className="text-xs text-[#263B8C] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+              className="text-xs text-[#0284C7] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
             >
               <HelpCircle className="w-3.5 h-3.5" />
               <span>{t.sizeGuide}</span>
@@ -1916,7 +1916,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                 }}
                 className={`py-3 px-2 rounded-xl border-2 font-bold text-sm transition-all cursor-pointer ${
                   tShirtSize === size
-                    ? 'border-[#172554] bg-[#172554] text-white shadow-xs'
+                    ? 'border-[#0284C7] bg-[#0284C7] text-white shadow-xs'
                     : 'border-slate-200 hover:border-slate-300 text-slate-700 bg-white'
                 }`}
               >
@@ -1949,7 +1949,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                 onClick={() => setDonationInput(amt)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                   donationInput === amt
-                    ? 'border-[#263B8C] bg-[#263B8C] text-white font-bold'
+                    ? 'border-[#0284C7] bg-[#0284C7] text-white font-bold'
                     : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
                 }`}
               >
@@ -1977,16 +1977,16 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                 setDonationInput(val);
               }}
               placeholder={t.donationPlaceholder}
-              className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#172554] focus:ring-2 focus:ring-[#172554]/20 focus:outline-hidden"
+              className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
             />
           </div>
         </div>
 
-        {/* Section 5: Order Summary & Terms - SOLID DEEP NAVY BLUE, STRICTLY ZERO GRADIENTS */}
-        <div className="bg-[#172554] text-white rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
-          <h2 className="text-lg font-bold border-b border-blue-900 pb-3 flex items-center justify-between">
+        {/* Section 5: Order Summary & Terms */}
+        <div className="bg-[#0F172A] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-800 space-y-6">
+          <h2 className="text-lg font-bold border-b border-slate-800 pb-3 flex items-center justify-between">
             <span>{t.summaryHeading}</span>
-            <span className="text-xs text-[#C5A45D] font-normal">
+            <span className="text-xs text-[#38BDF8] font-normal">
               {category === 'former' ? t.feeFormerTitle : t.feeCurrentTitle}
             </span>
           </h2>
@@ -2003,12 +2003,12 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               </div>
             )}
             {fees.donationAmount > 0 && (
-              <div className="flex justify-between text-[#C5A45D]">
+              <div className="flex justify-between text-[#38BDF8]">
                 <span>{t.donationSummary}</span>
                 <span className="font-semibold">+ ৳ {fees.donationAmount}</span>
               </div>
             )}
-            <div className="pt-3 border-t border-blue-900 flex justify-between items-center text-lg sm:text-xl font-black text-[#C5A45D]">
+            <div className="pt-3 border-t border-slate-800 flex justify-between items-center text-lg sm:text-xl font-black text-[#38BDF8]">
               <span>{t.totalPayable}</span>
               <span>৳ {fees.totalPayable} BDT</span>
             </div>
@@ -2055,7 +2055,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 border border-slate-200">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                <Shirt className="w-4 h-4 text-[#263B8C]" />
+                <Shirt className="w-4 h-4 text-[#0284C7]" />
                 <span>{t.sizeGuide}</span>
               </h3>
               <button
@@ -2086,7 +2086,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
             <button
               onClick={() => setShowSizeModal(false)}
-              className="mt-6 w-full py-2 bg-[#172554] text-white rounded-lg text-xs font-semibold cursor-pointer"
+              className="mt-6 w-full py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors"
             >
               {language === 'bn' ? 'বুঝেছি' : 'Close Chart'}
             </button>

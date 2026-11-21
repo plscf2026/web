@@ -50,12 +50,15 @@
     width: 8px;
     height: 8px;
   }
+
   ::-webkit-scrollbar-track {
     background: #f0f6fa;
   }
+
   ::-webkit-scrollbar-thumb {
     background: #0284c7;
   }
+
   ::-webkit-scrollbar-thumb:hover {
     background: #0ea5e9;
   }
@@ -70,23 +73,37 @@
     touch-action: manipulation;
   }
 
-  h1, h2, h3, h4, h5, h6, .font-heading {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .font-heading {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     letter-spacing: -0.015em;
   }
 
-  code, kbd, samp, pre, .font-mono {
+  code,
+  kbd,
+  samp,
+  pre,
+  .font-mono {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   }
 
   /* Prevent Mobile (iOS Safari & Android) from auto-zooming on focus & double-tap */
-  input, select, textarea {
+  input,
+  select,
+  textarea {
     font-size: 16px !important;
     font-family: inherit;
     touch-action: manipulation;
   }
 
-  button, a, [role="button"] {
+  button,
+  a,
+  [role="button"] {
     touch-action: manipulation;
   }
 
@@ -118,23 +135,32 @@
    on high-DPI mobile phone screens and wide desktop displays.
    ========================================================================= */
 .text-\[9px\] {
-  font-size: 0.72rem !important; /* ~11.5px */
+  font-size: 0.72rem !important;
+  /* ~11.5px */
   line-height: 1rem !important;
 }
+
 .text-\[10px\] {
-  font-size: 0.78rem !important; /* ~12.5px */
+  font-size: 0.78rem !important;
+  /* ~12.5px */
   line-height: 1.15rem !important;
 }
+
 .text-\[11px\] {
-  font-size: 0.84rem !important; /* ~13.5px */
+  font-size: 0.84rem !important;
+  /* ~13.5px */
   line-height: 1.25rem !important;
 }
+
 .text-xs {
-  font-size: 0.875rem !important; /* 14px */
+  font-size: 0.875rem !important;
+  /* 14px */
   line-height: 1.3rem !important;
 }
+
 .text-sm {
-  font-size: 0.95rem !important; /* ~15.2px */
+  font-size: 0.95rem !important;
+  /* ~15.2px */
   line-height: 1.45rem !important;
 }
 
@@ -144,6 +170,7 @@
    Ensure all form controls evaluate to >= 16px on mobile viewports.
    ========================================================================= */
 @media (max-width: 767.98px) {
+
   input,
   select,
   textarea,
@@ -207,7 +234,9 @@
    3. TOUCH-FRIENDLY CONTROLS (Coarse Pointer / Touch Devices)
    Ensures minimum 44px × 44px touch targets on touchscreens (Apple HIG & WCAG).
    ========================================================================= */
-@media (hover: none) and (pointer: coarse), (max-width: 639.98px) {
+@media (hover: none) and (pointer: coarse),
+(max-width: 639.98px) {
+
   .touch-target,
   button.touch-target,
   a.touch-target,
@@ -259,6 +288,7 @@
   body {
     padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   }
+
   .main-content {
     padding-bottom: 1.5rem;
   }
@@ -285,10 +315,12 @@
     transform: translate3d(0, 14px, 0);
     opacity: 0.85;
   }
+
   50% {
     transform: translate3d(0, 214px, 0);
     opacity: 1;
   }
+
   100% {
     transform: translate3d(0, 14px, 0);
     opacity: 0.85;
@@ -301,10 +333,12 @@
       transform: translate3d(0, 16px, 0);
       opacity: 0.85;
     }
+
     50% {
       transform: translate3d(0, 244px, 0);
       opacity: 1;
     }
+
     100% {
       transform: translate3d(0, 16px, 0);
       opacity: 0.85;
@@ -331,6 +365,7 @@
     opacity: 0;
     transform: translateY(28px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -347,6 +382,7 @@
     opacity: 0;
     transform: scale(0.94) translateY(14px);
   }
+
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
@@ -361,6 +397,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -372,10 +409,13 @@
 
 /* Organic pulsing gradient blobs */
 @keyframes blobPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translate(0px, 0px) scale(1);
     opacity: 0.65;
   }
+
   50% {
     transform: translate(30px, -20px) scale(1.08);
     opacity: 0.9;
@@ -424,12 +464,15 @@
     color: black !important;
     padding-bottom: 0 !important;
   }
+
   .no-print {
     display: none !important;
   }
+
   .print-only {
     display: block !important;
   }
+
   .print-ticket-container {
     box-shadow: none !important;
     border: 2px solid #0f172a !important;
@@ -438,6 +481,7 @@
     width: 100% !important;
     max-width: 190mm !important;
   }
+
   @page {
     size: A4 portrait;
     margin: 10mm;

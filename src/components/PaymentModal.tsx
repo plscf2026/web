@@ -623,9 +623,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     if (onSuccess && completedTicket) onSuccess(completedTicket, 'register');
                     else onClose();
                   }}
-                  className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2 group"
+                  className="w-full py-3.5 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold text-sm shadow-xl shadow-sky-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 group"
                 >
-                  <UserPlus className="w-5 h-5 text-emerald-100 group-hover:scale-110 transition-transform" />
+                  <UserPlus className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
                   <span>{isBangla ? 'পরবর্তী শিক্ষার্থী নিবন্ধন করুন' : 'Register Another Student'}</span>
                   <ArrowRight className="w-4 h-4 ml-1" />
                 </button>
@@ -637,7 +637,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     if (onSuccess && completedTicket) onSuccess(completedTicket, 'ticket');
                     else onClose();
                   }}
-                  className="w-full py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white font-semibold text-xs border border-slate-700 transition-all cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-3 rounded-full bg-[#0F172A] hover:bg-slate-800 text-slate-200 hover:text-white font-semibold text-xs border border-slate-700 transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <QrCode className="w-4 h-4 text-sky-400" />
                   <span>{isBangla ? 'সম্পূর্ণ ডিজিটাল টিকিট পাস দেখুন' : 'View Full Digital Ticket Pass'}</span>
@@ -713,7 +713,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <button
                 type="button"
                 onClick={handleManualVerify}
-                className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="w-full py-3.5 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>{isBangla ? 'পেমেন্ট সম্পন্ন করেছি — যাচাই করুন' : 'I completed payment — Verify Now'}</span>
@@ -768,7 +768,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={() => handleInstantSandboxPayment(selectedMethod || 'bkash')}
-                  className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm cursor-pointer transition shadow-lg flex items-center justify-center gap-2"
+                  className="w-full py-4 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold text-sm cursor-pointer transition shadow-lg shadow-sky-600/30 flex items-center justify-center gap-2"
                 >
                   <CheckCircle2 className="w-5 h-5 text-white" />
                   <span>

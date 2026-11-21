@@ -31,7 +31,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
   };
 
   return (
-    <footer className="bg-[#0B132B] text-slate-300 border-t border-[#1E293B] pt-14 pb-10">
+    <footer className="bg-[#0F172A] text-slate-300 border-t border-slate-800 pt-14 pb-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* 4-Column Navigation & Contact Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
@@ -134,7 +134,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
               <li>
                 <button
                   onClick={() => handleDirectPortalNav('scanner')}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] border border-[#1E293B] text-[#38BDF8] w-full transition-colors cursor-pointer"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#0F172A] hover:bg-slate-800 border border-slate-800 text-[#38BDF8] w-full transition-colors cursor-pointer"
                 >
                   <QrCode className="w-4 h-4 text-[#0EA5E9]" />
                   <span>{t.navScannerPortal}</span>
@@ -143,7 +143,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
               <li>
                 <button
                   onClick={() => handleDirectPortalNav('admin')}
-                  className="flex items-center justify-between px-3 py-2 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] border border-[#0284C7]/40 text-[#E2EEF8] w-full transition-all cursor-pointer group shadow-xs"
+                  className="flex items-center justify-between px-3 py-2 rounded-xl bg-[#0F172A] hover:bg-slate-800 border border-[#0284C7]/40 text-[#E2EEF8] w-full transition-all cursor-pointer group shadow-xs"
                   title="Exclusive Administrator Access (Single Slot / Supabase Command)"
                 >
                   <div className="flex items-center gap-2">
@@ -159,7 +159,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
               </li>
             </ul>
 
-            <div className="mt-4 p-3 rounded-xl bg-[#0F172A]/80 border border-[#1E293B] text-[11px] text-slate-400">
+            <div className="mt-4 p-3 rounded-xl bg-[#0F172A]/80 border border-slate-800 text-[11px] text-slate-400">
               <span className="font-semibold text-white block mb-1">
                 {language === 'bn' ? 'নিরাপত্তা বার্তা' : 'Security Notice'}
               </span>
@@ -192,7 +192,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
         </div>
 
         {/* Bottom Bar */}
-        <div className="pt-8 border-t border-[#1E293B] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+        <div className="pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div>
             © 2027 {t.institutionName}.{' '}
             {language === 'bn' ? 'সর্বস্বত্ব সংরক্ষিত।' : 'All Rights Reserved.'}

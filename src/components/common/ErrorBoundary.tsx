@@ -93,7 +93,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <button
                 type="button"
                 onClick={this.handleRetry}
-                className="px-4 py-2.5 rounded-xl bg-[#172554] hover:bg-[#1E3A8A] text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                className="px-4 py-2.5 rounded-full bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>আবার চেষ্টা করুন (Retry)</span>

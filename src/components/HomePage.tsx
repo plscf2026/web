@@ -632,9 +632,9 @@ export const HomePage: React.FC<HomePageProps> = ({
       >
         {timeLeft.isOver ? (
           /* AFTER THE EVENT STATE */
-          <div className="bg-[#172554] rounded-3xl p-8 border-2 border-[#C5A45D] shadow-2xl text-white text-center space-y-6">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#263B8C] border border-blue-400/40 text-[#C5A45D] text-xs font-bold uppercase tracking-wider">
-              <Sparkles className="w-4 h-4 text-[#C5A45D]" />
+          <div className="bg-[#0F172A] rounded-3xl p-8 border border-[#0284C7]/40 shadow-2xl text-white text-center space-y-6">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#0284C7]/20 border border-[#38BDF8]/40 text-[#38BDF8] text-xs font-bold uppercase tracking-wider">
+              <Sparkles className="w-4 h-4 text-[#38BDF8]" />
               <span>{language === 'bn' ? 'ঐতিহাসিক মুহূর্ত উদযাপিত' : 'Historic Milestone Celebrated'}</span>
             </div>
 
@@ -651,7 +651,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
               <button
                 onClick={() => onNavigate('gallery')}
-                className="px-6 py-3 rounded-xl bg-[#C5A45D] hover:bg-[#b0924e] text-slate-950 font-extrabold text-xs sm:text-sm shadow-md transition-all cursor-pointer flex items-center gap-2"
+                className="px-6 py-3 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-extrabold text-xs sm:text-sm shadow-md transition-all cursor-pointer flex items-center gap-2"
               >
                 <Camera className="w-4 h-4" />
                 <span>{t.btnViewEventPhotos}</span>
@@ -659,7 +659,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
               <button
                 onClick={() => onNavigate('gallery')}
-                className="px-6 py-3 rounded-xl bg-[#263B8C] hover:bg-[#1f3073] text-white font-bold text-xs sm:text-sm shadow-md transition-all cursor-pointer flex items-center gap-2"
+                className="px-6 py-3 rounded-full bg-[#0F172A] hover:bg-slate-800 text-white border border-slate-700 font-bold text-xs sm:text-sm shadow-md transition-all cursor-pointer flex items-center gap-2"
               >
                 <Video className="w-4 h-4" />
                 <span>{t.btnWatchVideos}</span>
@@ -667,9 +667,9 @@ export const HomePage: React.FC<HomePageProps> = ({
 
               <button
                 onClick={() => onNavigate('notices')}
-                className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-2"
+                className="px-6 py-3 rounded-full bg-[#E2EEF8] hover:bg-white text-[#0F172A] border border-[#0284C7]/30 font-semibold text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-2"
               >
-                <FileText className="w-4 h-4 text-blue-300" />
+                <FileText className="w-4 h-4 text-[#0284C7]" />
                 <span>{t.btnReadSouvenir}</span>
               </button>
             </div>
@@ -901,7 +901,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                       <span>{foundDonation.purpose}</span>
                       <span>•</span>
                       <span>
-                        <strong className="text-emerald-700 font-bold">
+                        <strong className="text-[#0284C7] font-bold">
                           ৳{foundDonation.amount.toLocaleString()} BDT
                         </strong>
                       </span>
@@ -965,14 +965,14 @@ export const HomePage: React.FC<HomePageProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {/* Former Student Card */}
-          <div className="bg-white rounded-3xl p-8 border-2 border-emerald-600 shadow-xl relative overflow-hidden flex flex-col justify-between">
-            <div className="absolute top-0 right-0 bg-emerald-600 text-white text-[10px] font-black uppercase px-4 py-1 rounded-bl-xl tracking-wider">
+          <div className="bg-white rounded-3xl p-8 border-2 border-[#0284C7] shadow-xl relative overflow-hidden flex flex-col justify-between">
+            <div className="absolute top-0 right-0 bg-[#0284C7] text-white text-[10px] font-black uppercase px-4 py-1 rounded-bl-xl tracking-wider">
               {language === 'bn' ? 'অ্যালামনাই ক্যাটাগরি' : 'Alumni'}
             </div>
 
             <div className="space-y-4">
               <div>
-                <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider block">
+                <span className="text-xs font-bold text-[#0284C7] uppercase tracking-wider block">
                   {t.feeFormerTitle}
                 </span>
                 <h3 className="text-3xl font-black text-slate-900 mt-1">
@@ -983,17 +983,17 @@ export const HomePage: React.FC<HomePageProps> = ({
 
               <div className="space-y-2.5 text-xs text-slate-700 pt-4 border-t border-slate-100">
                 <div className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-4 h-4 text-[#0284C7] shrink-0 mt-0.5" />
                   <span>{t.feeFormerIncludes}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Shirt className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <Shirt className="w-4 h-4 text-[#0284C7] shrink-0" />
                   <span>
                     {language === 'bn' ? 'কাস্টম সাইজ টি-শার্ট অন্তর্ভুক্ত' : 'T-shirt Included (S-XXXL)'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Award className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <Award className="w-4 h-4 text-[#0284C7] shrink-0" />
                   <span>
                     {language === 'bn' ? '৬৪ বছর পূর্তি স্মারক স্মরণিকা' : 'Anniversary Souvenir Magazine'}
                   </span>
@@ -1005,7 +1005,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               {feeSettings.registrationOpen ? (
                 <button
                   onClick={() => onNavigate('register')}
-                  className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-3.5 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold text-sm shadow-lg shadow-sky-600/30 transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <span>{language === 'bn' ? 'প্রাক্তন শিক্ষার্থী নিবন্ধন' : 'Register as Alumni'}</span>
                   <ArrowRight className="w-4 h-4" />
@@ -1013,7 +1013,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               ) : (
                 <button
                   disabled
-                  className="w-full py-3.5 rounded-xl bg-slate-200 text-slate-500 font-bold text-sm cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full py-3.5 rounded-full bg-slate-200 text-slate-500 font-bold text-sm cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   <Lock className="w-4 h-4" />
                   <span>{t.btnRegistrationClosed}</span>
@@ -1023,10 +1023,10 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
 
           {/* Current Student Card */}
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-lg relative overflow-hidden flex flex-col justify-between">
+          <div className="bg-white rounded-3xl p-8 border border-[#E2EEF8] shadow-lg relative overflow-hidden flex flex-col justify-between">
             <div className="space-y-4">
               <div>
-                <span className="text-xs font-bold text-teal-700 uppercase tracking-wider block">
+                <span className="text-xs font-bold text-[#0EA5E9] uppercase tracking-wider block">
                   {t.feeCurrentTitle}
                 </span>
                 <h3 className="text-3xl font-black text-slate-900 mt-1">
@@ -1037,17 +1037,17 @@ export const HomePage: React.FC<HomePageProps> = ({
 
               <div className="space-y-2.5 text-xs text-slate-700 pt-4 border-t border-slate-100">
                 <div className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-4 h-4 text-[#0EA5E9] shrink-0 mt-0.5" />
                   <span>{t.feeCurrentIncludes}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Shirt className="w-4 h-4 text-teal-600 shrink-0" />
+                  <Shirt className="w-4 h-4 text-[#0EA5E9] shrink-0" />
                   <span>
                     {language === 'bn' ? 'পুনর্মিলনী টি-শার্ট অন্তর্ভুক্ত' : 'Reunion T-shirt Included'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-teal-600 shrink-0" />
+                  <Sparkles className="w-4 h-4 text-[#0EA5E9] shrink-0" />
                   <span>
                     {language === 'bn' ? 'বিশেষ ছাত্র মধ্যাহ্নভোজ ও কনসার্ট' : 'Student Banquet & Live Concert'}
                   </span>
@@ -1059,7 +1059,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               {feeSettings.registrationOpen ? (
                 <button
                   onClick={() => onNavigate('register')}
-                  className="w-full py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-3.5 rounded-full bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <span>{language === 'bn' ? 'বর্তমান শিক্ষার্থী নিবন্ধন' : 'Register as Current Student'}</span>
                   <ArrowRight className="w-4 h-4" />
@@ -1067,7 +1067,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               ) : (
                 <button
                   disabled
-                  className="w-full py-3.5 rounded-xl bg-slate-200 text-slate-500 font-bold text-sm cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full py-3.5 rounded-full bg-slate-200 text-slate-500 font-bold text-sm cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   <Lock className="w-4 h-4" />
                   <span>{t.btnRegistrationClosed}</span>
@@ -1094,7 +1094,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
             <div className="flex items-center gap-2">
-              <Bell className="w-5 h-5 text-emerald-600" />
+              <Bell className="w-5 h-5 text-[#0284C7]" />
               <h2 className="text-2xl font-black text-slate-900 tracking-tight">
                 {t.noticesHeading}
               </h2>
@@ -1104,7 +1104,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
           <button
             onClick={() => onNavigate('notices')}
-            className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer"
+            className="text-xs font-bold text-[#0284C7] hover:text-[#0EA5E9] flex items-center gap-1 cursor-pointer"
           >
             <span>{language === 'bn' ? 'সকল নোটিশ দেখুন' : 'View All Notices'}</span>
             <ArrowRight className="w-4 h-4" />
@@ -1115,11 +1115,11 @@ export const HomePage: React.FC<HomePageProps> = ({
           {notices.slice(0, 3).map((notice) => (
             <div
               key={notice.id}
-              className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between space-y-4"
+              className="bg-white rounded-2xl p-6 border border-[#E2EEF8] shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between space-y-4"
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="px-2.5 py-0.5 rounded-full font-bold uppercase bg-emerald-100 text-emerald-800">
+                  <span className="px-2.5 py-0.5 rounded-full font-bold uppercase bg-[#E2EEF8] text-[#0284C7]">
                     {notice.category}
                   </span>
                   <span className="text-slate-400">{notice.date}</span>
@@ -1132,10 +1132,10 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </p>
               </div>
 
-              <div className="pt-2 border-t border-slate-100">
+              <div className="pt-2 border-t border-[#E2EEF8]">
                 <button
                   onClick={() => onNavigate('notices')}
-                  className="text-xs font-semibold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-xs font-semibold text-[#0284C7] hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <span>{language === 'bn' ? 'বিস্তারিত পড়ুন' : 'Read Notice'}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -1203,8 +1203,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                   alt={item.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
-                <div className="absolute inset-x-0 bottom-0 bg-[#172554]/90 p-3 flex flex-col justify-end border-t border-[#C5A45D]/40">
-                  <span className="text-[10px] font-bold text-[#C5A45D] uppercase tracking-wider">
+                <div className="absolute inset-x-0 bottom-0 bg-[#0F172A]/90 p-3 flex flex-col justify-end border-t border-[#0284C7]/40">
+                  <span className="text-[10px] font-bold text-[#38BDF8] uppercase tracking-wider">
                     {item.year}
                   </span>
                   <h4 className="font-bold text-white text-sm">{item.title}</h4>
@@ -1262,11 +1262,11 @@ export const HomePage: React.FC<HomePageProps> = ({
               <img
                 src={member.img}
                 alt={member.name}
-                className="w-20 h-20 rounded-full object-cover mx-auto border-2 border-emerald-600 shadow-sm"
+                className="w-20 h-20 rounded-full object-cover mx-auto border-2 border-[#0284C7] shadow-sm"
               />
               <div>
                 <h4 className="font-bold text-slate-900 text-sm">{member.name}</h4>
-                <span className="text-xs font-semibold text-emerald-700 block mt-0.5">
+                <span className="text-xs font-semibold text-[#0284C7] block mt-0.5">
                   {member.role}
                 </span>
                 <p className="text-[11px] text-slate-500 mt-1">{member.desc}</p>

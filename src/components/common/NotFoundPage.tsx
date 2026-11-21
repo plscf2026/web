@@ -19,9 +19,9 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
     <div className="min-h-[75vh] flex items-center justify-center px-4 py-12 sm:py-16">
       <div className="max-w-xl w-full bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-xl text-center space-y-6">
         {/* 404 Status Icon Badge */}
-        <div className="relative mx-auto w-24 h-24 rounded-3xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shadow-sm">
+        <div className="relative mx-auto w-24 h-24 rounded-3xl bg-[#E2EEF8]/50 border border-[#0284C7]/20 flex items-center justify-center text-[#0284C7] shadow-sm">
           <FileQuestion className="w-12 h-12" />
-          <span className="absolute -top-2 -right-2 px-2.5 py-0.5 rounded-full bg-[#172554] text-white text-[11px] font-black tracking-wider uppercase shadow-md">
+          <span className="absolute -top-2 -right-2 px-2.5 py-0.5 rounded-full bg-[#0F172A] text-white text-[11px] font-black tracking-wider uppercase shadow-md">
             404
           </span>
         </div>
@@ -51,7 +51,7 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
           <button
             type="button"
             onClick={() => onNavigate('home')}
-            className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-[#172554] hover:bg-[#1E3A8A] text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full sm:w-auto px-5 py-3 rounded-full bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
           >
             <Home className="w-4 h-4" />
             <span>{isBangla ? 'হোমপেজে ফিরে যান' : 'Return to Home'}</span>
@@ -60,7 +60,7 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
           <button
             type="button"
             onClick={() => onNavigate('register')}
-            className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full sm:w-auto px-5 py-3 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white text-xs font-bold transition-all shadow-sky-600/30 flex items-center justify-center gap-2 cursor-pointer"
           >
             <UserCheck className="w-4 h-4" />
             <span>{isBangla ? 'নিবন্ধন ফরম' : 'Registration Page'}</span>
@@ -72,7 +72,7 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
           <button
             type="button"
             onClick={() => onNavigate('find-ticket')}
-            className="hover:text-[#172554] transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="hover:text-[#0284C7] transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <Ticket className="w-3.5 h-3.5 text-slate-400" />
             <span>{isBangla ? 'টিকিট খুঁজুন' : 'Find Ticket'}</span>
@@ -81,7 +81,7 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
           <button
             type="button"
             onClick={() => onNavigate('about')}
-            className="hover:text-[#172554] transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="hover:text-[#0284C7] transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
             <span>{isBangla ? 'যোগাযোগ ও সহায়তা' : 'About & Help'}</span>
@@ -90,7 +90,7 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
           <button
             type="button"
             onClick={() => window.history.back()}
-            className="hover:text-[#172554] transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="hover:text-[#0284C7] transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-slate-400" />
             <span>{isBangla ? 'পূর্ববর্তী পৃষ্ঠা' : 'Go Back'}</span>

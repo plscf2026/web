@@ -53,7 +53,7 @@ export const NoticeBoardPage: React.FC<NoticeBoardPageProps> = ({ language }) =>
     <div className="max-w-5xl mx-auto px-4 py-10 space-y-8">
       {/* Title */}
       <div className="text-center space-y-2">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2EEF8] text-[#0284C7] text-xs font-semibold">
           <Bell className="w-3.5 h-3.5" />
           <span>{language === 'bn' ? 'সাপ্তাহিক ও জরুরি ঘোষণা' : 'Official Advisories'}</span>
         </div>
@@ -80,7 +80,7 @@ export const NoticeBoardPage: React.FC<NoticeBoardPageProps> = ({ language }) =>
               onClick={() => setActiveCategory(cat.id)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors cursor-pointer ${
                 activeCategory === cat.id
-                  ? 'bg-emerald-600 text-white shadow-xs'
+                  ? 'bg-[#0F172A] text-white shadow-xs'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
@@ -96,7 +96,7 @@ export const NoticeBoardPage: React.FC<NoticeBoardPageProps> = ({ language }) =>
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search notices..."
-            className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden"
+            className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-300 text-xs focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
           />
         </div>
       </div>
@@ -113,7 +113,7 @@ export const NoticeBoardPage: React.FC<NoticeBoardPageProps> = ({ language }) =>
               key={notice.id}
               className={`bg-white rounded-2xl p-6 border shadow-xs transition-shadow hover:shadow-md space-y-4 ${
                 notice.isPinned
-                  ? 'border-2 border-[#172554] bg-[#F3F4F6]'
+                  ? 'border-2 border-[#0284C7] bg-[#E2EEF8]/20'
                   : 'border-slate-200'
               }`}
             >
@@ -125,7 +125,7 @@ export const NoticeBoardPage: React.FC<NoticeBoardPageProps> = ({ language }) =>
                       <span>Pinned</span>
                     </span>
                   )}
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-[#E2EEF8] text-[#0284C7]">
                     {notice.category}
                   </span>
                 </div>
@@ -148,7 +148,7 @@ export const NoticeBoardPage: React.FC<NoticeBoardPageProps> = ({ language }) =>
               {notice.attachmentName && (
                 <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <FileText className="w-4 h-4 text-emerald-600" />
+                    <FileText className="w-4 h-4 text-[#0284C7]" />
                     <span>{notice.attachmentName}</span>
                   </div>
 
@@ -159,7 +159,7 @@ export const NoticeBoardPage: React.FC<NoticeBoardPageProps> = ({ language }) =>
                         language === 'bn' ? notice.titleBn : notice.titleEn
                       )
                     }
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#E2EEF8] hover:bg-[#E2EEF8]/80 text-[#0284C7] text-xs font-semibold transition-colors cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>{t.downloadAttachment}</span>

@@ -65,7 +65,7 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
     <div className="max-w-xl mx-auto px-4 py-12">
       <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 space-y-6">
         <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto shadow-xs">
+          <div className="w-14 h-14 rounded-2xl bg-[#E2EEF8] text-[#0284C7] flex items-center justify-center mx-auto shadow-xs">
             <Search className="w-7 h-7" />
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">
@@ -110,7 +110,7 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
                 value={registrationId}
                 onChange={(e) => setRegistrationId(e.target.value)}
                 placeholder="PLSCF-2026-F0001 or DON-2027-..."
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 focus:outline-hidden"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
                 required
               />
             </div>
@@ -125,7 +125,7 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
               value={mobileNumber}
               onChange={(e) => setMobileNumber(e.target.value)}
               placeholder="01XXXXXXXXX"
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 focus:outline-hidden"
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
               required
             />
           </div>
@@ -140,7 +140,7 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
           <button
             type="submit"
             disabled={isSearching}
-            className="w-full min-h-[44px] py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold text-sm rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+            className="w-full min-h-[44px] py-3.5 bg-[#0284C7] hover:bg-[#0EA5E9] disabled:opacity-60 text-white font-bold text-sm rounded-full shadow-lg shadow-sky-600/30 transition-all cursor-pointer flex items-center justify-center gap-2"
           >
             <span>{isSearching ? (language === 'bn' ? 'খোঁজা হচ্ছে...' : 'Searching...') : t.btnSearchTicket}</span>
             <ArrowRight className="w-4 h-4" />
@@ -149,15 +149,15 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
 
         {/* Found Student Result Card */}
         {matchedRecord && (
-          <div className="p-5 rounded-2xl bg-emerald-50 border-2 border-emerald-500 shadow-md space-y-4 animate-in fade-in">
+          <div className="p-5 rounded-2xl bg-[#E2EEF8]/40 border-2 border-[#0284C7] shadow-md space-y-4 animate-in fade-in">
             <div className="flex items-center gap-4">
               <img
                 src={matchedRecord.photoUrl}
                 alt={matchedRecord.fullName}
-                className="w-16 h-16 rounded-xl object-cover border-2 border-emerald-600"
+                className="w-16 h-16 rounded-xl object-cover border-2 border-[#0284C7]"
               />
               <div>
-                <span className="text-[10px] font-bold uppercase text-emerald-800 bg-emerald-200/60 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-bold uppercase text-[#0284C7] bg-[#E2EEF8] px-2.5 py-0.5 rounded-full border border-[#0284C7]/30">
                   {matchedRecord.category} Student
                 </span>
                 <h3 className="text-base font-bold text-slate-900 mt-1">
@@ -169,14 +169,14 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
               </div>
             </div>
 
-            <div className="pt-2 border-t border-emerald-200 flex justify-between items-center text-xs">
-              <span className="text-emerald-900 font-semibold">
+            <div className="pt-2 border-t border-[#E2EEF8] flex justify-between items-center text-xs">
+              <span className="text-[#0F172A] font-semibold">
                 Status: {matchedRecord.paymentStatus.toUpperCase()} (৳{matchedRecord.totalPaid})
               </span>
               <button
                 type="button"
                 onClick={() => onSelectRegistration(matchedRecord)}
-                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+                className="px-4 py-2 bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold rounded-full shadow-xs transition-colors cursor-pointer"
               >
                 View & Print Ticket
               </button>
@@ -196,7 +196,7 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
                   <span className="text-[10px] font-black uppercase text-amber-900 bg-amber-200 px-2.5 py-0.5 rounded-full border border-amber-300">
                     {isBangla ? 'অনুদাতা ও শুভাকাঙ্ক্ষী' : 'Honored Patron / Donor'}
                   </span>
-                  <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                  <span className="text-xs font-bold text-[#0284C7] flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     {isBangla ? 'যাচাইকৃত' : 'Verified'}
                   </span>
@@ -236,7 +236,7 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
             {language === 'bn' ? 'এখনো নিবন্ধন করেননি?' : "Haven't registered yet?"}{' '}
             <button
               onClick={onNavigateRegister}
-              className="text-emerald-700 font-bold hover:underline cursor-pointer"
+              className="text-[#0284C7] font-bold hover:underline cursor-pointer"
             >
               {language === 'bn' ? 'এখনই রেজিস্ট্রেশন করুন' : 'Register Now'}
             </button>

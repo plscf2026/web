@@ -221,7 +221,7 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
             </div>
 
             <div className="flex items-center gap-3">
-              <Mail className="w-5 h-5 text-[#263B8C] shrink-0" />
+              <Mail className="w-5 h-5 text-[#0284C7] shrink-0" />
               <div>
                 <strong className="block text-slate-900">Official Secretariat Email:</strong>
                 <span>{t.helplineEmail}</span>
@@ -243,8 +243,8 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
           </div>
 
           {feedbackSent ? (
-            <div className="p-4 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl text-xs flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <div className="p-4 bg-[#E2EEF8] border border-[#0284C7]/30 text-[#0F172A] rounded-xl text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-[#0284C7] shrink-0" />
               <span>
                 {language === 'bn'
                   ? 'আপনার বার্তা সফলভাবে সচিবালয়ে জমা হয়েছে। শীঘ্রই যোগাযোগ করা হবে।'
@@ -262,7 +262,7 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder={language === 'bn' ? 'উদা: মোঃ শহিদুল আলম' : 'e.g. Shahidul Alam'}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#172554] text-slate-900"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#0284C7] focus:border-[#0284C7] text-slate-900"
                   required
                 />
               </div>
@@ -289,8 +289,8 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
                     phoneTouched && !isPhoneValid
                       ? 'border-2 border-rose-500 focus:ring-rose-400 bg-rose-50/30 text-rose-900'
                       : isPhoneValid
-                      ? 'border-2 border-emerald-500 focus:ring-emerald-400 text-emerald-900'
-                      : 'border border-slate-300 focus:ring-[#172554] text-slate-900'
+                      ? 'border-2 border-[#0284C7] focus:ring-[#0284C7]/20 text-[#0284C7]'
+                      : 'border border-slate-300 focus:ring-[#0284C7] focus:border-[#0284C7] text-slate-900'
                   }`}
                   required
                 />
@@ -308,8 +308,8 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
                 )}
 
                 {isPhoneValid && (
-                  <div className="mt-1.5 p-1.5 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-700 text-[11px] flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                  <div className="mt-1.5 p-1.5 rounded-lg bg-[#E2EEF8] border border-[#0284C7]/30 text-[#0284C7] text-[11px] flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-[#0284C7]" />
                     <span>
                       {language === 'bn'
                         ? 'সঠিক বাংলাদেশি মোবাইল নম্বর যাচাইকৃত।'
@@ -333,7 +333,7 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
                       ? 'আপনার জিজ্ঞাসা বা বার্তা এখানে বিস্তারিত লিখুন...'
                       : 'Write your question or message in detail...'
                   }
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#172554] text-slate-900"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#0284C7] focus:border-[#0284C7] text-slate-900"
                   required
                 />
                 {!message.trim() && (

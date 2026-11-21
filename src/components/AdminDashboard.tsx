@@ -1465,10 +1465,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // ==========================================
   return (
     <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {/* Top Admin Header with Supabase Connection Telemetry - Solid Navy Blue */}
-      <div className="bg-[#172554] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-blue-900 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+      {/* Top Admin Header with Supabase Connection Telemetry - Solid Obsidian */}
+      <div className="bg-[#0F172A] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-800 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-full overflow-hidden bg-white p-0.5 border-2 border-[#C5A45D] shadow-md shrink-0 hidden sm:flex items-center justify-center">
+          <div className="w-14 h-14 rounded-full overflow-hidden bg-white p-0.5 border-2 border-[#0284C7] shadow-md shrink-0 hidden sm:flex items-center justify-center">
             <img
               src="/assets/school_logo.png"
               alt="Police Lines School & College Faridpur Emblem"
@@ -1477,8 +1477,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-1.5">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-900 border border-blue-700 text-[11px] font-bold text-[#C5A45D]">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#C5A45D]" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[11px] font-bold text-[#38BDF8]">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#38BDF8]" />
               <span>{adminSession.fullName}</span>
               <span className="text-slate-300 font-mono">(@{adminSession.username})</span>
             </span>
@@ -1533,14 +1533,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* Sidebar Title */}
           <div className="px-3 py-2 flex items-center justify-between border-b border-slate-100 mb-2">
             <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-[#172554]" />
+              <Layers className="w-4 h-4 text-[#0284C7]" />
               <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
                 {language === 'bn'
                   ? `${currentPortalConfig.badgeLabelBn} (${visibleNavTabs.length}টি)`
                   : `${currentPortalConfig.badgeLabelEn} (${visibleNavTabs.length})`}
               </span>
             </div>
-            <span className="text-[10px] font-mono font-bold bg-[#172554]/10 text-[#172554] px-1.5 py-0.5 rounded">
+            <span className="text-[10px] font-mono font-bold bg-[#E2EEF8] text-[#0284C7] px-1.5 py-0.5 rounded">
               {currentPortalConfig.badgeLabelEn.split(' ')[0]}
             </span>
           </div>
@@ -1557,18 +1557,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   onClick={() => handleTabChange(tab.id as any)}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-[#172554] text-white shadow-md'
+                      ? 'bg-[#0F172A] text-white shadow-md'
                       : tab.highlight
-                      ? 'text-[#172554] bg-[#172554]/5 hover:bg-[#172554]/10 font-black'
+                      ? 'text-[#0284C7] bg-[#E2EEF8]/40 hover:bg-[#E2EEF8] font-black'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 truncate">
-                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#C5A45D]' : tab.highlight ? 'text-[#172554]' : 'text-slate-400'}`} />
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#38BDF8]' : tab.highlight ? 'text-[#0284C7]' : 'text-slate-400'}`} />
                     <span className="truncate">{tab.label}</span>
                   </div>
                   {isActive ? (
-                    <ChevronRight className="w-3.5 h-3.5 text-[#C5A45D] shrink-0" />
+                    <ChevronRight className="w-3.5 h-3.5 text-[#38BDF8] shrink-0" />
                   ) : tab.badge ? (
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                       {tab.badge}
@@ -1595,7 +1595,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="relative w-72 max-w-[85vw] bg-white h-full shadow-2xl p-4 flex flex-col z-10 overflow-y-auto">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
                 <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-[#172554]" />
+                  <Layers className="w-4 h-4 text-[#0284C7]" />
                   <span className="text-xs font-black text-slate-900">
                     {language === 'bn'
                       ? `${currentPortalConfig.badgeLabelBn} মডিউলসমূহ`
@@ -1625,17 +1625,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       }}
                       className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
                         isActive
-                          ? 'bg-[#172554] text-white shadow-md'
+                          ? 'bg-[#0F172A] text-white shadow-md'
                           : tab.highlight
-                          ? 'text-[#172554] bg-[#172554]/5 hover:bg-[#172554]/10 font-black'
+                          ? 'text-[#0284C7] bg-[#E2EEF8]/40 hover:bg-[#E2EEF8] font-black'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 truncate">
-                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#C5A45D]' : 'text-slate-400'}`} />
+                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#38BDF8]' : 'text-slate-400'}`} />
                         <span className="truncate">{tab.label}</span>
                       </div>
-                      {isActive && <ChevronRight className="w-3.5 h-3.5 text-[#C5A45D] shrink-0" />}
+                      {isActive && <ChevronRight className="w-3.5 h-3.5 text-[#38BDF8] shrink-0" />}
                     </button>
                   );
                 })}
@@ -1651,7 +1651,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* Mobile Current Module Quick-Selector Bar (< lg) */}
           <div className="lg:hidden bg-white border border-slate-200 rounded-2xl p-3 shadow-xs flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-[#172554] text-[#C5A45D] flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-xl bg-[#0F172A] text-[#38BDF8] flex items-center justify-center shrink-0">
                 <Layers className="w-4 h-4" />
               </div>
               <div className="truncate">
@@ -3469,7 +3469,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     ? 'অনুদাতার নাম, মোবাইল নম্বর, ট্রানজ্যাকশন আইডি বা টোকেন দিয়ে খুঁজুন...'
                     : 'Search by donor name, phone, transaction ID, or token...'
                 }
-                className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#172554] transition-all"
+                className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0284C7] transition-all"
               />
               {donationsSearchQuery && (
                 <button
@@ -3486,7 +3486,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <select
                 value={donationsPurposeFilter}
                 onChange={(e) => setDonationsPurposeFilter(e.target.value)}
-                className="w-full sm:w-auto px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#172554]"
+                className="w-full sm:w-auto px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0284C7]"
               >
                 <option value="ALL">{language === 'bn' ? 'সকল খাত (All Causes)' : 'All Causes'}</option>
                 {Array.from(new Set(donations.map((d) => d.purpose).filter(Boolean))).map((purpose) => (
@@ -4396,7 +4396,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   setShowEditStudentModal(null);
                   refreshAll();
                 }}
-                className="w-full py-2.5 rounded-xl bg-[#172554] hover:bg-[#263B8C] text-white font-bold text-xs shadow-xs cursor-pointer transition-colors"
+                className="w-full py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold text-xs shadow-xs cursor-pointer transition-colors"
               >
                 Save Changes (Supabase & Local)
               </button>
@@ -4441,7 +4441,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {bookingToDelete.studentId && (
                 <div className="flex justify-between">
                   <span className="text-slate-500">Linked Student ID:</span>
-                  <span className="font-mono font-bold text-[#263B8C]">{bookingToDelete.studentId}</span>
+                  <span className="font-mono font-bold text-[#0284C7]">{bookingToDelete.studentId}</span>
                 </div>
               )}
               <div className="flex justify-between">

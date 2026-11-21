@@ -142,7 +142,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language }) => {
     <div className="max-w-7xl mx-auto px-4 py-10 space-y-8">
       {/* Title */}
       <div className="text-center space-y-2">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2EEF8] text-[#0284C7] text-xs font-semibold">
           <Sparkles className="w-3.5 h-3.5" />
           <span>{language === 'bn' ? 'সোনালী স্মৃতির সংগ্রহশালা' : 'Heritage Archive 1962-2026'}</span>
         </div>
@@ -164,7 +164,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language }) => {
             }}
             className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'photos'
-                ? 'bg-emerald-600 text-white shadow-xs'
+                ? 'bg-[#0284C7] text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -179,7 +179,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language }) => {
             }}
             className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'videos'
-                ? 'bg-emerald-600 text-white shadow-xs'
+                ? 'bg-[#0284C7] text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -231,7 +231,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language }) => {
 
               {item.type === 'video' && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/20 transition-colors">
-                  <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                  <div className="w-12 h-12 rounded-full bg-[#0284C7] text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
                     <Play className="w-5 h-5 fill-white ml-0.5" />
                   </div>
                 </div>
@@ -243,7 +243,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language }) => {
             </div>
 
             <div className="p-4 space-y-1">
-              <h3 className="font-bold text-slate-900 text-xs sm:text-sm line-clamp-1 group-hover:text-emerald-700 transition-colors">
+              <h3 className="font-bold text-slate-900 text-xs sm:text-sm line-clamp-1 group-hover:text-[#0284C7] transition-colors">
                 {language === 'bn' ? item.titleBn : item.titleEn}
               </h3>
               <p className="text-[11px] text-slate-500 line-clamp-2">
@@ -276,7 +276,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language }) => {
                 />
               ) : (
                 <div className="text-center p-8 text-white space-y-3">
-                  <Play className="w-16 h-16 text-emerald-400 mx-auto animate-pulse" />
+                  <Play className="w-16 h-16 text-[#38BDF8] mx-auto animate-pulse" />
                   <p className="text-sm font-semibold">
                     {language === 'bn' ? 'ভিডিও স্ট্রিম চালু হচ্ছে...' : 'Playing High-Definition Video Stream...'}
                   </p>
@@ -296,7 +296,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language }) => {
 
             <div className="p-6 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-emerald-700 uppercase">
+                <span className="text-xs font-bold text-[#0284C7] uppercase">
                   {selectedItem.album} • {selectedItem.year}
                 </span>
                 <span className="text-xs text-slate-400 font-mono">ID: {selectedItem.id}</span>

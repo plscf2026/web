@@ -92,15 +92,15 @@ export const MasterEventOverview: React.FC<MasterEventOverviewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Banner with Quick Highlights - Solid Navy Blue */}
-      <div className="bg-[#172554] text-white rounded-3xl p-6 sm:p-8 shadow-md border border-blue-900">
+      {/* Top Banner with Quick Highlights - Slate Obsidian */}
+      <div className="bg-[#0F172A] text-white rounded-3xl p-6 sm:p-8 shadow-md border border-slate-800">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-400 text-slate-950">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#0284C7] text-white">
                 Master Command Dashboard
               </span>
-              <span className="text-xs text-slate-400 font-mono">Grand Reunion 2026</span>
+              <span className="text-xs text-[#38BDF8] font-mono">Grand Reunion 2026</span>
             </div>
             <h2 className="text-2xl font-black tracking-tight mt-1">
               Police Lines School & College, Faridpur
@@ -113,7 +113,7 @@ export const MasterEventOverview: React.FC<MasterEventOverviewProps> = ({
           <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md p-2 rounded-2xl border border-white/10">
             <div className="px-3 py-1.5 text-center">
               <span className="text-[10px] text-slate-400 uppercase font-bold block">Capacity Target</span>
-              <span className="text-base font-black text-amber-300 font-mono">10,000+</span>
+              <span className="text-base font-black text-[#38BDF8] font-mono">10,000+</span>
             </div>
             <div className="w-px h-8 bg-white/20" />
             <div className="px-3 py-1.5 text-center">

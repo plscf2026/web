@@ -306,8 +306,8 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
       {/* Module Title Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#172554]/10 text-[#172554] text-xs font-bold mb-2">
-            <ShieldCheck className="w-4 h-4 text-[#172554]" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2EEF8] text-[#0284C7] text-xs font-bold mb-2">
+            <ShieldCheck className="w-4 h-4 text-[#0284C7]" />
             <span>
               {language === 'bn' ? 'প্রাতিষ্ঠানিক ডাটাবেজ মডিউল' : 'Institutional Database Module'}
             </span>
@@ -326,7 +326,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
           <button
             type="button"
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2.5 rounded-xl bg-[#172554] hover:bg-[#263B8C] text-white text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+            className="px-4 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0EA5E9] text-white text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
           >
             <Plus className="w-4 h-4" />
             <span>{language === 'bn' ? 'নতুন আইডি যুক্ত করুন' : 'Add Single ID'}</span>
@@ -335,9 +335,9 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
           <button
             type="button"
             onClick={() => setShowImportModal(true)}
-            className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-[#172554] border border-slate-300 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+            className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-[#0F172A] border border-slate-300 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
           >
-            <Upload className="w-4 h-4 text-[#263B8C]" />
+            <Upload className="w-4 h-4 text-[#0284C7]" />
             <span>{language === 'bn' ? 'সিএসভি / এক্সেল আপলোড' : 'Upload CSV / Excel'}</span>
           </button>
 
@@ -382,14 +382,14 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
         </div>
 
         {/* Reserved */}
-        <div className="bg-white p-4 rounded-xl border border-blue-200 bg-blue-50/20 shadow-xs">
-          <div className="text-[11px] font-bold text-[#263B8C] uppercase tracking-wider">
+        <div className="bg-white p-4 rounded-xl border border-sky-200 bg-sky-50/20 shadow-xs">
+          <div className="text-[11px] font-bold text-[#0284C7] uppercase tracking-wider">
             {language === 'bn' ? 'পেমেন্ট অপেক্ষমাণ' : 'Reserved in Checkout'}
           </div>
-          <div className="text-2xl font-black text-[#263B8C] mt-1 font-mono">
+          <div className="text-2xl font-black text-[#0284C7] mt-1 font-mono">
             {metrics.reserved}
           </div>
-          <div className="text-[10px] text-blue-600 mt-1">
+          <div className="text-[10px] text-sky-600 mt-1">
             {language === 'bn' ? '১০ মিনিট লকিং' : '10-min checkout lock'}
           </div>
         </div>
@@ -434,7 +434,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
                 ? 'আইডি নম্বর, শিক্ষার্থীর নাম বা টিকিট নম্বর দিয়ে খুঁজুন...'
                 : 'Search by Student ID, student name, or registration ID...'
             }
-            className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#172554] bg-white text-slate-800"
+            className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0284C7] bg-white text-slate-800"
           />
         </div>
 
@@ -499,7 +499,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
         <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-xs text-left border-collapse">
             <thead>
-              <tr className="bg-[#172554] text-white uppercase text-[11px] tracking-wider">
+              <tr className="bg-[#0F172A] text-white uppercase text-[11px] tracking-wider">
                 <th className="py-3 px-4 font-bold">Student ID</th>
                 <th className="py-3 px-4 font-bold">Student Name</th>
                 <th className="py-3 px-4 font-bold">Class</th>
@@ -564,7 +564,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
                         </span>
                       )}
                       {item.verificationStatus === 'RESERVED' && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-[#263B8C] font-bold text-[10px]">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E2EEF8] text-[#0284C7] font-bold text-[10px]">
                           <Clock className="w-3 h-3" />
                           RESERVED
                         </span>
@@ -580,7 +580,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
                     {/* Linked Booking */}
                     <td className="py-3 px-4 font-mono text-[11px]">
                       {item.usedRegistrationId ? (
-                        <span className="text-[#263B8C] font-bold">
+                        <span className="text-[#0284C7] font-bold">
                           {item.usedRegistrationId}
                         </span>
                       ) : (
@@ -696,9 +696,9 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
                     <span className="font-mono text-slate-700">{item.academicYear}</span>
                   </div>
                   {item.usedRegistrationId && (
-                    <div className="col-span-2 bg-blue-50/60 p-2 rounded-lg border border-blue-100 text-xs">
-                      <span className="text-[10px] uppercase font-bold text-blue-700 block">Linked Booking</span>
-                      <span className="font-mono font-bold text-[#172554]">{item.usedRegistrationId}</span>
+                    <div className="col-span-2 bg-[#E2EEF8]/60 p-2 rounded-lg border border-[#0284C7]/20 text-xs">
+                      <span className="text-[10px] uppercase font-bold text-[#0284C7] block">Linked Booking</span>
+                      <span className="font-mono font-bold text-[#0F172A]">{item.usedRegistrationId}</span>
                     </div>
                   )}
                 </div>
@@ -770,7 +770,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 border border-slate-200">
             <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                <Plus className="w-4 h-4 text-[#172554]" />
+                <Plus className="w-4 h-4 text-[#0284C7]" />
                 <span>{language === 'bn' ? 'একক স্টুডেন্ট আইডি যোগ করুন' : 'Add Single Student ID'}</span>
               </h3>
               <button
@@ -791,7 +791,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
                   value={newId}
                   onChange={(e) => setNewId(e.target.value.toUpperCase())}
                   placeholder="e.g. PLSC-2026-120"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-sm uppercase focus:outline-none focus:ring-2 focus:ring-[#172554]"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-sm uppercase focus:outline-none focus:ring-2 focus:ring-[#0284C7]"
                   required
                 />
               </div>
@@ -805,7 +805,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="e.g. Anisul Haque"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#172554]"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#0284C7]"
                 />
               </div>
 
@@ -846,7 +846,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
                 <button
                   type="submit"
                   disabled={isAddingSingle}
-                  className="px-5 py-2 rounded-xl bg-[#172554] hover:bg-[#263B8C] text-white font-bold cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold cursor-pointer disabled:opacity-50"
                 >
                   {isAddingSingle
                     ? language === 'bn' ? 'সংরক্ষণ হচ্ছে...' : 'Saving to Database...'
@@ -864,7 +864,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 border border-slate-200">
             <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                <Edit2 className="w-4 h-4 text-[#263B8C]" />
+                <Edit2 className="w-4 h-4 text-[#0284C7]" />
                 <span>{language === 'bn' ? 'আইডি রেকর্ড সম্পাদন' : 'Edit Student ID Record'}</span>
               </h3>
               <button
@@ -892,7 +892,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
                   type="text"
                   value={editingRecord.studentName || ''}
                   onChange={(e) => setEditingRecord({ ...editingRecord, studentName: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#172554]"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#0284C7]"
                 />
               </div>
 
@@ -931,7 +931,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#172554] hover:bg-[#263B8C] text-white font-bold cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold cursor-pointer"
                 >
                   {language === 'bn' ? 'হালনাগাদ করুন' : 'Update Record'}
                 </button>
@@ -947,7 +947,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
           <div className="bg-white rounded-2xl shadow-xl max-w-xl w-full p-6 border border-slate-200">
             <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5 text-[#172554]" />
+                <FileSpreadsheet className="w-5 h-5 text-[#0284C7]" />
                 <span>{language === 'bn' ? 'সিএসভি বা এক্সেল আইডি আপলোড' : 'Upload Student IDs (CSV / Excel)'}</span>
               </h3>
               <button
@@ -965,7 +965,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
             <div className="space-y-4 text-xs">
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
                 <div className="font-bold text-slate-800">CSV Column Format:</div>
-                <code className="text-[11px] text-[#172554] bg-white px-2 py-1 rounded border border-slate-200 block font-mono">
+                <code className="text-[11px] text-[#0284C7] bg-white px-2 py-1 rounded border border-slate-200 block font-mono">
                   student_id, student_name, class, year
                 </code>
                 <div className="text-[11px] text-slate-500">
@@ -1003,7 +1003,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
                   onChange={(e) => setCsvContent(e.target.value)}
                   rows={5}
                   placeholder={`PLSC-2026-115, Salman Farsi, Class 9, 2026\nPLSC-2026-116, Nusrat Jahan, Class 11 (HSC), 2026`}
-                  className="w-full p-3 font-mono text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#172554] bg-white"
+                  className="w-full p-3 font-mono text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0284C7] bg-white"
                 />
               </div>
 
@@ -1047,7 +1047,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
                   type="button"
                   onClick={handleImportCSV}
                   disabled={!csvContent.trim() || isImporting}
-                  className="px-5 py-2 rounded-xl bg-[#172554] hover:bg-[#263B8C] text-white font-bold cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                  className="px-5 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold cursor-pointer disabled:opacity-50 flex items-center gap-2"
                 >
                   {isImporting ? (
                     <>
@@ -1108,7 +1108,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
                       ? 'উদা: ভুলবশত এন্ট্রি করা হয়েছিল / শিক্ষার্থীর অনুরোধক্রমে...'
                       : 'e.g. Student transferred, entered by clerical mistake, duplicate record...'
                   }
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#172554] bg-white text-slate-900"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0284C7] bg-white text-slate-900"
                   required
                 />
               </div>
@@ -1132,7 +1132,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
                   className={`px-5 py-2 rounded-xl font-bold text-white cursor-pointer ${
                     auditModalAction.type === 'DELETE'
                       ? 'bg-rose-600 hover:bg-rose-700'
-                      : 'bg-[#172554] hover:bg-[#263B8C]'
+                      : 'bg-[#0284C7] hover:bg-[#0EA5E9]'
                   } disabled:opacity-50`}
                 >
                   {auditModalAction.type === 'DELETE'
