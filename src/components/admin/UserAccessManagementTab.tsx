@@ -20,7 +20,6 @@ import {
   XCircle,
   Crown,
   DollarSign,
-  Briefcase,
   Layers,
   ChevronRight,
   Edit2,
@@ -91,16 +90,34 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
   const [showDirectPassword, setShowDirectPassword] = useState(false);
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
 
-  // Create Form State
+  // Helper to generate RFC4122 compliant UUIDv4
+  const generateUuid = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  };
+
+  // Create Form State & Conditional Controls
+  const [selectedCreateCategory, setSelectedCreateCategory] = useState<RoleCategory>('SUPER_ADMIN');
+  const [customModelLabel, setCustomModelLabel] = useState('Super Admin 1');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [financeTier, setFinanceTier] = useState<'MANAGER' | 'STAFF'>('MANAGER');
+
   const [createForm, setCreateForm] = useState({
-    userType: 'STAFF' as UserType,
+    userType: 'ADMIN' as UserType,
     fullName: '',
     username: '',
     email: '',
-    role: 'GATE_STAFF',
-    department: 'GATE',
-    assignedStation: 'Gate 01 - Main Entrance',
-    permissions: ['VIEW', 'SCAN', 'VERIFY', 'APPROVE'] as StaffPermissionAction[],
+    role: 'super_admin',
+    department: 'CENTRAL_ADMIN',
+    assignedStation: 'Super Admin 1',
+    permissions: ['VIEW', 'SCAN', 'VERIFY', 'APPROVE', 'EXPORT', 'MANAGE'] as StaffPermissionAction[],
     authUserId: '',
     initialPassword: '',
   });
@@ -219,28 +236,173 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
     }
   };
 
+  // Switch Category inside Provisioning Modal
+  const handleSwitchCategory = (cat: RoleCategory) => {
+    setSelectedCreateCategory(cat);
+    const newUUID = generateUuid();
+
+    if (cat === 'SUPER_ADMIN') {
+      const nextNum = users.filter((u) => u.roleCategory === 'SUPER_ADMIN').length + 1;
+      const label = `Super Admin ${nextNum}`;
+      setCustomModelLabel(label);
+      setCreateForm((prev) => ({
+        ...prev,
+        userType: 'ADMIN',
+        role: 'super_admin',
+        department: 'CENTRAL_ADMIN',
+        assignedStation: label,
+        authUserId: newUUID,
+        permissions: ['VIEW', 'SCAN', 'VERIFY', 'APPROVE', 'EXPORT', 'MANAGE'],
+      }));
+    } else if (cat === 'ADMIN') {
+      const nextNum = users.filter((u) => u.roleCategory === 'ADMIN').length + 1;
+      const label = `Admin ${nextNum}`;
+      setCustomModelLabel(label);
+      setCreateForm((prev) => ({
+        ...prev,
+        userType: 'ADMIN',
+        role: 'admin',
+        department: 'CENTRAL_ADMIN',
+        assignedStation: label,
+        authUserId: newUUID,
+        permissions: ['VIEW', 'VERIFY', 'APPROVE', 'EXPORT'],
+      }));
+    } else if (cat === 'STAFF') {
+      setCreateForm((prev) => ({
+        ...prev,
+        userType: 'STAFF',
+        role: 'GATE_STAFF',
+        department: 'GATE',
+        assignedStation: 'Gate 01 - Main Entrance Checkpoint',
+        authUserId: newUUID,
+        permissions: ['VIEW', 'SCAN', 'VERIFY', 'APPROVE'],
+      }));
+    } else if (cat === 'FINANCE') {
+      if (financeTier === 'MANAGER') {
+        setCreateForm((prev) => ({
+          ...prev,
+          userType: 'ADMIN',
+          role: 'finance_manager',
+          department: 'FINANCE',
+          assignedStation: 'Central Finance Oversight Office',
+          authUserId: newUUID,
+          permissions: ['VIEW', 'APPROVE', 'EXPORT', 'MANAGE'],
+        }));
+      } else {
+        setCreateForm((prev) => ({
+          ...prev,
+          userType: 'STAFF',
+          role: 'FINANCE_STAFF',
+          department: 'FINANCE',
+          assignedStation: 'On-Site Finance & Cash Counter',
+          authUserId: newUUID,
+          permissions: ['VIEW', 'SCAN', 'VERIFY'],
+        }));
+      }
+    }
+  };
+
+  // Staff Daily Operational Role Switcher
+  const handleStaffRoleChange = (role: string) => {
+    let station = 'Operational Station';
+    let dept = 'OPERATIONS';
+    switch (role) {
+      case 'GATE_STAFF':
+        station = 'Gate 01 - Main Entrance Checkpoint';
+        dept = 'GATE';
+        break;
+      case 'BREAKFAST_STAFF':
+        station = 'Breakfast Station - Food Counter A';
+        dept = 'FOOD';
+        break;
+      case 'LUNCH_STAFF':
+        station = 'Lunch Dining Pavilion - Counter 01';
+        dept = 'FOOD';
+        break;
+      case 'DINNER_STAFF':
+        station = 'Dinner Banquet Pavilion - Counter 01';
+        dept = 'FOOD';
+        break;
+      case 'DRESS_STAFF':
+        station = 'T-Shirt & Souvenir Gift Desk';
+        dept = 'DRESS';
+        break;
+      default:
+        station = 'Operational Station';
+        dept = 'OPERATIONS';
+    }
+    setCreateForm((prev) => ({
+      ...prev,
+      role,
+      department: dept,
+      assignedStation: station,
+    }));
+  };
+
+  // Finance Tier Switcher (Manager vs Staff)
+  const handleFinanceTierChange = (tier: 'MANAGER' | 'STAFF') => {
+    setFinanceTier(tier);
+    if (tier === 'MANAGER') {
+      setCreateForm((prev) => ({
+        ...prev,
+        userType: 'ADMIN',
+        role: 'finance_manager',
+        department: 'FINANCE',
+        assignedStation: 'Central Finance Oversight Office',
+        permissions: ['VIEW', 'APPROVE', 'EXPORT', 'MANAGE'],
+      }));
+    } else {
+      setCreateForm((prev) => ({
+        ...prev,
+        userType: 'STAFF',
+        role: 'FINANCE_STAFF',
+        department: 'FINANCE',
+        assignedStation: 'On-Site Finance & Cash Counter',
+        permissions: ['VIEW', 'SCAN', 'VERIFY'],
+      }));
+    }
+  };
+
   // Open Create Modal for specific category
   const handleOpenCreateForCategory = (category: RoleCategory) => {
+    setSelectedCreateCategory(category);
+    const newUUID = generateUuid();
+    setConfirmPassword('');
+    setShowCreatePassword(false);
+    setShowConfirmPassword(false);
+
     let defaultRole = 'GATE_STAFF';
     let defaultType: UserType = 'STAFF';
-    let defaultDept = 'OPERATIONS';
+    let defaultDept = 'GATE';
+    let defaultStation = 'Gate 01 - Main Entrance Checkpoint';
 
     if (category === 'SUPER_ADMIN') {
+      const nextNum = users.filter((u) => u.roleCategory === 'SUPER_ADMIN').length + 1;
+      const label = `Super Admin ${nextNum}`;
+      setCustomModelLabel(label);
       defaultRole = 'super_admin';
       defaultType = 'ADMIN';
       defaultDept = 'CENTRAL_ADMIN';
+      defaultStation = label;
     } else if (category === 'ADMIN') {
+      const nextNum = users.filter((u) => u.roleCategory === 'ADMIN').length + 1;
+      const label = `Admin ${nextNum}`;
+      setCustomModelLabel(label);
       defaultRole = 'admin';
       defaultType = 'ADMIN';
       defaultDept = 'CENTRAL_ADMIN';
+      defaultStation = label;
     } else if (category === 'FINANCE') {
-      defaultRole = 'FINANCE_STAFF';
-      defaultType = 'STAFF';
-      defaultDept = 'FINANCE';
-    } else if (category === 'MANAGER') {
-      defaultRole = 'registration_officer';
+      setFinanceTier('MANAGER');
+      defaultRole = 'finance_manager';
       defaultType = 'ADMIN';
-      defaultDept = 'MANAGEMENT';
+      defaultDept = 'FINANCE';
+      defaultStation = 'Central Finance Oversight Office';
+    } else {
+      defaultRole = 'GATE_STAFF';
+      defaultType = 'STAFF';
+      defaultDept = 'GATE';
+      defaultStation = 'Gate 01 - Main Entrance Checkpoint';
     }
 
     setCreateForm({
@@ -250,9 +412,9 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
       email: '',
       role: defaultRole,
       department: defaultDept,
-      assignedStation: defaultType === 'ADMIN' ? 'Super Admin Command Center' : 'Operational Booth 01',
+      assignedStation: defaultStation,
       permissions: ['VIEW', 'SCAN', 'VERIFY', 'APPROVE'],
-      authUserId: '',
+      authUserId: newUUID,
       initialPassword: '',
     });
     setIsCreateModalOpen(true);
@@ -261,30 +423,79 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
   // Execute Create User
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createForm.fullName.trim() || !createForm.username.trim() || !createForm.email.trim()) {
-      showNotification('error', 'Please fill in all mandatory fields.');
+
+    if (!createForm.fullName.trim() || !createForm.username.trim()) {
+      showNotification('error', 'Please fill in Name and Username.');
       return;
     }
 
-    if (createForm.initialPassword && createForm.initialPassword.trim().length < 6) {
-      showNotification('error', 'Initial password must be at least 6 characters long.');
+    if (!createForm.initialPassword || createForm.initialPassword.trim().length < 6) {
+      showNotification('error', 'Password must be at least 6 characters long.');
       return;
+    }
+
+    if (createForm.initialPassword !== confirmPassword) {
+      showNotification('error', 'Passwords do not match. Please verify both password fields.');
+      return;
+    }
+
+    const cleanUsername = createForm.username.trim().toLowerCase().replace(/^@/, '');
+    const cleanEmail = createForm.email.trim()
+      ? createForm.email.trim().toLowerCase()
+      : `${cleanUsername}@plscf.edu.bd`;
+
+    let finalRole = createForm.role;
+    let finalDept = createForm.department;
+    let finalStation = createForm.assignedStation;
+    let finalType: UserType = createForm.userType;
+    let finalPermissions = createForm.permissions;
+
+    if (selectedCreateCategory === 'SUPER_ADMIN') {
+      finalType = 'ADMIN';
+      finalRole = 'super_admin';
+      finalDept = 'CENTRAL_ADMIN';
+      finalStation = customModelLabel.trim() || 'Super Admin 1';
+      finalPermissions = ['VIEW', 'SCAN', 'VERIFY', 'APPROVE', 'EXPORT', 'MANAGE'];
+    } else if (selectedCreateCategory === 'ADMIN') {
+      finalType = 'ADMIN';
+      finalRole = 'admin';
+      finalDept = 'CENTRAL_ADMIN';
+      finalStation = customModelLabel.trim() || 'Admin 1';
+      finalPermissions = ['VIEW', 'VERIFY', 'APPROVE', 'EXPORT'];
+    } else if (selectedCreateCategory === 'STAFF') {
+      finalType = 'STAFF';
+      finalRole = createForm.role;
+      finalStation = createForm.assignedStation;
+    } else if (selectedCreateCategory === 'FINANCE') {
+      if (financeTier === 'MANAGER') {
+        finalType = 'ADMIN';
+        finalRole = 'finance_manager';
+        finalDept = 'FINANCE';
+        finalStation = 'Central Finance Oversight Office';
+        finalPermissions = ['VIEW', 'APPROVE', 'EXPORT', 'MANAGE'];
+      } else {
+        finalType = 'STAFF';
+        finalRole = 'FINANCE_STAFF';
+        finalDept = 'FINANCE';
+        finalStation = 'On-Site Finance & Cash Counter';
+        finalPermissions = ['VIEW', 'SCAN', 'VERIFY'];
+      }
     }
 
     setIsSubmitting(true);
     try {
       const res = await UserManagementService.createSystemUser(
         {
-          userType: createForm.userType,
-          fullName: createForm.fullName,
-          username: createForm.username,
-          email: createForm.email,
-          role: createForm.role,
-          department: createForm.department,
-          assignedStation: createForm.assignedStation,
-          permissions: createForm.permissions,
+          userType: finalType,
+          fullName: createForm.fullName.trim(),
+          username: cleanUsername,
+          email: cleanEmail,
+          role: finalRole,
+          department: finalDept,
+          assignedStation: finalStation,
+          permissions: finalPermissions,
           authUserId: createForm.authUserId || undefined,
-          initialPassword: createForm.initialPassword.trim() || undefined,
+          initialPassword: createForm.initialPassword.trim(),
         },
         currentAdmin
       );
@@ -292,21 +503,17 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
       if (res.success) {
         showNotification(
           'success',
-          `Successfully created ${createForm.userType} user "${createForm.fullName}" with role ${createForm.role}!`
+          `Successfully provisioned ${finalRole} "${createForm.fullName}"! Real-time synchronized to cloud database.`
         );
         setIsCreateModalOpen(false);
-        setCreateForm({
-          userType: 'STAFF',
-          fullName: '',
-          username: '',
-          email: '',
-          role: 'GATE_STAFF',
-          department: 'GATE',
-          assignedStation: 'Gate 01 - Main Entrance',
-          permissions: ['VIEW', 'SCAN', 'VERIFY', 'APPROVE'],
-          authUserId: '',
-          initialPassword: '',
-        });
+
+        // Immediate real-time database and portal event dispatch
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('plscf_user_management_sync'));
+          window.dispatchEvent(new CustomEvent('plscf_staff_sync'));
+          window.dispatchEvent(new CustomEvent('plscf_admin_sync'));
+        }
+
         await loadUsers();
       } else {
         showNotification('error', res.error || 'Failed to create user account.');
@@ -528,11 +735,8 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
         return <Users className="w-5 h-5 text-emerald-500" />;
       case 'FINANCE':
         return <DollarSign className="w-5 h-5 text-purple-500" />;
-      case 'MANAGER':
-        return <Briefcase className="w-5 h-5 text-indigo-500" />;
-      case 'CUSTOM':
       default:
-        return <Layers className="w-5 h-5 text-rose-500" />;
+        return <Shield className="w-5 h-5 text-indigo-500" />;
     }
   };
 
@@ -657,7 +861,7 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {roleGroups.map((group) => {
             const isSelected = selectedRoleCategory === group.category;
             return (
@@ -816,8 +1020,6 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
               <option value="ADMIN">Admins</option>
               <option value="STAFF">Station Staff</option>
               <option value="FINANCE">Finance Users</option>
-              <option value="MANAGER">Managers & Desks</option>
-              <option value="CUSTOM">Custom Roles</option>
             </select>
           </div>
 
@@ -883,11 +1085,16 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                         <tr key={`${u.userType}-${u.id}`} className="hover:bg-slate-50/80 transition-colors">
                           {/* User Details */}
                           <td className="py-3.5 px-4">
-                            <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                            <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5 flex-wrap">
                               <span>{u.fullName}</span>
                               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-normal">
                                 {u.userType}
                               </span>
+                              {u.assignedStation && (u.roleCategory === 'SUPER_ADMIN' || u.roleCategory === 'ADMIN') && (
+                                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                                  {u.assignedStation}
+                                </span>
+                              )}
                             </div>
                             <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
                               <span className="font-mono text-slate-400">ID: {u.id}</span>
@@ -1068,7 +1275,14 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <h4 className="font-bold text-slate-900 text-sm">{u.fullName}</h4>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h4 className="font-bold text-slate-900 text-sm">{u.fullName}</h4>
+                          {u.assignedStation && (u.roleCategory === 'SUPER_ADMIN' || u.roleCategory === 'ADMIN') && (
+                            <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                              {u.assignedStation}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-slate-500 font-mono">@{u.username} • {u.id}</div>
                       </div>
                       <span
@@ -1172,171 +1386,563 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
             </div>
 
             <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
-              {/* User Type Switcher */}
+              {/* Category Selector Tabs */}
               <div>
-                <label className="font-bold text-slate-700 block mb-1">USER ARCHITECTURE TYPE *</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCreateForm({ ...createForm, userType: 'STAFF', role: 'GATE_STAFF' })}
-                    className={`py-2 px-3 rounded-xl font-bold border transition ${
-                      createForm.userType === 'STAFF'
-                        ? 'bg-indigo-600 text-white border-indigo-600'
-                        : 'bg-slate-50 text-slate-700 border-slate-200'
-                    }`}
-                  >
-                    Station Staff Account
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCreateForm({ ...createForm, userType: 'ADMIN', role: 'admin' })}
-                    className={`py-2 px-3 rounded-xl font-bold border transition ${
-                      createForm.userType === 'ADMIN'
-                        ? 'bg-indigo-600 text-white border-indigo-600'
-                        : 'bg-slate-50 text-slate-700 border-slate-200'
-                    }`}
-                  >
-                    Administrative Portal Account
-                  </button>
-                </div>
-              </div>
-
-              {/* Full Name & Username */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">FULL NAME *</label>
-                  <input
-                    type="text"
-                    required
-                    value={createForm.fullName}
-                    onChange={(e) => setCreateForm({ ...createForm, fullName: e.target.value })}
-                    placeholder="e.g. Tanvir Hasan"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-semibold"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">USERNAME *</label>
-                  <input
-                    type="text"
-                    required
-                    value={createForm.username}
-                    onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })}
-                    placeholder="e.g. gate1"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-semibold"
-                  />
-                </div>
-              </div>
-
-              {/* Email & Auth User ID */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">EMAIL ADDRESS *</label>
-                  <input
-                    type="email"
-                    required
-                    value={createForm.email}
-                    onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                    placeholder="e.g. staff@plscf.edu.bd"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-semibold"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">SUPABASE AUTH USER ID (UUID)</label>
-                  <input
-                    type="text"
-                    value={createForm.authUserId}
-                    onChange={(e) => setCreateForm({ ...createForm, authUserId: e.target.value })}
-                    placeholder="UID from Supabase Auth > Users"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-medium text-[11px]"
-                  />
-                </div>
-              </div>
-
-              {/* Role & Department */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">ASSIGNED ROLE *</label>
-                  {createForm.userType === 'ADMIN' ? (
-                    <select
-                      value={createForm.role}
-                      onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-bold"
-                    >
-                      <option value="super_admin">Super Administrator</option>
-                      <option value="admin">Administrator</option>
-                      <option value="finance_manager">Finance Manager</option>
-                      <option value="moderator">System Moderator</option>
-                      <option value="registration_officer">Registration Officer</option>
-                    </select>
-                  ) : (
-                    <select
-                      value={createForm.role}
-                      onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-bold"
-                    >
-                      <option value="GATE_STAFF">Gate Staff (Entry & Exit)</option>
-                      <option value="BREAKFAST_STAFF">Breakfast Staff</option>
-                      <option value="LUNCH_STAFF">Lunch Staff</option>
-                      <option value="DINNER_STAFF">Dinner Staff</option>
-                      <option value="DRESS_STAFF">Dress & Gift Kit Staff</option>
-                      <option value="FINANCE_STAFF">Finance & Treasury Staff</option>
-                      <option value="SUPER_ADMIN">Super Admin (Operational)</option>
-                    </select>
-                  )}
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">DEPARTMENT / MODULE *</label>
-                  <input
-                    type="text"
-                    required
-                    value={createForm.department}
-                    onChange={(e) => setCreateForm({ ...createForm, department: e.target.value })}
-                    placeholder="e.g. GATE, FINANCE, OPERATIONS"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-bold"
-                  />
-                </div>
-              </div>
-
-              {/* Station */}
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">ASSIGNED STATION / BOOTH</label>
-                <input
-                  type="text"
-                  value={createForm.assignedStation}
-                  onChange={(e) => setCreateForm({ ...createForm, assignedStation: e.target.value })}
-                  placeholder="e.g. Gate 01 - Main Entrance"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-semibold"
-                />
-              </div>
-
-              {/* Account Password */}
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">
-                  {language === 'bn' ? 'অ্যাকাউন্ট পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর) *' : 'ACCOUNT LOGIN PASSWORD (MIN 6 CHARACTERS) *'}
+                <label className="font-bold text-slate-700 block mb-1.5 uppercase text-[10px] tracking-wider">
+                  Select User Classification *
                 </label>
-                <div className="relative">
-                  <input
-                    type={showCreatePassword ? 'text' : 'password'}
-                    required
-                    value={createForm.initialPassword}
-                    onChange={(e) => setCreateForm({ ...createForm, initialPassword: e.target.value })}
-                    placeholder="Enter login password (e.g. Staff@2027)"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-bold pr-10"
-                  />
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1 bg-slate-100 rounded-2xl">
                   <button
                     type="button"
-                    onClick={() => setShowCreatePassword(!showCreatePassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    onClick={() => handleSwitchCategory('SUPER_ADMIN')}
+                    className={`py-2 px-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                      selectedCreateCategory === 'SUPER_ADMIN'
+                        ? 'bg-amber-500 text-white shadow-sm'
+                        : 'text-slate-700 hover:bg-white/60'
+                    }`}
                   >
-                    {showCreatePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    <Crown className="w-3.5 h-3.5" />
+                    <span>Super Admin</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSwitchCategory('ADMIN')}
+                    className={`py-2 px-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                      selectedCreateCategory === 'ADMIN'
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'text-slate-700 hover:bg-white/60'
+                    }`}
+                  >
+                    <Shield className="w-3.5 h-3.5" />
+                    <span>Admin</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSwitchCategory('STAFF')}
+                    className={`py-2 px-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                      selectedCreateCategory === 'STAFF'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-slate-700 hover:bg-white/60'
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Staff</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSwitchCategory('FINANCE')}
+                    className={`py-2 px-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                      selectedCreateCategory === 'FINANCE'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-slate-700 hover:bg-white/60'
+                    }`}
+                  >
+                    <DollarSign className="w-3.5 h-3.5" />
+                    <span>Finance</span>
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  {language === 'bn'
-                    ? '🔒 পাসওয়ার্ডটি সরাসরি সুপাবেস অথ এ এনক্রিপ্ট হবে এবং ইউজার অবিলম্বে লগইন করতে পারবে।'
-                    : '🔒 The password is encrypted in Supabase Auth and the user can sign in immediately.'}
-                </p>
+              </div>
+
+              {/* ================================================================= */}
+              {/* CONDITIONAL BRANCH 1: SUPER ADMIN & ADMIN (SIMPLIFIED EXECUTIVE)  */}
+              {/* ================================================================= */}
+              {(selectedCreateCategory === 'SUPER_ADMIN' || selectedCreateCategory === 'ADMIN') && (
+                <div className="space-y-4 pt-1">
+                  {/* Category Banner */}
+                  <div
+                    className={`p-3 rounded-2xl border text-xs flex items-center gap-2.5 ${
+                      selectedCreateCategory === 'SUPER_ADMIN'
+                        ? 'bg-amber-50/80 border-amber-200 text-amber-900'
+                        : 'bg-blue-50/80 border-blue-200 text-blue-900'
+                    }`}
+                  >
+                    {selectedCreateCategory === 'SUPER_ADMIN' ? (
+                      <Crown className="w-4 h-4 text-amber-600 shrink-0" />
+                    ) : (
+                      <Shield className="w-4 h-4 text-blue-600 shrink-0" />
+                    )}
+                    <div>
+                      <span className="font-extrabold block">
+                        {selectedCreateCategory === 'SUPER_ADMIN'
+                          ? 'Super Administrator Provisioning'
+                          : 'System Administrator Provisioning'}
+                      </span>
+                      <span className="text-[11px] opacity-80">
+                        {selectedCreateCategory === 'SUPER_ADMIN'
+                          ? 'Full root system privileges, financial authorization, and database audit control.'
+                          : 'Administrative operator managing registrations, inquiries, and event oversight.'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Full Name & Custom Model Labeling */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">FULL NAME *</label>
+                      <input
+                        type="text"
+                        required
+                        value={createForm.fullName}
+                        onChange={(e) => setCreateForm({ ...createForm, fullName: e.target.value })}
+                        placeholder="e.g. Tanvir Hasan"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500 transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">
+                        CUSTOM MODEL LABELING (e.g. {selectedCreateCategory === 'SUPER_ADMIN' ? 'Super Admin 1' : 'Admin 1'}) *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={customModelLabel}
+                        onChange={(e) => setCustomModelLabel(e.target.value)}
+                        placeholder={selectedCreateCategory === 'SUPER_ADMIN' ? 'Super Admin 1' : 'Admin 1'}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Preset Pills */}
+                  <div className="flex flex-wrap items-center gap-1.5 -mt-1">
+                    <span className="text-[10px] text-slate-400 font-bold">Quick Presets:</span>
+                    {(selectedCreateCategory === 'SUPER_ADMIN'
+                      ? ['Super Admin 1', 'Super Admin 2', 'Lead Executive', 'Director']
+                      : ['Admin 1', 'Admin 2', 'Event Operations Admin', 'Campus Lead']
+                    ).map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setCustomModelLabel(preset)}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md border transition cursor-pointer ${
+                          customModelLabel === preset
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Username & Auto-derived Email */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">USERNAME *</label>
+                      <input
+                        type="text"
+                        required
+                        value={createForm.username}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCreateForm({
+                            ...createForm,
+                            username: val,
+                            email: val ? `${val.trim().toLowerCase().replace(/^@/, '')}@plscf.edu.bd` : '',
+                          });
+                        }}
+                        placeholder={selectedCreateCategory === 'SUPER_ADMIN' ? 'e.g. superadmin1' : 'e.g. admin1'}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500 transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">SYSTEM AUTH EMAIL (AUTO-MANAGED)</label>
+                      <input
+                        type="email"
+                        value={
+                          createForm.email ||
+                          (createForm.username
+                            ? `${createForm.username.trim().toLowerCase().replace(/^@/, '')}@plscf.edu.bd`
+                            : '')
+                        }
+                        onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                        placeholder="e.g. admin@plscf.edu.bd"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 border border-slate-200 font-mono text-[11px] text-slate-600 focus:bg-white transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Auto-Generated Supabase Auth UUID */}
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-700 text-[11px] flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        AUTO-GENERATED SUPABASE AUTH ID (UUID)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCreateForm({ ...createForm, authUserId: generateUuid() })}
+                        className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer"
+                        title="Regenerate UUID"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Regenerate</span>
+                      </button>
+                    </div>
+                    <div className="font-mono text-[11px] font-bold text-slate-800 bg-white px-3 py-2 rounded-xl border border-slate-200 select-all flex items-center justify-between">
+                      <span>{createForm.authUserId || 'Generating UUID...'}</span>
+                      <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-extrabold">
+                        UUIDv4
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                      ✓ Generated cryptographically. Department modules and internal database roles are automated.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ================================================================= */}
+              {/* CONDITIONAL BRANCH 2: STAFF (DAILY OPERATIONAL ROLES & PORTAL)     */}
+              {/* ================================================================= */}
+              {selectedCreateCategory === 'STAFF' && (
+                <div className="space-y-4 pt-1">
+                  {/* Category Banner */}
+                  <div className="p-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 text-emerald-950 text-xs flex items-center gap-2.5">
+                    <Users className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <div>
+                      <span className="font-extrabold block">Daily Operational Staff Account</span>
+                      <span className="text-[11px] text-emerald-800">
+                        Deploy station operators for daily ground operations linked directly to dedicated station terminals.
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Full Name & Username */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">FULL NAME *</label>
+                      <input
+                        type="text"
+                        required
+                        value={createForm.fullName}
+                        onChange={(e) => setCreateForm({ ...createForm, fullName: e.target.value })}
+                        placeholder="e.g. Tanvir Hasan"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-semibold focus:bg-white focus:ring-2 focus:ring-emerald-500 transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">USERNAME *</label>
+                      <input
+                        type="text"
+                        required
+                        value={createForm.username}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCreateForm({
+                            ...createForm,
+                            username: val,
+                            email: val ? `${val.trim().toLowerCase().replace(/^@/, '')}@plscf.edu.bd` : '',
+                          });
+                        }}
+                        placeholder="e.g. gate1, lunch2"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-semibold focus:bg-white focus:ring-2 focus:ring-emerald-500 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">EMAIL ADDRESS *</label>
+                    <input
+                      type="email"
+                      required
+                      value={createForm.email}
+                      onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                      placeholder="e.g. gate1@plscf.edu.bd"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-semibold focus:bg-white focus:ring-2 focus:ring-emerald-500 transition"
+                    />
+                  </div>
+
+                  {/* Specific Daily Operational Role */}
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      ASSIGN SPECIFIC DAILY OPERATIONAL ROLE *
+                    </label>
+                    <select
+                      value={createForm.role}
+                      onChange={(e) => handleStaffRoleChange(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 transition"
+                    >
+                      <option value="GATE_STAFF">🚪 Gate Staff (Entry & Exit Checkpoint)</option>
+                      <option value="BREAKFAST_STAFF">🥐 Breakfast Staff (Morning Food Station)</option>
+                      <option value="LUNCH_STAFF">🍛 Lunch Staff (Noon Dining Hall)</option>
+                      <option value="DINNER_STAFF">🍽️ Dinner Staff (Evening Banquet)</option>
+                      <option value="DRESS_STAFF">👕 Dress & Gift Kit Staff (T-Shirt & Souvenirs)</option>
+                    </select>
+                  </div>
+
+                  {/* Designated Station / Booth */}
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">DESIGNATED STATION / BOOTH *</label>
+                    <input
+                      type="text"
+                      required
+                      value={createForm.assignedStation}
+                      onChange={(e) => setCreateForm({ ...createForm, assignedStation: e.target.value })}
+                      placeholder="e.g. Gate 01 - Main Entrance Checkpoint"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-semibold focus:bg-white focus:ring-2 focus:ring-emerald-500 transition"
+                    />
+                  </div>
+
+                  {/* Designated Portal & Sync Banner */}
+                  <div className="p-3.5 rounded-2xl bg-sky-50 border border-sky-200 space-y-1.5 text-sky-950">
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-xs flex items-center gap-1.5">
+                        <Activity className="w-3.5 h-3.5 text-sky-600" />
+                        <span>LINKED OPERATIONAL PORTAL</span>
+                      </span>
+                      <span className="font-mono text-[10px] bg-sky-200/80 px-2 py-0.5 rounded font-bold">
+                        /scanner
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-sky-800 leading-relaxed">
+                      🔗 Directly connects to the <strong>Scanner Portal</strong>. Upon signing in, this account will automatically open their station's verification module with <strong>real-time database cloud sync</strong>.
+                    </p>
+                  </div>
+
+                  {/* Auto-Generated Supabase Auth UUID */}
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Supabase Auth UUID</span>
+                      <span className="font-mono text-[11px] font-bold text-slate-700 block">{createForm.authUserId}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCreateForm({ ...createForm, authUserId: generateUuid() })}
+                      className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 cursor-pointer"
+                      title="Regenerate"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ================================================================= */}
+              {/* CONDITIONAL BRANCH 3: FINANCE (TWO TIERS: MANAGER VS STAFF)        */}
+              {/* ================================================================= */}
+              {selectedCreateCategory === 'FINANCE' && (
+                <div className="space-y-4 pt-1">
+                  {/* Category Banner */}
+                  <div className="p-3 rounded-2xl border border-purple-200 bg-purple-50/80 text-purple-950 text-xs flex items-center gap-2.5">
+                    <DollarSign className="w-4 h-4 text-purple-600 shrink-0" />
+                    <div>
+                      <span className="font-extrabold block">Dedicated Finance User Provisioning</span>
+                      <span className="text-[11px] text-purple-800">
+                        Strict role-isolated portals separating central administrative treasury oversight from on-site data entry.
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Two Dedicated Tiers Selection Cards */}
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5 uppercase text-[10px] tracking-wider">
+                      SELECT FINANCE ARCHITECTURE TIER *
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Tier 1: Finance Manager */}
+                      <button
+                        type="button"
+                        onClick={() => handleFinanceTierChange('MANAGER')}
+                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer space-y-1.5 ${
+                          financeTier === 'MANAGER'
+                            ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-600/20'
+                            : 'border-slate-200 bg-white hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-black text-xs text-purple-950">Tier 1: Finance Manager</span>
+                          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-purple-200 text-purple-900 uppercase">
+                            Admin Portal
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-snug">
+                          <strong>Full Approval & Management:</strong> Treasury oversight, expense approvals, budget allocations, fee settings, bank reconciliations, and audit reports.
+                        </p>
+                      </button>
+
+                      {/* Tier 2: Finance Staff */}
+                      <button
+                        type="button"
+                        onClick={() => handleFinanceTierChange('STAFF')}
+                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer space-y-1.5 ${
+                          financeTier === 'STAFF'
+                            ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-600/20'
+                            : 'border-slate-200 bg-white hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-black text-xs text-purple-950">Tier 2: Finance Staff</span>
+                          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 uppercase">
+                            Scanner Portal
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-snug">
+                          <strong>Field Data Entry & Counter Intake:</strong> Logging manual cash payments, uploading voucher photos, and intake entry (isolated from administrative approvals).
+                        </p>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Full Name & Username */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">FULL NAME *</label>
+                      <input
+                        type="text"
+                        required
+                        value={createForm.fullName}
+                        onChange={(e) => setCreateForm({ ...createForm, fullName: e.target.value })}
+                        placeholder="e.g. Finance Officer"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-semibold focus:bg-white focus:ring-2 focus:ring-purple-500 transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">USERNAME *</label>
+                      <input
+                        type="text"
+                        required
+                        value={createForm.username}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCreateForm({
+                            ...createForm,
+                            username: val,
+                            email: val ? `${val.trim().toLowerCase().replace(/^@/, '')}@plscf.edu.bd` : '',
+                          });
+                        }}
+                        placeholder="e.g. finance1, cfo_admin"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-semibold focus:bg-white focus:ring-2 focus:ring-purple-500 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">EMAIL ADDRESS *</label>
+                    <input
+                      type="email"
+                      required
+                      value={createForm.email}
+                      onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                      placeholder="e.g. finance@plscf.edu.bd"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-semibold focus:bg-white focus:ring-2 focus:ring-purple-500 transition"
+                    />
+                  </div>
+
+                  {/* Designated Portal Info Banner */}
+                  <div className="p-3 rounded-2xl bg-purple-50/60 border border-purple-200 text-purple-900 text-xs flex items-center justify-between">
+                    <div>
+                      <span className="font-bold block">
+                        Assigned Portal: {financeTier === 'MANAGER' ? 'Central Admin Dashboard (/admin)' : 'Operational Scanner Terminal (/scanner)'}
+                      </span>
+                      <span className="text-[11px] text-purple-700">
+                        {financeTier === 'MANAGER' ? 'Direct access to Treasury, Budget & Audit tabs.' : 'Direct access to On-site Cash & Voucher Logging desk.'}
+                      </span>
+                    </div>
+                    <span className="font-mono text-[10px] font-bold px-2 py-1 rounded bg-purple-200/80 text-purple-900">
+                      {financeTier === 'MANAGER' ? 'ADMIN' : 'STAFF'}
+                    </span>
+                  </div>
+
+                  {/* Auto-Generated Supabase Auth UUID */}
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Supabase Auth UUID</span>
+                      <span className="font-mono text-[11px] font-bold text-slate-700 block">{createForm.authUserId}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCreateForm({ ...createForm, authUserId: generateUuid() })}
+                      className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 cursor-pointer"
+                      title="Regenerate"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ================================================================= */}
+              {/* SHARED PASSWORD FIELDS (ENTER PASSWORD & CONFIRM PASSWORD)        */}
+              {/* ================================================================= */}
+              <div className="pt-2 border-t border-slate-100 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Enter Password */}
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      {language === 'bn' ? 'পাসওয়ার্ড লিখুন (কমপক্ষে ৬ অক্ষর) *' : 'ENTER PASSWORD (MIN 6 CHARACTERS) *'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showCreatePassword ? 'text' : 'password'}
+                        required
+                        value={createForm.initialPassword}
+                        onChange={(e) => setCreateForm({ ...createForm, initialPassword: e.target.value })}
+                        placeholder="Enter password (e.g. Admin@2027)"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-bold pr-10 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCreatePassword(!showCreatePassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        {showCreatePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Confirm Password */}
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      {language === 'bn' ? 'পাসওয়ার্ড নিশ্চিত করুন *' : 'CONFIRM PASSWORD *'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Re-enter password"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-bold pr-10 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Password Match Status Live Indicator */}
+                <div className="flex items-center justify-between text-[11px] pt-0.5">
+                  <div className="flex items-center gap-1.5 font-medium">
+                    {createForm.initialPassword && confirmPassword ? (
+                      createForm.initialPassword === confirmPassword ? (
+                        <span className="text-emerald-700 font-bold flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          ✓ Passwords match
+                        </span>
+                      ) : (
+                        <span className="text-rose-600 font-bold flex items-center gap-1">
+                          <XCircle className="w-3.5 h-3.5 text-rose-500" />
+                          ✗ Passwords do not match
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-slate-400">
+                        {language === 'bn' ? 'দুটো ঘরে একই পাসওয়ার্ড প্রবেশ করান' : 'Enter the same password in both fields'}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {createForm.initialPassword.length >= 6 ? '✓ Valid Length' : `${createForm.initialPassword.length}/6 chars`}
+                  </span>
+                </div>
               </div>
 
               {/* Buttons */}

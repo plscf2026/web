@@ -98,7 +98,7 @@ const mockUsers: UnifiedSystemUser[] = [
     username: 'coordinator1',
     email: 'coordinator@plsc2027.com',
     role: 'moderator',
-    roleCategory: 'MANAGER',
+    roleCategory: 'ADMIN',
     department: 'EVENTS',
     status: 'SUSPENDED',
     assignedStation: 'MAIN_PORTAL',
@@ -130,7 +130,7 @@ const mockUsers: UnifiedSystemUser[] = [
 test('computeRoleGroupSummaries aggregates counts and statuses correctly across role categories', () => {
   const summaries = UserManagementService.computeRoleGroupSummaries(mockUsers);
 
-  assert.equal(summaries.length, 6, 'Should generate 6 distinct role category cards');
+  assert.equal(summaries.length, 4, 'Should generate 4 distinct role category cards');
 
   const superAdminSummary = summaries.find((s) => s.category === 'SUPER_ADMIN');
   assert.ok(superAdminSummary, 'Super Admin card must exist');
@@ -138,6 +138,12 @@ test('computeRoleGroupSummaries aggregates counts and statuses correctly across 
   assert.equal(superAdminSummary.activeAccounts, 1);
   assert.equal(superAdminSummary.inactiveAccounts, 0);
   assert.equal(superAdminSummary.suspendedAccounts, 0);
+
+  const adminSummary = summaries.find((s) => s.category === 'ADMIN');
+  assert.ok(adminSummary, 'Admin card must exist');
+  assert.equal(adminSummary.totalAccounts, 2);
+  assert.equal(adminSummary.activeAccounts, 1);
+  assert.equal(adminSummary.suspendedAccounts, 1);
 
   const financeSummary = summaries.find((s) => s.category === 'FINANCE');
   assert.ok(financeSummary, 'Finance card must exist');
@@ -147,11 +153,6 @@ test('computeRoleGroupSummaries aggregates counts and statuses correctly across 
   assert.equal(financeSummary.suspendedAccounts, 0);
   assert.ok(financeSummary.subRoles.includes('FINANCE_STAFF'));
   assert.ok(financeSummary.subRoles.includes('finance_manager'));
-
-  const managerSummary = summaries.find((s) => s.category === 'MANAGER');
-  assert.ok(managerSummary, 'Manager card must exist');
-  assert.equal(managerSummary.totalAccounts, 1);
-  assert.equal(managerSummary.suspendedAccounts, 1);
 
   const staffSummary = summaries.find((s) => s.category === 'STAFF');
   assert.ok(staffSummary, 'Staff card must exist');

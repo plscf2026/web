@@ -8,9 +8,7 @@ export type RoleCategory =
   | 'SUPER_ADMIN'
   | 'ADMIN'
   | 'STAFF'
-  | 'FINANCE'
-  | 'MANAGER'
-  | 'CUSTOM';
+  | 'FINANCE';
 
 export interface UnifiedSystemUser {
   id: string;
@@ -81,7 +79,6 @@ export class UserManagementService {
           let cat: RoleCategory = 'ADMIN';
           if (roleLower.includes('super')) cat = 'SUPER_ADMIN';
           else if (roleLower.includes('finance')) cat = 'FINANCE';
-          else if (roleLower.includes('moderator') || roleLower.includes('officer')) cat = 'MANAGER';
 
           const st: UserStatus = a.is_locked ? 'INACTIVE' : (a.status || 'ACTIVE');
 
@@ -95,7 +92,7 @@ export class UserManagementService {
             roleCategory: cat,
             department: a.department || 'CENTRAL_ADMIN',
             status: st,
-            assignedStation: 'Super Admin Command Center',
+            assignedStation: a.assigned_station || 'Super Admin Command Center',
             permissions: (a.permissions as any) || ['VIEW', 'VERIFY', 'APPROVE', 'EXPORT', 'MANAGE'],
             createdAt: a.created_at || new Date().toISOString(),
             lastLoginAt: a.last_login_at || null,
@@ -110,9 +107,8 @@ export class UserManagementService {
           const roleUpper = (s.role || 'GATE_STAFF').toUpperCase();
           let cat: RoleCategory = 'STAFF';
           if (roleUpper.includes('SUPER')) cat = 'SUPER_ADMIN';
-          else if (roleUpper.includes('ADMIN')) cat = 'ADMIN';
           else if (roleUpper.includes('FINANCE')) cat = 'FINANCE';
-          else if (roleUpper.includes('MANAGER') || roleUpper.includes('COORDINATOR')) cat = 'MANAGER';
+          else if (roleUpper.includes('ADMIN')) cat = 'ADMIN';
 
           let st: UserStatus = 'ACTIVE';
           if (s.status === 'DISABLED' || s.status === 'INACTIVE') st = 'INACTIVE';
@@ -153,8 +149,6 @@ export class UserManagementService {
       'ADMIN',
       'STAFF',
       'FINANCE',
-      'MANAGER',
-      'CUSTOM',
     ];
 
     const categoryMeta: Record<
@@ -209,26 +203,6 @@ export class UserManagementService {
         accentBorder: 'border-purple-400',
         badgeBg: 'bg-purple-100',
         badgeText: 'text-purple-900',
-      },
-      MANAGER: {
-        titleEn: 'Manager Management',
-        titleBn: 'ম্যানেজার ও মডারেটর ব্যবস্থাপনা',
-        descEn: 'Venue managers, registration desk officers, and module moderators.',
-        themeColor: 'indigo',
-        accentBg: 'bg-indigo-500/10 hover:bg-indigo-500/15',
-        accentBorder: 'border-indigo-400',
-        badgeBg: 'bg-indigo-100',
-        badgeText: 'text-indigo-900',
-      },
-      CUSTOM: {
-        titleEn: 'Other Custom Role Management',
-        titleBn: 'অন্যান্য কাস্টম রোল ব্যবস্থাপনা',
-        descEn: 'Dynamically discovered user roles with specialized department-specific privileges.',
-        themeColor: 'rose',
-        accentBg: 'bg-rose-500/10 hover:bg-rose-500/15',
-        accentBorder: 'border-rose-400',
-        badgeBg: 'bg-rose-100',
-        badgeText: 'text-rose-900',
       },
     };
 
