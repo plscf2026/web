@@ -2612,22 +2612,9 @@ CREATE TABLE IF NOT EXISTS public.admin_accounts (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Trigger to strictly enforce the SINGLE ADMIN SLOT requirement:
-CREATE OR REPLACE FUNCTION public.check_single_admin_slot()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF (SELECT COUNT(*) FROM public.admin_accounts) >= 1 THEN
-    RAISE EXCEPTION 'CRITICAL SECURITY ERROR: The single administrator account slot has already been claimed. Additional administrator accounts are strictly prohibited.';
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
+-- Allow multi-role administrative accounts (Super Admin, Finance Manager, Moderator, etc.)
 DROP TRIGGER IF EXISTS trg_enforce_single_admin_slot ON public.admin_accounts;
-CREATE TRIGGER trg_enforce_single_admin_slot
-  BEFORE INSERT ON public.admin_accounts
-  FOR EACH ROW
-  EXECUTE FUNCTION public.check_single_admin_slot();
+DROP FUNCTION IF EXISTS public.check_single_admin_slot();
 
 CREATE OR REPLACE FUNCTION public.current_admin_role()
 RETURNS TEXT
