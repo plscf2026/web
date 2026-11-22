@@ -210,7 +210,7 @@ export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
       {/* ========================================================================= */}
       <div className="block md:hidden">
         <div
-          className="relative overflow-hidden select-none px-1"
+          className="relative overflow-hidden select-none px-1 py-1"
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
           onTouchStart={handleTouchStart}
@@ -218,25 +218,27 @@ export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
         >
           {/* Pause Notification Pill */}
           {isPaused && (
-            <div className="absolute top-2 right-4 z-20 pointer-events-none bg-slate-900/80 text-white text-[10px] px-2.5 py-1 rounded-full backdrop-blur-xs font-semibold flex items-center gap-1 shadow-sm">
+            <div className="absolute top-3 right-4 z-20 pointer-events-none bg-slate-900/80 text-white text-[10px] px-2.5 py-1 rounded-full backdrop-blur-xs font-semibold flex items-center gap-1 shadow-sm">
               <Pause className="w-2.5 h-2.5 text-amber-400" />
               <span>{isBn ? 'বিরতি দেওয়া হয়েছে' : 'Paused on Touch'}</span>
             </div>
           )}
 
-          {/* Carousel Slide Track */}
+          {/* Carousel Slide Track with Exact Math Proportion */}
           <div
-            className="flex transition-transform duration-500 ease-in-out"
+            className="flex transition-transform duration-500 ease-out"
             style={{
-              transform: `translateX(-${currentIndex * 100}%)`,
+              width: `${activeMembers.length * 100}%`,
+              transform: `translateX(-${currentIndex * (100 / activeMembers.length)}%)`,
             }}
           >
             {activeMembers.map((member, idx) => (
               <div
                 key={member.id || idx}
-                className="w-full shrink-0 px-2"
+                style={{ width: `${100 / activeMembers.length}%` }}
+                className="shrink-0 px-2"
               >
-                <div className="max-w-sm mx-auto">
+                <div className="w-full max-w-xs mx-auto">
                   <CommitteeMemberCard member={member} language={language} isMobileSlide />
                 </div>
               </div>
@@ -244,39 +246,50 @@ export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
           </div>
 
           {/* Mobile Slide Navigation & Counter */}
-          <div className="flex items-center justify-between gap-3 pt-4 px-2">
+          <div className="flex items-center justify-between gap-2 pt-4 px-2">
             {/* Slide Index Pill */}
-            <span className="text-[11px] font-mono font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+            <span className="text-[11px] font-mono font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200 shadow-2xs">
               {currentIndex + 1} / {activeMembers.length}
             </span>
 
-            {/* Pagination Dots (Clamped preview) */}
-            <div className="flex items-center gap-1 overflow-hidden max-w-[200px] justify-center">
-              {activeMembers.map((_, dotIdx) => {
-                // Show sliding dot window around currentIndex
-                const distance = Math.abs(dotIdx - currentIndex);
-                if (distance > 3) return null;
-
-                return (
-                  <button
-                    key={`mob-dot-${dotIdx}`}
-                    type="button"
-                    onClick={() => setCurrentIndex(dotIdx)}
-                    className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                      currentIndex === dotIdx
-                        ? 'w-5 bg-[#0284C7]'
-                        : 'w-1.5 bg-slate-300 hover:bg-slate-400'
-                    }`}
-                    aria-label={`Go to slide ${dotIdx + 1}`}
-                  />
-                );
-              })}
+            {/* Pagination Dots (All dots neatly styled) */}
+            <div className="flex items-center gap-1 justify-center flex-wrap max-w-[150px]">
+              {activeMembers.map((_, dotIdx) => (
+                <button
+                  key={`mob-dot-${dotIdx}`}
+                  type="button"
+                  onClick={() => setCurrentIndex(dotIdx)}
+                  className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                    currentIndex === dotIdx
+                      ? 'w-4 bg-[#0284C7]'
+                      : 'w-1.5 bg-slate-300 hover:bg-slate-400'
+                  }`}
+                  aria-label={`Go to slide ${dotIdx + 1}`}
+                />
+              ))}
             </div>
 
-            {/* Mobile Swipe Tip */}
-            <span className="text-[10px] text-slate-400 italic">
-              {isBn ? 'স্লাইড করুন ↔' : 'Swipe ↔'}
-            </span>
+            {/* Mobile Prev / Next Buttons */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handlePrev}
+                className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+                title={isBn ? 'পূর্ববর্তী' : 'Previous'}
+                aria-label="Previous"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleNext}
+                className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+                title={isBn ? 'পরবর্তী' : 'Next'}
+                aria-label="Next"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -298,8 +311,10 @@ const CommitteeMemberCard: React.FC<MemberCardProps> = ({ member, language, isMo
 
   return (
     <div
-      className={`bg-white rounded-2xl border border-slate-200/90 text-center shadow-xs hover:shadow-md hover:border-sky-300 transition-all duration-300 flex flex-col items-center justify-between h-full group ${
-        isMobileSlide ? 'p-6 space-y-3.5 border-sky-100 shadow-sm' : 'p-5 lg:p-6 space-y-3 hover:-translate-y-1'
+      className={`bg-white rounded-3xl border border-slate-200 text-center shadow-xs transition-all duration-300 flex flex-col items-center justify-between group ${
+        isMobileSlide
+          ? 'p-6 space-y-4 border-sky-200/90 shadow-md min-h-[280px]'
+          : 'p-5 lg:p-6 space-y-3 hover:shadow-md hover:border-sky-300 hover:-translate-y-1 h-full'
       }`}
     >
       {/* Avatar Container with glowing border */}
@@ -313,7 +328,7 @@ const CommitteeMemberCard: React.FC<MemberCardProps> = ({ member, language, isMo
             src={member.img || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&auto=format&fit=crop&q=80'}
             alt={name}
             className="w-full h-full object-cover rounded-full"
-            loading="lazy"
+            loading={isMobileSlide ? 'eager' : 'lazy'}
             onError={(e) => {
               (e.target as HTMLImageElement).src =
                 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
@@ -328,17 +343,17 @@ const CommitteeMemberCard: React.FC<MemberCardProps> = ({ member, language, isMo
       </div>
 
       {/* Member Details */}
-      <div className="w-full pt-1">
+      <div className="w-full pt-1 space-y-1">
         <h4
-          className={`font-bold text-slate-900 group-hover:text-[#0284C7] transition-colors ${
-            isMobileSlide ? 'text-base' : 'text-sm sm:text-base line-clamp-1'
+          className={`font-extrabold text-slate-900 group-hover:text-[#0284C7] transition-colors ${
+            isMobileSlide ? 'text-base sm:text-lg' : 'text-sm sm:text-base line-clamp-1'
           }`}
           title={name}
         >
           {name}
         </h4>
         <span
-          className={`font-semibold text-[#0284C7] block mt-0.5 ${
+          className={`font-bold text-[#0284C7] block ${
             isMobileSlide ? 'text-xs sm:text-sm' : 'text-xs sm:text-sm line-clamp-1'
           }`}
           title={role}
@@ -346,8 +361,8 @@ const CommitteeMemberCard: React.FC<MemberCardProps> = ({ member, language, isMo
           {role}
         </span>
         <p
-          className={`text-slate-500 mt-1.5 leading-relaxed ${
-            isMobileSlide ? 'text-xs' : 'text-xs line-clamp-2'
+          className={`text-slate-600 leading-relaxed ${
+            isMobileSlide ? 'text-xs px-2 pt-1' : 'text-xs line-clamp-2'
           }`}
           title={desc}
         >
