@@ -237,11 +237,11 @@ export const CommitteeManagementTab: React.FC<CommitteeManagementTabProps> = ({
         </div>
       </div>
 
-      {/* Display Controls & Carousel Configuration Box */}
+      {/* Display Controls & Configuration Box */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-2xs space-y-4">
         <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
           <Sliders className="w-4 h-4 text-[#0284C7]" />
-          <span>{isBn ? 'লেআউট ও ক্যারোসেল অটো-স্ক্রোল সেটিংস' : 'Layout & Carousel Auto-Scroll Settings'}</span>
+          <span>{isBn ? 'লেআউট ও প্রদর্শন সেটিংস' : 'Layout & Display Settings'}</span>
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
@@ -257,37 +257,31 @@ export const CommitteeManagementTab: React.FC<CommitteeManagementTabProps> = ({
               </div>
               <div className="flex items-center gap-2 font-bold text-slate-900">
                 <Sliders className="w-3.5 h-3.5 text-[#0284C7]" />
-                <span>{isBn ? 'মোবাইল: অটো-স্ক্রোলিং ক্যারোসেল' : 'Mobile: Auto Carousel'}</span>
+                <span>{isBn ? 'মোবাইল: অনুভূমিক স্ক্রোল সিস্টেম' : 'Mobile: Horizontal Scroll System'}</span>
               </div>
             </div>
             <p className="text-[11px] text-slate-500">
               {isBn
-                ? 'বড় স্ক্রিনে সব সদস্য একসাথে গ্রিডে এবং মোবাইলে স্বয়ংক্রিয় ক্যারোসেলে দেখায়।'
-                : 'Computer/Tab displays full grid, mobile auto-scrolls seamlessly.'}
+                ? 'বড় স্ক্রিনে সব সদস্য একসাথে গ্রিডে এবং মোবাইলে স্পর্শবান্ধব অনুভূমিক স্ক্রোলে দেখায়।'
+                : 'Computer/Tab displays full grid, mobile allows natural horizontal scrolling.'}
             </p>
           </div>
 
-          {/* Carousel Scroll Speed */}
+          {/* Section Heading Title Customization (English) */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700">
-              {isBn ? 'মোবাইল ক্যারোসেল স্ক্রোল বিরতি' : 'Mobile Carousel Speed'}
+              {isBn ? 'সেকশন শিরোনাম (ইংরেজি)' : 'Section Heading (English)'}
             </label>
-            <select
-              value={settings.autoScrollSpeedMs}
-              onChange={(e) => handleUpdateSettings({ autoScrollSpeedMs: Number(e.target.value) })}
+            <input
+              type="text"
+              value={settings.sectionTitleEn}
+              onChange={(e) => handleUpdateSettings({ sectionTitleEn: e.target.value })}
               className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 bg-white focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
-            >
-              <option value={2000}>{isBn ? 'দ্রুত (২ সেকেন্ড)' : 'Fast (2.0s per slide)'}</option>
-              <option value={3500}>{isBn ? 'স্বাভাবিক (৩.৫ সেকেন্ড)' : 'Normal (3.5s per slide)'}</option>
-              <option value={5000}>{isBn ? 'ধীর (৫ সেকেন্ড)' : 'Slow (5.0s per slide)'}</option>
-              <option value={7000}>{isBn ? 'খুব ধীর (৭ সেকেন্ড)' : 'Very Slow (7.0s per slide)'}</option>
-            </select>
-            <p className="text-[11px] text-slate-500">
-              {isBn ? 'মাউস হোভার বা স্পর্শে স্বয়ংক্রিয়ভাবে থেমে থাকবে।' : 'Pauses automatically when hovered or touched.'}
-            </p>
+              placeholder="Reunion 2026 Organizing Committee"
+            />
           </div>
 
-          {/* Section Heading Title Customization */}
+          {/* Section Heading Title Customization (Bangla) */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700">
               {isBn ? 'সেকশন শিরোনাম (বাংলা)' : 'Section Heading (Bangla)'}

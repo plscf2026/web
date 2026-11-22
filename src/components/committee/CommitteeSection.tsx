@@ -2,10 +2,9 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
-  Pause,
-  Play,
   Users,
   ShieldCheck,
+  MoveHorizontal,
 } from 'lucide-react';
 import { CommitteeMember, CommitteeSettings, Language } from '../../types';
 import { CommitteeService } from '../../services/committeeService';
@@ -25,9 +24,7 @@ export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
   const t = translations[language];
   const [members, setMembers] = useState<CommitteeMember[]>(() => CommitteeService.getMembers());
   const [settings, setSettings] = useState<CommitteeSettings>(() => CommitteeService.getSettings());
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  const touchStartXRef = useRef<number | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Sync with service on mount and on realtime updates
   useEffect(() => {
@@ -63,53 +60,14 @@ export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
     return members.filter((m) => m.isActive !== false);
   }, [members]);
 
-  // Mobile Infinite Auto-Scroll Carousel
-  useEffect(() => {
-    if (isPaused || activeMembers.length <= 1) {
-      return;
-    }
-
-    const intervalTime = settings.autoScrollSpeedMs || 3500;
-    const timer = setInterval(() => {
-      setCurrentIndex((prev) => {
-        if (prev >= activeMembers.length - 1) {
-          return 0; // Seamless loop back to first member
-        }
-        return prev + 1;
-      });
-    }, intervalTime);
-
-    return () => clearInterval(timer);
-  }, [isPaused, activeMembers.length, settings.autoScrollSpeedMs]);
-
-  const handleNext = () => {
-    setCurrentIndex((prev) => (prev >= activeMembers.length - 1 ? 0 : prev + 1));
-  };
-
-  const handlePrev = () => {
-    setCurrentIndex((prev) => (prev <= 0 ? activeMembers.length - 1 : prev - 1));
-  };
-
-  // Touch swipe support for mobile carousel
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setIsPaused(true);
-    touchStartXRef.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    setIsPaused(false);
-    if (touchStartXRef.current === null) return;
-    const touchEndX = e.changedTouches[0].clientX;
-    const diff = touchStartXRef.current - touchEndX;
-
-    if (Math.abs(diff) > 35) {
-      if (diff > 0) {
-        handleNext();
-      } else {
-        handlePrev();
-      }
-    }
-    touchStartXRef.current = null;
+  // Mobile horizontal scroll button handlers
+  const handleScroll = (direction: 'left' | 'right') => {
+    if (!scrollContainerRef.current) return;
+    const scrollAmount = 280; // Approximate card width + gap
+    scrollContainerRef.current.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth',
+    });
   };
 
   if (activeMembers.length === 0) {
@@ -143,43 +101,29 @@ export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
 
         {/* Header Right Actions */}
         <div className="flex items-center gap-2 self-center sm:self-auto shrink-0">
-          {/* Mobile Carousel Controls (Visible ONLY on Mobile < 768px) */}
+          {/* Mobile Horizontal Scroll Arrows (Visible ONLY on Mobile < 768px) */}
           <div className="flex md:hidden items-center gap-1.5">
-            {/* Play/Pause Button */}
             <button
               type="button"
-              onClick={() => setIsPaused((prev) => !prev)}
-              className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 transition-colors shadow-2xs active:scale-95 cursor-pointer"
-              title={isPaused ? (isBn ? 'চালু করুন' : 'Resume') : (isBn ? 'থামান' : 'Pause')}
-              aria-label={isPaused ? 'Resume Auto-scroll' : 'Pause Auto-scroll'}
+              onClick={() => handleScroll('left')}
+              className="p-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+              title={isBn ? 'বামে স্ক্রোল করুন' : 'Scroll Left'}
+              aria-label="Scroll Left"
             >
-              {isPaused ? <Play className="w-3.5 h-3.5 text-emerald-600" /> : <Pause className="w-3.5 h-3.5" />}
+              <ChevronLeft className="w-4 h-4" />
             </button>
-
-            {/* Prev / Next Buttons */}
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handlePrev}
-                className="p-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs active:scale-95 cursor-pointer"
-                title={isBn ? 'পূর্ববর্তী' : 'Previous'}
-                aria-label="Previous"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={handleNext}
-                className="p-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs active:scale-95 cursor-pointer"
-                title={isBn ? 'পরবর্তী' : 'Next'}
-                aria-label="Next"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => handleScroll('right')}
+              className="p-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+              title={isBn ? 'ডানে স্ক্রোল করুন' : 'Scroll Right'}
+              aria-label="Scroll Right"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Super Admin Quick Link (Desktop & Mobile) */}
+          {/* Super Admin Quick Link */}
           {isSuperAdmin && onNavigateAdminTab && (
             <button
               type="button"
@@ -205,92 +149,38 @@ export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. MOBILE VIEW: AUTO-SCROLLING HORIZONTAL INFINITE CAROUSEL                */}
+      {/* 2. MOBILE VIEW: TOUCH-FRIENDLY HORIZONTAL SCROLL SYSTEM                   */}
       {/*    Strictly displayed on Mobile devices < 768px                           */}
       {/* ========================================================================= */}
       <div className="block md:hidden">
+        {/* Horizontal Native Scroll Rail */}
         <div
-          className="relative overflow-hidden select-none px-1 py-1"
-          onMouseEnter={() => setIsPaused(true)}
-          onMouseLeave={() => setIsPaused(false)}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
+          ref={scrollContainerRef}
+          className="flex gap-4 overflow-x-auto pb-4 pt-1 px-1 scrollbar-none snap-x snap-mandatory"
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+          }}
         >
-          {/* Pause Notification Pill */}
-          {isPaused && (
-            <div className="absolute top-3 right-4 z-20 pointer-events-none bg-slate-900/80 text-white text-[10px] px-2.5 py-1 rounded-full backdrop-blur-xs font-semibold flex items-center gap-1 shadow-sm">
-              <Pause className="w-2.5 h-2.5 text-amber-400" />
-              <span>{isBn ? 'বিরতি দেওয়া হয়েছে' : 'Paused on Touch'}</span>
+          {activeMembers.map((member, idx) => (
+            <div
+              key={member.id || idx}
+              className="w-[260px] sm:w-[280px] shrink-0 snap-start"
+            >
+              <CommitteeMemberCard member={member} language={language} isMobileScroll />
             </div>
-          )}
+          ))}
+        </div>
 
-          {/* Carousel Slide Track with Exact Math Proportion */}
-          <div
-            className="flex transition-transform duration-500 ease-out"
-            style={{
-              width: `${activeMembers.length * 100}%`,
-              transform: `translateX(-${currentIndex * (100 / activeMembers.length)}%)`,
-            }}
-          >
-            {activeMembers.map((member, idx) => (
-              <div
-                key={member.id || idx}
-                style={{ width: `${100 / activeMembers.length}%` }}
-                className="shrink-0 px-2"
-              >
-                <div className="w-full max-w-xs mx-auto">
-                  <CommitteeMemberCard member={member} language={language} isMobileSlide />
-                </div>
-              </div>
-            ))}
+        {/* Mobile Swipe Hint */}
+        <div className="flex items-center justify-between text-slate-400 text-[11px] pt-1 px-2 border-t border-slate-100">
+          <div className="flex items-center gap-1.5">
+            <MoveHorizontal className="w-3.5 h-3.5 text-[#0284C7]" />
+            <span>{isBn ? 'ডানে-বামে স্ক্রোল করে সব সদস্য দেখুন' : 'Scroll horizontally to view all members'}</span>
           </div>
-
-          {/* Mobile Slide Navigation & Counter */}
-          <div className="flex items-center justify-between gap-2 pt-4 px-2">
-            {/* Slide Index Pill */}
-            <span className="text-[11px] font-mono font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200 shadow-2xs">
-              {currentIndex + 1} / {activeMembers.length}
-            </span>
-
-            {/* Pagination Dots (All dots neatly styled) */}
-            <div className="flex items-center gap-1 justify-center flex-wrap max-w-[150px]">
-              {activeMembers.map((_, dotIdx) => (
-                <button
-                  key={`mob-dot-${dotIdx}`}
-                  type="button"
-                  onClick={() => setCurrentIndex(dotIdx)}
-                  className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                    currentIndex === dotIdx
-                      ? 'w-4 bg-[#0284C7]'
-                      : 'w-1.5 bg-slate-300 hover:bg-slate-400'
-                  }`}
-                  aria-label={`Go to slide ${dotIdx + 1}`}
-                />
-              ))}
-            </div>
-
-            {/* Mobile Prev / Next Buttons */}
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handlePrev}
-                className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs active:scale-95 cursor-pointer"
-                title={isBn ? 'পূর্ববর্তী' : 'Previous'}
-                aria-label="Previous"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={handleNext}
-                className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs active:scale-95 cursor-pointer"
-                title={isBn ? 'পরবর্তী' : 'Next'}
-                aria-label="Next"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+          <span className="font-mono font-semibold text-slate-500">
+            1 - {activeMembers.length}
+          </span>
         </div>
       </div>
     </div>
@@ -300,10 +190,10 @@ export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
 interface MemberCardProps {
   member: CommitteeMember;
   language: Language;
-  isMobileSlide?: boolean;
+  isMobileScroll?: boolean;
 }
 
-const CommitteeMemberCard: React.FC<MemberCardProps> = ({ member, language, isMobileSlide }) => {
+const CommitteeMemberCard: React.FC<MemberCardProps> = ({ member, language, isMobileScroll }) => {
   const isBn = language === 'bn';
   const name = isBn && member.nameBn ? member.nameBn : member.name;
   const role = isBn && member.roleBn ? member.roleBn : member.role;
@@ -311,24 +201,24 @@ const CommitteeMemberCard: React.FC<MemberCardProps> = ({ member, language, isMo
 
   return (
     <div
-      className={`bg-white rounded-3xl border border-slate-200 text-center shadow-xs transition-all duration-300 flex flex-col items-center justify-between group ${
-        isMobileSlide
-          ? 'p-6 space-y-4 border-sky-200/90 shadow-md min-h-[280px]'
-          : 'p-5 lg:p-6 space-y-3 hover:shadow-md hover:border-sky-300 hover:-translate-y-1 h-full'
+      className={`bg-white rounded-3xl border border-slate-200/90 text-center shadow-xs transition-all duration-300 flex flex-col items-center justify-between h-full group ${
+        isMobileScroll
+          ? 'p-5 space-y-3.5 border-sky-100 shadow-sm min-h-[290px]'
+          : 'p-5 lg:p-6 space-y-3 hover:shadow-md hover:border-sky-300 hover:-translate-y-1'
       }`}
     >
       {/* Avatar Container with glowing border */}
       <div className="relative">
         <div
           className={`rounded-full overflow-hidden bg-slate-100 p-0.5 border-2 border-[#0284C7] shadow-sm group-hover:scale-105 group-hover:border-[#0EA5E9] transition-transform duration-300 flex items-center justify-center ${
-            isMobileSlide ? 'w-24 h-24' : 'w-20 h-20 sm:w-22 sm:h-22'
+            isMobileScroll ? 'w-22 h-22' : 'w-20 h-20 sm:w-22 sm:h-22'
           }`}
         >
           <img
             src={member.img || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&auto=format&fit=crop&q=80'}
             alt={name}
             className="w-full h-full object-cover rounded-full"
-            loading={isMobileSlide ? 'eager' : 'lazy'}
+            loading="lazy"
             onError={(e) => {
               (e.target as HTMLImageElement).src =
                 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
@@ -345,25 +235,21 @@ const CommitteeMemberCard: React.FC<MemberCardProps> = ({ member, language, isMo
       {/* Member Details */}
       <div className="w-full pt-1 space-y-1">
         <h4
-          className={`font-extrabold text-slate-900 group-hover:text-[#0284C7] transition-colors ${
-            isMobileSlide ? 'text-base sm:text-lg' : 'text-sm sm:text-base line-clamp-1'
+          className={`font-extrabold text-slate-900 group-hover:text-[#0284C7] transition-colors line-clamp-1 ${
+            isMobileScroll ? 'text-sm sm:text-base' : 'text-sm sm:text-base'
           }`}
           title={name}
         >
           {name}
         </h4>
         <span
-          className={`font-bold text-[#0284C7] block ${
-            isMobileSlide ? 'text-xs sm:text-sm' : 'text-xs sm:text-sm line-clamp-1'
-          }`}
+          className="font-bold text-[#0284C7] block text-xs sm:text-sm line-clamp-1"
           title={role}
         >
           {role}
         </span>
         <p
-          className={`text-slate-600 leading-relaxed ${
-            isMobileSlide ? 'text-xs px-2 pt-1' : 'text-xs line-clamp-2'
-          }`}
+          className="text-slate-500 leading-relaxed text-xs line-clamp-2 pt-0.5"
           title={desc}
         >
           {desc}
