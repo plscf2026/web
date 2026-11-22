@@ -18,6 +18,8 @@ import {
   X,
   KeyRound,
   ShieldCheck,
+  Crown,
+  Ban,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -27,6 +29,8 @@ import {
 } from '../types';
 import { AppStore } from '../services/store';
 import { EventStore, hasDepartmentPermission } from '../services/eventStore';
+import { GuestService } from '../services/guestService';
+import { GuestCard, GuestMealFacilities } from '../types/guest';
 import { parseScannedInput } from '../utils/tokenGenerator';
 import { validateMealCollection } from '../utils/eventRules';
 import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
@@ -58,6 +62,13 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
   const [scanInput, setScanInput] = useState('');
   const [tokenInput, setTokenInput] = useState('');
   const [scannedStudent, setScannedStudent] = useState<RegistrationRecord | null>(null);
+  const [scannedGuest, setScannedGuest] = useState<GuestCard | null>(null);
+  const [guestFacilities, setGuestFacilities] = useState<GuestMealFacilities | null>(null);
+  const [guestNotice, setGuestNotice] = useState<{
+    type: 'success' | 'error' | 'warning';
+    message: string;
+    messageBn?: string;
+  } | null>(null);
   const [validationResult, setValidationResult] = useState<any | null>(null);
   const [distributions, setDistributions] = useState<FoodDistributionRecord[]>(() =>
     EventStore.getFoodDistributions()
@@ -87,13 +98,16 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
   useEffect(() => {
     EventStore.initRealtimeSync();
     EventStore.syncDistributionsWithSupabase().then(refreshDistributions);
+    GuestService.syncWithSupabase();
 
     const onSync = () => refreshDistributions();
     window.addEventListener('plscf_food_sync', onSync);
     window.addEventListener('plscf_all_stations_synced', onSync);
+    window.addEventListener('plscf_guest_sync', onSync);
     return () => {
       window.removeEventListener('plscf_food_sync', onSync);
       window.removeEventListener('plscf_all_stations_synced', onSync);
+      window.removeEventListener('plscf_guest_sync', onSync);
     };
   }, []);
 
@@ -106,6 +120,92 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
     const parsed = parseScannedInput(clean);
     const displayTicket = parsed.id || clean;
     const expectedToken = tokenParam?.trim().toUpperCase() || parsed.token;
+
+    // =========================================================================
+    // 0. GUEST PASS VERIFICATION & FOOD WORKFLOW (Requirement 4)
+    // =========================================================================
+    const isGuestCode =
+      parsed.isGuestPass ||
+      clean.toUpperCase().startsWith('GUEST-') ||
+      clean.toUpperCase().startsWith('PLSCF-GST-') ||
+      clean.toUpperCase().startsWith('GST-') ||
+      clean.toUpperCase().includes('"TYPE":"GUEST"');
+
+    if (isGuestCode) {
+      setScannedStudent(null);
+      setValidationResult(null);
+
+      const guest = await GuestService.findGuestByCode(clean, expectedToken);
+      if (!guest) {
+        playScanErrorSound();
+        setScannedGuest(null);
+        setGuestFacilities(null);
+        setGuestNotice({
+          type: 'error',
+          message: `Guest Pass "${clean}" not found in system database.`,
+          messageBn: `"${clean}" নম্বরের কোনো গেস্ট পাস পাওয়া যায়নি।`,
+        });
+        setIsResultPopupOpen(true);
+        return;
+      }
+
+      if (guest.status === 'REVOKED') {
+        playScanErrorSound();
+        setScannedGuest(guest);
+        setGuestFacilities(null);
+        setGuestNotice({
+          type: 'error',
+          message: `REVOKED GUEST CARD: This card was revoked by administration (${guest.revocationReason || 'Security Revocation'}). Food collection denied.`,
+          messageBn: 'বাতিলকৃত গেস্ট কার্ড: প্রশাসন কর্তৃক এই কার্ডটি বাতিল করা হয়েছে। খাবার বিতরণ নিষিদ্ধ।',
+        });
+        setIsResultPopupOpen(true);
+        return;
+      }
+
+      if (guest.status === 'INACTIVE' || !guest.isActivated) {
+        playScanErrorSound();
+        setScannedGuest(guest);
+        setGuestFacilities(null);
+        setGuestNotice({
+          type: 'error',
+          message: 'INACTIVE GUEST CARD: Please activate card at Main Gate first before collecting food.',
+          messageBn: 'নিষ্ক্রিয় গেস্ট কার্ড: খাবার গ্রহণের পূর্বে অনুগ্রহ করে প্রধান গেটে কার্ডটি সক্রিয় করান।',
+        });
+        setIsResultPopupOpen(true);
+        return;
+      }
+
+      // Guest card is ACTIVE! Query independent meal facilities
+      const facilities = await GuestService.getMealFacilities(guest.id);
+      setScannedGuest(guest);
+      setGuestFacilities(facilities);
+
+      const isAlreadyCollected = facilities[mealType] === 'Collected';
+
+      if (isAlreadyCollected) {
+        playScanErrorSound();
+        setGuestNotice({
+          type: 'warning',
+          message: `ALREADY COLLECTED: Guest ${guest.id} has already collected ${mealType.toUpperCase()}.`,
+          messageBn: `ইতিমধ্যেই সংগৃহীত: গেস্ট ${guest.id} ইতিপূর্বে ${mealType === 'breakfast' ? 'সকালের নাস্তা' : mealType === 'lunch' ? 'দুপুরের খাবার' : 'রাতের খাবার'} গ্রহণ করেছেন।`,
+        });
+      } else {
+        playScanSuccessSound();
+        setGuestNotice({
+          type: 'success',
+          message: `ELIGIBLE: Guest card active. Ready to collect ${mealType.toUpperCase()}.`,
+          messageBn: `যোগ্য: গেস্ট কার্ড সক্রিয় ও বৈধ। ${mealType === 'breakfast' ? 'সকালের নাস্তা' : mealType === 'lunch' ? 'দুপুরের খাবার' : 'রাতের খাবার'} বিতরণের জন্য প্রস্তুত।`,
+        });
+      }
+
+      setIsResultPopupOpen(true);
+      return;
+    }
+
+    // Reset guest state when processing a regular student
+    setScannedGuest(null);
+    setGuestFacilities(null);
+    setGuestNotice(null);
 
     const verifyRes = await AppStore.verifyStudentTicketAsync(clean, expectedToken, staffUser?.id || 'FOOD_STAFF');
 
@@ -256,6 +356,56 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
       }, 1600);
     } else {
       setFeedbackNotice({
+        type: 'error',
+        message: res.error || 'Failed to record meal collection.',
+      });
+    }
+  };
+
+  // Guest Meal Collection Handler (Requirement 4)
+  const handleConfirmGuestFoodCollection = async () => {
+    if (!scannedGuest || !guestFacilities) return;
+
+    const isAlready = guestFacilities[mealType] === 'Collected';
+
+    if (isAlready) {
+      playScanErrorSound();
+      setGuestNotice({
+        type: 'error',
+        message: `ALREADY COLLECTED: Guest has already collected ${mealType.toUpperCase()}.`,
+      });
+      return;
+    }
+
+    const res = await GuestService.collectMeal(
+      scannedGuest.id,
+      mealType,
+      scannedGuest.token,
+      staffUser.id,
+      staffUser.fullName,
+      staffUser.assignedGate || 'Food Counter'
+    );
+
+    if (res.success && res.record) {
+      playScanSuccessSound();
+      const updatedFacilities = await GuestService.getMealFacilities(scannedGuest.id);
+      setGuestFacilities(updatedFacilities);
+      setGuestNotice({
+        type: 'success',
+        message: `[COLLECTION RECORDED] ${mealType.toUpperCase()} marked as COLLECTED for Guest ${scannedGuest.id} (${scannedGuest.category}).`,
+        messageBn: `[সফল] গেস্ট ${scannedGuest.id}-এর ${mealType === 'breakfast' ? 'সকালের নাস্তা' : mealType === 'lunch' ? 'দুপুরের খাবার' : 'রাতের খাবার'} সফলভাবে সম্পন্ন হয়েছে।`,
+      });
+
+      // Auto-dismiss after success so staff can scan next pass
+      setTimeout(() => {
+        setIsResultPopupOpen(false);
+        setScannedGuest(null);
+        setGuestFacilities(null);
+        setGuestNotice(null);
+      }, 1800);
+    } else {
+      playScanErrorSound();
+      setGuestNotice({
         type: 'error',
         message: res.error || 'Failed to record meal collection.',
       });
@@ -488,7 +638,7 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
           </div>
         </div>
 
-        {/* Right Column: Student Verification Card & Confirmation */}
+        {/* Right Column: Student / Guest Verification Card & Confirmation */}
         <div className="lg:col-span-7">
           {feedbackNotice && (
             <div
@@ -507,7 +657,206 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
             </div>
           )}
 
-          {scannedStudent ? (
+          {guestNotice && (
+            <div
+              className={`p-4 rounded-2xl mb-4 text-xs font-bold flex items-center gap-2.5 ${
+                guestNotice.type === 'success'
+                  ? 'bg-emerald-50 border border-emerald-300 text-emerald-900'
+                  : guestNotice.type === 'warning'
+                  ? 'bg-amber-50 border border-amber-300 text-amber-900'
+                  : 'bg-rose-50 border border-rose-300 text-rose-900'
+              }`}
+            >
+              {guestNotice.type === 'success' ? (
+                <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : guestNotice.type === 'warning' ? (
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              ) : (
+                <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              )}
+              <div>
+                <p>{guestNotice.message}</p>
+                {guestNotice.messageBn && (
+                  <p className="text-[11px] font-normal opacity-90 mt-0.5">{guestNotice.messageBn}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {scannedGuest ? (
+            /* GUEST PASS FOOD VERIFICATION CARD (INLINE) */
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-amber-200/80 shadow-md space-y-6">
+              {/* Guest Header */}
+              <div className="flex items-start gap-4 pb-6 border-b border-amber-100">
+                <div className="w-20 h-24 rounded-2xl bg-gradient-to-br from-amber-500 via-amber-600 to-orange-700 flex flex-col items-center justify-center text-white shadow-md border-2 border-amber-300 shrink-0">
+                  <Crown className="w-8 h-8 text-amber-200 mb-1" />
+                  <span className="text-[9px] font-black uppercase tracking-wider">Guest Pass</span>
+                </div>
+
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500 text-slate-950">
+                      {scannedGuest.category}
+                    </span>
+                    <span className="font-mono text-xs font-black text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded">
+                      {scannedGuest.id}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                        scannedGuest.status === 'ACTIVE'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : scannedGuest.status === 'INACTIVE'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                          : 'bg-rose-100 text-rose-800 border border-rose-300'
+                      }`}
+                    >
+                      {scannedGuest.status}
+                    </span>
+                  </div>
+
+                  <h3 className="text-xl font-black text-slate-900 truncate">
+                    {scannedGuest.regNumber}
+                  </h3>
+
+                  <div className="pt-1 flex items-center gap-2 text-xs">
+                    <span className="font-bold text-slate-500">TOKEN:</span>
+                    <span className="font-mono font-black tracking-widest text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                      {scannedGuest.token}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gate Activation Info */}
+              <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/60 text-xs space-y-1">
+                <div className="flex justify-between">
+                  <span className="font-bold text-slate-500">Gate Activation:</span>
+                  <span className="font-bold text-slate-800">
+                    {scannedGuest.activatedGate || 'Main Gate 01'} (
+                    {scannedGuest.activatedAt ? new Date(scannedGuest.activatedAt).toLocaleTimeString() : 'Verified'}
+                    )
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold text-slate-500">Activated By:</span>
+                  <span className="font-medium text-slate-700">{scannedGuest.activatedByStaffName || 'Gate Operator'}</span>
+                </div>
+              </div>
+
+              {/* Food Facilities Matrix */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                  Guest Meal Facilities Status
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                  <div
+                    className={`p-3 rounded-2xl border ${
+                      guestFacilities?.breakfast === 'Collected'
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                        : 'bg-blue-50 border-blue-200 text-blue-900'
+                    }`}
+                  >
+                    <Utensils className="w-4 h-4 mx-auto mb-1 text-slate-600" />
+                    <span className="font-bold block text-xs">Breakfast</span>
+                    <span
+                      className={`text-[10px] font-black uppercase mt-1 inline-block px-2 py-0.5 rounded-full ${
+                        guestFacilities?.breakfast === 'Collected'
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-blue-600 text-white'
+                      }`}
+                    >
+                      {guestFacilities?.breakfast === 'Collected' ? 'Collected' : 'Available'}
+                    </span>
+                  </div>
+
+                  <div
+                    className={`p-3 rounded-2xl border ${
+                      guestFacilities?.lunch === 'Collected'
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                        : 'bg-blue-50 border-blue-200 text-blue-900'
+                    }`}
+                  >
+                    <Utensils className="w-4 h-4 mx-auto mb-1 text-slate-600" />
+                    <span className="font-bold block text-xs">Lunch</span>
+                    <span
+                      className={`text-[10px] font-black uppercase mt-1 inline-block px-2 py-0.5 rounded-full ${
+                        guestFacilities?.lunch === 'Collected'
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-blue-600 text-white'
+                      }`}
+                    >
+                      {guestFacilities?.lunch === 'Collected' ? 'Collected' : 'Available'}
+                    </span>
+                  </div>
+
+                  <div
+                    className={`p-3 rounded-2xl border ${
+                      guestFacilities?.dinner === 'Collected'
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                        : 'bg-blue-50 border-blue-200 text-blue-900'
+                    }`}
+                  >
+                    <Utensils className="w-4 h-4 mx-auto mb-1 text-slate-600" />
+                    <span className="font-bold block text-xs">Dinner</span>
+                    <span
+                      className={`text-[10px] font-black uppercase mt-1 inline-block px-2 py-0.5 rounded-full ${
+                        guestFacilities?.dinner === 'Collected'
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-blue-600 text-white'
+                      }`}
+                    >
+                      {guestFacilities?.dinner === 'Collected' ? 'Collected' : 'Available'}
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-2xl border bg-rose-50 border-rose-200 text-rose-900">
+                    <Ban className="w-4 h-4 mx-auto mb-1 text-rose-600" />
+                    <span className="font-bold block text-xs">Dress / Gift</span>
+                    <span className="text-[10px] font-black uppercase mt-1 inline-block px-2 py-0.5 rounded-full bg-rose-600 text-white">
+                      Not Eligible
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Button / Duplicate Warning */}
+              {scannedGuest.status === 'ACTIVE' ? (
+                guestFacilities?.[mealType] === 'Collected' ? (
+                  <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-900 text-center font-bold text-xs space-y-1">
+                    <div className="flex items-center justify-center gap-1.5 text-rose-700 text-sm font-black">
+                      <XCircle className="w-5 h-5 text-rose-600" />
+                      <span>ALREADY COLLECTED</span>
+                    </div>
+                    <p className="text-xs text-rose-800 font-extrabold">
+                      Guest has already collected {mealType.toUpperCase()}.
+                    </p>
+                    <p className="text-[11px] font-normal text-rose-700">
+                      Duplicate meal collection is strictly prohibited. Each meal can only be collected once.
+                    </p>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleConfirmGuestFoodCollection}
+                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 active:scale-[0.99] text-white font-black text-sm tracking-wider uppercase transition-all shadow-lg shadow-amber-600/25 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Utensils className="w-5 h-5" />
+                    <span>[ CONFIRM GUEST {mealType.toUpperCase()} COLLECTION ]</span>
+                  </button>
+                )
+              ) : (
+                <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-900 text-center font-bold text-xs space-y-1">
+                  <div className="flex items-center justify-center gap-1.5 text-rose-700 text-sm font-black">
+                    <DoorOpen className="w-5 h-5 text-rose-600" />
+                    <span>GATE ENTRY REQUIRED</span>
+                  </div>
+                  <p className="text-xs text-rose-800 font-bold">
+                    Guest card must be activated at the Main Gate first before collecting food.
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : scannedStudent ? (
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
               {/* Student Header with Photograph */}
               <div className="flex items-start gap-4 pb-6 border-b border-slate-100">
@@ -883,6 +1232,9 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                 onClick={() => {
                   setIsResultPopupOpen(false);
                   setScannedStudent(null);
+                  setScannedGuest(null);
+                  setGuestFacilities(null);
+                  setGuestNotice(null);
                   setFeedbackNotice(null);
                 }}
                 className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
@@ -912,7 +1264,208 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                 </div>
               )}
 
-              {scannedStudent ? (
+              {/* Guest Feedback Alert Notice */}
+              {guestNotice && (
+                <div
+                  className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2.5 ${
+                    guestNotice.type === 'success'
+                      ? 'bg-emerald-50 border border-emerald-300 text-emerald-900'
+                      : guestNotice.type === 'warning'
+                      ? 'bg-amber-50 border border-amber-300 text-amber-900'
+                      : 'bg-rose-50 border border-rose-300 text-rose-900'
+                  }`}
+                >
+                  {guestNotice.type === 'success' ? (
+                    <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+                  ) : guestNotice.type === 'warning' ? (
+                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                  )}
+                  <div>
+                    <p>{guestNotice.message}</p>
+                    {guestNotice.messageBn && (
+                      <p className="text-[11px] font-normal opacity-90 mt-0.5">{guestNotice.messageBn}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {scannedGuest ? (
+                <>
+                  {/* Guest Profile Card */}
+                  <div className="flex items-start gap-4 pb-5 border-b border-amber-100">
+                    <div className="w-20 h-24 rounded-2xl bg-gradient-to-br from-amber-500 via-amber-600 to-orange-700 flex flex-col items-center justify-center text-white shadow-md border-2 border-amber-300 shrink-0">
+                      <Crown className="w-8 h-8 text-amber-200 mb-1" />
+                      <span className="text-[9px] font-black uppercase tracking-wider">Guest Pass</span>
+                    </div>
+
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500 text-slate-950">
+                          {scannedGuest.category}
+                        </span>
+                        <span className="font-mono text-xs font-black text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded">
+                          {scannedGuest.id}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            scannedGuest.status === 'ACTIVE'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : scannedGuest.status === 'INACTIVE'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                              : 'bg-rose-100 text-rose-800 border border-rose-300'
+                          }`}
+                        >
+                          {scannedGuest.status}
+                        </span>
+                      </div>
+
+                      <h4 className="text-lg font-black text-slate-900 truncate">
+                        {scannedGuest.regNumber}
+                      </h4>
+
+                      <div className="pt-1 flex items-center gap-2 text-xs">
+                        <span className="font-bold text-slate-500">TOKEN:</span>
+                        <span className="font-mono font-black tracking-widest text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded border border-amber-300">
+                          {scannedGuest.token}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gate Activation Info */}
+                  <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/60 text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <span className="font-bold text-slate-500">Gate Activation:</span>
+                      <span className="font-bold text-slate-800">
+                        {scannedGuest.activatedGate || 'Main Gate 01'} (
+                        {scannedGuest.activatedAt ? new Date(scannedGuest.activatedAt).toLocaleTimeString() : 'Verified'}
+                        )
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-bold text-slate-500">Activated By:</span>
+                      <span className="font-medium text-slate-700">{scannedGuest.activatedByStaffName || 'Gate Operator'}</span>
+                    </div>
+                  </div>
+
+                  {/* Food Facilities Matrix */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                      Guest Meal Facilities Status
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                      <div
+                        className={`p-3 rounded-2xl border ${
+                          guestFacilities?.breakfast === 'Collected'
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                            : 'bg-blue-50 border-blue-200 text-blue-900'
+                        }`}
+                      >
+                        <Utensils className="w-4 h-4 mx-auto mb-1 text-slate-600" />
+                        <span className="font-bold block text-xs">Breakfast</span>
+                        <span
+                          className={`text-[10px] font-black uppercase mt-1 inline-block px-2 py-0.5 rounded-full ${
+                            guestFacilities?.breakfast === 'Collected'
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-blue-600 text-white'
+                          }`}
+                        >
+                          {guestFacilities?.breakfast === 'Collected' ? 'Collected' : 'Available'}
+                        </span>
+                      </div>
+
+                      <div
+                        className={`p-3 rounded-2xl border ${
+                          guestFacilities?.lunch === 'Collected'
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                            : 'bg-blue-50 border-blue-200 text-blue-900'
+                        }`}
+                      >
+                        <Utensils className="w-4 h-4 mx-auto mb-1 text-slate-600" />
+                        <span className="font-bold block text-xs">Lunch</span>
+                        <span
+                          className={`text-[10px] font-black uppercase mt-1 inline-block px-2 py-0.5 rounded-full ${
+                            guestFacilities?.lunch === 'Collected'
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-blue-600 text-white'
+                          }`}
+                        >
+                          {guestFacilities?.lunch === 'Collected' ? 'Collected' : 'Available'}
+                        </span>
+                      </div>
+
+                      <div
+                        className={`p-3 rounded-2xl border ${
+                          guestFacilities?.dinner === 'Collected'
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                            : 'bg-blue-50 border-blue-200 text-blue-900'
+                        }`}
+                      >
+                        <Utensils className="w-4 h-4 mx-auto mb-1 text-slate-600" />
+                        <span className="font-bold block text-xs">Dinner</span>
+                        <span
+                          className={`text-[10px] font-black uppercase mt-1 inline-block px-2 py-0.5 rounded-full ${
+                            guestFacilities?.dinner === 'Collected'
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-blue-600 text-white'
+                          }`}
+                        >
+                          {guestFacilities?.dinner === 'Collected' ? 'Collected' : 'Available'}
+                        </span>
+                      </div>
+
+                      <div className="p-3 rounded-2xl border bg-rose-50 border-rose-200 text-rose-900">
+                        <Ban className="w-4 h-4 mx-auto mb-1 text-rose-600" />
+                        <span className="font-bold block text-xs">Dress / Gift</span>
+                        <span className="text-[10px] font-black uppercase mt-1 inline-block px-2 py-0.5 rounded-full bg-rose-600 text-white">
+                          Not Eligible
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Button / Duplicate Warning */}
+                  {scannedGuest.status === 'ACTIVE' ? (
+                    (mealType === 'breakfast' && guestFacilities?.breakfast === 'Collected') ||
+                    (mealType === 'lunch' && guestFacilities?.lunch === 'Collected') ||
+                    (mealType === 'dinner' && guestFacilities?.dinner === 'Collected') ? (
+                      <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-900 text-center font-bold text-xs space-y-1">
+                        <div className="flex items-center justify-center gap-1.5 text-rose-700 text-sm font-black">
+                          <XCircle className="w-5 h-5 text-rose-600" />
+                          <span>ALREADY COLLECTED</span>
+                        </div>
+                        <p className="text-xs text-rose-800 font-extrabold">
+                          Guest {scannedGuest.id} has already collected {mealType.toUpperCase()}.
+                        </p>
+                        <p className="text-[11px] font-normal text-rose-700">
+                          Duplicate meal collection is strictly prohibited. Each meal can only be collected once.
+                        </p>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleConfirmGuestFoodCollection}
+                        className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 active:scale-[0.99] text-white font-black text-sm tracking-wider uppercase transition-all shadow-lg shadow-amber-600/25 cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Utensils className="w-5 h-5" />
+                        <span>[ CONFIRM GUEST {mealType.toUpperCase()} COLLECTION ]</span>
+                      </button>
+                    )
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-900 text-center font-bold text-xs space-y-1">
+                      <div className="flex items-center justify-center gap-1.5 text-rose-700 text-sm font-black">
+                        <DoorOpen className="w-5 h-5 text-rose-600" />
+                        <span>GATE ENTRY REQUIRED</span>
+                      </div>
+                      <p className="text-xs text-rose-800 font-bold">
+                        Guest card must be activated at the Main Gate first before collecting food.
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : scannedStudent ? (
                 <>
                   {/* Student Profile Card */}
                   <div className="flex items-start gap-4 pb-5 border-b border-slate-100">
@@ -1081,11 +1634,14 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                 onClick={() => {
                   setIsResultPopupOpen(false);
                   setScannedStudent(null);
+                  setScannedGuest(null);
+                  setGuestFacilities(null);
+                  setGuestNotice(null);
                   setFeedbackNotice(null);
                 }}
                 className="w-full py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
               >
-                {language === 'bn' ? 'পরবর্তী টিকিট স্ক্যান করুন' : 'Scan Next Student / Close'}
+                {language === 'bn' ? 'পরবর্তী টিকিট স্ক্যান করুন' : 'Scan Next Ticket / Close'}
               </button>
             </div>
           </div>

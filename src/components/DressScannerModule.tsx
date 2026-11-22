@@ -111,6 +111,31 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
       return;
     }
 
+    // Guest Pass: strictly NOT eligible for dress or clothing distribution (Requirement 4)
+    if (
+      parsed.isGuestPass ||
+      clean.toUpperCase().startsWith('GUEST-') ||
+      clean.toUpperCase().startsWith('PLSCF-GST-') ||
+      clean.toUpperCase().startsWith('GST-')
+    ) {
+      playScanErrorSound();
+      setScannedStudent(null);
+      setValidationResult({
+        canReceive: false,
+        status: 'GUEST_NO_ACCESS' as any,
+        messageEn:
+          'GUEST RESTRICTION: Guest cards are strictly NOT eligible for dress collection or clothing distribution (Entry & Food pass only).',
+        messageBn:
+          'গেস্ট কার্ডের জন্য টি-শার্ট বা গিফট প্রযোজ্য নয় (শুধুমাত্র গেট এন্ট্রি ও খাবার পাস)।',
+      });
+      setFeedbackNotice({
+        type: 'error',
+        message: 'GUEST RESTRICTION: Guest passes are strictly NOT eligible for dress or clothing collection.',
+      });
+      setIsResultPopupOpen(true);
+      return;
+    }
+
     const verifyRes = await AppStore.verifyStudentTicketAsync(clean, expectedToken, staffUser?.id || 'DRESS_STAFF');
 
     if (!verifyRes.verified || !verifyRes.student) {

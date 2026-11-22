@@ -103,6 +103,7 @@ export function parseScannedInput(input: string): {
   token?: string;
   id?: string;
   isGuardianPass?: boolean;
+  isGuestPass?: boolean;
   raw: string;
 } {
   if (!input) return { raw: '' };
@@ -112,18 +113,27 @@ export function parseScannedInput(input: string): {
     trimmed.toLowerCase().includes('verify-parent-pass') ||
     trimmed.toUpperCase().startsWith('P-');
 
+  const isGuestPass =
+    trimmed.toUpperCase().startsWith('GUEST-') ||
+    trimmed.toUpperCase().startsWith('PLSCF-GST-') ||
+    trimmed.toUpperCase().startsWith('GST-') ||
+    trimmed.toLowerCase().includes('verify-guest-pass') ||
+    trimmed.toLowerCase().includes('type=guest');
+
   // 1. JSON payload
   if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
     try {
       const parsed = JSON.parse(trimmed);
       let t = parsed.token ? String(parsed.token).trim().toUpperCase() : undefined;
-      let rawId = parsed.id ? String(parsed.id).trim().toUpperCase() : undefined;
+      let rawId = (parsed.id || parsed.guestId || parsed.regNumber) ? String(parsed.id || parsed.guestId || parsed.regNumber).trim().toUpperCase() : undefined;
       if (rawId && rawId.startsWith('PAR-')) rawId = rawId.replace(/^PAR-/i, '');
       if (t && t.startsWith('P-') && t.length === 8) t = t.replace(/^P-/i, '');
+      const jsonIsGuest = isGuestPass || parsed.type === 'GUEST' || Boolean(parsed.isGuestPass) || Boolean(rawId && (rawId.startsWith('GUEST-') || rawId.startsWith('PLSCF-GST-')));
       return {
         token: t,
         id: rawId,
         isGuardianPass: isGuardianPass || Boolean(parsed.isGuardianPass),
+        isGuestPass: jsonIsGuest,
         raw: trimmed.toUpperCase(),
       };
     } catch {}
@@ -137,6 +147,7 @@ export function parseScannedInput(input: string): {
         url.searchParams.get('token') ||
         url.searchParams.get('TOKEN') ||
         url.searchParams.get('qr_token') ||
+        url.searchParams.get('guest_token') ||
         url.searchParams.get('verify') ||
         url.searchParams.get('VERIFY') ||
         url.searchParams.get('t') ||
@@ -144,16 +155,18 @@ export function parseScannedInput(input: string): {
       let id =
         url.searchParams.get('studentId') ||
         url.searchParams.get('student_id') ||
+        url.searchParams.get('guestId') ||
+        url.searchParams.get('guest_id') ||
         url.searchParams.get('id') ||
         url.searchParams.get('ID') ||
         url.searchParams.get('reg_id') ||
         url.searchParams.get('registration_id');
 
-      // Check URL path segments for Ticket ID pattern (e.g., /verify-student-id/PLSCF-2027-F8472)
+      // Check URL path segments for Ticket ID or Guest ID pattern
       let pathId: string | undefined;
       const pathSegments = url.pathname.split('/').filter(Boolean);
       for (const seg of pathSegments) {
-        if (/^PLSCF-\d{4}-[A-Z0-9]+$/i.test(seg)) {
+        if (/^PLSCF-\d{4}-[A-Z0-9]+$/i.test(seg) || /^GUEST-\d+$/i.test(seg) || /^PLSCF-GST-/i.test(seg)) {
           pathId = seg.toUpperCase();
           break;
         }
@@ -169,11 +182,18 @@ export function parseScannedInput(input: string): {
         effectiveToken = effectiveToken.replace(/^P-/i, '');
       }
 
+      const urlIsGuest =
+        isGuestPass ||
+        url.searchParams.get('type')?.toUpperCase() === 'GUEST' ||
+        Boolean(effectiveId && (effectiveId.startsWith('GUEST-') || effectiveId.startsWith('PLSCF-GST-'))) ||
+        Boolean(effectiveToken && effectiveToken.startsWith('GST-'));
+
       if (effectiveToken || effectiveId) {
         return {
           token: effectiveToken,
           id: effectiveId,
           isGuardianPass,
+          isGuestPass: urlIsGuest,
           raw: trimmed.toUpperCase(),
         };
       }
@@ -192,10 +212,17 @@ export function parseScannedInput(input: string): {
     cleanToken = cleanToken.replace(/^P-/i, '');
   }
 
+  const directIsGuest =
+    isGuestPass ||
+    cleanId.startsWith('GUEST-') ||
+    cleanId.startsWith('PLSCF-GST-') ||
+    cleanToken.startsWith('GST-');
+
   return {
-    token: cleanToken.length === 6 && /^[A-Z0-9]{6}$/.test(cleanToken) ? cleanToken : undefined,
+    token: cleanToken.length === 6 && /^[A-Z0-9]{6}$/.test(cleanToken) ? cleanToken : (directIsGuest && cleanToken.startsWith('GST-') ? cleanToken : undefined),
     id: cleanId,
     isGuardianPass,
+    isGuestPass: directIsGuest,
     raw: upper,
   };
 }

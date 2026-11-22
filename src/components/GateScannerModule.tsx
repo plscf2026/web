@@ -14,6 +14,9 @@ import {
   QrCode,
   X,
   KeyRound,
+  Crown,
+  Utensils,
+  Ban,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -23,6 +26,8 @@ import {
 } from '../types';
 import { AppStore } from '../services/store';
 import { EventStore, hasDepartmentPermission } from '../services/eventStore';
+import { GuestService } from '../services/guestService';
+import { GuestCard } from '../types/guest';
 import { parseScannedInput } from '../utils/tokenGenerator';
 import { validateGateAction } from '../utils/eventRules';
 import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
@@ -42,13 +47,24 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
   staffUser,
   isSuperAdmin = false,
 }) => {
+  // Mode selection: STUDENT | STAFF | GUEST
+  const [scannerMode, setScannerMode] = useState<'STUDENT' | 'STAFF' | 'GUEST'>('STUDENT');
   const [scanInput, setScanInput] = useState('');
   const [tokenInput, setTokenInput] = useState('');
   const [scannedStudent, setScannedStudent] = useState<RegistrationRecord | null>(null);
+  const [scannedGuest, setScannedGuest] = useState<GuestCard | null>(null);
+  const [guestNotice, setGuestNotice] = useState<{
+    type: 'success' | 'error' | 'info';
+    message: string;
+    alreadyActive?: boolean;
+  } | null>(null);
   const [isInside, setIsInside] = useState<boolean>(false);
   const [cameraActive, setCameraActive] = useState<boolean>(false);
   const [gateEvents, setGateEvents] = useState<GateEventRecord[]>(() =>
     EventStore.getGateEvents()
+  );
+  const [guestCards, setGuestCards] = useState<GuestCard[]>(() =>
+    GuestService.getGuestCards()
   );
 
   // Global Pagination State (Default 10, options 10, 20, 30, 40)
@@ -64,18 +80,22 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
 
   const refreshEvents = () => {
     setGateEvents(EventStore.getGateEvents());
+    setGuestCards(GuestService.getGuestCards());
   };
 
   useEffect(() => {
     EventStore.initRealtimeSync();
     EventStore.syncDistributionsWithSupabase().then(refreshEvents);
+    GuestService.syncWithSupabase().then(refreshEvents);
 
     const onSync = () => refreshEvents();
     window.addEventListener('plscf_gate_sync', onSync);
     window.addEventListener('plscf_all_stations_synced', onSync);
+    window.addEventListener('plscf_guest_sync', onSync);
     return () => {
       window.removeEventListener('plscf_gate_sync', onSync);
       window.removeEventListener('plscf_all_stations_synced', onSync);
+      window.removeEventListener('plscf_guest_sync', onSync);
     };
   }, []);
 
@@ -88,6 +108,86 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
     const parsed = parseScannedInput(clean);
     const displayTicket = parsed.id || clean;
     const expectedToken = tokenParam?.trim().toUpperCase() || parsed.token;
+
+    // =========================================================================
+    // 1. GUEST MODE SCANNER LOGIC (Requirement 3)
+    // =========================================================================
+    if (scannerMode === 'GUEST') {
+      const isGuestCode =
+        parsed.isGuestPass ||
+        clean.toUpperCase().startsWith('GUEST-') ||
+        clean.toUpperCase().startsWith('PLSCF-GST-') ||
+        clean.toUpperCase().startsWith('GST-');
+
+      if (!isGuestCode) {
+        playScanErrorSound();
+        setScannedStudent(null);
+        setScannedGuest(null);
+        setGuestNotice({
+          type: 'error',
+          message: 'INVALID PASS FOR GUEST MODE: This QR belongs to a Student/Staff pass. Please switch scanner mode to STUDENT or STAFF.',
+        });
+        setIsResultPopupOpen(true);
+        return;
+      }
+
+      const actRes = await GuestService.activateGuestCard(
+        clean,
+        expectedToken,
+        staffUser.assignedGate || 'Gate 01 - Main Gate',
+        staffUser.id,
+        staffUser.fullName
+      );
+
+      if (actRes.success && actRes.card) {
+        playScanSuccessSound();
+        setScannedStudent(null);
+        setScannedGuest(actRes.card);
+        setGuestNotice({
+          type: 'success',
+          alreadyActive: actRes.alreadyActive,
+          message: actRes.alreadyActive
+            ? 'GUEST CARD IS ALREADY ACTIVE'
+            : 'GUEST CARD ACTIVATED SUCCESSFULLY',
+        });
+        setIsResultPopupOpen(true);
+        refreshEvents();
+      } else {
+        playScanErrorSound();
+        setScannedStudent(null);
+        setScannedGuest(null);
+        setGuestNotice({
+          type: 'error',
+          message: actRes.error || `Invalid or revoked Guest QR Code: ${clean}`,
+        });
+        setIsResultPopupOpen(true);
+      }
+      return;
+    }
+
+    // =========================================================================
+    // 2. STUDENT / STAFF MODE SCANNER LOGIC
+    // =========================================================================
+    // Reject guest pass if scanned in STUDENT / STAFF mode
+    if (
+      parsed.isGuestPass ||
+      clean.toUpperCase().startsWith('GUEST-') ||
+      clean.toUpperCase().startsWith('PLSCF-GST-') ||
+      clean.toUpperCase().startsWith('GST-')
+    ) {
+      playScanErrorSound();
+      setScannedStudent(null);
+      setScannedGuest(null);
+      setActionNotice({
+        type: 'error',
+        message: 'GUEST PASS DETECTED: Please switch scanner mode above to [👑 GUEST] to activate and verify guest passes.',
+      });
+      setIsResultPopupOpen(true);
+      return;
+    }
+
+    setScannedGuest(null);
+    setGuestNotice(null);
 
     const verifyRes = await AppStore.verifyStudentTicketAsync(clean, expectedToken, staffUser?.id || 'GATE_STAFF');
 
@@ -256,6 +356,13 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
             <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Exits</span>
             <span className="text-base font-black text-slate-900 font-mono">{totalExits}</span>
           </div>
+
+          <div className="bg-amber-50 border border-amber-200 px-3.5 py-2 rounded-2xl text-center">
+            <span className="text-[10px] uppercase font-bold text-amber-800 block">Active Guests</span>
+            <span className="text-base font-black text-amber-950 font-mono">
+              {guestCards.filter((c) => c.status === 'ACTIVE').length} / {guestCards.length}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -264,10 +371,83 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
         {/* Left Column: QR Code Scan & Search */}
         <div className="lg:col-span-5 space-y-5">
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+            {/* SCANNER OPERATIONAL MODE TOGGLE (Requirement 3: STUDENT | STAFF | GUEST) */}
+            <div className="bg-slate-100 p-1.5 rounded-2xl flex items-center gap-1.5 border border-slate-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setScannerMode('STUDENT');
+                  setScanInput('');
+                  setTokenInput('');
+                  setScannedStudent(null);
+                  setScannedGuest(null);
+                  setActionNotice(null);
+                  setGuestNotice(null);
+                }}
+                className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  scannerMode === 'STUDENT'
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>🎓 STUDENT</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setScannerMode('STAFF');
+                  setScanInput('');
+                  setTokenInput('');
+                  setScannedStudent(null);
+                  setScannedGuest(null);
+                  setActionNotice(null);
+                  setGuestNotice(null);
+                }}
+                className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  scannerMode === 'STAFF'
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>🛡️ STAFF</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setScannerMode('GUEST');
+                  setScanInput('');
+                  setTokenInput('');
+                  setScannedStudent(null);
+                  setScannedGuest(null);
+                  setActionNotice(null);
+                  setGuestNotice(null);
+                }}
+                className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  scannerMode === 'GUEST'
+                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black shadow-md ring-2 ring-amber-300'
+                    : 'text-amber-800 hover:text-amber-950 font-bold bg-amber-50/50'
+                }`}
+              >
+                <Crown className="w-3.5 h-3.5" />
+                <span>GUEST</span>
+              </button>
+            </div>
+
             <div className="flex items-center justify-between flex-wrap gap-2">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                <QrCode className="w-4 h-4 text-sky-700" />
-                <span>Gate QR Scanner Desk</span>
+                {scannerMode === 'GUEST' ? (
+                  <>
+                    <Crown className="w-4 h-4 text-amber-600" />
+                    <span className="text-amber-900 font-black">Guest Pass Activation Desk</span>
+                  </>
+                ) : (
+                  <>
+                    <QrCode className="w-4 h-4 text-sky-700" />
+                    <span>Gate QR Scanner Desk ({scannerMode})</span>
+                  </>
+                )}
               </h3>
 
               <div className="flex items-center gap-2">
@@ -278,6 +458,8 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
                     cameraActive
                       ? 'bg-rose-100 text-rose-700 border border-rose-300'
+                      : scannerMode === 'GUEST'
+                      ? 'bg-amber-600 text-slate-950 hover:bg-amber-500'
                       : 'bg-slate-900 text-white hover:bg-slate-800'
                   }`}
                 >
@@ -807,7 +989,126 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                 </div>
               )}
 
-              {scannedStudent ? (
+              {/* GUEST PASS ACTIVATION POPUP (Requirement 3) */}
+              {scannedGuest ? (
+                <div className="space-y-4">
+                  {/* Guest Badge & Status */}
+                  <div className="bg-gradient-to-br from-amber-500/10 via-purple-500/10 to-indigo-500/10 rounded-2xl p-5 border-2 border-amber-300 shadow-sm">
+                    <div className="flex items-center justify-between pb-3 border-b border-amber-200/60 mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-sm">
+                          <Crown className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 block">
+                            Police Lines Reunion 2027
+                          </span>
+                          <h4 className="text-sm font-black text-slate-900">
+                            OFFICIAL GUEST PASS
+                          </h4>
+                        </div>
+                      </div>
+
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+                          scannedGuest.status === 'ACTIVE'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : 'bg-amber-100 text-amber-800 border border-amber-300'
+                        }`}
+                      >
+                        {scannedGuest.status}
+                      </span>
+                    </div>
+
+                    {/* Guest Identification Info */}
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase block">Guest ID</span>
+                        <span className="font-mono font-black text-slate-900 text-sm">{scannedGuest.id}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase block">Registration No.</span>
+                        <span className="font-mono font-bold text-slate-800 text-xs">{scannedGuest.regNumber}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase block">Category</span>
+                        <span className="font-bold text-indigo-900">{scannedGuest.category}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase block">Secure Token</span>
+                        <span className="font-mono font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
+                          {scannedGuest.token}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Activation Metadata */}
+                    <div className="mt-4 pt-3 border-t border-amber-200/60 bg-white/80 rounded-xl p-3 space-y-1 text-[11px] text-slate-600">
+                      <div className="flex justify-between">
+                        <span className="font-bold text-slate-500">Gate Location:</span>
+                        <span className="font-semibold text-slate-800">{scannedGuest.activatedGate || staffUser.assignedGate || 'Main Gate 01'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-bold text-slate-500">Authorized Operator:</span>
+                        <span className="font-semibold text-slate-800">{scannedGuest.activatedByStaffName || staffUser.fullName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-bold text-slate-500">Activation Time:</span>
+                        <span className="font-mono font-semibold text-slate-800">
+                          {scannedGuest.activatedAt ? new Date(scannedGuest.activatedAt).toLocaleString() : new Date().toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Guest Eligible Facilities & Restrictions */}
+                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                      Guest Facility Entitlements
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                      <div className="bg-white p-2 rounded-xl border border-emerald-200 text-emerald-800">
+                        <Utensils className="w-4 h-4 mx-auto mb-1 text-emerald-600" />
+                        <span className="font-bold block text-[11px]">Breakfast</span>
+                        <span className="text-[9px] font-bold uppercase text-emerald-600">Eligible</span>
+                      </div>
+                      <div className="bg-white p-2 rounded-xl border border-emerald-200 text-emerald-800">
+                        <Utensils className="w-4 h-4 mx-auto mb-1 text-emerald-600" />
+                        <span className="font-bold block text-[11px]">Lunch</span>
+                        <span className="text-[9px] font-bold uppercase text-emerald-600">Eligible</span>
+                      </div>
+                      <div className="bg-white p-2 rounded-xl border border-emerald-200 text-emerald-800">
+                        <Utensils className="w-4 h-4 mx-auto mb-1 text-emerald-600" />
+                        <span className="font-bold block text-[11px]">Dinner</span>
+                        <span className="text-[9px] font-bold uppercase text-emerald-600">Eligible</span>
+                      </div>
+                      <div className="bg-rose-50 p-2 rounded-xl border border-rose-200 text-rose-800">
+                        <Ban className="w-4 h-4 mx-auto mb-1 text-rose-600" />
+                        <span className="font-bold block text-[11px]">Dress / Gift</span>
+                        <span className="text-[9px] font-black uppercase text-rose-600">Not Eligible</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Immediate Action Completed Alert */}
+                  <div className="p-3.5 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs text-center flex items-center justify-center gap-2 shadow-sm">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{guestNotice?.message || 'GUEST CARD ACTIVATED SUCCESSFULLY'}</span>
+                  </div>
+                </div>
+              ) : guestNotice?.type === 'error' ? (
+                <div className="p-6 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto">
+                    <XCircle className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-base font-bold text-slate-900">
+                    Guest Pass Verification Failed
+                  </h4>
+                  <p className="text-xs text-rose-600 font-semibold leading-relaxed">
+                    {guestNotice.message}
+                  </p>
+                </div>
+              ) : scannedStudent ? (
                 <>
                   {/* Student Profile Card */}
                   <div className="flex items-start gap-4 pb-5 border-b border-slate-100">

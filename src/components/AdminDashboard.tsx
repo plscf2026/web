@@ -42,6 +42,7 @@ import {
   Eye,
   EyeOff,
   Heart,
+  Crown,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -109,6 +110,9 @@ const GalleryManagementTab = lazy(() =>
 );
 const CommitteeManagementTab = lazy(() =>
   import('./admin/CommitteeManagementTab').then((m) => ({ default: m.CommitteeManagementTab }))
+);
+const GuestManagementTab = lazy(() =>
+  import('./admin/guest/GuestManagementTab').then((m) => ({ default: m.GuestManagementTab }))
 );
 
 const AdminTabFallback = () => (
@@ -303,6 +307,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   type AdminTab =
     | 'overview'
     | 'userAccessManagement'
+    | 'guestManagement'
     | 'idCardManagement'
     | 'manualRegistration'
     | 'manualApproval'
@@ -1415,6 +1420,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           },
         ]
       : []),
+    ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('guestManagement' as any)
+      ? [
+          {
+            id: 'guestManagement' as const,
+            label: language === 'bn' ? '👑 গেস্ট পাস ও ফুড ম্যানেজমেন্ট' : '👑 Guest Pass & Food',
+            icon: Crown,
+            highlight: true,
+            badge: 'VIP Pass',
+          },
+        ]
+      : []),
     {
       id: 'idCardManagement',
       label: language === 'bn' ? '🪪 আইডি কার্ড পোর্টাল' : '🪪 Student ID Cards',
@@ -1686,6 +1702,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <span className="text-xs font-black text-slate-900 truncate block">
                   {activeTab === 'userAccessManagement'
                     ? (language === 'bn' ? '👥 ইউজার ও এক্সেস ম্যানেজমেন্ট' : '👥 User & Access Management')
+                    : activeTab === 'guestManagement'
+                    ? (language === 'bn' ? '👑 গেস্ট পাস ও ফুড ম্যানেজমেন্ট' : '👑 Guest Pass & Food')
                     : activeTab === 'idCardManagement'
                     ? (language === 'bn' ? '🪪 আইডি কার্ড পোর্টাল' : '🪪 Student ID Cards')
                     : activeTab === 'manualRegistration'
@@ -1775,6 +1793,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             language={language}
             currentAdmin={effectiveAdmin}
           />
+        </ErrorBoundary>
+      )}
+
+      {/* TAB: DYNAMIC GUEST PASS & FOOD MANAGEMENT SYSTEM */}
+      {activeTab === 'guestManagement' && (
+        <ErrorBoundary>
+          <Suspense fallback={<AdminTabFallback />}>
+            <GuestManagementTab
+              language={language}
+              currentAdmin={effectiveAdmin}
+            />
+          </Suspense>
         </ErrorBoundary>
       )}
 
