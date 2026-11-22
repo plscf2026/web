@@ -666,8 +666,21 @@ export class EventStore {
       }
     }
 
+    let emailToAuth = normalized;
+    if (!emailToAuth.includes('@') || emailToAuth.startsWith('@')) {
+      const cleanUsername = emailToAuth.replace(/^@/, '');
+      const { data: userLookup } = await supabase
+        .from('staff_accounts')
+        .select('email')
+        .ilike('username', cleanUsername)
+        .maybeSingle();
+      if (userLookup?.email) {
+        emailToAuth = userLookup.email;
+      }
+    }
+
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: normalized,
+      email: emailToAuth,
       password: passwordAttempt,
     });
 

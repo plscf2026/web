@@ -1962,8 +1962,21 @@ export const SupabaseService = {
       return { success: true, account: testAccount };
     }
 
+    let emailToAuth = normalizedEmail;
+    if (!emailToAuth.includes('@') || emailToAuth.startsWith('@')) {
+      const cleanUsername = emailToAuth.replace(/^@/, '');
+      const { data: adminLookup } = await supabase
+        .from('admin_accounts')
+        .select('email')
+        .ilike('username', cleanUsername)
+        .maybeSingle();
+      if (adminLookup?.email) {
+        emailToAuth = adminLookup.email;
+      }
+    }
+
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
+      email: emailToAuth,
       password,
     });
 
