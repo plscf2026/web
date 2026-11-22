@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CommitteeService, DEFAULT_COMMITTEE_MEMBERS } from '../services/committeeService';
+import { CommitteeService } from '../services/committeeService';
 
 test('1. CommitteeService: Loads default 16 committee members', () => {
   const members = CommitteeService.getMembers();

@@ -245,48 +245,32 @@ export const CommitteeManagementTab: React.FC<CommitteeManagementTabProps> = ({
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-          {/* Default Display Mode */}
+          {/* Responsive Display Mode Status */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700">
-              {isBn ? 'ডিফল্ট ভিউ মোড' : 'Default View Mode'}
+              {isBn ? 'রেসপনসিভ প্রদর্শন নীতি' : 'Responsive Display Rules'}
             </label>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleUpdateSettings({ displayMode: 'carousel' })}
-                className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  settings.displayMode === 'carousel'
-                    ? 'bg-sky-50 border-[#0284C7] text-[#0284C7] shadow-xs'
-                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Sliders className="w-3.5 h-3.5" />
-                <span>{isBn ? 'অটো-স্ক্রোল ক্যারোসেল' : 'Auto Carousel'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleUpdateSettings({ displayMode: 'grid' })}
-                className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  settings.displayMode === 'grid'
-                    ? 'bg-sky-50 border-[#0284C7] text-[#0284C7] shadow-xs'
-                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Grid className="w-3.5 h-3.5" />
-                <span>{isBn ? 'রেসপনসিভ গ্রিড (১৬ জন)' : 'Grid (All 16)'}</span>
-              </button>
+            <div className="p-2.5 rounded-xl bg-sky-50/70 border border-sky-200 text-xs space-y-1.5 text-slate-700">
+              <div className="flex items-center gap-2 font-bold text-slate-900">
+                <Grid className="w-3.5 h-3.5 text-[#0284C7]" />
+                <span>{isBn ? 'কম্পিউটার ও ট্যাব: ১৬ কার্ড গ্রিড' : 'Computer & Tab: 16 Card Grid'}</span>
+              </div>
+              <div className="flex items-center gap-2 font-bold text-slate-900">
+                <Sliders className="w-3.5 h-3.5 text-[#0284C7]" />
+                <span>{isBn ? 'মোবাইল: অটো-স্ক্রোলিং ক্যারোসেল' : 'Mobile: Auto Carousel'}</span>
+              </div>
             </div>
             <p className="text-[11px] text-slate-500">
               {isBn
-                ? 'ভিজিটররা হোম পেজে নিজেদের পছন্দমতো টগল করতে পারবেন।'
-                : 'Visitors can also switch between Grid and Carousel on the Home page.'}
+                ? 'বড় স্ক্রিনে সব সদস্য একসাথে গ্রিডে এবং মোবাইলে স্বয়ংক্রিয় ক্যারোসেলে দেখায়।'
+                : 'Computer/Tab displays full grid, mobile auto-scrolls seamlessly.'}
             </p>
           </div>
 
           {/* Carousel Scroll Speed */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700">
-              {isBn ? 'ক্যারোসেল অটো-স্ক্রোল বিরতি' : 'Auto-Scroll Transition Speed'}
+              {isBn ? 'মোবাইল ক্যারোসেল স্ক্রোল বিরতি' : 'Mobile Carousel Speed'}
             </label>
             <select
               value={settings.autoScrollSpeedMs}
