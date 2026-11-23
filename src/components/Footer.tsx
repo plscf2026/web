@@ -78,6 +78,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
             <ul className="space-y-2 text-xs">
               <li>
                 <button
+                  type="button"
                   onClick={() => onNavigate('register')}
                   className="hover:text-[#38BDF8] transition-colors flex items-center gap-1 cursor-pointer"
                 >
@@ -87,6 +88,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
               </li>
               <li>
                 <button
+                  type="button"
                   onClick={() => onNavigate('find-ticket')}
                   className="hover:text-[#38BDF8] transition-colors flex items-center gap-1 cursor-pointer"
                 >
@@ -96,6 +98,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
               </li>
               <li>
                 <button
+                  type="button"
                   onClick={() => onNavigate('donate')}
                   className="hover:text-[#38BDF8] transition-colors flex items-center gap-1 cursor-pointer"
                 >
@@ -105,6 +108,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
               </li>
               <li>
                 <button
+                  type="button"
                   onClick={() => onNavigate('notices')}
                   className="hover:text-[#38BDF8] transition-colors flex items-center gap-1 cursor-pointer"
                 >
@@ -114,6 +118,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
               </li>
               <li>
                 <button
+                  type="button"
                   onClick={() => onNavigate('gallery')}
                   className="hover:text-[#38BDF8] transition-colors flex items-center gap-1 cursor-pointer"
                 >
@@ -132,6 +137,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
             <ul className="space-y-2 text-xs">
               <li>
                 <button
+                  type="button"
                   onClick={() => handleDirectPortalNav('scanner')}
                   className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#0F172A] hover:bg-slate-800 border border-slate-800 text-[#38BDF8] w-full transition-colors cursor-pointer"
                 >
@@ -141,6 +147,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
               </li>
               <li>
                 <button
+                  type="button"
                   onClick={() => handleDirectPortalNav('admin')}
                   className="flex items-center justify-between px-3 py-2 rounded-xl bg-[#0F172A] hover:bg-slate-800 border border-[#0284C7]/40 text-[#E2EEF8] w-full transition-all cursor-pointer group shadow-xs"
                   title="Exclusive Administrator Access (Single Slot / Supabase Command)"
