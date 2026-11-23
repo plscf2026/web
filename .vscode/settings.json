@@ -7,5 +7,8 @@
   "deno.unstable": true,
   "css.lint.unknownAtRules": "ignore",
   "scss.lint.unknownAtRules": "ignore",
+  "css.validate": false,
+  "tailwindCSS.experimental.configFile": "src/index.css",
+  "tailwindCSS.lint.suggestCanonicalClasses": "ignore",
   "typescript.tsserver.experimental.enableProjectDiagnostics": false
 }
