@@ -272,6 +272,22 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'errorType', 'INVALID_INPUT', 'error', 'No guest QR token or ID provided.');
     END IF;
 
+    -- If p_identifier is a JSON QR string, safely extract id, regNumber, and token
+    IF v_clean_id LIKE '{%}' THEN
+        BEGIN
+            IF (v_clean_id::jsonb)->>'id' IS NOT NULL THEN
+                v_clean_id := trim((v_clean_id::jsonb)->>'id');
+            ELSIF (v_clean_id::jsonb)->>'regNumber' IS NOT NULL THEN
+                v_clean_id := trim((v_clean_id::jsonb)->>'regNumber');
+            END IF;
+            IF v_clean_tok = '' AND (p_identifier::jsonb)->>'token' IS NOT NULL THEN
+                v_clean_tok := trim((p_identifier::jsonb)->>'token');
+            END IF;
+        EXCEPTION WHEN OTHERS THEN
+            -- Ignore malformed JSON and proceed with literal matching
+        END;
+    END IF;
+
     -- Lookup card by ID, Registration Number, or Token
     SELECT * INTO v_card
     FROM public.guest_cards
@@ -285,7 +301,7 @@ BEGIN
         RETURN jsonb_build_object(
             'success', false,
             'errorType', 'NOT_FOUND',
-            'error', 'Guest Card not found in database. Please verify the QR code.'
+            'error', 'Guest Pass "' || v_clean_id || '" not found in database. Please verify the QR code.'
         );
     END IF;
 
@@ -401,6 +417,22 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'errorType', 'INVALID_MEAL', 'error', 'Invalid meal type. Must be breakfast, lunch, or dinner.');
     END IF;
 
+    -- If p_identifier is a JSON QR string, safely extract id, regNumber, and token
+    IF v_clean_id LIKE '{%}' THEN
+        BEGIN
+            IF (v_clean_id::jsonb)->>'id' IS NOT NULL THEN
+                v_clean_id := trim((v_clean_id::jsonb)->>'id');
+            ELSIF (v_clean_id::jsonb)->>'regNumber' IS NOT NULL THEN
+                v_clean_id := trim((v_clean_id::jsonb)->>'regNumber');
+            END IF;
+            IF v_clean_tok = '' AND (p_identifier::jsonb)->>'token' IS NOT NULL THEN
+                v_clean_tok := trim((p_identifier::jsonb)->>'token');
+            END IF;
+        EXCEPTION WHEN OTHERS THEN
+            -- Ignore malformed JSON and proceed with literal matching
+        END;
+    END IF;
+
     -- Lookup card
     SELECT * INTO v_card
     FROM public.guest_cards
@@ -411,7 +443,11 @@ BEGIN
     LIMIT 1;
 
     IF v_card.id IS NULL THEN
-        RETURN jsonb_build_object('success', false, 'errorType', 'NOT_FOUND', 'error', 'Guest card not found.');
+        RETURN jsonb_build_object(
+            'success', false,
+            'errorType', 'NOT_FOUND',
+            'error', 'Guest Pass "' || v_clean_id || '" not found in database.'
+        );
     END IF;
 
     -- Gate Activation Check

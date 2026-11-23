@@ -31,7 +31,7 @@ import { AppStore } from '../services/store';
 import { EventStore, hasDepartmentPermission } from '../services/eventStore';
 import { GuestService } from '../services/guestService';
 import { GuestCard, GuestMealFacilities } from '../types/guest';
-import { parseScannedInput } from '../utils/tokenGenerator';
+import { parseScannedInput, getCleanPassDisplayLabel } from '../utils/tokenGenerator';
 import { validateMealCollection } from '../utils/eventRules';
 import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
 import { QrCameraScanner } from './common/QrCameraScanner';
@@ -135,15 +135,22 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
       setScannedStudent(null);
       setValidationResult(null);
 
+      const cleanLabel = getCleanPassDisplayLabel(clean, parsed);
       const guest = await GuestService.findGuestByCode(clean, expectedToken);
       if (!guest) {
         playScanErrorSound();
         setScannedGuest(null);
         setGuestFacilities(null);
+        setValidationResult({
+          canCollect: false,
+          status: 'INVALID_REGISTRATION',
+          messageEn: `Guest Pass "${cleanLabel}" not found in system database.`,
+          messageBn: `গেস্ট পাস "${cleanLabel}" সিস্টেমে পাওয়া যায়নি।`,
+        });
         setGuestNotice({
           type: 'error',
-          message: `Guest Pass "${clean}" not found in system database.`,
-          messageBn: `"${clean}" নম্বরের কোনো গেস্ট পাস পাওয়া যায়নি।`,
+          message: `Guest Pass "${cleanLabel}" not found in system database.`,
+          messageBn: `গেস্ট পাস "${cleanLabel}" সিস্টেমে পাওয়া যায়নি।`,
         });
         setIsResultPopupOpen(true);
         return;
@@ -1619,7 +1626,9 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                     <XCircle className="w-6 h-6" />
                   </div>
                   <h4 className="text-base font-bold text-slate-900">
-                    {language === 'bn' ? 'কোনো টিকিট পাওয়া যায়নি' : 'Ticket Not Found'}
+                    {validationResult?.messageEn?.includes('Guest Pass') || guestNotice
+                      ? (language === 'bn' ? 'গেস্ট পাস পাওয়া যায়নি' : 'Guest Pass Not Found')
+                      : (language === 'bn' ? 'কোনো টিকিট পাওয়া যায়নি' : 'Ticket Not Found')}
                   </h4>
                   <p className="text-xs text-slate-500 leading-relaxed">
                     {validationResult?.messageEn ||

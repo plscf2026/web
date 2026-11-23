@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GuestService } from '../services/guestService';
-import { parseScannedInput } from './tokenGenerator';
+import { parseScannedInput, getCleanPassDisplayLabel } from './tokenGenerator';
 
 // Mock in-memory localStorage for Node test runner environment
 const mockStorage: Record<string, string> = {};
@@ -27,7 +27,7 @@ test('1. Dynamic Guest Card Generator generates requested quantity with sequenti
   // Generate first batch of 2 cards
   const res = await GuestService.generateBatch(2, 'VIP Guest', 'Super Admin 1', 'VIP Batch 1');
   assert.equal(res.success, true, 'Batch generation must succeed');
-  assert.equal(res.cards.length, 2, 'Must generate exactly 2 cards');
+  assert.equal(res.cards?.length, 2, 'Must generate exactly 2 cards');
 
   const cards = GuestService.getGuestCards();
   assert.equal(cards.length, 2, 'Stored cards must equal 2');
@@ -227,7 +227,7 @@ test('9. Generating second batch preserves original cards & continues numbering 
   // Generate 3 additional cards in second batch
   const res2 = await GuestService.generateBatch(3, 'Honorary Guest', 'Super Admin 1', 'Honorary Batch 2');
   assert.equal(res2.success, true);
-  assert.equal(res2.cards.length, 3);
+  assert.equal(res2.cards?.length, 3);
 
   const allCards = GuestService.getGuestCards();
   assert.equal(allCards.length, 5, 'Total cards must now be 2 + 3 = 5');
@@ -303,3 +303,44 @@ test('11. Portal statistics calculate accurately', () => {
   assert.equal(stats.totalLunch, 1, 'Total lunch collections must equal 1');
   assert.equal(stats.totalDinner, 1, 'Total dinner collections must equal 1');
 });
+
+test('12. Clean pass display label extracts readable ID and never outputs raw JSON', async () => {
+  const rawQrJson = JSON.stringify({
+    type: 'GUEST',
+    id: 'GUEST-0099',
+    regNumber: 'PLSCF-GST-2027-0099',
+    token: 'GST-9P2A7C-YFS',
+    category: 'Honorary Guest',
+  });
+
+  const parsed = parseScannedInput(rawQrJson);
+  assert.equal(parsed.isGuestPass, true);
+  assert.equal(parsed.id, 'GUEST-0099');
+  assert.equal(parsed.regNumber, 'PLSCF-GST-2027-0099');
+  assert.equal(parsed.token, 'GST-9P2A7C-YFS');
+
+  const cleanLabel = getCleanPassDisplayLabel(rawQrJson, parsed);
+  assert.equal(cleanLabel, 'GUEST-0099 (PLSCF-GST-2027-0099)');
+  assert.equal(cleanLabel.includes('{'), false, 'Clean label must never contain JSON brackets');
+  assert.equal(cleanLabel.includes('}'), false, 'Clean label must never contain JSON brackets');
+
+  // Verify non-existent card yields clean error message without raw JSON
+  const actRes = await GuestService.activateGuestCard(rawQrJson);
+  assert.equal(actRes.success, false);
+  assert.equal(actRes.errorType, 'NOT_FOUND');
+  assert.equal(
+    actRes.error,
+    'Guest Pass "GUEST-0099 (PLSCF-GST-2027-0099)" not found in database. Please verify the QR code.'
+  );
+  assert.equal(actRes.error?.includes('{"type"'), false, 'Error message must never contain raw JSON');
+
+  const mealRes = await GuestService.collectMeal(rawQrJson, 'lunch');
+  assert.equal(mealRes.success, false);
+  assert.equal(mealRes.errorType, 'NOT_FOUND');
+  assert.equal(
+    mealRes.error,
+    'Guest Pass "GUEST-0099 (PLSCF-GST-2027-0099)" not found in system database.'
+  );
+  assert.equal(mealRes.error?.includes('{"type"'), false, 'Error message must never contain raw JSON');
+});
+

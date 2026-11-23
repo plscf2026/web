@@ -14,7 +14,7 @@ import {
   GuestMealType,
   GuestPortalStatistics,
 } from '../types/guest';
-import { parseScannedInput } from '../utils/tokenGenerator';
+import { parseScannedInput, getCleanPassDisplayLabel } from '../utils/tokenGenerator';
 
 const KEY_GUEST_CARDS = 'plscf_guest_cards_v1';
 const KEY_GUEST_BATCHES = 'plscf_guest_batches_v1';
@@ -224,26 +224,93 @@ export class GuestService {
   // CORE BUSINESS ACTIONS
   // =========================================================================
 
+  static fromDbRow(c: any): GuestCard {
+    return {
+      id: c.id,
+      batchId: c.batch_id,
+      regNumber: c.reg_number,
+      token: c.token,
+      qrPayload: c.qr_payload,
+      category: c.category,
+      status: c.status,
+      isActivated: Boolean(c.is_activated),
+      activatedAt: c.activated_at,
+      activatedGate: c.activated_gate,
+      activatedByStaffId: c.activated_by_staff_id,
+      activatedByStaffName: c.activated_by_staff_name,
+      revocationReason: c.revocation_reason,
+      revokedAt: c.revoked_at,
+      revokedBy: c.revoked_by,
+      generationDate: c.generation_date,
+      createdAt: c.created_at,
+      updatedAt: c.updated_at,
+    };
+  }
+
   /**
    * Look up card by any scanned identifier, token, regNumber, or QR payload
+   * Checks local reactive cache first, then falls back to Supabase cloud table.
    */
-  static findGuestByCode(codeOrToken: string, tokenParam?: string): GuestCard | undefined {
+  static async findGuestByCode(codeOrToken: string, tokenParam?: string): Promise<GuestCard | undefined> {
     if (!codeOrToken) return undefined;
-    const cards = this.getGuestCards();
-    const parsed = parseScannedInput(codeOrToken);
-    const targetId = (parsed.id || codeOrToken).trim().toUpperCase();
+    const clean = codeOrToken.trim();
+    const parsed = parseScannedInput(clean);
+    const targetId = (parsed.id || (clean.startsWith('{') ? '' : clean)).trim().toUpperCase();
+    const targetReg = (parsed.regNumber || '').trim().toUpperCase();
     const targetToken = (tokenParam || parsed.token || '').trim().toUpperCase();
 
-    return cards.find((c) => {
+    // 1. Check local cache
+    const cards = this.getGuestCards();
+    const foundLocal = cards.find((c) => {
       const cId = c.id.toUpperCase();
       const cReg = c.regNumber.toUpperCase();
       const cTok = c.token.toUpperCase();
 
-      if (cId === targetId || cReg === targetId || cTok === targetId) return true;
+      if (targetId && (cId === targetId || cReg === targetId || cTok === targetId)) return true;
+      if (targetReg && cReg === targetReg) return true;
       if (targetToken && cTok === targetToken) return true;
       if (parsed.raw && (cId === parsed.raw || cReg === parsed.raw || cTok === parsed.raw)) return true;
       return false;
     });
+
+    if (foundLocal) return foundLocal;
+
+    // 2. Direct Supabase Cloud Query (handles cross-device & fresh scans)
+    try {
+      const orClauses: string[] = [];
+      if (targetId) {
+        orClauses.push(`id.ilike.${targetId}`);
+        orClauses.push(`reg_number.ilike.${targetId}`);
+      }
+      if (targetReg && targetReg !== targetId) {
+        orClauses.push(`reg_number.ilike.${targetReg}`);
+      }
+      if (targetToken) {
+        orClauses.push(`token.ilike.${targetToken}`);
+      }
+
+      if (orClauses.length > 0) {
+        const { data, error } = await supabase
+          .from('guest_cards')
+          .select('*')
+          .or(orClauses.join(','))
+          .limit(1)
+          .maybeSingle();
+
+        if (!error && data) {
+          const cloudCard = this.fromDbRow(data);
+          const current = this.getGuestCards();
+          if (!current.some((c) => c.id === cloudCard.id)) {
+            this.saveGuestCards([...current, cloudCard]);
+          }
+          return cloudCard;
+        }
+      }
+    } catch (e) {
+      console.warn('[GuestService] Cloud guest lookup notice:', e);
+    }
+
+    return undefined;
   }
 
   /**
@@ -407,12 +474,16 @@ export class GuestService {
     errorType?: string;
   }> {
     const clean = codeOrToken.trim();
+    const parsed = parseScannedInput(clean);
+    const cleanLabel = getCleanPassDisplayLabel(clean, parsed);
+    const lookupId = parsed.id || parsed.regNumber || (clean.startsWith('{') ? '' : clean);
+    const lookupToken = tokenParam || parsed.token || null;
 
     // 1. Try Supabase RPC first
     try {
       const { data, error } = await supabase.rpc('rpc_activate_guest_card', {
-        p_identifier: clean,
-        p_token: tokenParam || null,
+        p_identifier: lookupId || clean,
+        p_token: lookupToken,
         p_gate_id: gateId,
         p_operator_id: operatorId,
         p_operator_name: operatorName,
@@ -420,7 +491,7 @@ export class GuestService {
 
       if (!error && data?.success) {
         await this.syncWithSupabase();
-        const activeCard = this.findGuestByCode(clean, tokenParam);
+        const activeCard = await this.findGuestByCode(clean, tokenParam);
         return {
           success: true,
           alreadyActive: Boolean(data.alreadyActive),
@@ -441,13 +512,10 @@ export class GuestService {
     // 2. Resilient Local Engine
     const cards = this.getGuestCards();
     const cardIndex = cards.findIndex((c) => {
-      const parsed = parseScannedInput(clean);
-      const targetId = (parsed.id || clean).toUpperCase();
-      const targetToken = (tokenParam || parsed.token || '').toUpperCase();
+      const targetId = (lookupId || clean).toUpperCase();
+      const targetToken = (lookupToken || '').toUpperCase();
       return (
-        c.id.toUpperCase() === targetId ||
-        c.regNumber.toUpperCase() === targetId ||
-        c.token.toUpperCase() === targetId ||
+        (targetId && (c.id.toUpperCase() === targetId || c.regNumber.toUpperCase() === targetId || c.token.toUpperCase() === targetId)) ||
         (targetToken && c.token.toUpperCase() === targetToken)
       );
     });
@@ -456,7 +524,7 @@ export class GuestService {
       return {
         success: false,
         errorType: 'NOT_FOUND',
-        error: `Guest Card "${clean}" not found in database. Please verify the QR code.`,
+        error: `Guest Pass "${cleanLabel}" not found in database. Please verify the QR code.`,
       };
     }
 
@@ -558,13 +626,17 @@ export class GuestService {
     message?: string;
   }> {
     const clean = codeOrToken.trim();
+    const parsed = parseScannedInput(clean);
+    const cleanLabel = getCleanPassDisplayLabel(clean, parsed);
+    const lookupId = parsed.id || parsed.regNumber || (clean.startsWith('{') ? '' : clean);
+    const lookupToken = tokenParam || parsed.token || null;
 
     // 1. Try Supabase RPC first
     try {
       const { data, error } = await supabase.rpc('rpc_collect_guest_food', {
-        p_identifier: clean,
+        p_identifier: lookupId || clean,
         p_meal_type: mealType,
-        p_token: tokenParam || null,
+        p_token: lookupToken,
         p_staff_id: staffId,
         p_staff_name: staffName,
         p_counter_id: counterId,
@@ -590,12 +662,12 @@ export class GuestService {
     }
 
     // 2. Resilient Local Engine
-    const card = this.findGuestByCode(clean, tokenParam);
+    const card = await this.findGuestByCode(clean, tokenParam);
     if (!card) {
       return {
         success: false,
         errorType: 'NOT_FOUND',
-        error: `Guest Card "${clean}" not found.`,
+        error: `Guest Pass "${cleanLabel}" not found in system database.`,
       };
     }
 

@@ -28,7 +28,7 @@ import { AppStore } from '../services/store';
 import { EventStore, hasDepartmentPermission } from '../services/eventStore';
 import { GuestService } from '../services/guestService';
 import { GuestCard } from '../types/guest';
-import { parseScannedInput } from '../utils/tokenGenerator';
+import { parseScannedInput, getCleanPassDisplayLabel } from '../utils/tokenGenerator';
 import { validateGateAction } from '../utils/eventRules';
 import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
 import { QrCameraScanner } from './common/QrCameraScanner';
@@ -117,7 +117,8 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
         parsed.isGuestPass ||
         clean.toUpperCase().startsWith('GUEST-') ||
         clean.toUpperCase().startsWith('PLSCF-GST-') ||
-        clean.toUpperCase().startsWith('GST-');
+        clean.toUpperCase().startsWith('GST-') ||
+        clean.toUpperCase().includes('"TYPE":"GUEST"');
 
       if (!isGuestCode) {
         playScanErrorSound();
@@ -131,6 +132,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
         return;
       }
 
+      const cleanLabel = getCleanPassDisplayLabel(clean, parsed);
       const actRes = await GuestService.activateGuestCard(
         clean,
         expectedToken,
@@ -158,7 +160,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
         setScannedGuest(null);
         setGuestNotice({
           type: 'error',
-          message: actRes.error || `Invalid or revoked Guest QR Code: ${clean}`,
+          message: actRes.error || `Invalid or revoked Guest Pass "${cleanLabel}".`,
         });
         setIsResultPopupOpen(true);
       }

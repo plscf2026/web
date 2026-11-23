@@ -102,6 +102,9 @@ export function formatSafeQrPayload(token: string, studentId: string): string {
 export function parseScannedInput(input: string): {
   token?: string;
   id?: string;
+  regNumber?: string;
+  category?: string;
+  displayLabel?: string;
   isGuardianPass?: boolean;
   isGuestPass?: boolean;
   raw: string;
@@ -125,13 +128,25 @@ export function parseScannedInput(input: string): {
     try {
       const parsed = JSON.parse(trimmed);
       let t = parsed.token ? String(parsed.token).trim().toUpperCase() : undefined;
-      let rawId = (parsed.id || parsed.guestId || parsed.regNumber) ? String(parsed.id || parsed.guestId || parsed.regNumber).trim().toUpperCase() : undefined;
+      let rawId = (parsed.id || parsed.guestId) ? String(parsed.id || parsed.guestId).trim().toUpperCase() : undefined;
+      let regNo = parsed.regNumber ? String(parsed.regNumber).trim().toUpperCase() : undefined;
+      let cat = parsed.category ? String(parsed.category).trim() : undefined;
+
+      if (!rawId && regNo) rawId = regNo;
       if (rawId && rawId.startsWith('PAR-')) rawId = rawId.replace(/^PAR-/i, '');
       if (t && t.startsWith('P-') && t.length === 8) t = t.replace(/^P-/i, '');
       const jsonIsGuest = isGuestPass || parsed.type === 'GUEST' || Boolean(parsed.isGuestPass) || Boolean(rawId && (rawId.startsWith('GUEST-') || rawId.startsWith('PLSCF-GST-')));
+
+      const label = rawId
+        ? (regNo && regNo !== rawId ? `${rawId} (${regNo})` : rawId)
+        : (regNo || (t ? `Token ${t}` : 'Scanned Guest Pass'));
+
       return {
         token: t,
         id: rawId,
+        regNumber: regNo,
+        category: cat,
+        displayLabel: label,
         isGuardianPass: isGuardianPass || Boolean(parsed.isGuardianPass),
         isGuestPass: jsonIsGuest,
         raw: trimmed.toUpperCase(),
@@ -192,6 +207,7 @@ export function parseScannedInput(input: string): {
         return {
           token: effectiveToken,
           id: effectiveId,
+          displayLabel: effectiveId || (effectiveToken ? `Token ${effectiveToken}` : 'Scanned Pass'),
           isGuardianPass,
           isGuestPass: urlIsGuest,
           raw: trimmed.toUpperCase(),
@@ -218,13 +234,62 @@ export function parseScannedInput(input: string): {
     cleanId.startsWith('PLSCF-GST-') ||
     cleanToken.startsWith('GST-');
 
+  const resolvedId = cleanId.startsWith('GUEST-') || cleanId.startsWith('PLSCF-') ? cleanId : undefined;
+  const resolvedToken = cleanToken.length === 6 && /^[A-Z0-9]{6}$/.test(cleanToken)
+    ? cleanToken
+    : (directIsGuest && cleanToken.startsWith('GST-') ? cleanToken : undefined);
+
   return {
-    token: cleanToken.length === 6 && /^[A-Z0-9]{6}$/.test(cleanToken) ? cleanToken : (directIsGuest && cleanToken.startsWith('GST-') ? cleanToken : undefined),
-    id: cleanId,
+    token: resolvedToken,
+    id: resolvedId || cleanId,
+    displayLabel: resolvedId || cleanId,
     isGuardianPass,
     isGuestPass: directIsGuest,
     raw: upper,
   };
+}
+
+/**
+ * Returns a human-friendly, clean identifier for logs, alerts, and feedback messages.
+ * Never outputs raw JSON blobs like {"type":"GUEST",...} to the UI.
+ */
+export function getCleanPassDisplayLabel(
+  input: string,
+  parsed?: { id?: string; regNumber?: string; token?: string; displayLabel?: string }
+): string {
+  if (!input) return 'Pass';
+  if (parsed?.displayLabel && !parsed.displayLabel.startsWith('{')) {
+    return parsed.displayLabel;
+  }
+  const clean = input.trim();
+  if (parsed?.id && parsed?.regNumber && parsed.id !== parsed.regNumber) {
+    return `${parsed.id} (${parsed.regNumber})`;
+  }
+  if (parsed?.id && !parsed.id.startsWith('{')) return parsed.id;
+  if (parsed?.regNumber) return parsed.regNumber;
+  if (parsed?.token) return `Token ${parsed.token}`;
+
+  // If input is raw JSON, extract clean labels safely
+  if (clean.startsWith('{') && clean.endsWith('}')) {
+    try {
+      const obj = JSON.parse(clean);
+      if (obj.id && obj.regNumber && obj.id !== obj.regNumber) {
+        return `${obj.id} (${obj.regNumber})`;
+      }
+      if (obj.id) return String(obj.id);
+      if (obj.regNumber) return String(obj.regNumber);
+      if (obj.token) return `Token ${obj.token}`;
+      if (obj.type) return `${obj.type} Pass`;
+    } catch {}
+    return 'Scanned Pass';
+  }
+
+  // If long URL or query string
+  if (clean.length > 35) {
+    return 'Scanned Pass';
+  }
+
+  return clean;
 }
 
 /**

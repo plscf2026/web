@@ -35,7 +35,7 @@ import {
   downloadGuestBatchPdf,
   downloadGuestBatchZip,
 } from '../../../utils/guestCardGenerator';
-import { parseScannedInput } from '../../../utils/tokenGenerator';
+import { parseScannedInput, getCleanPassDisplayLabel } from '../../../utils/tokenGenerator';
 import { GlobalPagination } from '../../common/GlobalPagination';
 import { paginate } from '../../../utils/pagination';
 import { QrCameraScanner } from '../../common/QrCameraScanner';
@@ -322,15 +322,16 @@ export const GuestManagementTab: React.FC<GuestManagementTabProps> = ({
     if (!code.trim()) return;
     const clean = code.trim();
     const parsed = parseScannedInput(clean);
-    const lookupKey = parsed.id || clean;
+    const cleanLabel = getCleanPassDisplayLabel(clean, parsed);
+    const lookupKey = parsed.id || parsed.regNumber || (clean.startsWith('{') ? '' : clean);
     const expectedToken = parsed.token;
 
     setAdminScanError(null);
-    const guest = await GuestService.findGuestByCode(lookupKey, expectedToken);
+    const guest = await GuestService.findGuestByCode(lookupKey || clean, expectedToken);
     if (!guest) {
       setAdminScannedGuest(null);
       setAdminScannedFacilities(null);
-      setAdminScanError(`No guest card found matching "${lookupKey}".`);
+      setAdminScanError(`No guest card found matching "${cleanLabel}".`);
       return;
     }
 
