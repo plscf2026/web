@@ -35,6 +35,7 @@ import {
   calculateTotalFee,
   normalizeBangladeshiMobileNumber,
   RegistrationFormData,
+  isStudentBelowClass6,
 } from '../utils/rules';
 import { StudentIdService } from '../services/studentIdStore';
 import { readValidatedImage } from '../utils/fileValidation';
@@ -330,11 +331,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
   // Accompanying Parent Eligibility Rule:
   // Eligible if female (any category/class), OR if current student below Class 6 (male or female)
-  const isBelowClass6 =
-    category === 'current' &&
-    ['play', 'nursery', 'kg', 'class 1', 'class 2', 'class 3', 'class 4', 'class 5'].includes(
-      (currentClass || '').toLowerCase().trim()
-    );
+  const isBelowClass6 = category === 'current' && isStudentBelowClass6(currentClass);
   const isParentEligible = gender === 'female' || isBelowClass6;
   const effectiveHasParent = isParentEligible && hasParent;
 

@@ -34,6 +34,38 @@ export function normalizeBangladeshiMobileNumber(phone: string): string {
 }
 
 /**
+ * Checks whether a student is enrolled below Class 6 (Class 1-5, Play, Nursery, KG, etc.)
+ * Supports raw numbers ("1".."5"), Roman numerals ("I".."V"), "Class 4", Bengali digits ("৪"),
+ * and early childhood keywords.
+ */
+export function isStudentBelowClass6(className?: string | null): boolean {
+  if (!className) return false;
+  const clean = String(className).trim().toLowerCase();
+
+  // Early childhood keywords
+  if (/^(play|nursery|kg|kindergarten|pre|shishu|baby|infant)/i.test(clean)) return true;
+
+  // Roman numerals I to V (with or without 'class', 'std', 'grade')
+  if (/^(class\s*|std\s*|grade\s*)?(i|ii|iii|iv|v)$/i.test(clean)) return true;
+
+  // Bengali digits ১, ২, ৩, ৪, ৫
+  if (/[১-৫]/.test(clean)) return true;
+
+  // Word forms
+  if (/\b(one|two|three|four|five)\b/i.test(clean)) return true;
+
+  // Extract number (e.g. '4', 'Class 4', 'Class-4', 'Grade 4', 'Std 4')
+  const match = clean.match(/\d+/);
+  if (match) {
+    const classNum = parseInt(match[0], 10);
+    if (classNum >= 1 && classNum <= 5) return true;
+  }
+
+  // Explicit fallback list
+  return ['play', 'nursery', 'kg', '1', '2', '3', '4', '5', 'class 1', 'class 2', 'class 3', 'class 4', 'class 5'].includes(clean);
+}
+
+/**
  * Validates email addresses
  */
 export function isValidEmail(email: string): boolean {

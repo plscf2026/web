@@ -6,6 +6,7 @@ import {
   validateRegistrationData,
   verifyStudentIdAgainstRecords,
   RegistrationFormData,
+  isStudentBelowClass6,
 } from './rules';
 import { CurrentStudentIdRecord } from '../types';
 import { StudentIdService } from '../services/studentIdStore';
@@ -209,4 +210,41 @@ test('parseScannedInput extracts ID and regNumber from formatted label (GUEST-00
   assert.equal(parsed.id, 'GUEST-0001');
   assert.equal(parsed.regNumber, 'PLSCF-GST-2027-0001');
   assert.equal(parsed.isGuestPass, true);
+});
+
+test('isStudentBelowClass6 accurately identifies students below Class 6 across number and text variations', () => {
+  // Raw digit formats (as uploaded in admin CSV e.g. "4")
+  assert.equal(isStudentBelowClass6('4'), true);
+  assert.equal(isStudentBelowClass6('1'), true);
+  assert.equal(isStudentBelowClass6('2'), true);
+  assert.equal(isStudentBelowClass6('3'), true);
+  assert.equal(isStudentBelowClass6('5'), true);
+
+  // Standard "Class X" formats
+  assert.equal(isStudentBelowClass6('Class 4'), true);
+  assert.equal(isStudentBelowClass6('class 5'), true);
+  assert.equal(isStudentBelowClass6('Class-3'), true);
+
+  // Early childhood formats
+  assert.equal(isStudentBelowClass6('Play'), true);
+  assert.equal(isStudentBelowClass6('Nursery'), true);
+  assert.equal(isStudentBelowClass6('KG'), true);
+
+  // Roman numerals
+  assert.equal(isStudentBelowClass6('IV'), true);
+  assert.equal(isStudentBelowClass6('Class IV'), true);
+
+  // Bengali numerals
+  assert.equal(isStudentBelowClass6('৪'), true);
+  assert.equal(isStudentBelowClass6('শ্রেণি ৪'), true);
+
+  // NOT below Class 6
+  assert.equal(isStudentBelowClass6('Class 6'), false);
+  assert.equal(isStudentBelowClass6('6'), false);
+  assert.equal(isStudentBelowClass6('Class 7'), false);
+  assert.equal(isStudentBelowClass6('Class 10'), false);
+  assert.equal(isStudentBelowClass6('10'), false);
+  assert.equal(isStudentBelowClass6('Class 12 (HSC)'), false);
+  assert.equal(isStudentBelowClass6(''), false);
+  assert.equal(isStudentBelowClass6(undefined), false);
 });
