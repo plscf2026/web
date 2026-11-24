@@ -76,13 +76,16 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
       ? 'via-sky-400 shadow-[0_0_12px_#38bdf8]'
       : 'via-amber-400 shadow-[0_0_12px_#fbbf24]';
 
-  // Toggle Physical Hardware Flashlight (Torch)
+  // Toggle Flashlight (Hardware LED Torch + Night Screen Illuminator)
   const handleToggleTorch = async () => {
-    if (!streamRef.current || !isTorchAvailable) return;
     const nextState = !isTorchOn;
-    const ok = await setCameraTorch(streamRef.current, nextState);
-    if (ok) {
-      setIsTorchOn(nextState);
+    setIsTorchOn(nextState);
+    if (streamRef.current) {
+      try {
+        await setCameraTorch(streamRef.current, nextState);
+      } catch (err) {
+        console.warn('[Flashlight] Hardware torch warning:', err);
+      }
     }
   };
 
@@ -224,36 +227,40 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Dedicated Hardware Flashlight (Torch) Button */}
-          {isTorchAvailable && (
-            <button
-              type="button"
-              onClick={handleToggleTorch}
-              title={
-                isTorchOn
-                  ? language === 'bn'
-                    ? 'টর্চ বন্ধ করুন (Flashlight OFF)'
-                    : 'Turn Flashlight OFF'
-                  : language === 'bn'
-                  ? 'টর্চ চালু করুন (Flashlight ON)'
-                  : 'Turn Flashlight ON'
-              }
-              className={`p-2 rounded-xl backdrop-blur-md transition-all cursor-pointer shadow-md flex items-center gap-1 ${
-                isTorchOn
-                  ? 'bg-amber-400 text-slate-950 font-bold ring-2 ring-amber-300 drop-shadow-[0_0_10px_#f59e0b]'
-                  : 'bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-amber-300 hover:text-amber-200'
-              }`}
-            >
-              {isTorchOn ? (
-                <Flashlight className="w-4 h-4 fill-current text-slate-950" />
-              ) : (
-                <FlashlightOff className="w-4 h-4" />
-              )}
-              <span className="text-[10px] font-bold hidden sm:inline">
-                {isTorchOn ? (language === 'bn' ? 'টর্চ চালু' : 'Torch ON') : language === 'bn' ? 'টর্চ' : 'Torch'}
-              </span>
-            </button>
-          )}
+          {/* Flashlight / Torch Button for Night Scanning (Always visible) */}
+          <button
+            type="button"
+            onClick={handleToggleTorch}
+            title={
+              isTorchOn
+                ? language === 'bn'
+                  ? 'ফ্ল্যাশ লাইট বন্ধ করুন (Flashlight OFF)'
+                  : 'Turn Flashlight OFF'
+                : language === 'bn'
+                ? 'নাইট ফ্ল্যাশ লাইট চালু করুন (Flashlight ON)'
+                : 'Turn Flashlight ON (Night Scanner)'
+            }
+            className={`px-2.5 py-1.5 rounded-xl backdrop-blur-md transition-all cursor-pointer shadow-md flex items-center gap-1.5 border select-none ${
+              isTorchOn
+                ? 'bg-amber-400 text-slate-950 font-black border-amber-300 ring-2 ring-amber-300 drop-shadow-[0_0_12px_#f59e0b]'
+                : 'bg-slate-900/90 hover:bg-slate-800 border-slate-700/80 text-amber-300 hover:text-amber-200'
+            }`}
+          >
+            {isTorchOn ? (
+              <Flashlight className="w-4 h-4 fill-current text-slate-950 animate-pulse" />
+            ) : (
+              <Flashlight className="w-4 h-4 text-amber-400" />
+            )}
+            <span className="text-[11px] font-bold">
+              {isTorchOn
+                ? language === 'bn'
+                  ? 'ফ্ল্যাশ চালু'
+                  : 'Flash ON'
+                : language === 'bn'
+                ? 'ফ্ল্যাশ'
+                : 'Flash'}
+            </span>
+          </button>
 
           {/* Switch Camera Button (Front / Back) */}
           <button
@@ -325,16 +332,28 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
               muted
             />
 
-            {/* Darkened Vignette Overlay */}
-            <div className="absolute inset-0 bg-slate-950/45 pointer-events-none" />
+            {/* Darkened Vignette Overlay / Night Scanner Illuminator */}
+            <div
+              className={`absolute inset-0 pointer-events-none transition-colors duration-300 ${
+                isTorchOn
+                  ? 'bg-white/75 shadow-[inset_0_0_100px_rgba(255,255,255,0.9)] mix-blend-screen'
+                  : 'bg-slate-950/45'
+              }`}
+            />
 
             {/* ROCK-SOLID RETICLE TARGET BOX (Zero layout shift on scan) */}
             <div
-              className={`relative z-10 w-60 h-60 sm:w-68 sm:h-68 rounded-3xl pointer-events-none shadow-[0_0_0_9999px_rgba(15,23,42,0.55)] transition-colors duration-200 ${
+              className={`relative z-10 w-60 h-60 sm:w-68 sm:h-68 rounded-3xl pointer-events-none transition-all duration-200 ${
+                isTorchOn
+                  ? 'shadow-[0_0_0_9999px_rgba(255,255,255,0.7)]'
+                  : 'shadow-[0_0_0_9999px_rgba(15,23,42,0.55)]'
+              } ${
                 isDetectedSuccess
                   ? 'ring-4 ring-emerald-400/90 bg-emerald-500/10'
                   : paused
                   ? 'ring-2 ring-amber-400/50 bg-amber-500/5'
+                  : isTorchOn
+                  ? 'ring-4 ring-amber-400/80 bg-white/5'
                   : 'ring-1 ring-white/15 bg-transparent'
               }`}
               style={{ boxSizing: 'border-box' }}
@@ -346,6 +365,8 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
                     ? 'border-emerald-400 drop-shadow-[0_0_8px_#10b981]'
                     : paused
                     ? 'border-amber-400'
+                    : isTorchOn
+                    ? 'border-amber-300 drop-shadow-[0_0_8px_#fbbf24]'
                     : themeBorderColor
                 }`}
               />
@@ -356,6 +377,8 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
                     ? 'border-emerald-400 drop-shadow-[0_0_8px_#10b981]'
                     : paused
                     ? 'border-amber-400'
+                    : isTorchOn
+                    ? 'border-amber-300 drop-shadow-[0_0_8px_#fbbf24]'
                     : themeBorderColor
                 }`}
               />
@@ -366,6 +389,8 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
                     ? 'border-emerald-400 drop-shadow-[0_0_8px_#10b981]'
                     : paused
                     ? 'border-amber-400'
+                    : isTorchOn
+                    ? 'border-amber-300 drop-shadow-[0_0_8px_#fbbf24]'
                     : themeBorderColor
                 }`}
               />
@@ -376,6 +401,8 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
                     ? 'border-emerald-400 drop-shadow-[0_0_8px_#10b981]'
                     : paused
                     ? 'border-amber-400'
+                    : isTorchOn
+                    ? 'border-amber-300 drop-shadow-[0_0_8px_#fbbf24]'
                     : themeBorderColor
                 }`}
               />
@@ -393,6 +420,37 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
               </div>
             </div>
 
+            {/* Floating Quick Action Flashlight Button for Night Scanning */}
+            <button
+              type="button"
+              onClick={handleToggleTorch}
+              title={
+                isTorchOn
+                  ? language === 'bn'
+                    ? 'ফ্ল্যাশ লাইট বন্ধ করুন'
+                    : 'Turn Flash OFF'
+                  : language === 'bn'
+                  ? 'নাইট ফ্ল্যাশ চালু করুন'
+                  : 'Turn Night Flash ON'
+              }
+              className={`absolute bottom-12 right-3 sm:bottom-14 sm:right-4 z-20 px-3 py-2 rounded-2xl backdrop-blur-md transition-all cursor-pointer shadow-2xl flex items-center gap-1.5 border select-none active:scale-95 ${
+                isTorchOn
+                  ? 'bg-amber-400 text-slate-950 font-black border-amber-200 ring-4 ring-amber-400/40 shadow-[0_0_20px_rgba(245,158,11,0.6)]'
+                  : 'bg-slate-900/90 hover:bg-slate-800 text-amber-300 border-amber-400/50 hover:border-amber-300 shadow-black/80'
+              }`}
+            >
+              <Flashlight className={`w-4 h-4 ${isTorchOn ? 'fill-current text-slate-950 animate-bounce' : 'text-amber-400'}`} />
+              <span className="text-[11px] font-bold tracking-wide">
+                {isTorchOn
+                  ? language === 'bn'
+                    ? 'ফ্ল্যাশ বন্ধ'
+                    : 'Flash OFF'
+                  : language === 'bn'
+                  ? 'নাইট ফ্ল্যাশ'
+                  : 'Night Flash'}
+              </span>
+            </button>
+
             {/* Bottom Target Alignment Pill */}
             <div className="absolute bottom-3 inset-x-0 z-20 flex justify-center pointer-events-none px-4">
               <span
@@ -401,6 +459,8 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
                     ? 'bg-emerald-500/30 text-emerald-200 border-emerald-400/60 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
                     : paused
                     ? 'bg-amber-500/30 text-amber-200 border-amber-400/60'
+                    : isTorchOn
+                    ? 'bg-amber-500/30 text-amber-200 border-amber-400/60 shadow-[0_0_12px_rgba(245,158,11,0.3)]'
                     : themeBadgeColor
                 }`}
               >
@@ -414,6 +474,10 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
                     ? language === 'bn'
                       ? '⏸️ স্ক্যানার বিরতি (যাচাই প্রক্রিয়াধীন)'
                       : '⏸️ Scanner Dormant (Verifying...)'
+                    : isTorchOn
+                    ? language === 'bn'
+                      ? '🔦 নাইট ফ্ল্যাশ সক্রিয় — কোড সোজা রাখুন'
+                      : '🔦 Night Flash Active — Align QR Code'
                     : language === 'bn'
                     ? 'কিউআর কোড স্কয়ার বক্সে সোজা রাখুন'
                     : 'Align QR Code Inside Square Frame'}
