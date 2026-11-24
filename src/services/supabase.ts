@@ -1348,12 +1348,18 @@ export const SupabaseService = {
   },
 
   async lookupVerifiedTicket(
-    registrationId: string,
-    mobileNumber: string,
+    registrationId?: string,
+    mobileNumber?: string,
     year: number = 2027
   ): Promise<{ registration?: RegistrationRecord; donation?: DonationRecord; type?: 'registration' | 'donation'; error?: string }> {
     const cleanId = (registrationId || '').trim();
     const cleanMobile = (mobileNumber || '').trim();
+
+    if (!cleanId && !cleanMobile) {
+      return {
+        error: 'Please enter your Registered Mobile Number OR Registration ID / Token.',
+      };
+    }
 
     // Fast-path: If ID matches donation prefix DON- or INV-DON-, query donation directly
     if (cleanId.toUpperCase().startsWith('DON-') || cleanId.toUpperCase().startsWith('INV-DON-')) {
@@ -1363,28 +1369,30 @@ export const SupabaseService = {
       }
     }
 
-    // 1. Primary: Edge Function
-    try {
-      const { data, error } = await supabase.functions.invoke<{
-        success: boolean;
-        error?: string;
-        ticket?: Record<string, unknown>;
-        donation?: Record<string, unknown>;
-        type?: 'registration' | 'donation';
-      }>('secure-ticket-lookup', {
-        body: { registrationId: cleanId, mobileNumber: cleanMobile, year },
-      });
+    // 1. Primary: Edge Function (invoked when both registrationId and mobileNumber are supplied)
+    if (cleanId && cleanMobile) {
+      try {
+        const { data, error } = await supabase.functions.invoke<{
+          success: boolean;
+          error?: string;
+          ticket?: Record<string, unknown>;
+          donation?: Record<string, unknown>;
+          type?: 'registration' | 'donation';
+        }>('secure-ticket-lookup', {
+          body: { registrationId: cleanId, mobileNumber: cleanMobile, year },
+        });
 
-      if (!error && data?.success) {
-        if (data.type === 'donation' && data.donation) {
-          return { type: 'donation', donation: fromDonationDbRow(data.donation) };
+        if (!error && data?.success) {
+          if (data.type === 'donation' && data.donation) {
+            return { type: 'donation', donation: fromDonationDbRow(data.donation) };
+          }
+          if (data.ticket) {
+            return { type: 'registration', registration: fromRegistrationDbRow(data.ticket) };
+          }
         }
-        if (data.ticket) {
-          return { type: 'registration', registration: fromRegistrationDbRow(data.ticket) };
-        }
+      } catch {
+        // Edge Function unavailable or network failure; continue to database RPC fallback
       }
-    } catch {
-      // Edge Function unavailable or network failure; continue to database RPC fallback
     }
 
     // 2. Resilient Database Fallback: rpc_lookup_ticket (SECURITY DEFINER)
@@ -1411,6 +1419,28 @@ export const SupabaseService = {
     if (donFallback.donation) {
       return { type: 'donation', donation: donFallback.donation };
     }
+
+    // 4. Fallback: Local storage lookup (works offline or when network is down)
+    try {
+      const rawRegs = typeof localStorage !== 'undefined' ? localStorage.getItem('plscf_reunion_registrations_v2') : null;
+      if (rawRegs) {
+        const localList: RegistrationRecord[] = JSON.parse(rawRegs);
+        const match = localList.find((r) => {
+          const matchId = cleanId && (
+            r.id.toLowerCase() === cleanId.toLowerCase() ||
+            (r.qrToken && r.qrToken.toLowerCase() === cleanId.toLowerCase())
+          );
+          const matchMob = cleanMobile && r.mobileNumber?.includes(cleanMobile);
+          if (cleanId && cleanMobile) return matchId && matchMob;
+          if (cleanId) return matchId;
+          if (cleanMobile) return matchMob;
+          return false;
+        });
+        if (match) {
+          return { type: 'registration', registration: match };
+        }
+      }
+    } catch {}
 
     return {
       error: 'No verified ticket or donation matched those details.',

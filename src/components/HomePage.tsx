@@ -149,7 +149,14 @@ export const HomePage: React.FC<HomePageProps> = ({
     setFoundDonation(null);
     setStatusLookupError('');
 
-    if (!searchRegId.trim() || !searchMobile.trim()) return;
+    if (!searchRegId.trim() && !searchMobile.trim()) {
+      setStatusLookupError(
+        language === 'bn'
+          ? 'অনুগ্রহ করে নিবন্ধিত মোবাইল নম্বর অথবা রেজিস্ট্রেশন আইডি দিন।'
+          : 'Please enter your Registered Mobile Number OR Registration ID.'
+      );
+      return;
+    }
 
     setIsCheckingStatus(true);
     try {
@@ -783,21 +790,10 @@ export const HomePage: React.FC<HomePageProps> = ({
           <form onSubmit={handleCheckStatus} className="grid grid-cols-1 sm:grid-cols-5 gap-3 max-w-2xl mx-auto">
             <div className="sm:col-span-2">
               <label className="block text-xs font-bold text-[#0F172A] mb-1">
-                {t.inputRegIdLabel}
-              </label>
-              <input
-                type="text"
-                value={searchRegId}
-                onChange={(e) => setSearchRegId(e.target.value)}
-                placeholder={t.inputRegIdPlaceholder}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2EEF8] text-xs sm:text-sm font-mono uppercase focus:border-[#0284C7] focus:ring-1 focus:ring-[#0284C7] focus:outline-hidden"
-                required
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-[#0F172A] mb-1">
-                {t.inputMobileLabel}
+                {language === 'bn' ? 'নিবন্ধিত মোবাইল নম্বর' : 'Registered Mobile Number'}
+                <span className="text-[10px] text-sky-600 font-semibold ml-1">
+                  ({language === 'bn' ? 'যথেষ্ট' : 'Enough'})
+                </span>
               </label>
               <input
                 type="text"
@@ -805,7 +801,19 @@ export const HomePage: React.FC<HomePageProps> = ({
                 onChange={(e) => setSearchMobile(e.target.value)}
                 placeholder={t.inputMobilePlaceholder}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2EEF8] text-xs sm:text-sm font-mono focus:border-[#0284C7] focus:ring-1 focus:ring-[#0284C7] focus:outline-hidden"
-                required
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-[#0F172A] mb-1">
+                {language === 'bn' ? 'অথবা রেজিস্ট্রেশন আইডি / টোকেন' : 'OR Reg ID / Token'}
+              </label>
+              <input
+                type="text"
+                value={searchRegId}
+                onChange={(e) => setSearchRegId(e.target.value)}
+                placeholder={t.inputRegIdPlaceholder}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2EEF8] text-xs sm:text-sm font-mono uppercase focus:border-[#0284C7] focus:ring-1 focus:ring-[#0284C7] focus:outline-hidden"
               />
             </div>
 

@@ -32,7 +32,14 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
     setMatchedRecord(null);
     setMatchedDonation(null);
 
-    if (!registrationId.trim() || !mobileNumber.trim()) return;
+    if (!registrationId.trim() && !mobileNumber.trim()) {
+      setSearchError(
+        isBangla
+          ? 'অনুগ্রহ করে নিবন্ধিত মোবাইল নম্বর অথবা আইডি / টোকেন প্রদান করুন।'
+          : 'Please enter your Registered Mobile Number OR Registration ID / Token.'
+      );
+      return;
+    }
 
     setIsSearching(true);
     try {
@@ -65,7 +72,7 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
     <div className="max-w-xl mx-auto px-4 py-12">
       <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 space-y-6">
         <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-[#E2EEF8] text-[#0284C7] flex items-center justify-center mx-auto shadow-xs">
+          <div className="w-14 h-14 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center mx-auto shadow-xs">
             <Search className="w-7 h-7" />
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">
@@ -73,8 +80,8 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
           </h1>
           <p className="text-xs text-slate-600">
             {isBangla
-              ? 'শিক্ষার্থী টিকিট বা অনুদাতার সম্মাননা কার্ড দেখতে আইডি ও মোবাইল নম্বর দিয়ে সার্চ করুন।'
-              : 'Search with your Registration ID / Donation ID and Mobile Number to view ticket or Thank You Card.'}
+              ? 'শিক্ষার্থী টিকিট বা অনুদাতার সম্মাননা কার্ড দেখতে নিবন্ধিত মোবাইল নম্বর অথবা আইডি / টোকেন দিয়ে সার্চ করুন।'
+              : 'Search with your Registered Mobile Number OR Registration ID / Donation ID / Token to view ticket or Thank You Card.'}
           </p>
         </div>
 
@@ -100,6 +107,35 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
 
         <form onSubmit={handleSearch} className="space-y-4">
           <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700" htmlFor="ticket-mobile-number">
+                {language === 'bn' ? 'নিবন্ধিত মোবাইল নম্বর:' : 'Registered mobile number:'}
+              </label>
+              <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
+                {isBangla ? 'টিকিট খুঁজতে এটিই যথেষ্ট' : 'Enough to find ticket'}
+              </span>
+            </div>
+            <input
+              type="tel"
+              inputMode="tel"
+              id="ticket-mobile-number"
+              autoComplete="tel"
+              value={mobileNumber}
+              onChange={(e) => setMobileNumber(e.target.value)}
+              placeholder="01XXXXXXXXX"
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm focus:border-sky-600 focus:ring-2 focus:ring-sky-600/20 focus:outline-hidden"
+            />
+          </div>
+
+          {/* Visual OR Divider */}
+          <div className="relative flex items-center justify-center my-1">
+            <div className="border-t border-slate-200 w-full" />
+            <span className="bg-white px-3 text-xs font-black text-slate-400 uppercase tracking-wider absolute">
+              {isBangla ? 'অথবা' : 'OR'}
+            </span>
+          </div>
+
+          <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="ticket-registration-id">
               {isBangla ? 'রেজিস্ট্রেশন বা অনুদান আইডি / টোকেন:' : 'Registration ID / Donation ID / Token:'}
             </label>
@@ -110,24 +146,9 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
                 value={registrationId}
                 onChange={(e) => setRegistrationId(e.target.value)}
                 placeholder="PLSCF-2026-F0001 or DON-2027-..."
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
-                required
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm font-mono uppercase focus:border-sky-600 focus:ring-2 focus:ring-sky-600/20 focus:outline-hidden"
               />
             </div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 mt-3" htmlFor="ticket-mobile-number">
-              {language === 'bn' ? 'নিবন্ধিত মোবাইল নম্বর:' : 'Registered mobile number:'}
-            </label>
-            <input
-              type="tel"
-              inputMode="tel"
-              id="ticket-mobile-number"
-              autoComplete="tel"
-              value={mobileNumber}
-              onChange={(e) => setMobileNumber(e.target.value)}
-              placeholder="01XXXXXXXXX"
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
-              required
-            />
           </div>
 
           {searchError && (
