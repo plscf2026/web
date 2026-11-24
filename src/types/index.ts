@@ -805,6 +805,8 @@ export interface StudentIdVerificationResult {
     studentId: string;
     studentName?: string;
     className?: string;
+    academicYear?: string;
+    phone?: string;
   };
 }
 

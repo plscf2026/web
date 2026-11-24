@@ -147,6 +147,11 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     }
   }, [isProcessingPayment]);
 
+  // Synchronize student IDs with cloud database on registration portal mount
+  useEffect(() => {
+    StudentIdService.syncWithSupabase().catch(() => {});
+  }, []);
+
   // Comprehensive form reset — clears all input fields, previews, file input, and state
   const resetForm = () => {
     setFullName('');
@@ -562,33 +567,45 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     }
   };
 
-  // Student ID Verification Handler
-  const handleVerifyStudentId = (idToVerify?: string) => {
+  // Student ID Verification Handler with Instant Cloud Database Fallback
+  const handleVerifyStudentId = async (idToVerify?: string) => {
     const rawId = (idToVerify !== undefined ? idToVerify : studentId).trim();
     if (!rawId) {
       setIdVerificationResult(null);
       return;
     }
     setIsVerifyingId(true);
-    setTimeout(() => {
-      const res = StudentIdService.verifyStudentId(rawId);
+    try {
+      const res = await StudentIdService.verifyStudentIdAsync(rawId);
       setIdVerificationResult(res);
-      setIsVerifyingId(false);
 
       if (res.success && res.record) {
-        if (res.record.studentName && !fullName) {
+        if (res.record.studentName) {
           setFullName(res.record.studentName);
         }
         if (res.record.className) {
           setCurrentClass(res.record.className);
         }
-        if (validationErrors.studentId) {
-          const next = { ...validationErrors };
-          delete next.studentId;
-          setValidationErrors(next);
+        if (res.record.academicYear) {
+          setPassingYear(res.record.academicYear);
+          setBatchName(`${res.record.className} (${res.record.academicYear})`);
+        } else if (res.record.className) {
+          setBatchName(res.record.className);
         }
+        if (res.record.phone && !mobileNumber) {
+          setMobileNumber(res.record.phone);
+        }
+        setValidationErrors((prev) => {
+          const next = { ...prev };
+          delete next.studentId;
+          delete next.fullName;
+          delete next.currentClass;
+          return next;
+        });
       }
-    }, 150);
+    } finally {
+      setIsVerifyingId(false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -864,44 +881,301 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           </div>
         </div>
 
-        {/* Section 1: Personal Information */}
-        <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <User className="w-5 h-5 text-[#0284C7]" />
-            <h2 className="text-lg font-bold text-slate-900">
-              {t.personalInfoHeading}
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Full Name */}
-            <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                {t.fullNameLabel} <span className="text-rose-600">*</span>
-              </label>
-              <input
-                name="fullName"
-                aria-invalid={Boolean(validationErrors.fullName)}
-                type="text"
-                value={fullName}
-                onChange={(e) => {
-                  setFullName(e.target.value);
-                  clearValidationError('fullName');
-                }}
-                placeholder={t.fullNamePlaceholder}
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
-                  validationErrors.fullName
-                    ? 'border-rose-500 bg-rose-50/30 focus:ring-2 focus:ring-rose-500'
-                    : 'border-slate-300 focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20'
-                }`}
-              />
-              {validationErrors.fullName && (
-                <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  <span>{validationErrors.fullName[language]}</span>
-                </p>
-              )}
+        {/* CURRENT STUDENT SPECIFIC: 1. ACADEMIC INFORMATION & INSTITUTIONAL VERIFICATION (FIRST STEP) */}
+        {category === 'current' && (
+          <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-[#0284C7]" />
+                <h2 className="text-lg font-bold text-slate-900">
+                  {language === 'bn' ? '১. প্রাতিষ্ঠানিক তথ্য ও আইডি যাচাই' : '1. Academic Information & Student ID Verification'}
+                </h2>
+              </div>
+              <span className="text-[11px] font-bold text-[#0284C7] bg-[#E2EEF8] px-2.5 py-1 rounded-full border border-[#0284C7]/20 flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                {language === 'bn' ? 'ডাটাবেজ অটো-ফিল' : 'Database Auto-fill'}
+              </span>
             </div>
+
+            {/* If NOT verified yet: Render ID Input Box with Testing Helper */}
+            {!idVerificationResult?.success ? (
+              <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+                <div className="text-xs text-slate-600 leading-relaxed">
+                  {language === 'bn'
+                    ? 'আপনার প্রাতিষ্ঠানিক স্টুডেন্ট আইডি প্রদান করুন। বিদ্যালয় ডাটাবেজ থেকে আপনার নাম, শ্রেণি ও বছর স্বয়ংক্রিয়ভাবে লোড হবে এবং প্রদর্শন করা হবে।'
+                    : 'Enter your institutional Student ID. Your official full name, enrolled class, and academic year will be loaded and displayed directly from the school database.'}
+                </div>
+
+                {/* Quick Testing Badges */}
+                <div className="p-2.5 bg-sky-50 border border-sky-300 text-sky-900 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                  <div className="flex items-center gap-1.5 font-medium flex-wrap">
+                    <span className="font-bold text-sky-950">🧪 {language === 'bn' ? 'নমুনা ভেরিফাইড আইডি:' : 'Quick Test ID:'}</span>
+                    <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">PLSC-2026-101</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStudentId('PLSC-2026-101');
+                      clearValidationError('studentId');
+                      handleVerifyStudentId('PLSC-2026-101');
+                    }}
+                    className="text-[10px] text-sky-800 bg-sky-100 hover:bg-sky-200 px-2.5 py-1 rounded-full font-bold cursor-pointer transition-colors shadow-2xs"
+                  >
+                    {language === 'bn' ? 'অটো-ফিল ও যাচাই' : 'Auto-fill & Verify'}
+                  </button>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-900">
+                    {language === 'bn' ? 'স্টুডেন্ট আইডি নম্বর *' : 'Student ID Number *'}{' '}
+                    <span className="text-rose-600">*</span>
+                  </label>
+
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <School className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                      <input
+                        type="text"
+                        value={studentId}
+                        onChange={(e) => {
+                          const val = e.target.value.toUpperCase();
+                          setStudentId(val);
+                          clearValidationError('studentId');
+                          if (idVerificationResult) setIdVerificationResult(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (studentId.trim() && !isVerifyingId) {
+                              handleVerifyStudentId(studentId);
+                            }
+                          }
+                        }}
+                        placeholder="e.g. PLSC-2026-101"
+                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm font-mono tracking-wide uppercase transition-all focus:outline-hidden ${
+                          idVerificationResult && !idVerificationResult.success
+                            ? 'border-rose-500 bg-rose-50/40'
+                            : 'border-slate-300 focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20'
+                        }`}
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleVerifyStudentId(studentId)}
+                      disabled={!studentId.trim() || isVerifyingId}
+                      className="px-5 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
+                    >
+                      {isVerifyingId ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>{language === 'bn' ? 'যাচাই হচ্ছে...' : 'Verifying...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Search className="w-3.5 h-3.5" />
+                          <span>{language === 'bn' ? 'আইডি যাচাই করুন' : 'Verify ID'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* More test IDs */}
+                <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="font-semibold text-slate-700">
+                    {language === 'bn' ? 'অন্যান্য টেস্ট আইডি:' : 'More Sample IDs:'}
+                  </span>
+                  {['PLSC-2026-104', 'PLSC-2026-105', 'PLSC-2026-106'].map((demoId) => (
+                    <button
+                      key={demoId}
+                      type="button"
+                      onClick={() => {
+                        setStudentId(demoId);
+                        handleVerifyStudentId(demoId);
+                      }}
+                      className="px-1.5 py-0.5 rounded bg-slate-200 hover:bg-slate-300 font-mono text-[10px] text-slate-700 cursor-pointer"
+                    >
+                      {demoId}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Status Error feedback */}
+                {idVerificationResult && !idVerificationResult.success && (
+                  <div className="p-3.5 rounded-xl text-xs flex items-start gap-2 border bg-rose-50 border-rose-300 text-rose-800">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-bold">
+                        {language === 'bn' ? idVerificationResult.messageBn : idVerificationResult.messageEn}
+                      </div>
+                      <div className="text-[11px] text-rose-700 mt-0.5">
+                        {language === 'bn'
+                          ? 'সুপার এডমিন কর্তৃক আপলোডকৃত সঠিক স্টুডেন্ট আইডি প্রদান করুন অথবা বিদ্যালয় হেল্পডেস্কে যোগাযোগ করুন।'
+                          : 'Please enter a valid student ID pre-uploaded by the school administration or contact the help desk.'}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {validationErrors.studentId && !idVerificationResult && (
+                  <p className="text-xs text-rose-600 flex items-center gap-1 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    <span>{validationErrors.studentId[language]}</span>
+                  </p>
+                )}
+              </div>
+            ) : (
+              /* If VERIFIED: Show Read-Only Official Information Card ("they can't change, just view") */
+              <div className="rounded-2xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-50/80 via-white to-sky-50/60 p-5 sm:p-6 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-200/60 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-black uppercase tracking-wider text-emerald-900 block">
+                        {language === 'bn' ? 'যাচাইকৃত প্রাতিষ্ঠানিক শিক্ষার্থী প্রোফাইল' : 'Verified Official Student Record'}
+                      </span>
+                      <p className="text-[11px] text-emerald-700 font-medium">
+                        {language === 'bn'
+                          ? '🔒 প্রশাসনিক ডাটাবেজ থেকে তথ্য যাচাই সম্পন্ন — শুধুমাত্র প্রদর্শনযোগ্য ও অপরিবর্তনযোগ্য'
+                          : '🔒 Verified against institutional database — Read-only & Tamper-proof'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIdVerificationResult(null);
+                      setStudentId('');
+                      setFullName('');
+                      setCurrentClass('');
+                      setBatchName('');
+                    }}
+                    className="text-xs text-slate-500 hover:text-slate-800 font-semibold underline cursor-pointer self-start sm:self-auto"
+                  >
+                    {language === 'bn' ? 'অন্য আইডি যাচাই করুন' : 'Change Student ID'}
+                  </button>
+                </div>
+
+                {/* 4 Read-Only Credential Badges */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="bg-white p-3.5 rounded-xl border border-emerald-200/70 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      {language === 'bn' ? 'শিক্ষার্থীর নাম' : 'Student Full Name'}
+                    </span>
+                    <span className="text-sm font-black text-slate-900 mt-1 block truncate">
+                      {fullName || idVerificationResult.record?.studentName || 'N/A'}
+                    </span>
+                    <span className="text-[9px] text-emerald-600 font-semibold mt-0.5 block">
+                      ✓ {language === 'bn' ? 'ডাটাবেজ থেকে যাচাইকৃত' : 'Database verified'}
+                    </span>
+                  </div>
+
+                  <div className="bg-white p-3.5 rounded-xl border border-emerald-200/70 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      {language === 'bn' ? 'স্টুডেন্ট আইডি' : 'Student ID'}
+                    </span>
+                    <span className="text-sm font-mono font-black text-[#0284C7] mt-1 block">
+                      {studentId || idVerificationResult.record?.studentId}
+                    </span>
+                    <span className="text-[9px] text-emerald-600 font-semibold mt-0.5 block">
+                      ✓ {language === 'bn' ? 'অনুমোদিত আইডি' : 'Authorized ID'}
+                    </span>
+                  </div>
+
+                  <div className="bg-white p-3.5 rounded-xl border border-emerald-200/70 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      {language === 'bn' ? 'অধ্যয়নরত শ্রেণি' : 'Current Class'}
+                    </span>
+                    <span className="text-sm font-black text-slate-900 mt-1 block">
+                      {currentClass || idVerificationResult.record?.className || 'N/A'}
+                    </span>
+                    <span className="text-[9px] text-emerald-600 font-semibold mt-0.5 block">
+                      ✓ {language === 'bn' ? 'নথিভুক্ত শ্রেণি' : 'Official Enrolled Class'}
+                    </span>
+                  </div>
+
+                  <div className="bg-white p-3.5 rounded-xl border border-emerald-200/70 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      {language === 'bn' ? 'শিক্ষাবর্ষ / ব্যাচ' : 'Academic Year / Batch'}
+                    </span>
+                    <span className="text-sm font-black text-slate-900 mt-1 block">
+                      {idVerificationResult.record?.academicYear || passingYear || '2026'}
+                    </span>
+                    <span className="text-[9px] text-emerald-600 font-semibold mt-0.5 block">
+                      ✓ {language === 'bn' ? 'নিয়মিত শিক্ষাবর্ষ' : 'Official Academic Year'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Gated Callout for Current Students if not yet verified */}
+        {category === 'current' && !idVerificationResult?.success && (
+          <div className="bg-white rounded-2xl p-8 shadow-sm border border-dashed border-slate-300 text-center space-y-3">
+            <div className="w-12 h-12 rounded-full bg-sky-50 text-[#0284C7] flex items-center justify-center mx-auto">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-slate-800">
+              {language === 'bn' ? 'পরবর্তী ধাপের জন্য স্টুডেন্ট আইডি যাচাই করুন' : 'Verify Student ID to Unlock Registration'}
+            </h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+              {language === 'bn'
+                ? 'বর্তমান শিক্ষার্থীদের জন্য স্টুডেন্ট আইডি যাচাই আবশ্যক। ওপরে আপনার সঠিক স্টুডেন্ট আইডি প্রদান করে "আইডি যাচাই করুন" বাটনে ক্লিক করলে আপনার নাম ও শ্রেণি প্রদর্শিত হবে এবং রেজিস্ট্রেশনের পরবর্তী ধাপসমূহ উন্মুক্ত হবে।'
+                : 'Institutional Student ID verification is mandatory for current students. Please enter your Student ID above and click "Verify ID" to load your verified record and unlock the rest of the registration form.'}
+            </p>
+          </div>
+        )}
+
+        {/* Section 1 / Next Steps: Rendered for Alumni, or for Current Student once verified */}
+        {(category === 'former' || (category === 'current' && idVerificationResult?.success)) && (
+          <>
+          <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+              <User className="w-5 h-5 text-[#0284C7]" />
+              <h2 className="text-lg font-bold text-slate-900">
+                {category === 'current'
+                  ? (language === 'bn' ? '২. যোগাযোগ ও পরিচয়পত্র বিবরণী' : '2. Contact & Identity Details')
+                  : t.personalInfoHeading}
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Full Name: Only manually editable for Former students (Alumni). For current students, verified & locked above! */}
+              {category === 'former' && (
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    {t.fullNameLabel} <span className="text-rose-600">*</span>
+                  </label>
+                  <input
+                    name="fullName"
+                    aria-invalid={Boolean(validationErrors.fullName)}
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => {
+                      setFullName(e.target.value);
+                      clearValidationError('fullName');
+                    }}
+                    placeholder={t.fullNamePlaceholder}
+                    className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
+                      validationErrors.fullName
+                        ? 'border-rose-500 bg-rose-50/30 focus:ring-2 focus:ring-rose-500'
+                        : 'border-slate-300 focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20'
+                    }`}
+                  />
+                  {validationErrors.fullName && (
+                    <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>{validationErrors.fullName[language]}</span>
+                    </p>
+                  )}
+                </div>
+              )}
 
             {/* Gender Selection */}
             <div>
@@ -1581,305 +1855,98 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
         )}
 
 
-        {/* Section 2: Academic Information & Current Student ID Verification */}
-        <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <GraduationCap className="w-5 h-5 text-[#0284C7]" />
-            <h2 className="text-lg font-bold text-slate-900">
-              {t.academicInfoHeading}
-            </h2>
-          </div>
-
-          {/* CURRENT STUDENT SPECIFIC: MANDATORY VERIFIED STUDENT ID */}
-          {category === 'current' && (
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-              {/* Testing Student ID Banner */}
-              <div className="p-2.5 bg-sky-50 border border-sky-300 text-sky-900 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xs">
-                <div className="flex items-center gap-1.5 font-medium flex-wrap">
-                  <span className="font-bold text-sky-950">🧪 Testing Student ID:</span>
-                  <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">PLSC-2026-101</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStudentId('PLSC-2026-101');
-                    clearValidationError('studentId');
-                    handleVerifyStudentId('PLSC-2026-101');
-                  }}
-                  className="text-[10px] text-sky-800 bg-sky-100 hover:bg-sky-200 px-2.5 py-1 rounded-full font-bold cursor-pointer transition-colors shadow-2xs"
-                >
-                  Auto-fill & Verify
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-slate-900">
-                  {language === 'bn' ? 'স্টুডেন্ট আইডি নম্বর *' : 'Student ID Number *'}{' '}
-                  <span className="text-rose-600">*</span>
-                </label>
-                <span className="text-[11px] text-[#0284C7] font-semibold flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  {language === 'bn' ? 'প্রতিষ্ঠানিক আইডি ভেরিফিকেশন' : 'Institutional ID Verification'}
-                </span>
-              </div>
-
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <School className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                  <input
-                    type="text"
-                    value={studentId}
-                    onChange={(e) => {
-                      const val = e.target.value.toUpperCase();
-                      setStudentId(val);
-                      clearValidationError('studentId');
-                      if (idVerificationResult) setIdVerificationResult(null);
-                    }}
-                    onBlur={() => {
-                      if (studentId.trim() && !idVerificationResult) {
-                        handleVerifyStudentId(studentId);
-                      }
-                    }}
-                    placeholder="e.g. PLSC-2026-101"
-                    className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm font-mono tracking-wide uppercase transition-all focus:outline-hidden ${
-                      idVerificationResult?.success
-                        ? 'border-emerald-500 bg-emerald-50/40'
-                        : idVerificationResult && !idVerificationResult.success
-                        ? 'border-rose-500 bg-rose-50/40'
-                        : 'border-slate-300 focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20'
-                    }`}
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleVerifyStudentId(studentId)}
-                  disabled={!studentId.trim() || isVerifyingId}
-                  className="px-4 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
-                >
-                  <Search className="w-3.5 h-3.5" />
-                  <span>{isVerifyingId ? (language === 'bn' ? 'যাচাই হচ্ছে...' : 'Verifying...') : (language === 'bn' ? 'যাচাই করুন' : 'Verify ID')}</span>
-                </button>
-              </div>
-
-              {/* Sample IDs helper to assist user testing */}
-              <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="font-semibold text-slate-700">
-                  {language === 'bn' ? 'নমুনা ভেরিফাইড আইডি:' : 'Test IDs:'}
-                </span>
-                {['PLSC-2026-101', 'PLSC-2026-104', 'PLSC-2026-105', 'PLSC-2026-106'].map((demoId) => (
-                  <button
-                    key={demoId}
-                    type="button"
-                    onClick={() => {
-                      setStudentId(demoId);
-                      handleVerifyStudentId(demoId);
-                    }}
-                    className="px-1.5 py-0.5 rounded bg-slate-200 hover:bg-slate-300 font-mono text-[10px] text-slate-700 cursor-pointer"
-                  >
-                    {demoId}
-                  </button>
-                ))}
-              </div>
-
-              {/* Status Message Badges */}
-              {idVerificationResult && (
-                <div
-                  className={`p-3 rounded-xl text-xs flex items-start gap-2 border ${
-                    idVerificationResult.success
-                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
-                      : idVerificationResult.status === 'ALREADY_USED'
-                      ? 'bg-rose-50 border-rose-300 text-rose-800'
-                      : idVerificationResult.status === 'INACTIVE'
-                      ? 'bg-amber-50 border-amber-300 text-amber-800'
-                      : 'bg-rose-50 border-rose-300 text-rose-800'
-                  }`}
-                >
-                  {idVerificationResult.success ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                  )}
-                  <div>
-                    <div className="font-bold">
-                      {language === 'bn' ? idVerificationResult.messageBn : idVerificationResult.messageEn}
-                    </div>
-                    {idVerificationResult.record && (
-                      <div className="text-[11px] text-slate-600 mt-0.5">
-                        {language === 'bn'
-                          ? `শিক্ষার্থী: ${idVerificationResult.record.studentName || 'এন/এ'} | শ্রেণি: ${idVerificationResult.record.className || 'এন/এ'}`
-                          : `Student: ${idVerificationResult.record.studentName || 'N/A'} | Class: ${idVerificationResult.record.className || 'N/A'}`}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {validationErrors.studentId && !idVerificationResult && (
-                <p className="text-xs text-rose-600 flex items-center gap-1 font-medium">
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  <span>{validationErrors.studentId[language]}</span>
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {category === 'former' ? (
-              /* Former Student: Graduation / Last Attended Year is MANDATORY */
-              <>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    {language === 'bn' ? 'পাস বা অধ্যয়নের শেষ বছর *' : 'Graduation / Last Attended Year *'}{' '}
-                    <span className="text-rose-600">*</span>
-                  </label>
-                  <select
-                    name="passingYear"
-                    aria-invalid={Boolean(validationErrors.passingYear)}
-                    value={passingYear}
-                    onChange={(e) => {
-                      setPassingYear(e.target.value);
-                      clearValidationError('passingYear');
-                    }}
-                    className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
-                      validationErrors.passingYear
-                        ? 'border-rose-500 bg-rose-50/30'
-                        : 'border-slate-300 focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20'
-                    }`}
-                  >
-                    <option value="">{t.passingYearPlaceholder}</option>
-                    {passingYears.map((yr) => (
-                      <option key={yr} value={yr}>
-                        {yr} {language === 'bn' ? 'সাল' : 'Batch'}
-                      </option>
-                    ))}
-                  </select>
-                  {validationErrors.passingYear && (
-                    <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">
-                      <AlertCircle className="w-3.5 h-3.5" />
-                      <span>{validationErrors.passingYear[language]}</span>
-                    </p>
-                  )}
-                </div>
-
-                {/* Optional Last Class Attended for Former Students */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    {language === 'bn' ? 'সর্বশেষ অধ্যয়নের শ্রেণি (ঐচ্ছিক)' : 'Last Class Attended (Optional)'}
-                  </label>
-                  <select
-                    value={lastClassAttended}
-                    onChange={(e) => setLastClassAttended(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
-                  >
-                    <option value="SSC">SSC (মাধ্যমিক)</option>
-                    <option value="HSC">HSC (উচ্চ মাধ্যমিক)</option>
-                    <option value="Class 10">Class 10 (দশম শ্রেণি)</option>
-                    <option value="Class 8">Class 8 (অষ্টম শ্রেণি)</option>
-                    <option value="Class 5">Class 5 (পঞ্চম শ্রেণি)</option>
-                    <option value="Class 3">Class 3 (তৃতীয় শ্রেণি)</option>
-                    <option value="Other">Other / অন্যান্য</option>
-                  </select>
-                  <span className="text-[10px] text-slate-500 mt-1 block">
-                    {language === 'bn'
-                      ? 'এসএসসি বা এইচএসসির আগেই বিদ্যালয় ত্যাগ করে থাকলে প্রযোজ্য শ্রেণি নির্বাচন করুন।'
-                      : 'Applicable if student left school prior to SSC or HSC completion.'}
-                  </span>
-                </div>
-              </>
-            ) : (
-              /* Current Student: Current Class & Section */
-              <>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    {t.currentClassLabel} <span className="text-rose-600">*</span>
-                  </label>
-                  <select
-                    name="currentClass"
-                    aria-invalid={Boolean(validationErrors.currentClass)}
-                    value={currentClass}
-                    onChange={(e) => {
-                      setCurrentClass(e.target.value);
-                      clearValidationError('currentClass');
-                    }}
-                    className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
-                      validationErrors.currentClass
-                        ? 'border-rose-500 bg-rose-50/30'
-                        : 'border-slate-300 focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20'
-                    }`}
-                  >
-                    <option value="">{t.currentClassPlaceholder}</option>
-                    {currentClasses.map((cls) => (
-                      <option key={cls} value={cls}>
-                        {cls}
-                      </option>
-                    ))}
-                  </select>
-                  {validationErrors.currentClass && (
-                    <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">
-                      <AlertCircle className="w-3.5 h-3.5" />
-                      <span>{validationErrors.currentClass[language]}</span>
-                    </p>
-                  )}
-                </div>
-
-                {/* Section / Group for Current Students */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    {language === 'bn' ? 'শাখা / বিভাগ' : 'Section / Group'}
-                  </label>
-                  <select
-                    value={groupOrSection}
-                    onChange={(e) => setGroupOrSection(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
-                  >
-                    <option value="Section A">Section A (ক শাখা)</option>
-                    <option value="Section B">Section B (খ শাখা)</option>
-                    <option value="Science">Science (বিজ্ঞান)</option>
-                    <option value="Humanities">Humanities (মানবিক)</option>
-                    <option value="Business Studies">Business Studies (ব্যবসায় শিক্ষা)</option>
-                    <option value="General">General (সাধারণ)</option>
-                  </select>
-                </div>
-              </>
-            )}
-
-            {/* Batch Name / Identifier */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                {t.batchNameLabel}
-              </label>
-              <input
-                type="text"
-                value={batchName}
-                onChange={(e) => setBatchName(e.target.value)}
-                placeholder={getComputedBatch()}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
-              />
-              <span className="text-[10px] text-slate-500 mt-1 block">
-                {language === 'bn'
-                  ? 'খালি রাখলে স্বয়ংক্রিয় ব্যাচ নির্ধারণ হবে।'
-                  : 'Defaults automatically to selected passing year or class.'}
-              </span>
+        {/* Section 2: Academic Information (Alumni / Former Students Only) */}
+        {category === 'former' && (
+          <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+              <GraduationCap className="w-5 h-5 text-[#0284C7]" />
+              <h2 className="text-lg font-bold text-slate-900">
+                {t.academicInfoHeading}
+              </h2>
             </div>
 
-            {/* Roll Number (for current students) */}
-            {category === 'current' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Former Student: Graduation / Last Attended Year is MANDATORY */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  {t.rollNumberLabel}
+                  {language === 'bn' ? 'পাস বা অধ্যয়নের শেষ বছর *' : 'Graduation / Last Attended Year *'}{' '}
+                  <span className="text-rose-600">*</span>
+                </label>
+                <select
+                  name="passingYear"
+                  aria-invalid={Boolean(validationErrors.passingYear)}
+                  value={passingYear}
+                  onChange={(e) => {
+                    setPassingYear(e.target.value);
+                    clearValidationError('passingYear');
+                  }}
+                  className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
+                    validationErrors.passingYear
+                      ? 'border-rose-500 bg-rose-50/30'
+                      : 'border-slate-300 focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20'
+                  }`}
+                >
+                  <option value="">{t.passingYearPlaceholder}</option>
+                  {passingYears.map((yr) => (
+                    <option key={yr} value={yr}>
+                      {yr} {language === 'bn' ? 'সাল' : 'Batch'}
+                    </option>
+                  ))}
+                </select>
+                {validationErrors.passingYear && (
+                  <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    <span>{validationErrors.passingYear[language]}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Optional Last Class Attended for Former Students */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  {language === 'bn' ? 'সর্বশেষ অধ্যয়নের শ্রেণি (ঐচ্ছিক)' : 'Last Class Attended (Optional)'}
+                </label>
+                <select
+                  value={lastClassAttended}
+                  onChange={(e) => setLastClassAttended(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
+                >
+                  <option value="SSC">SSC (মাধ্যমিক)</option>
+                  <option value="HSC">HSC (উচ্চ মাধ্যমিক)</option>
+                  <option value="Class 10">Class 10 (দশম শ্রেণি)</option>
+                  <option value="Class 8">Class 8 (অষ্টম শ্রেণি)</option>
+                  <option value="Class 5">Class 5 (পঞ্চম শ্রেণি)</option>
+                  <option value="Class 3">Class 3 (তৃতীয় শ্রেণি)</option>
+                  <option value="Other">Other / অন্যান্য</option>
+                </select>
+                <span className="text-[10px] text-slate-500 mt-1 block">
+                  {language === 'bn'
+                    ? 'এসএসসি বা এইচএসসির আগেই বিদ্যালয় ত্যাগ করে থাকলে প্রযোজ্য শ্রেণি নির্বাচন করুন।'
+                    : 'Applicable if student left school prior to SSC or HSC completion.'}
+                </span>
+              </div>
+
+              {/* Batch Name / Identifier */}
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  {t.batchNameLabel}
                 </label>
                 <input
                   type="text"
-                  value={rollNumber}
-                  onChange={(e) => setRollNumber(e.target.value)}
-                  placeholder="e.g. 05"
+                  value={batchName}
+                  onChange={(e) => setBatchName(e.target.value)}
+                  placeholder={getComputedBatch()}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
                 />
+                <span className="text-[10px] text-slate-500 mt-1 block">
+                  {language === 'bn'
+                    ? 'খালি রাখলে স্বয়ংক্রিয় ব্যাচ নির্ধারণ হবে।'
+                    : 'Defaults automatically to selected passing year or class.'}
+                </span>
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Section 3: T-shirt Selection */}
         <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-4">
@@ -2047,6 +2114,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             </button>
           )}
         </div>
+          </>
+        )}
       </form>
 
       {/* Size Chart Modal */}

@@ -8,6 +8,8 @@ import {
   RegistrationFormData,
 } from './rules';
 import { CurrentStudentIdRecord } from '../types';
+import { StudentIdService } from '../services/studentIdStore';
+import { parseScannedInput } from './tokenGenerator';
 
 test('Strict 11-digit Bangladeshi mobile validation in Contact & Registration forms', () => {
   // Valid cases
@@ -188,4 +190,23 @@ test('Current Student registration requires verified student ID', () => {
   const res2 = validateRegistrationData(currentStudentWithId);
   assert.equal(res2.isValid, true);
   assert.equal(res2.errors.studentId, undefined);
+});
+
+test('Super Admin student ID import parses flexible headers (student_id, student_name, class, year)', () => {
+  const csvContent = `student_id, student_name, class, year\nPLSC-TEST-901, Tareq Mahmud, Class 10, 2026\nPLSC-TEST-902, Jannat Ferdous, Class 9, 2026`;
+  const report = StudentIdService.importFromCSV(csvContent);
+  assert.equal(report.addedCount >= 0, true);
+
+  const verified = StudentIdService.verifyStudentId('PLSC-TEST-901');
+  assert.equal(verified.success, true);
+  assert.equal(verified.record?.studentName, 'Tareq Mahmud');
+  assert.equal(verified.record?.className, 'Class 10');
+  assert.equal(verified.record?.academicYear, '2026');
+});
+
+test('parseScannedInput extracts ID and regNumber from formatted label (GUEST-0001 (PLSCF-GST-2027-0001))', () => {
+  const parsed = parseScannedInput('GUEST-0001 (PLSCF-GST-2027-0001)');
+  assert.equal(parsed.id, 'GUEST-0001');
+  assert.equal(parsed.regNumber, 'PLSCF-GST-2027-0001');
+  assert.equal(parsed.isGuestPass, true);
 });

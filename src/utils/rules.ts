@@ -266,6 +266,8 @@ export function verifyStudentIdAgainstRecords(
       studentId: match.studentId,
       studentName: match.studentName,
       className: match.className,
+      academicYear: match.academicYear,
+      phone: (match as any).phone || undefined,
     },
   };
 }

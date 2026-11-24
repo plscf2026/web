@@ -228,21 +228,42 @@ export function parseScannedInput(input: string): {
     cleanToken = cleanToken.replace(/^P-/i, '');
   }
 
+  // Handle formatted label inputs like "GUEST-0001 (PLSCF-GST-2027-0001)"
+  const guestIdMatch = upper.match(/GUEST-\d+/i);
+  const guestRegMatch = upper.match(/PLSCF-GST-[\w-]+/i);
+  const guestTokenMatch = upper.match(/GST-[A-Z0-9]{5,8}-[A-Z0-9]{2,5}/i);
+
   const directIsGuest =
     isGuestPass ||
+    Boolean(guestIdMatch) ||
+    Boolean(guestRegMatch) ||
+    Boolean(guestTokenMatch) ||
     cleanId.startsWith('GUEST-') ||
     cleanId.startsWith('PLSCF-GST-') ||
     cleanToken.startsWith('GST-');
 
-  const resolvedId = cleanId.startsWith('GUEST-') || cleanId.startsWith('PLSCF-') ? cleanId : undefined;
+  let resolvedId = cleanId.startsWith('GUEST-') || cleanId.startsWith('PLSCF-') ? cleanId : undefined;
+  if (guestIdMatch) {
+    resolvedId = guestIdMatch[0].toUpperCase();
+  } else if (guestRegMatch) {
+    resolvedId = guestRegMatch[0].toUpperCase();
+  }
+
+  let resolvedReg = guestRegMatch ? guestRegMatch[0].toUpperCase() : undefined;
+
   const resolvedToken = cleanToken.length === 6 && /^[A-Z0-9]{6}$/.test(cleanToken)
     ? cleanToken
-    : (directIsGuest && cleanToken.startsWith('GST-') ? cleanToken : undefined);
+    : (guestTokenMatch ? guestTokenMatch[0].toUpperCase() : (directIsGuest && cleanToken.startsWith('GST-') ? cleanToken : undefined));
+
+  const displayLabel = guestIdMatch && guestRegMatch
+    ? `${guestIdMatch[0].toUpperCase()} (${guestRegMatch[0].toUpperCase()})`
+    : (resolvedId || cleanId);
 
   return {
     token: resolvedToken,
     id: resolvedId || cleanId,
-    displayLabel: resolvedId || cleanId,
+    regNumber: resolvedReg,
+    displayLabel,
     isGuardianPass,
     isGuestPass: directIsGuest,
     raw: upper,

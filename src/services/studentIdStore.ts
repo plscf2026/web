@@ -623,6 +623,54 @@ export class StudentIdService {
   }
 
   /**
+   * Verify Student ID asynchronously with instant fallback to Supabase cloud database
+   * (Ensures records uploaded by Super Admin from any device are instantly verified)
+   */
+  static async verifyStudentIdAsync(studentId: string): Promise<StudentIdVerificationResult> {
+    const cleanId = (studentId || '').trim().toUpperCase();
+    if (!cleanId) {
+      return {
+        success: false,
+        status: 'NOT_FOUND',
+        messageEn: 'Please enter a valid Student ID.',
+        messageBn: 'অনুগ্রহ করে একটি সঠিক স্টুডেন্ট আইডি প্রদান করুন।',
+      };
+    }
+
+    // 1. Check local cache first
+    const list = this.getAllStudentIds();
+    const localMatch = list.find((r) => r.studentId.trim().toUpperCase() === cleanId);
+    if (localMatch) {
+      return verifyStudentIdAgainstRecords(cleanId, list);
+    }
+
+    // 2. Direct Supabase Cloud Fallback (Cross-device instant verification)
+    try {
+      const { data, error } = await supabase
+        .from('current_student_ids')
+        .select('*')
+        .ilike('student_id', cleanId)
+        .maybeSingle();
+
+      if (!error && data) {
+        const cloudRecord = fromStudentIdDbRow(data);
+        const updatedList = [cloudRecord, ...list.filter((r) => r.studentId.trim().toUpperCase() !== cleanId)];
+        persistList(updatedList);
+        return verifyStudentIdAgainstRecords(cleanId, updatedList);
+      }
+    } catch (e) {
+      console.warn('[StudentIdService] Cloud verify notice:', e);
+    }
+
+    return {
+      success: false,
+      status: 'NOT_FOUND',
+      messageEn: 'Student ID Not Found. Please check your ID or contact the Help Desk.',
+      messageBn: 'স্টুডেন্ট আইডি খুঁজে পাওয়া যায়নি। অনুগ্রহ করে আপনার আইডি যাচাই করুন অথবা হেল্পডেস্কে যোগাযোগ করুন।',
+    };
+  }
+
+  /**
    * Atomically reserve Student ID when student proceeds to payment
    */
   static reserveStudentId(studentId: string, durationMinutes = 15): boolean {
@@ -849,17 +897,41 @@ export class StudentIdService {
     const errorRows: string[] = [];
     const newRecords: CurrentStudentIdRecord[] = [];
 
-    // Check if line 0 is header
-    const startIndex = lines[0].toLowerCase().includes('student') || lines[0].toLowerCase().includes('id') ? 1 : 0;
+    // Flexible header detection
+    let colId = 0;
+    let colName = 1;
+    let colClass = 2;
+    let colYear = 3;
+    let isHeader = false;
+
+    if (lines.length > 0) {
+      const headerParts = lines[0].split(/[,;\t]/).map((p) => p.trim().toLowerCase().replace(/^["']|["']$/g, ''));
+      isHeader = headerParts.some((p) => p.includes('student') || p.includes('id') || p.includes('name') || p.includes('class') || p.includes('year'));
+      if (isHeader) {
+        headerParts.forEach((h, idx) => {
+          if (h.includes('student_id') || h.includes('studentid') || (h.includes('id') && !h.includes('name'))) {
+            colId = idx;
+          } else if (h.includes('student_name') || h.includes('studentname') || h.includes('name')) {
+            colName = idx;
+          } else if (h.includes('class')) {
+            colClass = idx;
+          } else if (h.includes('year')) {
+            colYear = idx;
+          }
+        });
+      }
+    }
+
+    const startIndex = isHeader ? 1 : 0;
 
     for (let i = startIndex; i < lines.length; i++) {
       const line = lines[i];
       // Split by comma or tab or semicolon
       const parts = line.split(/[,;\t]/).map((p) => p.trim().replace(/^["']|["']$/g, ''));
-      const studentId = parts[0]?.toUpperCase();
-      const studentName = parts[1] || undefined;
-      const className = parts[2] || 'Class 10';
-      const academicYear = parts[3] || '2026';
+      const studentId = parts[colId]?.toUpperCase();
+      const studentName = colName >= 0 && parts[colName] ? parts[colName] : undefined;
+      const className = colClass >= 0 && parts[colClass] ? parts[colClass] : 'Class 10';
+      const academicYear = colYear >= 0 && parts[colYear] ? parts[colYear] : '2026';
 
       if (!studentId || studentId.length < 3) {
         invalidCount++;
@@ -875,7 +947,7 @@ export class StudentIdService {
 
       existingIds.add(studentId);
       const record: CurrentStudentIdRecord = {
-        id: `SID-${Date.now()}-${i}`,
+        id: `SID-${studentId.replace(/[^A-Z0-9]/gi, '_')}`,
         studentId,
         studentName,
         className,
