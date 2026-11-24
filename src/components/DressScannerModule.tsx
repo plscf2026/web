@@ -59,6 +59,7 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
   const [logPageSize, setLogPageSize] = useState(10);
   const [feedbackNotice, setFeedbackNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isResultPopupOpen, setIsResultPopupOpen] = useState(false);
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
 
   // Correction modal for Super Admin
   const [selectedRecordForCorrection, setSelectedRecordForCorrection] = useState<DressDistributionRecord | null>(null);
@@ -85,8 +86,11 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
 
   // Handle QR Camera scan or manual Registration ID + QR Token verification
   const handleProcessScan = async (codeToSearch: string, tokenParam?: string) => {
-    if (!codeToSearch.trim()) return;
+    if (!codeToSearch.trim() || isProcessingScan) return;
+    setIsProcessingScan(true);
     refreshDistributions();
+
+    try {
 
     const clean = codeToSearch.trim();
     const parsed = parseScannedInput(clean);
@@ -222,6 +226,9 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
     setValidationResult(result);
     setFeedbackNotice(null);
     setIsResultPopupOpen(true);
+    } finally {
+      setIsProcessingScan(false);
+    }
   };
 
   // Confirm Received Handler
@@ -389,6 +396,7 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
                 language={language}
                 themeColor="emerald"
                 title={language === 'bn' ? 'পোশাক কিউআর ক্যামেরা' : 'Dress Kit QR Camera Scanner'}
+                paused={isResultPopupOpen || isProcessingScan}
               />
             )}
 

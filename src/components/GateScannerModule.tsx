@@ -72,6 +72,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
   const [logPageSize, setLogPageSize] = useState(10);
   const [actionNotice, setActionNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isResultPopupOpen, setIsResultPopupOpen] = useState(false);
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
 
   // Correction Modal State for Super Admin
   const [selectedEventForCorrection, setSelectedEventForCorrection] = useState<GateEventRecord | null>(null);
@@ -101,8 +102,11 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
 
   // Handle QR Camera scan or manual Registration ID + QR Token verification
   const handleProcessScan = async (codeToSearch: string, tokenParam?: string) => {
-    if (!codeToSearch.trim()) return;
+    if (!codeToSearch.trim() || isProcessingScan) return;
+    setIsProcessingScan(true);
     refreshEvents();
+
+    try {
 
     const clean = codeToSearch.trim();
     const parsed = parseScannedInput(clean);
@@ -229,6 +233,9 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
     setIsInside(inside);
     setActionNotice(null);
     setIsResultPopupOpen(true);
+    } finally {
+      setIsProcessingScan(false);
+    }
   };
 
   // Perform Entry or Back (Exit)
@@ -479,6 +486,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                 language={_language}
                 themeColor="sky"
                 title={_language === 'bn' ? 'গেট কিউআর ক্যামেরা' : 'Gate QR Camera'}
+                paused={isResultPopupOpen || isProcessingScan}
               />
             )}
 

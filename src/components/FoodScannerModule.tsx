@@ -85,6 +85,7 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
   }, [mealType]);
   const [feedbackNotice, setFeedbackNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isResultPopupOpen, setIsResultPopupOpen] = useState(false);
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
 
   // Correction modal state for Super Admin
   const [selectedRecordForCorrection, setSelectedRecordForCorrection] = useState<FoodDistributionRecord | null>(null);
@@ -113,8 +114,11 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
 
   // Handle QR Camera scan or manual Registration ID + QR Token verification
   const handleProcessScan = async (codeToSearch: string, tokenParam?: string) => {
-    if (!codeToSearch.trim()) return;
+    if (!codeToSearch.trim() || isProcessingScan) return;
+    setIsProcessingScan(true);
     refreshDistributions();
+
+    try {
 
     const clean = codeToSearch.trim();
     const parsed = parseScannedInput(clean);
@@ -300,6 +304,9 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
     setValidationResult(result);
     setFeedbackNotice(null);
     setIsResultPopupOpen(true);
+    } finally {
+      setIsProcessingScan(false);
+    }
   };
 
   // Confirm Received Handler
@@ -547,6 +554,7 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                 language={language}
                 themeColor="amber"
                 title={language === 'bn' ? 'খাবার বিতরণ কিউআর ক্যামেরা' : 'Food QR Camera Scanner'}
+                paused={isResultPopupOpen || isProcessingScan}
               />
             )}
 

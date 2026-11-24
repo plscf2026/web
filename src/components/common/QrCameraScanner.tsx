@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, RefreshCw, X, AlertTriangle, QrCode } from 'lucide-react';
-import { startResilientCameraStream, startLiveQRScanner } from '../../utils/qrDecoder';
+import { Camera, RefreshCw, X, AlertTriangle, QrCode, Flashlight, FlashlightOff } from 'lucide-react';
+import {
+  startResilientCameraStream,
+  startLiveQRScanner,
+  stopCameraStream,
+  setCameraTorch,
+  isTorchSupported,
+  ScannerStopFn,
+} from '../../utils/qrDecoder';
 
 interface QrCameraScannerProps {
   onScan: (code: string) => void;
@@ -8,6 +15,7 @@ interface QrCameraScannerProps {
   language?: 'en' | 'bn';
   title?: string;
   themeColor?: 'amber' | 'emerald' | 'sky';
+  paused?: boolean;
 }
 
 export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
@@ -16,12 +24,19 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
   language = 'en',
   title,
   themeColor = 'amber',
+  paused = false,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const scannerRef = useRef<ScannerStopFn | null>(null);
+
   const [preferRear, setPreferRear] = useState(true);
   const [isInitializing, setIsInitializing] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isDetectedSuccess, setIsDetectedSuccess] = useState(false);
+  const [isTorchAvailable, setIsTorchAvailable] = useState(false);
+  const [isTorchOn, setIsTorchOn] = useState(false);
+  const [isHardwareEngine, setIsHardwareEngine] = useState(false);
 
   // Keep callback and scan state in stable refs so parent re-renders never tear down or restart the camera stream
   const onScanRef = useRef(onScan);
@@ -32,6 +47,13 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
   const lastScannedRef = useRef<string | null>(null);
   const lastScannedTimeRef = useRef<number>(0);
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync paused state into scanner controller without restarting stream
+  useEffect(() => {
+    if (scannerRef.current) {
+      scannerRef.current.setPaused(Boolean(paused));
+    }
+  }, [paused]);
 
   const themeBorderColor =
     themeColor === 'emerald'
@@ -54,19 +76,30 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
       ? 'via-sky-400 shadow-[0_0_12px_#38bdf8]'
       : 'via-amber-400 shadow-[0_0_12px_#fbbf24]';
 
-  // Master camera stream lifecycle: strictly depends on hardware facing mode (preferRear), NOT on scan results
+  // Toggle Physical Hardware Flashlight (Torch)
+  const handleToggleTorch = async () => {
+    if (!streamRef.current || !isTorchAvailable) return;
+    const nextState = !isTorchOn;
+    const ok = await setCameraTorch(streamRef.current, nextState);
+    if (ok) {
+      setIsTorchOn(nextState);
+    }
+  };
+
+  // Master camera stream lifecycle: strictly depends on hardware facing mode (preferRear)
   useEffect(() => {
     let stream: MediaStream | null = null;
-    let stopScanner: (() => void) | null = null;
+    let stopScanner: ScannerStopFn | null = null;
     let isCancelled = false;
 
     setIsInitializing(true);
     setCameraError(null);
+    setIsTorchOn(false);
 
     startResilientCameraStream(preferRear)
       .then((res) => {
         if (isCancelled) {
-          if (res.stream) res.stream.getTracks().forEach((t) => t.stop());
+          if (res.stream) stopCameraStream(res.stream);
           return;
         }
 
@@ -79,6 +112,9 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
 
         if (res.stream && videoRef.current) {
           stream = res.stream;
+          streamRef.current = res.stream;
+          setIsTorchAvailable(Boolean(res.torchSupported || isTorchSupported(res.stream)));
+
           videoRef.current.srcObject = res.stream;
           videoRef.current.setAttribute('playsinline', 'true');
           videoRef.current.setAttribute('webkit-playsinline', 'true');
@@ -88,7 +124,7 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
             .play()
             .then(() => {
               if (videoRef.current && !isCancelled) {
-                // Initialize high-speed live scanner with frame lock
+                // Initialize thermally-regulated live scanner with frame lock & ROI cropping
                 stopScanner = startLiveQRScanner(
                   videoRef.current,
                   (code) => {
@@ -107,6 +143,13 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
                     lastScannedRef.current = cleanCode;
                     lastScannedTimeRef.current = now;
 
+                    // Gentle haptic feedback on successful scan
+                    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                      try {
+                        navigator.vibrate(40);
+                      } catch (_) {}
+                    }
+
                     // Trigger non-intrusive green glow feedback without shifting layout
                     setIsDetectedSuccess(true);
                     if (successTimeoutRef.current) {
@@ -121,8 +164,15 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
                       onScanRef.current(cleanCode);
                     }
                   },
-                  150
+                  {
+                    intervalMs: 180,
+                    paused: Boolean(paused),
+                    roiCropRatio: 0.65,
+                  }
                 );
+
+                scannerRef.current = stopScanner;
+                setIsHardwareEngine(stopScanner.isNativeSupported());
               }
             })
             .catch((e) => {
@@ -141,13 +191,21 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
       isCancelled = true;
       if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
       if (stopScanner) stopScanner();
+      scannerRef.current = null;
       if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+        stopCameraStream(stream);
       }
+      streamRef.current = null;
+      setIsTorchOn(false);
     };
   }, [preferRear]);
 
   const handleToggleFacing = () => {
+    // If torch is on, turn off before switching facing mode
+    if (isTorchOn && streamRef.current) {
+      setCameraTorch(streamRef.current, false).catch(() => {});
+      setIsTorchOn(false);
+    }
     setPreferRear((prev) => !prev);
   };
 
@@ -158,9 +216,45 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
         <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700/80 text-[11px] font-bold text-white shadow-md">
           <Camera className="w-3.5 h-3.5 text-amber-400" />
           <span>{title || (language === 'bn' ? 'কিউআর কোড স্ক্যানার' : 'Live QR Scanner')}</span>
+          {isHardwareEngine && (
+            <span className="hidden sm:inline text-[9px] font-extrabold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.2 rounded-full">
+              GPU
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Dedicated Hardware Flashlight (Torch) Button */}
+          {isTorchAvailable && (
+            <button
+              type="button"
+              onClick={handleToggleTorch}
+              title={
+                isTorchOn
+                  ? language === 'bn'
+                    ? 'টর্চ বন্ধ করুন (Flashlight OFF)'
+                    : 'Turn Flashlight OFF'
+                  : language === 'bn'
+                  ? 'টর্চ চালু করুন (Flashlight ON)'
+                  : 'Turn Flashlight ON'
+              }
+              className={`p-2 rounded-xl backdrop-blur-md transition-all cursor-pointer shadow-md flex items-center gap-1 ${
+                isTorchOn
+                  ? 'bg-amber-400 text-slate-950 font-bold ring-2 ring-amber-300 drop-shadow-[0_0_10px_#f59e0b]'
+                  : 'bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-amber-300 hover:text-amber-200'
+              }`}
+            >
+              {isTorchOn ? (
+                <Flashlight className="w-4 h-4 fill-current text-slate-950" />
+              ) : (
+                <FlashlightOff className="w-4 h-4" />
+              )}
+              <span className="text-[10px] font-bold hidden sm:inline">
+                {isTorchOn ? (language === 'bn' ? 'টর্চ চালু' : 'Torch ON') : language === 'bn' ? 'টর্চ' : 'Torch'}
+              </span>
+            </button>
+          )}
+
           {/* Switch Camera Button (Front / Back) */}
           <button
             type="button"
@@ -239,6 +333,8 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
               className={`relative z-10 w-60 h-60 sm:w-68 sm:h-68 rounded-3xl pointer-events-none shadow-[0_0_0_9999px_rgba(15,23,42,0.55)] transition-colors duration-200 ${
                 isDetectedSuccess
                   ? 'ring-4 ring-emerald-400/90 bg-emerald-500/10'
+                  : paused
+                  ? 'ring-2 ring-amber-400/50 bg-amber-500/5'
                   : 'ring-1 ring-white/15 bg-transparent'
               }`}
               style={{ boxSizing: 'border-box' }}
@@ -246,32 +342,48 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
               {/* Corner 1: Top-Left */}
               <div
                 className={`absolute -top-0.5 -left-0.5 w-9 h-9 border-t-4 border-l-4 rounded-tl-2xl transition-colors duration-200 ${
-                  isDetectedSuccess ? 'border-emerald-400 drop-shadow-[0_0_8px_#10b981]' : themeBorderColor
+                  isDetectedSuccess
+                    ? 'border-emerald-400 drop-shadow-[0_0_8px_#10b981]'
+                    : paused
+                    ? 'border-amber-400'
+                    : themeBorderColor
                 }`}
               />
               {/* Corner 2: Top-Right */}
               <div
                 className={`absolute -top-0.5 -right-0.5 w-9 h-9 border-t-4 border-r-4 rounded-tr-2xl transition-colors duration-200 ${
-                  isDetectedSuccess ? 'border-emerald-400 drop-shadow-[0_0_8px_#10b981]' : themeBorderColor
+                  isDetectedSuccess
+                    ? 'border-emerald-400 drop-shadow-[0_0_8px_#10b981]'
+                    : paused
+                    ? 'border-amber-400'
+                    : themeBorderColor
                 }`}
               />
               {/* Corner 3: Bottom-Left */}
               <div
                 className={`absolute -bottom-0.5 -left-0.5 w-9 h-9 border-b-4 border-l-4 rounded-bl-2xl transition-colors duration-200 ${
-                  isDetectedSuccess ? 'border-emerald-400 drop-shadow-[0_0_8px_#10b981]' : themeBorderColor
+                  isDetectedSuccess
+                    ? 'border-emerald-400 drop-shadow-[0_0_8px_#10b981]'
+                    : paused
+                    ? 'border-amber-400'
+                    : themeBorderColor
                 }`}
               />
               {/* Corner 4: Bottom-Right */}
               <div
                 className={`absolute -bottom-0.5 -right-0.5 w-9 h-9 border-b-4 border-r-4 rounded-br-2xl transition-colors duration-200 ${
-                  isDetectedSuccess ? 'border-emerald-400 drop-shadow-[0_0_8px_#10b981]' : themeBorderColor
+                  isDetectedSuccess
+                    ? 'border-emerald-400 drop-shadow-[0_0_8px_#10b981]'
+                    : paused
+                    ? 'border-amber-400'
+                    : themeBorderColor
                 }`}
               />
 
-              {/* Animated Laser Scanning Line (GPU-accelerated, suppressed during recognition) */}
+              {/* Animated Laser Scanning Line (Suppressed when recognized or paused) */}
               <div
                 className={`absolute top-0 inset-x-3 h-0.5 bg-gradient-to-r from-transparent ${themeLaserColor} to-transparent animate-qr-laser transition-opacity duration-200 ${
-                  isDetectedSuccess ? 'opacity-0' : 'opacity-100'
+                  isDetectedSuccess || paused ? 'opacity-0' : 'opacity-100'
                 }`}
               />
 
@@ -287,6 +399,8 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
                 className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-bold tracking-wide backdrop-blur-md border shadow-lg transition-colors duration-200 ${
                   isDetectedSuccess
                     ? 'bg-emerald-500/30 text-emerald-200 border-emerald-400/60 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
+                    : paused
+                    ? 'bg-amber-500/30 text-amber-200 border-amber-400/60'
                     : themeBadgeColor
                 }`}
               >
@@ -296,6 +410,10 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
                     ? language === 'bn'
                       ? '✓ কিউআর কোড শনাক্ত হয়েছে!'
                       : '✓ QR Code Recognized!'
+                    : paused
+                    ? language === 'bn'
+                      ? '⏸️ স্ক্যানার বিরতি (যাচাই প্রক্রিয়াধীন)'
+                      : '⏸️ Scanner Dormant (Verifying...)'
                     : language === 'bn'
                     ? 'কিউআর কোড স্কয়ার বক্সে সোজা রাখুন'
                     : 'Align QR Code Inside Square Frame'}

@@ -59,6 +59,7 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
   const [cameraActive, setCameraActive] = useState(false);
   const [actionNotice, setActionNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isResultPopupOpen, setIsResultPopupOpen] = useState(false);
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
 
   // Real-time state caches
   const [gateEvents, setGateEvents] = useState<GateEventRecord[]>(() => EventStore.getGateEvents());
@@ -94,8 +95,11 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
 
   // Process QR Camera scan or manual Registration ID + QR Token lookup
   const handleProcessScan = async (codeToSearch: string, tokenParam?: string) => {
-    if (!codeToSearch.trim()) return;
+    if (!codeToSearch.trim() || isProcessingScan) return;
+    setIsProcessingScan(true);
     refreshAllState();
+
+    try {
 
     const clean = codeToSearch.trim();
     const parsed = parseScannedInput(clean);
@@ -150,6 +154,9 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
     setScannedStudent(student);
     setActionNotice(null);
     setIsResultPopupOpen(true);
+    } finally {
+      setIsProcessingScan(false);
+    }
   };
 
   // Station specific quick actions
@@ -407,6 +414,7 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
                 language={language}
                 themeColor="sky"
                 title={language === 'bn' ? 'মাল্টি-স্টেশন কিউআর ক্যামেরা' : 'Multi-Station QR Camera Scanner'}
+                paused={isResultPopupOpen || isProcessingScan}
               />
             )}
 
