@@ -47,8 +47,6 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
   staffUser,
   isSuperAdmin = false,
 }) => {
-  // Mode selection: STUDENT | STAFF | GUEST
-  const [scannerMode, setScannerMode] = useState<'STUDENT' | 'STAFF' | 'GUEST'>('STUDENT');
   const [scanInput, setScanInput] = useState('');
   const [tokenInput, setTokenInput] = useState('');
   const [scannedStudent, setScannedStudent] = useState<RegistrationRecord | null>(null);
@@ -113,29 +111,24 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
     const displayTicket = parsed.id || clean;
     const expectedToken = tokenParam?.trim().toUpperCase() || parsed.token;
 
-    // =========================================================================
-    // 1. GUEST MODE SCANNER LOGIC (Requirement 3)
-    // =========================================================================
-    if (scannerMode === 'GUEST') {
-      const isGuestCode =
-        parsed.isGuestPass ||
-        clean.toUpperCase().startsWith('GUEST-') ||
-        clean.toUpperCase().startsWith('PLSCF-GST-') ||
-        clean.toUpperCase().startsWith('GST-') ||
-        clean.toUpperCase().includes('"TYPE":"GUEST"');
+    setScannedStudent(null);
+    setScannedGuest(null);
+    setActionNotice(null);
+    setGuestNotice(null);
 
-      if (!isGuestCode) {
-        playScanErrorSound();
-        setScannedStudent(null);
-        setScannedGuest(null);
-        setGuestNotice({
-          type: 'error',
-          message: 'INVALID PASS FOR GUEST MODE: This QR belongs to a Student/Staff pass. Please switch scanner mode to STUDENT or STAFF.',
-        });
-        setIsResultPopupOpen(true);
-        return;
-      }
+    // =========================================================================
+    // 1. AUTO-DETECT & VERIFY GUEST PASS
+    // =========================================================================
+    const isGuestCode =
+      parsed.isGuestPass ||
+      clean.toUpperCase().startsWith('GUEST-') ||
+      clean.toUpperCase().startsWith('PLSCF-GST-') ||
+      clean.toUpperCase().startsWith('GST-') ||
+      clean.toUpperCase().includes('"TYPE":"GUEST"');
 
+    const knownGuest = isGuestCode ? true : await GuestService.findGuestByCode(clean, expectedToken);
+
+    if (isGuestCode || knownGuest) {
       const cleanLabel = getCleanPassDisplayLabel(clean, parsed);
       const actRes = await GuestService.activateGuestCard(
         clean,
@@ -158,7 +151,8 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
         });
         setIsResultPopupOpen(true);
         refreshEvents();
-      } else {
+        return;
+      } else if (isGuestCode) {
         playScanErrorSound();
         setScannedStudent(null);
         setScannedGuest(null);
@@ -167,71 +161,78 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
           message: actRes.error || `Invalid or revoked Guest Pass "${cleanLabel}".`,
         });
         setIsResultPopupOpen(true);
+        return;
       }
-      return;
     }
 
     // =========================================================================
-    // 2. STUDENT / STAFF MODE SCANNER LOGIC
+    // 2. AUTO-DETECT & VERIFY STUDENT OR STAFF TICKET
     // =========================================================================
-    // Reject guest pass if scanned in STUDENT / STAFF mode
-    if (
-      parsed.isGuestPass ||
-      clean.toUpperCase().startsWith('GUEST-') ||
-      clean.toUpperCase().startsWith('PLSCF-GST-') ||
-      clean.toUpperCase().startsWith('GST-')
-    ) {
-      playScanErrorSound();
-      setScannedStudent(null);
-      setScannedGuest(null);
-      setActionNotice({
-        type: 'error',
-        message: 'GUEST PASS DETECTED: Please switch scanner mode above to [👑 GUEST] to activate and verify guest passes.',
-      });
-      setIsResultPopupOpen(true);
-      return;
-    }
-
-    setScannedGuest(null);
-    setGuestNotice(null);
-
     const verifyRes = await AppStore.verifyStudentTicketAsync(clean, expectedToken, staffUser?.id || 'GATE_STAFF');
 
-    if (!verifyRes.verified || !verifyRes.student) {
-      playScanErrorSound();
-      setScannedStudent(null);
-      if (verifyRes.errorType === 'NETWORK_ERROR') {
-        setActionNotice({
-          type: 'error',
-          message: 'Network Connection Error: Unable to reach verification server. Please check your internet connection.',
-        });
-      } else if (verifyRes.errorType === 'UNPAID') {
-        setActionNotice({
-          type: 'error',
-          message: verifyRes.error || `Payment Pending: Student ticket is unpaid. Access is denied until payment is completed.`,
-        });
-      } else if (verifyRes.errorType === 'TOKEN_MISMATCH') {
-        setActionNotice({
-          type: 'error',
-          message: verifyRes.error || `Security Warning: Cryptographic QR token mismatch. Pass is invalid.`,
-        });
-      } else {
-        setActionNotice({
-          type: 'error',
-          message: verifyRes.error || `Student ticket "${displayTicket}" not found in database.`,
-        });
-      }
+    if (verifyRes.verified && verifyRes.student) {
+      const student = verifyRes.student;
+      playScanSuccessSound();
+      const liveStatus = student.gateStatus || (EventStore.isStudentCurrentlyInside(student.id) ? 'ENTRY' : (student.isCheckedIn ? 'ENTRY' : 'NOT_ENTERED'));
+      const inside = liveStatus === 'ENTRY';
+      setScannedStudent({ ...student, gateStatus: liveStatus as any, isCheckedIn: inside });
+      setIsInside(inside);
+      setActionNotice(null);
       setIsResultPopupOpen(true);
       return;
     }
 
-    const student = verifyRes.student;
-    playScanSuccessSound();
-    const liveStatus = student.gateStatus || (EventStore.isStudentCurrentlyInside(student.id) ? 'ENTRY' : (student.isCheckedIn ? 'ENTRY' : 'NOT_ENTERED'));
-    const inside = liveStatus === 'ENTRY';
-    setScannedStudent({ ...student, gateStatus: liveStatus as any, isCheckedIn: inside });
-    setIsInside(inside);
-    setActionNotice(null);
+    // 3. Fallback: Check if guest activation succeeds for unformatted raw tokens
+    if (!knownGuest) {
+      const fallbackGuestRes = await GuestService.activateGuestCard(
+        clean,
+        expectedToken,
+        staffUser.assignedGate || 'Gate 01 - Main Gate',
+        staffUser.id,
+        staffUser.fullName
+      );
+      if (fallbackGuestRes.success && fallbackGuestRes.card) {
+        playScanSuccessSound();
+        setScannedStudent(null);
+        setScannedGuest(fallbackGuestRes.card);
+        setGuestNotice({
+          type: 'success',
+          alreadyActive: fallbackGuestRes.alreadyActive,
+          message: fallbackGuestRes.alreadyActive
+            ? 'GUEST CARD IS ALREADY ACTIVE'
+            : 'GUEST CARD ACTIVATED SUCCESSFULLY',
+        });
+        setIsResultPopupOpen(true);
+        refreshEvents();
+        return;
+      }
+    }
+
+    // 4. If neither matched, report clear error
+    playScanErrorSound();
+    setScannedStudent(null);
+    setScannedGuest(null);
+    if (verifyRes.errorType === 'NETWORK_ERROR') {
+      setActionNotice({
+        type: 'error',
+        message: 'Network Connection Error: Unable to reach verification server. Please check your internet connection.',
+      });
+    } else if (verifyRes.errorType === 'UNPAID') {
+      setActionNotice({
+        type: 'error',
+        message: verifyRes.error || `Payment Pending: Ticket is unpaid. Access is denied until payment is completed.`,
+      });
+    } else if (verifyRes.errorType === 'TOKEN_MISMATCH') {
+      setActionNotice({
+        type: 'error',
+        message: verifyRes.error || `Security Warning: Cryptographic QR token mismatch. Pass is invalid.`,
+      });
+    } else {
+      setActionNotice({
+        type: 'error',
+        message: verifyRes.error || `No Student, Staff, or Guest pass found matching "${displayTicket}".`,
+      });
+    }
     setIsResultPopupOpen(true);
     } finally {
       setIsProcessingScan(false);
@@ -380,95 +381,35 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
         {/* Left Column: QR Code Scan & Search */}
         <div className="lg:col-span-5 space-y-5">
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
-            {/* SCANNER OPERATIONAL MODE TOGGLE (Requirement 3: STUDENT | STAFF | GUEST) */}
-            <div className="bg-slate-100 p-1.5 rounded-2xl flex items-center gap-1.5 border border-slate-200">
-              <button
-                type="button"
-                onClick={() => {
-                  setScannerMode('STUDENT');
-                  setScanInput('');
-                  setTokenInput('');
-                  setScannedStudent(null);
-                  setScannedGuest(null);
-                  setActionNotice(null);
-                  setGuestNotice(null);
-                }}
-                className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  scannerMode === 'STUDENT'
-                    ? 'bg-slate-900 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span>🎓 STUDENT</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setScannerMode('STAFF');
-                  setScanInput('');
-                  setTokenInput('');
-                  setScannedStudent(null);
-                  setScannedGuest(null);
-                  setActionNotice(null);
-                  setGuestNotice(null);
-                }}
-                className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  scannerMode === 'STAFF'
-                    ? 'bg-slate-900 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span>🛡️ STAFF</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setScannerMode('GUEST');
-                  setScanInput('');
-                  setTokenInput('');
-                  setScannedStudent(null);
-                  setScannedGuest(null);
-                  setActionNotice(null);
-                  setGuestNotice(null);
-                }}
-                className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  scannerMode === 'GUEST'
-                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black shadow-md ring-2 ring-amber-300'
-                    : 'text-amber-800 hover:text-amber-950 font-bold bg-amber-50/50'
-                }`}
-              >
-                <Crown className="w-3.5 h-3.5" />
-                <span>GUEST</span>
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                {scannerMode === 'GUEST' ? (
-                  <>
-                    <Crown className="w-4 h-4 text-amber-600" />
-                    <span className="text-amber-900 font-black">Guest Pass Activation Desk</span>
-                  </>
-                ) : (
-                  <>
-                    <QrCode className="w-4 h-4 text-sky-700" />
-                    <span>Gate QR Scanner Desk ({scannerMode})</span>
-                  </>
-                )}
-              </h3>
+            {/* Unified Gate Admission Desk Header (Auto-detects Student, Staff, and Guest) */}
+            <div className="flex items-center justify-between flex-wrap gap-2.5 pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-600 via-indigo-600 to-amber-500 text-white flex items-center justify-center shadow-xs">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-black text-slate-900 tracking-tight">
+                      Gate QR Scanner Desk
+                    </h3>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      All-In-One
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    🎓 Student • 🛡️ Staff • 👑 Guest (Auto-Detect)
+                  </p>
+                </div>
+              </div>
 
               <div className="flex items-center gap-2">
                 {/* OPTION 1: OPEN CAMERA */}
                 <button
                   type="button"
                   onClick={() => setCameraActive(!cameraActive)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
                     cameraActive
                       ? 'bg-rose-100 text-rose-700 border border-rose-300'
-                      : scannerMode === 'GUEST'
-                      ? 'bg-amber-600 text-slate-950 hover:bg-amber-500'
                       : 'bg-slate-900 text-white hover:bg-slate-800'
                   }`}
                 >
@@ -512,14 +453,14 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Registration ID *
+                      Registration ID / Guest ID *
                     </label>
                     <div className="relative">
                       <input
                         type="text"
                         value={scanInput}
                         onChange={(e) => setScanInput(e.target.value)}
-                        placeholder="e.g. PLSCF-2027-F8472"
+                        placeholder="e.g. PLSCF-2027-F8472 or GUEST-0001"
                         required
                         className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-300 text-xs font-mono uppercase tracking-wider focus:border-slate-900 focus:outline-hidden"
                       />
@@ -536,9 +477,8 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                         type="text"
                         value={tokenInput}
                         onChange={(e) => setTokenInput(e.target.value)}
-                        placeholder="e.g. FJJG4G"
-                        maxLength={10}
-                        required
+                        placeholder="e.g. FJJG4G or GST-..."
+                        maxLength={16}
                         className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-300 text-xs font-mono uppercase tracking-wider focus:border-slate-900 focus:outline-hidden"
                       />
                       <KeyRound className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-3" />
@@ -551,21 +491,21 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                   className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-2"
                 >
                   <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Verify Registration ID + QR Token</span>
+                  <span>Verify Pass (Student • Staff • Guest)</span>
                 </button>
               </form>
             </div>
 
-            {/* Quick Demo Student Buttons */}
+            {/* Quick Demo Test Buttons */}
             <div className="pt-2 border-t border-slate-100">
               <span className="text-[11px] font-bold text-slate-500 block mb-2">
-                Quick Test Student Tickets:
+                Quick Test Tickets (Student • Staff • Guest):
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  { id: 'PLSCF-2026-F1001', token: 'A7K9M2' },
-                  { id: 'PLSCF-2026-F1002', token: 'R8W3N5' },
-                  { id: 'PLSCF-2026-C2001', token: 'C3P7X9' },
+                  { id: 'PLSCF-2026-F1001', token: 'A7K9M2', type: 'Student' },
+                  { id: 'PLSCF-2026-F1002', token: 'R8W3N5', type: 'Student' },
+                  { id: 'GUEST-0001', token: 'GST-9P2A7C-YFS', type: 'Guest' },
                 ].map((demo) => (
                   <button
                     key={demo.id}
@@ -575,9 +515,10 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                       setTokenInput(demo.token);
                       handleProcessScan(demo.id, demo.token);
                     }}
-                    className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-mono font-bold transition-colors cursor-pointer border border-slate-200"
+                    className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-mono font-bold transition-colors cursor-pointer border border-slate-200 flex items-center gap-1"
                   >
-                    {demo.id}
+                    <span>{demo.type === 'Guest' ? '👑' : '🎓'}</span>
+                    <span>{demo.id}</span>
                   </button>
                 ))}
               </div>
@@ -622,7 +563,11 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                 <div className="space-y-1.5 flex-1 min-w-0">
                   <div className="flex items-center justify-center sm:justify-start gap-2">
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-900 text-white">
-                      {scannedStudent.category === 'former' ? 'Former Student' : 'Current Student'}
+                      {scannedStudent.category === 'former'
+                        ? '🎓 Former Student'
+                        : scannedStudent.category === 'staff' || scannedStudent.category === 'teacher'
+                        ? '🛡️ Staff / Teacher'
+                        : '🎓 Current Student'}
                     </span>
                     <span className="font-mono text-xs font-black text-emerald-700">
                       {scannedStudent.id}
@@ -1131,7 +1076,11 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                     <div className="space-y-1 min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-900 text-white">
-                          {scannedStudent.category === 'former' ? 'Former Student' : 'Current Student'}
+                          {scannedStudent.category === 'former'
+                            ? '🎓 Former Student'
+                            : scannedStudent.category === 'staff' || scannedStudent.category === 'teacher'
+                            ? '🛡️ Staff / Teacher'
+                            : '🎓 Current Student'}
                         </span>
                         <span className="font-mono text-xs font-black text-sky-700">
                           {scannedStudent.id}
