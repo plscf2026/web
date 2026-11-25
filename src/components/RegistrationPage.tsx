@@ -356,12 +356,12 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   const donationAmount = typeof donationInput === 'number' ? donationInput : 0;
   const fees = calculateTotalFee(category, feeSettings, donationAmount, effectiveHasParent);
 
-  // Auto-generate batch suggestion if empty
+  // Auto-generate batch name based on category and selected academic fields
   const getComputedBatch = () => {
-    if (batchName.trim()) return batchName;
     if (category === 'former') {
       return `SSC ${passingYear || 'Batch'}`;
     }
+    if (batchName.trim()) return batchName;
     return `${currentClass} (${groupOrSection})`;
   };
 
@@ -470,7 +470,9 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
         ? currentClass
           ? `Class ${currentClass}`
           : 'Class X'
-        : batchName || (passingYear ? `SSC ${passingYear}` : 'Alumni Member'),
+        : passingYear
+        ? `SSC ${passingYear}`
+        : 'Alumni Member',
     batchYear: category === 'current' ? '2027' : passingYear || '2018',
     contactNumber: mobileNumber || '01XXXXXXXXX',
     photoUrl: photoUrl || '',
@@ -1965,25 +1967,6 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   {language === 'bn'
                     ? 'এসএসসি বা এইচএসসির আগেই বিদ্যালয় ত্যাগ করে থাকলে প্রযোজ্য শ্রেণি নির্বাচন করুন।'
                     : 'Applicable if student left school prior to SSC or HSC completion.'}
-                </span>
-              </div>
-
-              {/* Batch Name / Identifier */}
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  {t.batchNameLabel}
-                </label>
-                <input
-                  type="text"
-                  value={batchName}
-                  onChange={(e) => setBatchName(e.target.value)}
-                  placeholder={getComputedBatch()}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
-                />
-                <span className="text-[10px] text-slate-500 mt-1 block">
-                  {language === 'bn'
-                    ? 'খালি রাখলে স্বয়ংক্রিয় ব্যাচ নির্ধারণ হবে।'
-                    : 'Defaults automatically to selected passing year or class.'}
                 </span>
               </div>
             </div>
