@@ -1,5 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import {
+  Shield,
   ShieldCheck,
   Users,
   DollarSign,
@@ -114,6 +115,9 @@ const CommitteeManagementTab = lazy(() =>
 );
 const GuestManagementTab = lazy(() =>
   import('./admin/guest/GuestManagementTab').then((m) => ({ default: m.GuestManagementTab }))
+);
+const StaffCardManagementTab = lazy(() =>
+  import('./admin/staffCard/StaffCardManagementTab').then((m) => ({ default: m.StaffCardManagementTab }))
 );
 
 const AdminTabFallback = () => (
@@ -309,6 +313,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'overview'
     | 'userAccessManagement'
     | 'guestManagement'
+    | 'staffCardManagement'
     | 'idCardManagement'
     | 'manualRegistration'
     | 'manualApproval'
@@ -1509,6 +1514,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           },
         ]
       : []),
+    ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('staffCardManagement' as any)
+      ? [
+          {
+            id: 'staffCardManagement' as const,
+            label: language === 'bn' ? 'স্টাফ কার্ড ও খাবার' : 'Staff Pass & Meal Suite',
+            icon: Shield,
+            category: 'credentials' as const,
+            highlight: true,
+            badge: 'Staff',
+            badgeColor: 'emerald' as const,
+          },
+        ]
+      : []),
     {
       id: 'tickets',
       label: language === 'bn' ? 'কিউআর টিকিট ভেরিফিকেশন' : 'QR Ticket Verification',
@@ -2055,6 +2073,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <ErrorBoundary>
           <Suspense fallback={<AdminTabFallback />}>
             <GuestManagementTab
+              language={language}
+              currentAdmin={effectiveAdmin}
+            />
+          </Suspense>
+        </ErrorBoundary>
+      )}
+
+      {/* TAB: DYNAMIC STAFF CARD & MEAL ENTITLEMENT SYSTEM */}
+      {activeTab === 'staffCardManagement' && (
+        <ErrorBoundary>
+          <Suspense fallback={<AdminTabFallback />}>
+            <StaffCardManagementTab
               language={language}
               currentAdmin={effectiveAdmin}
             />

@@ -11,7 +11,6 @@ import {
   UserX,
   Edit3,
   Shield,
-  QrCode,
   X,
   KeyRound,
   Crown,
@@ -28,6 +27,7 @@ import { AppStore } from '../services/store';
 import { EventStore, hasDepartmentPermission } from '../services/eventStore';
 import { GuestService } from '../services/guestService';
 import { GuestCard } from '../types/guest';
+import { StaffCardService } from '../services/staffCardService';
 import { parseScannedInput, getCleanPassDisplayLabel } from '../utils/tokenGenerator';
 import { validateGateAction } from '../utils/eventRules';
 import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
@@ -163,6 +163,70 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
         setIsResultPopupOpen(true);
         return;
       }
+    }
+
+    // =========================================================================
+    // 1.5. AUTO-DETECT & VERIFY STAFF CARD
+    // =========================================================================
+    const isStaffCode =
+      parsed.type === 'STAFF' ||
+      clean.toUpperCase().startsWith('STF-') ||
+      clean.toUpperCase().startsWith('PLSCF-STF-') ||
+      clean.includes('"type":"STAFF"');
+
+    const knownStaff = isStaffCode ? true : await StaffCardService.findStaffCardByCode(clean, expectedToken);
+
+    if (isStaffCode || knownStaff) {
+      const cleanLabel = getCleanPassDisplayLabel(clean, parsed);
+      const staffCard = await StaffCardService.findStaffCardByCode(clean, expectedToken);
+
+      if (!staffCard) {
+        playScanErrorSound();
+        setScannedStudent(null);
+        setScannedGuest(null);
+        setActionNotice({
+          type: 'error',
+          message: `Staff Card "${cleanLabel}" not found in system database.`,
+        });
+        setIsResultPopupOpen(true);
+        return;
+      }
+
+      if (staffCard.status === 'REVOKED') {
+        playScanErrorSound();
+        setScannedStudent(null);
+        setScannedGuest(null);
+        setActionNotice({
+          type: 'error',
+          message: `REVOKED STAFF CARD: This staff pass was revoked (${staffCard.revocationReason || 'Security Revocation'}). Entry denied.`,
+        });
+        setIsResultPopupOpen(true);
+        return;
+      }
+
+      if (staffCard.status === 'INACTIVE' || !staffCard.isActivated) {
+        playScanErrorSound();
+        setScannedStudent(null);
+        setScannedGuest(null);
+        setActionNotice({
+          type: 'error',
+          message: `Card Not Activated: Staff card "${staffCard.regNumber}" is inactive. Please activate via Super Admin Panel.`,
+        });
+        setIsResultPopupOpen(true);
+        return;
+      }
+
+      // Record Gate Entry
+      playScanSuccessSound();
+      setScannedStudent(null);
+      setScannedGuest(null);
+      setActionNotice({
+        type: 'success',
+        message: `STAFF PASS VERIFIED: Access Granted to ${staffCard.staffName || staffCard.id} (${staffCard.designation || 'Staff Member'}).`,
+      });
+      setIsResultPopupOpen(true);
+      refreshEvents();
+      return;
     }
 
     // =========================================================================
@@ -565,7 +629,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-900 text-white">
                       {scannedStudent.category === 'former'
                         ? '🎓 Former Student'
-                        : scannedStudent.category === 'staff' || scannedStudent.category === 'teacher'
+                        : (scannedStudent.category as string) === 'staff' || (scannedStudent.category as string) === 'teacher'
                         ? '🛡️ Staff / Teacher'
                         : '🎓 Current Student'}
                     </span>
@@ -1078,7 +1142,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-900 text-white">
                           {scannedStudent.category === 'former'
                             ? '🎓 Former Student'
-                            : scannedStudent.category === 'staff' || scannedStudent.category === 'teacher'
+                            : (scannedStudent.category as string) === 'staff' || (scannedStudent.category as string) === 'teacher'
                             ? '🛡️ Staff / Teacher'
                             : '🎓 Current Student'}
                         </span>

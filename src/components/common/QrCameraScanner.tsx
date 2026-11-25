@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, RefreshCw, X, AlertTriangle, QrCode, Flashlight } from 'lucide-react';
+import { RefreshCw, X, AlertTriangle, QrCode, Flashlight } from 'lucide-react';
 import {
   startResilientCameraStream,
   startLiveQRScanner,
@@ -61,13 +61,6 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
       : themeColor === 'sky'
       ? 'border-sky-400'
       : 'border-amber-400';
-
-  const themeBadgeColor =
-    themeColor === 'emerald'
-      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-      : themeColor === 'sky'
-      ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
-      : 'bg-amber-500/20 text-amber-300 border-amber-500/40';
 
   const themeLaserColor =
     themeColor === 'emerald'
@@ -230,27 +223,29 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
         {/* Right: Sleek Circular Action Buttons (Flash, Flip, Close) */}
         <div className="flex items-center gap-1.5">
           {/* 1. Hardware Flashlight (Torch) Toggle */}
-          <button
-            type="button"
-            onClick={handleToggleTorch}
-            title={
-              isTorchOn
-                ? language === 'bn'
-                  ? 'ফ্ল্যাশ লাইট বন্ধ করুন (Flash OFF)'
-                  : 'Turn Flashlight OFF'
-                : language === 'bn'
-                ? 'ফ্ল্যাশ লাইট চালু করুন (Flash ON)'
-                : 'Turn Flashlight ON'
-            }
-            aria-label={isTorchOn ? 'Flashlight OFF' : 'Flashlight ON'}
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer backdrop-blur-md ${
-              isTorchOn
-                ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]'
-                : 'bg-black/50 hover:bg-black/70 text-white/80 hover:text-white border border-white/15'
-            }`}
-          >
-            <Flashlight className={`w-4 h-4 ${isTorchOn ? 'fill-current' : ''}`} />
-          </button>
+          {isTorchAvailable && (
+            <button
+              type="button"
+              onClick={handleToggleTorch}
+              title={
+                isTorchOn
+                  ? language === 'bn'
+                    ? 'ফ্ল্যাশ লাইট বন্ধ করুন (Flash OFF)'
+                    : 'Turn Flashlight OFF'
+                  : language === 'bn'
+                  ? 'ফ্ল্যাশ লাইট চালু করুন (Flash ON)'
+                  : 'Turn Flashlight ON'
+              }
+              aria-label={isTorchOn ? 'Flashlight OFF' : 'Flashlight ON'}
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer backdrop-blur-md ${
+                isTorchOn
+                  ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]'
+                  : 'bg-black/50 hover:bg-black/70 text-white/80 hover:text-white border border-white/15'
+              }`}
+            >
+              <Flashlight className={`w-4 h-4 ${isTorchOn ? 'fill-current' : ''}`} />
+            </button>
+          )}
 
           {/* 2. Switch Camera Button (Front / Rear) */}
           <button

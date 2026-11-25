@@ -107,6 +107,8 @@ export function parseScannedInput(input: string): {
   displayLabel?: string;
   isGuardianPass?: boolean;
   isGuestPass?: boolean;
+  isStaffPass?: boolean;
+  type?: string;
   raw: string;
 } {
   if (!input) return { raw: '' };
@@ -123,12 +125,19 @@ export function parseScannedInput(input: string): {
     trimmed.toLowerCase().includes('verify-guest-pass') ||
     trimmed.toLowerCase().includes('type=guest');
 
+  const isStaffPass =
+    trimmed.toUpperCase().startsWith('STF-') ||
+    trimmed.toUpperCase().startsWith('PLSCF-STF-') ||
+    trimmed.toLowerCase().includes('verify-staff-pass') ||
+    trimmed.toLowerCase().includes('type=staff') ||
+    trimmed.toUpperCase().includes('"TYPE":"STAFF"');
+
   // 1. JSON payload
   if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
     try {
       const parsed = JSON.parse(trimmed);
       let t = parsed.token ? String(parsed.token).trim().toUpperCase() : undefined;
-      let rawId = (parsed.id || parsed.guestId) ? String(parsed.id || parsed.guestId).trim().toUpperCase() : undefined;
+      let rawId = (parsed.id || parsed.guestId || parsed.staffId) ? String(parsed.id || parsed.guestId || parsed.staffId).trim().toUpperCase() : undefined;
       let regNo = parsed.regNumber ? String(parsed.regNumber).trim().toUpperCase() : undefined;
       let cat = parsed.category ? String(parsed.category).trim() : undefined;
 
@@ -136,10 +145,11 @@ export function parseScannedInput(input: string): {
       if (rawId && rawId.startsWith('PAR-')) rawId = rawId.replace(/^PAR-/i, '');
       if (t && t.startsWith('P-') && t.length === 8) t = t.replace(/^P-/i, '');
       const jsonIsGuest = isGuestPass || parsed.type === 'GUEST' || Boolean(parsed.isGuestPass) || Boolean(rawId && (rawId.startsWith('GUEST-') || rawId.startsWith('PLSCF-GST-')));
+      const jsonIsStaff = isStaffPass || parsed.type === 'STAFF' || Boolean(parsed.isStaffPass) || Boolean(rawId && (rawId.startsWith('STF-') || rawId.startsWith('PLSCF-STF-')));
 
       const label = rawId
         ? (regNo && regNo !== rawId ? `${rawId} (${regNo})` : rawId)
-        : (regNo || (t ? `Token ${t}` : 'Scanned Guest Pass'));
+        : (regNo || (t ? `Token ${t}` : jsonIsStaff ? 'Scanned Staff Pass' : 'Scanned Guest Pass'));
 
       return {
         token: t,
@@ -149,6 +159,8 @@ export function parseScannedInput(input: string): {
         displayLabel: label,
         isGuardianPass: isGuardianPass || Boolean(parsed.isGuardianPass),
         isGuestPass: jsonIsGuest,
+        isStaffPass: jsonIsStaff,
+        type: parsed.type || (jsonIsStaff ? 'STAFF' : jsonIsGuest ? 'GUEST' : undefined),
         raw: trimmed.toUpperCase(),
       };
     } catch {}

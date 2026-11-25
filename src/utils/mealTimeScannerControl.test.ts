@@ -1,17 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_MEAL_SCHEDULE_CONFIG,
   getDhakaTimeParts,
   formatTime24to12,
   evaluateMealScannerStatus,
-  MealScheduleConfig,
 } from '../types/mealControl';
 import { MealControlService } from '../services/mealControlService';
 import { validateMealCollection } from './eventRules';
 import { EventStore } from '../services/eventStore';
 import { GuestService } from '../services/guestService';
-import { StudentRegistration } from '../types';
+import { RegistrationRecord } from '../types';
 
 // Mock in-memory localStorage for Node test runner environment
 const mockStorage: Record<string, string> = {};
@@ -54,6 +52,7 @@ test('1. Timezone: Bangladesh Standard Time (Asia/Dhaka) Extraction', () => {
 
 test('2. SCHEDULED Mode: Active within schedule window', () => {
   const schedule = {
+    mealType: 'breakfast' as const,
     enabled: true,
     mode: 'SCHEDULED' as const,
     startTime: '07:00',
@@ -71,6 +70,7 @@ test('2. SCHEDULED Mode: Active within schedule window', () => {
 
 test('3. SCHEDULED Mode: Timeout when before or after schedule window', () => {
   const schedule = {
+    mealType: 'breakfast' as const,
     enabled: true,
     mode: 'SCHEDULED' as const,
     startTime: '07:00',
@@ -98,6 +98,7 @@ test('3. SCHEDULED Mode: Timeout when before or after schedule window', () => {
 
 test('4. MANUAL_ON Mode: Active outside scheduled hours', () => {
   const schedule = {
+    mealType: 'breakfast' as const,
     enabled: true,
     mode: 'MANUAL_ON' as const,
     startTime: '07:00',
@@ -116,6 +117,7 @@ test('4. MANUAL_ON Mode: Active outside scheduled hours', () => {
 
 test('5. MANUAL_OFF Mode: Timeout even during scheduled hours', () => {
   const schedule = {
+    mealType: 'breakfast' as const,
     enabled: true,
     mode: 'MANUAL_OFF' as const,
     startTime: '07:00',
@@ -135,6 +137,7 @@ test('5. MANUAL_OFF Mode: Timeout even during scheduled hours', () => {
 
 test('6. Disabled Toggle: Master OFF overrides all modes to Timeout', () => {
   const schedule = {
+    mealType: 'breakfast' as const,
     enabled: false,
     mode: 'MANUAL_ON' as const, // Even if set to Manual ON, enabled=false halts
     startTime: '07:00',
@@ -168,17 +171,30 @@ test('7. MealControlService: State mutations & live evaluation', () => {
 });
 
 test('8. validateMealCollection: Rejects with TIMEOUT when scanner is closed', () => {
-  const mockStudent: StudentRegistration = {
+  const mockStudent: RegistrationRecord = {
     id: 'PLSCF-2027-MOCK1',
     fullName: 'Test Attendee',
     email: 'test@example.com',
-    phone: '01700000000',
-    passingYear: '2015',
-    category: 'alumni',
+    mobileNumber: '01700000000',
+    qrToken: 'MCK001',
+    category: 'former',
     paymentStatus: 'paid',
     registrationFee: 1000,
-    registrationDate: new Date().toISOString(),
+    totalPaid: 1000,
+    donationAmount: 0,
+    tShirtSize: 'L',
+    year: 2027,
+    batchName: 'Batch 2015',
+    registeredAt: new Date().toISOString(),
     gender: 'male',
+    hasParent: false,
+    isCheckedIn: true,
+    gateStatus: 'ENTRY',
+    isTShirtCollected: false,
+    photoUrl: '',
+    address: 'Faridpur',
+    transactionId: 'TX789',
+    paymentMethod: 'bkash',
   };
 
   // Set dinner to MANUAL_OFF

@@ -331,7 +331,11 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
   // Accompanying Parent Eligibility Rule:
   // Eligible if female (any category/class), OR if current student below Class 6 (male or female)
-  const isBelowClass6 = category === 'current' && isStudentBelowClass6(currentClass);
+  const effectiveCurrentClass =
+    (category === 'current' && idVerificationResult?.record?.className)
+      ? idVerificationResult.record.className
+      : currentClass;
+  const isBelowClass6 = category === 'current' && isStudentBelowClass6(effectiveCurrentClass);
   const isParentEligible = gender === 'female' || isBelowClass6;
   const effectiveHasParent = isParentEligible && hasParent;
 
@@ -712,24 +716,6 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   for (let y = 2025; y >= 1962; y--) {
     passingYears.push(y);
   }
-
-  const currentClasses = [
-    'Play',
-    'Nursery',
-    'KG',
-    'Class 1',
-    'Class 2',
-    'Class 3',
-    'Class 4',
-    'Class 5',
-    'Class 6',
-    'Class 7',
-    'Class 8',
-    'Class 9',
-    'Class 10',
-    'Class 11 (HSC)',
-    'Class 12 (HSC)',
-  ];
 
   const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 

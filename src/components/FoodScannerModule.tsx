@@ -31,6 +31,8 @@ import { AppStore } from '../services/store';
 import { EventStore, hasDepartmentPermission } from '../services/eventStore';
 import { GuestService } from '../services/guestService';
 import { GuestCard, GuestMealFacilities } from '../types/guest';
+import { StaffCardService } from '../services/staffCardService';
+import { StaffCard, StaffMealFacilitiesStatus } from '../types/staffCard';
 import { parseScannedInput, getCleanPassDisplayLabel } from '../utils/tokenGenerator';
 import { validateMealCollection } from '../utils/eventRules';
 import { playScanSuccessSound, playScanErrorSound } from '../utils/audioAlert';
@@ -40,7 +42,6 @@ import { paginate } from '../utils/pagination';
 import { DEFAULT_STUDENT_AVATAR_PLACEHOLDER } from '../services/studentPhotoStorageService';
 import { MealControlService, EVENT_MEAL_CONTROL_SYNC } from '../services/mealControlService';
 import { MealTimeScannerControlPanel } from './admin/MealTimeScannerControlPanel';
-import { formatTime24to12 } from '../types/mealControl';
 
 interface FoodScannerModuleProps {
   language: Language;
@@ -72,6 +73,13 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
     message: string;
     messageBn?: string;
   } | null>(null);
+  const [scannedStaff, setScannedStaff] = useState<StaffCard | null>(null);
+  const [staffFacilities, setStaffFacilities] = useState<StaffMealFacilitiesStatus | null>(null);
+  const [staffNotice, setStaffNotice] = useState<{
+    type: 'success' | 'error' | 'warning';
+    message: string;
+    messageBn?: string;
+  } | null>(null);
   const [validationResult, setValidationResult] = useState<any | null>(null);
   const [distributions, setDistributions] = useState<FoodDistributionRecord[]>(() =>
     EventStore.getFoodDistributions()
@@ -84,7 +92,7 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
 
   // Meal Time & Scanner Control System state
   const [isMealControlOpen, setIsMealControlOpen] = useState(false);
-  const [mealControlTick, setMealControlTick] = useState(0);
+  const [_mealControlTick, setMealControlTick] = useState(0);
 
   // Re-evaluate whenever sync happens
   useEffect(() => {
@@ -249,10 +257,136 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
       return;
     }
 
-    // Reset guest state when processing a regular student
+    // =========================================================================
+    // 0.5. STAFF CARD VERIFICATION & FOOD WORKFLOW
+    // =========================================================================
+    const isStaffCode =
+      parsed.type === 'STAFF' ||
+      clean.toUpperCase().startsWith('STF-') ||
+      clean.toUpperCase().startsWith('PLSCF-STF-') ||
+      clean.includes('"type":"STAFF"');
+
+    const knownStaff = isStaffCode ? true : await StaffCardService.findStaffCardByCode(clean, expectedToken);
+
+    if (isStaffCode || knownStaff) {
+      setScannedStudent(null);
+      setScannedGuest(null);
+      setValidationResult(null);
+
+      const cleanLabel = getCleanPassDisplayLabel(clean, parsed);
+      const staffCard = await StaffCardService.findStaffCardByCode(clean, expectedToken);
+
+      if (!staffCard) {
+        playScanErrorSound();
+        setScannedStaff(null);
+        setStaffFacilities(null);
+        setValidationResult({
+          canCollect: false,
+          status: 'INVALID_REGISTRATION',
+          messageEn: `Staff Card "${cleanLabel}" not found in system database.`,
+          messageBn: `স্টাফ কার্ড "${cleanLabel}" সিস্টেমে পাওয়া যায়নি।`,
+        });
+        setStaffNotice({
+          type: 'error',
+          message: `Staff Card "${cleanLabel}" not found in system database.`,
+          messageBn: `স্টাফ কার্ড "${cleanLabel}" সিস্টেমে পাওয়া যায়নি।`,
+        });
+        setIsResultPopupOpen(true);
+        return;
+      }
+
+      // Check Meal Time & Scanner Control System for Staff
+      const staffTimeControl = MealControlService.evaluateMealStatus(mealType);
+      if (!staffTimeControl.isOpen) {
+        playScanErrorSound();
+        setScannedStaff(staffCard);
+        const facilities = await StaffCardService.getStaffMealFacilities(staffCard.id);
+        setStaffFacilities(facilities);
+        setStaffNotice({
+          type: 'error',
+          message: 'Time Out',
+          messageBn: `Time Out (সময় শেষ): ${staffTimeControl.reasonBn}`,
+        });
+        setIsResultPopupOpen(true);
+        return;
+      }
+
+      if (staffCard.status === 'REVOKED') {
+        playScanErrorSound();
+        setScannedStaff(staffCard);
+        setStaffFacilities(null);
+        setStaffNotice({
+          type: 'error',
+          message: `REVOKED STAFF CARD: This card was revoked by administration (${staffCard.revocationReason || 'Security Revocation'}). Food collection denied.`,
+          messageBn: 'বাতিলকৃত স্টাফ কার্ড: প্রশাসন কর্তৃক এই কার্ডটি বাতিল করা হয়েছে। খাবার বিতরণ নিষিদ্ধ।',
+        });
+        setIsResultPopupOpen(true);
+        return;
+      }
+
+      if (staffCard.status === 'INACTIVE' || !staffCard.isActivated) {
+        playScanErrorSound();
+        setScannedStaff(staffCard);
+        setStaffFacilities(null);
+        setStaffNotice({
+          type: 'error',
+          message: 'Card Not Activated',
+          messageBn: 'Card Not Activated: কার্ডটি এখনও সক্রিয় করা হয়নি।',
+        });
+        setIsResultPopupOpen(true);
+        return;
+      }
+
+      // Check if Card has Required Meal Entitlement
+      const hasMeal = staffCard.mealEntitlements && staffCard.mealEntitlements.includes(mealType);
+      if (!hasMeal) {
+        playScanErrorSound();
+        setScannedStaff(staffCard);
+        const facilities = await StaffCardService.getStaffMealFacilities(staffCard.id);
+        setStaffFacilities(facilities);
+        setStaffNotice({
+          type: 'error',
+          message: 'Meal Not Assigned',
+          messageBn: 'Meal Not Assigned: এই খাবারের সুবিধা কার্ডটিতে বরাদ্দ নেই।',
+        });
+        setIsResultPopupOpen(true);
+        return;
+      }
+
+      // Staff card is ACTIVE and authorized! Query meal facilities
+      const facilities = await StaffCardService.getStaffMealFacilities(staffCard.id);
+      setScannedStaff(staffCard);
+      setStaffFacilities(facilities);
+
+      const isAlreadyCollected = facilities[mealType] === 'Collected';
+
+      if (isAlreadyCollected) {
+        playScanErrorSound();
+        setStaffNotice({
+          type: 'warning',
+          message: `ALREADY COLLECTED: Staff member ${staffCard.staffName || staffCard.id} has already collected ${mealType.toUpperCase()}.`,
+          messageBn: `ALREADY COLLECTED: স্টাফ সদস্য ${staffCard.staffName || staffCard.id} ইতিপূর্বে ${mealType === 'breakfast' ? 'সকালের নাস্তা' : mealType === 'lunch' ? 'দুপুরের খাবার' : 'রাতের খাবার'} গ্রহণ করেছেন।`,
+        });
+      } else {
+        playScanSuccessSound();
+        setStaffNotice({
+          type: 'success',
+          message: `ELIGIBLE: Staff card active & entitled. Ready to collect ${mealType.toUpperCase()}.`,
+          messageBn: `যোগ্য: স্টাফ কার্ড সক্রিয় ও খাবার অনুমোদিত। ${mealType === 'breakfast' ? 'সকালের নাস্তা' : mealType === 'lunch' ? 'দুপুরের খাবার' : 'রাতের খাবার'} বিতরণের জন্য প্রস্তুত।`,
+        });
+      }
+
+      setIsResultPopupOpen(true);
+      return;
+    }
+
+    // Reset guest & staff state when processing a regular student
     setScannedGuest(null);
     setGuestFacilities(null);
     setGuestNotice(null);
+    setScannedStaff(null);
+    setStaffFacilities(null);
+    setStaffNotice(null);
 
     const verifyRes = await AppStore.verifyStudentTicketAsync(clean, expectedToken, staffUser?.id || 'FOOD_STAFF');
 
@@ -499,6 +633,78 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
     } else {
       playScanErrorSound();
       setGuestNotice({
+        type: 'error',
+        message: res.error || 'Failed to record meal collection.',
+      });
+    }
+  };
+
+  // Staff Meal Collection Handler
+  const handleConfirmStaffFoodCollection = async () => {
+    if (!scannedStaff || !staffFacilities) return;
+
+    const isAlready = staffFacilities[mealType] === 'Collected';
+
+    if (isAlready) {
+      playScanErrorSound();
+      setStaffNotice({
+        type: 'error',
+        message: `ALREADY COLLECTED: Staff member has already collected ${mealType.toUpperCase()}.`,
+      });
+      return;
+    }
+
+    // Meal Time & Scanner Control System check (Asia/Dhaka)
+    const mealControl = MealControlService.evaluateMealStatus(mealType);
+    if (!mealControl.isOpen) {
+      playScanErrorSound();
+      setStaffNotice({
+        type: 'error',
+        message: 'Time Out',
+      });
+      return;
+    }
+
+    // Entitlement check
+    if (!scannedStaff.mealEntitlements?.includes(mealType)) {
+      playScanErrorSound();
+      setStaffNotice({
+        type: 'error',
+        message: 'Meal Not Assigned',
+      });
+      return;
+    }
+
+    const res = await StaffCardService.collectStaffMeal(
+      scannedStaff.id,
+      mealType,
+      scannedStaff.token,
+      staffUser.id,
+      staffUser.fullName,
+      staffUser.assignedGate || 'Food Counter',
+      { checkSchedule: true }
+    );
+
+    if (res.success && res.record) {
+      playScanSuccessSound();
+      const updatedFacilities = await StaffCardService.getStaffMealFacilities(scannedStaff.id);
+      setStaffFacilities(updatedFacilities);
+      setStaffNotice({
+        type: 'success',
+        message: `[COLLECTION RECORDED] ${mealType.toUpperCase()} marked as COLLECTED for Staff ${scannedStaff.staffName || scannedStaff.id}.`,
+        messageBn: `[সফল] স্টাফ ${scannedStaff.staffName || scannedStaff.id}-এর ${mealType === 'breakfast' ? 'সকালের নাস্তা' : mealType === 'lunch' ? 'দুপুরের খাবার' : 'রাতের খাবার'} সফলভাবে সম্পন্ন হয়েছে।`,
+      });
+
+      // Auto-dismiss after success so staff can scan next pass
+      setTimeout(() => {
+        setIsResultPopupOpen(false);
+        setScannedStaff(null);
+        setStaffFacilities(null);
+        setStaffNotice(null);
+      }, 1800);
+    } else {
+      playScanErrorSound();
+      setStaffNotice({
         type: 'error',
         message: res.error || 'Failed to record meal collection.',
       });
@@ -1428,6 +1634,9 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                   setScannedGuest(null);
                   setGuestFacilities(null);
                   setGuestNotice(null);
+                  setScannedStaff(null);
+                  setStaffFacilities(null);
+                  setStaffNotice(null);
                   setFeedbackNotice(null);
                 }}
                 className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
@@ -1479,6 +1688,33 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                     <p>{guestNotice.message}</p>
                     {guestNotice.messageBn && (
                       <p className="text-[11px] font-normal opacity-90 mt-0.5">{guestNotice.messageBn}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Staff Feedback Alert Notice */}
+              {staffNotice && (
+                <div
+                  className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2.5 ${
+                    staffNotice.type === 'success'
+                      ? 'bg-emerald-50 border border-emerald-300 text-emerald-900'
+                      : staffNotice.type === 'warning'
+                      ? 'bg-amber-50 border border-amber-300 text-amber-900'
+                      : 'bg-rose-50 border border-rose-300 text-rose-900'
+                  }`}
+                >
+                  {staffNotice.type === 'success' ? (
+                    <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+                  ) : staffNotice.type === 'warning' ? (
+                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                  )}
+                  <div>
+                    <p>{staffNotice.message}</p>
+                    {staffNotice.messageBn && (
+                      <p className="text-[11px] font-normal opacity-90 mt-0.5">{staffNotice.messageBn}</p>
                     )}
                   </div>
                 </div>
@@ -1654,6 +1890,208 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                       </div>
                       <p className="text-xs text-rose-800 font-bold">
                         Guest card must be activated at the Main Gate first before collecting food.
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : scannedStaff ? (
+                <>
+                  {/* Staff Profile Card */}
+                  <div className="flex items-start gap-4 pb-5 border-b border-amber-100">
+                    <div className="w-20 h-24 rounded-2xl bg-gradient-to-br from-yellow-400 via-amber-500 to-amber-700 flex flex-col items-center justify-center text-slate-950 shadow-md border-2 border-amber-300 shrink-0 font-sans">
+                      <Shield className="w-8 h-8 text-slate-950 mb-1" />
+                      <span className="text-[9px] font-black uppercase tracking-wider">Staff Pass</span>
+                    </div>
+
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
+                          {scannedStaff.designation || 'Staff Member'}
+                        </span>
+                        <span className="font-mono text-xs font-black text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded">
+                          {scannedStaff.id}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            scannedStaff.status === 'ACTIVE'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : scannedStaff.status === 'INACTIVE'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                              : 'bg-rose-100 text-rose-800 border border-rose-300'
+                          }`}
+                        >
+                          {scannedStaff.status}
+                        </span>
+                      </div>
+
+                      <h4 className="text-lg font-black text-slate-900 truncate">
+                        {scannedStaff.staffName || scannedStaff.regNumber}
+                      </h4>
+
+                      <div className="text-xs text-slate-500">
+                        <span>{scannedStaff.department || 'Operations Team'}</span>
+                        {(scannedStaff.mobileNumber || scannedStaff.phone) && <span> • {scannedStaff.mobileNumber || scannedStaff.phone}</span>}
+                      </div>
+
+                      <div className="pt-1 flex items-center gap-2 text-xs">
+                        <span className="font-bold text-slate-500">TOKEN:</span>
+                        <span className="font-mono font-black tracking-widest text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded border border-amber-300">
+                          {scannedStaff.token}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Staff Meal Facilities Matrix */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                      Assigned Meal Entitlements
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                      {/* Breakfast */}
+                      <div
+                        className={`p-3 rounded-2xl border ${
+                          staffFacilities?.breakfast === 'Collected'
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                            : staffFacilities?.breakfast === 'Available'
+                            ? 'bg-blue-50 border-blue-200 text-blue-900'
+                            : 'bg-slate-50 border-slate-200 text-slate-500'
+                        }`}
+                      >
+                        <Utensils className="w-4 h-4 mx-auto mb-1 text-slate-600" />
+                        <span className="font-bold block text-xs">Breakfast</span>
+                        <span
+                          className={`text-[10px] font-black uppercase mt-1 inline-block px-2 py-0.5 rounded-full ${
+                            staffFacilities?.breakfast === 'Collected'
+                              ? 'bg-emerald-600 text-white'
+                              : staffFacilities?.breakfast === 'Available'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-200 text-slate-600'
+                          }`}
+                        >
+                          {staffFacilities?.breakfast === 'Collected'
+                            ? 'Collected'
+                            : staffFacilities?.breakfast === 'Available'
+                            ? 'Authorized'
+                            : 'Not Assigned'}
+                        </span>
+                      </div>
+
+                      {/* Lunch */}
+                      <div
+                        className={`p-3 rounded-2xl border ${
+                          staffFacilities?.lunch === 'Collected'
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                            : staffFacilities?.lunch === 'Available'
+                            ? 'bg-blue-50 border-blue-200 text-blue-900'
+                            : 'bg-slate-50 border-slate-200 text-slate-500'
+                        }`}
+                      >
+                        <Utensils className="w-4 h-4 mx-auto mb-1 text-slate-600" />
+                        <span className="font-bold block text-xs">Lunch</span>
+                        <span
+                          className={`text-[10px] font-black uppercase mt-1 inline-block px-2 py-0.5 rounded-full ${
+                            staffFacilities?.lunch === 'Collected'
+                              ? 'bg-emerald-600 text-white'
+                              : staffFacilities?.lunch === 'Available'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-200 text-slate-600'
+                          }`}
+                        >
+                          {staffFacilities?.lunch === 'Collected'
+                            ? 'Collected'
+                            : staffFacilities?.lunch === 'Available'
+                            ? 'Authorized'
+                            : 'Not Assigned'}
+                        </span>
+                      </div>
+
+                      {/* Dinner */}
+                      <div
+                        className={`p-3 rounded-2xl border ${
+                          staffFacilities?.dinner === 'Collected'
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                            : staffFacilities?.dinner === 'Available'
+                            ? 'bg-blue-50 border-blue-200 text-blue-900'
+                            : 'bg-slate-50 border-slate-200 text-slate-500'
+                        }`}
+                      >
+                        <Utensils className="w-4 h-4 mx-auto mb-1 text-slate-600" />
+                        <span className="font-bold block text-xs">Dinner</span>
+                        <span
+                          className={`text-[10px] font-black uppercase mt-1 inline-block px-2 py-0.5 rounded-full ${
+                            staffFacilities?.dinner === 'Collected'
+                              ? 'bg-emerald-600 text-white'
+                              : staffFacilities?.dinner === 'Available'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-200 text-slate-600'
+                          }`}
+                        >
+                          {staffFacilities?.dinner === 'Collected'
+                            ? 'Collected'
+                            : staffFacilities?.dinner === 'Available'
+                            ? 'Authorized'
+                            : 'Not Assigned'}
+                        </span>
+                      </div>
+
+                      {/* Dress / Gift */}
+                      <div className="p-3 rounded-2xl border bg-rose-50 border-rose-200 text-rose-900">
+                        <Ban className="w-4 h-4 mx-auto mb-1 text-rose-600" />
+                        <span className="font-bold block text-xs">Dress / Gift</span>
+                        <span className="text-[10px] font-black uppercase mt-1 inline-block px-2 py-0.5 rounded-full bg-rose-600 text-white">
+                          Not Eligible
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Button / Duplicate Warning / Inactive Warning */}
+                  {scannedStaff.status === 'ACTIVE' ? (
+                    !scannedStaff.mealEntitlements?.includes(mealType) ? (
+                      <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-900 text-center font-bold text-xs space-y-1">
+                        <div className="flex items-center justify-center gap-1.5 text-amber-800 text-sm font-black">
+                          <AlertTriangle className="w-5 h-5 text-amber-600" />
+                          <span>MEAL NOT ASSIGNED</span>
+                        </div>
+                        <p className="text-xs text-amber-800 font-extrabold">
+                          Staff card is not authorized for {mealType.toUpperCase()}.
+                        </p>
+                        <p className="text-[11px] font-normal text-amber-700">
+                          Super Admin can assign or update meal entitlements from the Staff Pass Suite.
+                        </p>
+                      </div>
+                    ) : staffFacilities?.[mealType] === 'Collected' ? (
+                      <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-900 text-center font-bold text-xs space-y-1">
+                        <div className="flex items-center justify-center gap-1.5 text-rose-700 text-sm font-black">
+                          <XCircle className="w-5 h-5 text-rose-600" />
+                          <span>ALREADY COLLECTED</span>
+                        </div>
+                        <p className="text-xs text-rose-800 font-extrabold">
+                          Staff member {scannedStaff.staffName || scannedStaff.id} has already collected {mealType.toUpperCase()}.
+                        </p>
+                        <p className="text-[11px] font-normal text-rose-700">
+                          Duplicate meal collection is strictly prohibited. Each meal can only be collected once.
+                        </p>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleConfirmStaffFoodCollection}
+                        className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-800 active:scale-[0.99] text-slate-950 font-black text-sm tracking-wider uppercase transition-all shadow-lg shadow-amber-500/25 cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Utensils className="w-5 h-5" />
+                        <span>[ CONFIRM STAFF {mealType.toUpperCase()} COLLECTION ]</span>
+                      </button>
+                    )
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-900 text-center font-bold text-xs space-y-1">
+                      <div className="flex items-center justify-center gap-1.5 text-rose-700 text-sm font-black">
+                        <Shield className="w-5 h-5 text-rose-600" />
+                        <span>CARD NOT ACTIVATED</span>
+                      </div>
+                      <p className="text-xs text-rose-800 font-bold">
+                        Staff card must be activated by Super Admin before collecting meals.
                       </p>
                     </div>
                   )}
@@ -1851,6 +2289,9 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                   setScannedGuest(null);
                   setGuestFacilities(null);
                   setGuestNotice(null);
+                  setScannedStaff(null);
+                  setStaffFacilities(null);
+                  setStaffNotice(null);
                   setFeedbackNotice(null);
                 }}
                 className="w-full py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"

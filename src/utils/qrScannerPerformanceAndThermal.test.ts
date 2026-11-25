@@ -224,10 +224,11 @@ test('6. Atomic Multi-Device Race Condition: Exactly 1 device succeeds for singl
   const staffAccounts: StaffAccount[] = [
     {
       id: 'STAFF_BOOTH_1',
+      authUserId: 'usr_booth1',
+      email: 'booth1@plscf.org',
       username: 'booth1',
       fullName: 'Booth 1 Staff',
       department: 'LUNCH',
-      allowedDepartments: ['LUNCH'],
       role: 'STAFF' as any,
       status: 'ACTIVE',
       permissions: ['VERIFY', 'APPROVE'],
@@ -235,10 +236,11 @@ test('6. Atomic Multi-Device Race Condition: Exactly 1 device succeeds for singl
     },
     {
       id: 'STAFF_BOOTH_2',
+      authUserId: 'usr_booth2',
+      email: 'booth2@plscf.org',
       username: 'booth2',
       fullName: 'Booth 2 Staff',
       department: 'LUNCH',
-      allowedDepartments: ['LUNCH'],
       role: 'STAFF' as any,
       status: 'ACTIVE',
       permissions: ['VERIFY', 'APPROVE'],
@@ -265,7 +267,11 @@ test('6. Atomic Multi-Device Race Condition: Exactly 1 device succeeds for singl
     hasParent: false,
     isCheckedIn: true,
     gateStatus: 'ENTRY',
-    isTshirtCollected: false,
+    isTShirtCollected: false,
+    photoUrl: '',
+    address: 'Faridpur',
+    transactionId: 'TX456',
+    paymentMethod: 'bkash',
   };
 
   // Seed student and ensure gate entry status
@@ -273,6 +279,7 @@ test('6. Atomic Multi-Device Race Condition: Exactly 1 device succeeds for singl
   EventStore.saveGateEvents([
     {
       id: 'GATE-CONCURRENCY-1',
+      gateId: 'GATE-01',
       registrationId: testStudentId,
       studentName: testStudent.fullName,
       batchName: 'Batch 2020',

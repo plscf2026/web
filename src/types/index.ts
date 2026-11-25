@@ -359,6 +359,7 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
     allowedTabs: [
       'userAccessManagement',
       'guestManagement',
+      'staffCardManagement',
       'masterOverview',
       'gateManagement',
       'manualApproval',
@@ -822,3 +823,4 @@ export interface ContactInquiry {
 }
 
 export * from './mealControl';
+export * from './staffCard';

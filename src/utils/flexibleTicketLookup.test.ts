@@ -38,7 +38,11 @@ test('Flexible Ticket Lookup: Mobile Number is Enough OR Registration ID / Token
     gender: 'male',
     hasParent: false,
     isCheckedIn: false,
-    isTshirtCollected: false,
+    isTShirtCollected: false,
+    photoUrl: '',
+    address: 'Faridpur',
+    transactionId: 'TX123',
+    paymentMethod: 'bkash',
   };
 
   const storageKey = 'plscf_reunion_registrations_v2';

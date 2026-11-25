@@ -5,20 +5,12 @@ import {
   Sun,
   Moon,
   Power,
-  CheckCircle2,
-  AlertTriangle,
-  RefreshCw,
   Save,
-  ShieldCheck,
-  Radio,
   Sliders,
-  Calendar,
-  Sparkles,
 } from 'lucide-react';
 import {
   MealType,
   MealScannerMode,
-  SingleMealSchedule,
   MealScheduleConfig,
   formatTime24to12,
   getDhakaTimeParts,
@@ -35,7 +27,7 @@ interface MealTimeScannerControlPanelProps {
 export const MealTimeScannerControlPanel: React.FC<MealTimeScannerControlPanelProps> = ({
   language = 'en',
   adminName = 'Super Admin',
-  isCompact = false,
+  isCompact: _isCompact = false,
 }) => {
   const [config, setConfig] = useState<MealScheduleConfig>(() =>
     MealControlService.getScheduleConfig()
