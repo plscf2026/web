@@ -3526,7 +3526,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     key={section.id}
                   >
                     <div className="flex items-center gap-2 flex-wrap">
-                      <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                      <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                         <input
                           checked={section.visible}
                           onChange={() => toggleHomePageSection(section.id)}

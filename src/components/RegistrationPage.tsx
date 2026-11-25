@@ -1254,11 +1254,11 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
             {/* Blood Group Selection */}
             <div>
-              <label className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+              <div className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
                 <Droplet className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                 <span>{language === 'bn' ? 'রক্তের গ্রুপ (Blood Group)' : 'Blood Group'}</span>
                 <span className="text-rose-600">*</span>
-              </label>
+              </div>
               <div>
                 <select
                   name="bloodGroup"
@@ -1292,14 +1292,14 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
             {/* Profile Photo Upload & Live Camera Capture (Requirement 4) */}
             <div className="md:col-span-2">
-              <label className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+              <div className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
                 <span>
                   {t.photoLabel} <span className="text-rose-600">*</span>
                 </span>
                 <span className="text-[10px] text-[#0284C7] font-medium bg-[#E2EEF8] px-2 py-0.5 rounded-full border border-[#0284C7]/20">
                   {language === 'bn' ? 'সর্বোচ্চ ২০০ কেবিতে কম্প্রেসড হবে' : 'Auto-compressed to ≤ 200 KB'}
                 </span>
-              </label>
+              </div>
 
               <div
                 data-validation-field="photoUrl"
@@ -1593,7 +1593,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             </div>
 
             {/* Checkbox toggle */}
-            <label className="flex items-start gap-3 p-3.5 rounded-xl bg-white border border-amber-200 hover:border-amber-400 transition cursor-pointer select-none shadow-2xs">
+            <label className="inline-flex items-start gap-3 p-3.5 rounded-xl bg-white border border-amber-200 hover:border-amber-400 transition cursor-pointer select-none shadow-2xs w-full">
               <input
                 type="checkbox"
                 checked={hasParent}
@@ -1694,14 +1694,14 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
                   {/* Parent Photo Upload & Camera Capture */}
                   <div className="md:col-span-2">
-                    <label className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+                    <div className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
                       <span>
                         {language === 'bn' ? 'অভিভাবকের পাসপোর্ট সাইজ ছবি' : 'Parent / Guardian Photo'} <span className="text-rose-600">*</span>
                       </span>
                       <span className="text-[10px] text-amber-800 font-medium bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
                         {language === 'bn' ? 'সর্বোচ্চ ২০০ কেবি' : 'Auto-compressed to ≤ 200 KB'}
                       </span>
-                    </label>
+                    </div>
 
                     <div
                       data-validation-field="parentPhotoUrl"

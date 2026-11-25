@@ -629,10 +629,10 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
 
               {/* Step 1: Amount Selector */}
               <div>
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                   <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">1</span>
                   <span>{isBangla ? 'অনুদানের পরিমাণ নির্বাচন করুন (টাকা) *' : 'Select Donation Amount (BDT) *'}</span>
-                </label>
+                </div>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-3">
                   {PRESET_AMOUNTS.map((amt) => {
                     const isSelected = !customAmount && selectedAmount === amt;
@@ -669,10 +669,10 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
 
               {/* Step 2: Donor Details */}
               <div>
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                   <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">2</span>
                   <span>{isBangla ? 'আপনার তথ্য দিন' : 'Donor Information'}</span>
-                </label>
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
@@ -732,7 +732,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
                 </div>
 
                 <div className="pt-3">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <label className="inline-flex items-center gap-2 cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={isAnonymous}
@@ -750,10 +750,10 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
 
               {/* Step 3: Payment Method Selection */}
               <div>
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                   <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">3</span>
                   <span>{isBangla ? 'পেমেন্ট মাধ্যম (PayStation Gateway)' : 'Payment Method (PayStation Gateway)'}</span>
-                </label>
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   {[
                     { id: 'bkash', label: 'bKash', color: 'border-pink-300 hover:bg-pink-50 text-pink-700' },
