@@ -6,10 +6,11 @@
 import DOMPurify from 'dompurify';
 import { PaymentMethod, SecurityAuditItem } from '../types';
 
-// Server-side payment signing secret fallback (used in conjunction with environment variable)
+// Payment signing secret is server-only (never hardcoded in frontend JS)
 export const SERVER_PAYMENT_SECRET =
-  (typeof process !== 'undefined' && process.env?.PAYMENT_SIGNING_SECRET) ||
-  'PLSCF_REUNION_2026_HMAC_SECURE_PAYMENT_SALT_98412';
+  typeof process !== 'undefined' && process.env?.PAYMENT_SIGNING_SECRET
+    ? process.env.PAYMENT_SIGNING_SECRET
+    : '';
 
 // -------------------------------------------------------------
 // Isomorphic DOMPurify Provider
@@ -395,16 +396,22 @@ export function isDuplicateTransaction(
 
 /**
  * 4. Cryptographic Server Verification Signature
- * Deterministic hash created by server to attest that a payment has been verified.
- * Clients CANNOT forge this signature without the secret.
+ * Deterministic hash created by server/trusted runtime to attest that a payment has been verified.
+ * Clients CANNOT forge or sign this signature without a server secret.
  */
 export function generateServerPaymentSignature(
   registrationId: string,
   trxId: string,
   amount: number,
-  salt: string = SERVER_PAYMENT_SECRET
+  salt?: string
 ): string {
-  const payload = `PLSCF:${registrationId.trim()}:${trxId.trim().toUpperCase()}:${amount}:${salt}`;
+  const effectiveSalt = (salt ?? SERVER_PAYMENT_SECRET).trim();
+  if (!effectiveSalt) {
+    throw new Error(
+      'Payment signing secret is unavailable in frontend code; signatures must be generated server-side.'
+    );
+  }
+  const payload = `PLSCF:${registrationId.trim()}:${trxId.trim().toUpperCase()}:${amount}:${effectiveSalt}`;
   let hash = 0;
   for (let i = 0; i < payload.length; i++) {
     const char = payload.charCodeAt(i);
@@ -425,14 +432,18 @@ export function verifyServerPaymentSignature(
   trxId: string,
   amount: number,
   signature: string | undefined,
-  salt: string = SERVER_PAYMENT_SECRET
+  salt?: string
 ): boolean {
   if (!signature || typeof signature !== 'string') return false;
   // Accept genuine server-issued HMAC-SHA256 signatures from Supabase Edge Function
   if (signature.startsWith('SIG_HMAC256_') || signature.startsWith('SIG_SERVER_')) {
     return signature.length >= 20;
   }
-  const expected = generateServerPaymentSignature(registrationId, trxId, amount, salt);
+  const effectiveSalt = (salt ?? SERVER_PAYMENT_SECRET).trim();
+  if (!effectiveSalt) {
+    return false;
+  }
+  const expected = generateServerPaymentSignature(registrationId, trxId, amount, effectiveSalt);
   return signature === expected;
 }
 

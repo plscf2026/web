@@ -81,24 +81,29 @@ test('5. Cryptographic Server Payment Signature protects ticket authenticity', (
   const regId = 'PLSCF-26F1001';
   const trxId = 'BL9X87K2M1';
   const amount = 1500;
+  const testOnlySalt = 'UNIT_TEST_EPHEMERAL_SIGNING_SALT';
 
-  const validSig = generateServerPaymentSignature(regId, trxId, amount);
+  // Frontend execution without a server secret must refuse to sign
+  assert.throws(() => generateServerPaymentSignature(regId, trxId, amount));
+  assert.equal(verifyServerPaymentSignature(regId, trxId, amount, 'SIG_V2_ANYTHING'), false);
+
+  const validSig = generateServerPaymentSignature(regId, trxId, amount, testOnlySalt);
   assert.ok(validSig.startsWith('SIG_V2_'));
 
-  // Valid verification
-  assert.equal(verifyServerPaymentSignature(regId, trxId, amount, validSig), true);
+  // Valid verification with server secret
+  assert.equal(verifyServerPaymentSignature(regId, trxId, amount, validSig, testOnlySalt), true);
 
   // Tampered amount: fails!
-  assert.equal(verifyServerPaymentSignature(regId, trxId, 500, validSig), false);
+  assert.equal(verifyServerPaymentSignature(regId, trxId, 500, validSig, testOnlySalt), false);
 
   // Tampered registration ID: fails!
-  assert.equal(verifyServerPaymentSignature('PLSCF-26F9999', trxId, amount, validSig), false);
+  assert.equal(verifyServerPaymentSignature('PLSCF-26F9999', trxId, amount, validSig, testOnlySalt), false);
 
   // Tampered transaction ID: fails!
-  assert.equal(verifyServerPaymentSignature(regId, 'FORGED_TRX', amount, validSig), false);
+  assert.equal(verifyServerPaymentSignature(regId, 'FORGED_TRX', amount, validSig, testOnlySalt), false);
 
   // Forged signature: fails!
-  assert.equal(verifyServerPaymentSignature(regId, trxId, amount, 'SIG_V2_FORGED_SIGNATURE'), false);
+  assert.equal(verifyServerPaymentSignature(regId, trxId, amount, 'SIG_V2_FORGED_SIGNATURE', testOnlySalt), false);
 });
 
 test('6. Role-Based Access Control (RBAC) enforces principle of least privilege', () => {

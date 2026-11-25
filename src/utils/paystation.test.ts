@@ -3,21 +3,15 @@ import assert from 'node:assert/strict';
 import { PayStationService, PayStationPaymentResult } from '../services/paystation';
 import { RegistrationFormData } from './rules';
 import { AppStore } from '../services/store';
+import { supabase } from '../services/supabase';
 
-test('PayStation Configuration defaults to official Sandbox parameters without leaking client passwords', () => {
-  const config = PayStationService.getConfig();
-  assert.equal(config.merchantId, '104-1653730183');
+test('PayStation Configuration contains no client password or hardcoded credentials', () => {
+  const config = PayStationService.getConfig() as unknown as Record<string, unknown>;
   assert.equal(config.isSandbox, true);
   assert.equal(config.baseUrl, 'https://sandbox.paystation.com.bd');
-  assert.equal(config.proxyBaseUrl, '/api/paystation');
-  // In sandbox/dev mode, password is loaded from VITE_PAYSTATION_PASSWORD env var (gitignored .env).
-  // In production isSandbox=false the password MUST be empty — stored in Supabase Secrets only.
-  if (!config.isSandbox) {
-    assert.equal(config.password, '', 'Production config must NOT bundle merchant password');
-  } else {
-    // Sandbox: password is populated from .env for local proxy calls — this is acceptable
-    assert.ok(typeof config.password === 'string', 'Sandbox password should be a string');
-  }
+  assert.equal('password' in config, false, 'Frontend config must NEVER expose PayStation password');
+  assert.equal('proxyBaseUrl' in config, false, 'Frontend config must NOT expose browser-direct proxy routes');
+  assert.equal(typeof config.merchantId, 'string');
 });
 
 test('PayStation Grant Token and Payment Creation pipeline', async () => {
@@ -87,7 +81,11 @@ test('PayStation Complete Registration and Authoritative Ticket Generation (2027
   assert.equal(ticket.totalPaid, 1700);
   assert.ok(/^[A-Z0-9]{6}$/.test(ticket.qrToken));
   assert.equal(ticket.qrToken.length, 6);
-  assert.ok(ticket.serverVerificationSignature?.startsWith('SIG_V2_'));
+  assert.ok(
+    ticket.serverVerificationSignature?.startsWith('SIG_HMAC256_') ||
+      ticket.serverVerificationSignature?.startsWith('SIG_SANDBOX_'),
+    'Signature must come from server or non-secret sandbox tag (never hardcoded client signing secret)'
+  );
 
   // Verify it exists in local store
   const registrations = AppStore.getRegistrations();
@@ -280,4 +278,129 @@ test('PayStation IPN validation rejects invalid payloads (amount mismatch, wrong
   );
   assert.equal(res4.valid, false);
   assert.ok(res4.reason?.includes('Missing trx_id'));
+});
+
+test('PayStation payment initiation and transaction status route exclusively through Edge Function without direct browser calls', async () => {
+  const prevUrl = process.env.VITE_SUPABASE_URL;
+  const origFunctionsDesc = Object.getOwnPropertyDescriptor(supabase, 'functions');
+  const origFetch = globalThis.fetch;
+
+  const invokedCalls: Array<{ fn: string; action: string; body: any }> = [];
+  const directFetchUrls: string[] = [];
+
+  process.env.VITE_SUPABASE_URL = 'https://mock-project.supabase.co';
+  (globalThis as any).fetch = async (url: unknown) => {
+    directFetchUrls.push(String(url));
+    throw new Error(`Forbidden direct fetch to ${String(url)}`);
+  };
+
+  Object.defineProperty(supabase, 'functions', {
+    configurable: true,
+    value: {
+      invoke: async (fnName: string, options: any) => {
+        const body = options?.body || {};
+        invokedCalls.push({ fn: fnName, action: body.action, body });
+
+        if (body.action === 'create-payment') {
+          return {
+            data: {
+              success: true,
+              paymentUrl: 'https://sandbox.paystation.com.bd/checkout/MOCK-SESSION',
+              invoiceNumber: body.order?.invoice_number,
+            },
+            error: null,
+          };
+        }
+        if (body.action === 'transaction-status-v1') {
+          return {
+            data: {
+              status_code: '200',
+              status: 'success',
+              data: {
+                invoice_number: body.invoice_number,
+                trx_status: 'Success',
+                trx_id: 'PST-EDGE-9001',
+                payment_amount: '1500',
+                order_date_time: '2026-11-25 12:00:00',
+                payer_mobile_no: '01700000000',
+                payment_method: 'bKash',
+                reference: 'ALUMNI',
+                checkout_items: 'Reunion Registration',
+              },
+            },
+            error: null,
+          };
+        }
+        if (body.action === 'transaction-status-v2') {
+          return {
+            data: {
+              status_code: '200',
+              status: 'success',
+              data: {
+                invoice_number: 'INV-EDGE-001',
+                trx_status: 'success',
+                trx_id: body.trxId,
+                trx_amount: 1500,
+                trx_date: '2026-11-25',
+                request_amount: '1500',
+                payment_amount: '1500',
+                order_date_time: '2026-11-25 12:00:00',
+                payer_mobile_no: '01700000000',
+                payment_method: 'bKash',
+                reference: 'ALUMNI',
+              },
+            },
+            error: null,
+          };
+        }
+        return { data: null, error: new Error('Unexpected action') };
+      },
+    },
+  });
+
+  try {
+    const createRes = await PayStationService.createPayment({
+      invoice_number: 'INV-EDGE-001',
+      currency: 'BDT',
+      payment_amount: 1500,
+      cust_name: 'Edge Test User',
+      cust_phone: '01712345678',
+      callback_url: 'https://plscf.org/?payment_return=1',
+    });
+    assert.equal(createRes.success, true);
+    assert.equal(createRes.paymentUrl, 'https://sandbox.paystation.com.bd/checkout/MOCK-SESSION');
+
+    const statusV1 = await PayStationService.getTransactionStatusV1('INV-EDGE-001');
+    assert.equal(statusV1.success, true);
+    assert.equal(statusV1.status, 'success');
+    assert.equal(statusV1.data?.trx_id, 'PST-EDGE-9001');
+
+    const statusV2 = await PayStationService.getTransactionStatusV2('PST-EDGE-9001');
+    assert.equal(statusV2.success, true);
+    assert.equal(statusV2.data?.invoice_number, 'INV-EDGE-001');
+
+    assert.equal(directFetchUrls.length, 0, 'Must never call PayStation or /api/paystation directly from client');
+    assert.deepEqual(
+      invokedCalls.map((c) => `${c.fn}:${c.action}`),
+      [
+        'verify-payment:create-payment',
+        'verify-payment:transaction-status-v1',
+        'verify-payment:transaction-status-v2',
+      ]
+    );
+    const serialized = JSON.stringify(invokedCalls);
+    assert.equal(serialized.includes('password'), false, 'Client initiation payload must not include password');
+  } finally {
+    if (origFunctionsDesc) {
+      Object.defineProperty(supabase, 'functions', origFunctionsDesc);
+    } else {
+      delete (supabase as any).functions;
+    }
+    globalThis.fetch = origFetch;
+    if (prevUrl === undefined) {
+      delete process.env.VITE_SUPABASE_URL;
+    } else {
+      process.env.VITE_SUPABASE_URL = prevUrl;
+    }
+  }
 });

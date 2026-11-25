@@ -1311,7 +1311,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
             {/* Footer */}
             <div className="text-center text-[10px] text-slate-400 flex items-center justify-center gap-2 pt-1 border-t border-slate-100 flex-wrap">
-              <span>Merchant ID: {config.merchantId}</span>
+              <span>{config.merchantId ? `Merchant ID: ${config.merchantId}` : 'PayStation Secure Gateway'}</span>
               <span>•</span>
               <span className="text-emerald-600 font-semibold">bKash (Active) · Nagad (Active) · Rocket (Active) · Cards (Active) · Amex (Active)</span>
             </div>
