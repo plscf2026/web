@@ -16,6 +16,11 @@ export interface UnifiedSystemUser {
   fullName: string;
   username: string;
   email: string;
+  mobileNumber?: string | null;
+  staffCode?: string | null;
+  assignedManagerId?: string | null;
+  assignedManagerName?: string | null;
+  mustChangePassword?: boolean;
   role: string;
   roleCategory: RoleCategory;
   department: string;
@@ -46,6 +51,26 @@ export interface RoleGroupSummary {
 }
 
 export class UserManagementService {
+  /**
+   * Enforce strict Super Admin authorization on account & credential operations.
+   */
+  static isSuperAdminSession(adminSession?: Partial<AdminAccount> | null): boolean {
+    return Boolean(adminSession && String(adminSession.role || '').toLowerCase() === 'super_admin');
+  }
+
+  /**
+   * Fetch Finance Manager accounts authorized for supervising Finance Staff.
+   */
+  static async fetchFinanceManagers(): Promise<UnifiedSystemUser[]> {
+    const all = await this.fetchUnifiedUsers();
+    return all.filter(
+      (u) =>
+        u.userType === 'ADMIN' &&
+        (u.role.toLowerCase() === 'finance_manager' || u.role.toLowerCase() === 'super_admin') &&
+        u.status === 'ACTIVE'
+    );
+  }
+
   /**
    * Authoritatively discover and fetch all system users across all roles from Supabase database
    */
@@ -88,6 +113,11 @@ export class UserManagementService {
             fullName: a.full_name || 'Admin User',
             username: a.username || a.email,
             email: a.email,
+            mobileNumber: a.mobile_number || null,
+            staffCode: a.staff_code || a.id,
+            assignedManagerId: null,
+            assignedManagerName: null,
+            mustChangePassword: Boolean(a.must_change_password),
             role: a.role,
             roleCategory: cat,
             department: a.department || 'CENTRAL_ADMIN',
@@ -120,6 +150,11 @@ export class UserManagementService {
             fullName: s.full_name || 'Staff User',
             username: s.username || s.email,
             email: s.email,
+            mobileNumber: s.mobile_number || null,
+            staffCode: s.staff_code || s.id,
+            assignedManagerId: s.assigned_manager_id || null,
+            assignedManagerName: s.assigned_manager_name || null,
+            mustChangePassword: Boolean(s.must_change_password),
             role: s.role,
             roleCategory: cat,
             department: s.department || 'OPERATIONS',
@@ -243,6 +278,10 @@ export class UserManagementService {
     adminSession: AdminAccount,
     reason: string
   ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isSuperAdminSession(adminSession)) {
+      return { success: false, error: 'UNAUTHORIZED: Only Super Admin can activate or deactivate accounts.' };
+    }
+
     try {
       const { data, error } = await supabase.rpc('rpc_manage_user_status', {
         p_user_id: userId,
@@ -272,7 +311,7 @@ export class UserManagementService {
   }
 
   /**
-   * Update User Profile (Role, Department, Permissions, Details)
+   * Update User Profile (Role, Department, Permissions, Mobile, Assigned Manager)
    */
   static async updateUserProfile(
     userId: string,
@@ -285,10 +324,17 @@ export class UserManagementService {
       department: string;
       assignedStation: string;
       permissions: StaffPermissionAction[];
+      mobileNumber?: string;
+      staffCode?: string;
+      assignedManagerId?: string | null;
     },
     adminSession: AdminAccount,
     reason: string
   ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isSuperAdminSession(adminSession)) {
+      return { success: false, error: 'UNAUTHORIZED: Only Super Admin can modify account profiles.' };
+    }
+
     try {
       const { data, error } = await supabase.rpc('rpc_manage_user_profile', {
         p_user_id: userId,
@@ -303,6 +349,9 @@ export class UserManagementService {
         p_admin_id: adminSession.id,
         p_admin_name: adminSession.fullName || adminSession.username,
         p_reason: reason.trim() || 'Profile details updated by Super Admin',
+        p_mobile_number: payload.mobileNumber?.trim() || null,
+        p_staff_code: payload.staffCode?.trim() || null,
+        p_assigned_manager_id: payload.assignedManagerId !== undefined ? (payload.assignedManagerId?.trim() || '') : null,
       });
 
       if (!error && data?.success) {
@@ -324,7 +373,7 @@ export class UserManagementService {
   }
 
   /**
-   * Create a new System User (Admin or Staff) in database
+   * Create a new System User (Admin or Staff) in database (Super Admin only)
    */
   static async createSystemUser(
     payload: {
@@ -338,9 +387,29 @@ export class UserManagementService {
       permissions: StaffPermissionAction[];
       authUserId?: string;
       initialPassword?: string;
+      mobileNumber?: string;
+      staffCode?: string;
+      assignedManagerId?: string;
+      initialStatus?: 'ACTIVE' | 'INACTIVE';
+      mustChangePassword?: boolean;
     },
     adminSession: AdminAccount
-  ): Promise<{ success: boolean; userId?: string; error?: string }> {
+  ): Promise<{
+    success: boolean;
+    userId?: string;
+    staffCode?: string;
+    username?: string;
+    role?: string;
+    status?: string;
+    assignedManagerId?: string | null;
+    assignedManagerName?: string | null;
+    mustChangePassword?: boolean;
+    error?: string;
+  }> {
+    if (!this.isSuperAdminSession(adminSession)) {
+      return { success: false, error: 'UNAUTHORIZED: Only Super Admin can create accounts.' };
+    }
+
     try {
       const { data, error } = await supabase.rpc('rpc_create_system_user', {
         p_user_type: payload.userType,
@@ -355,10 +424,25 @@ export class UserManagementService {
         p_initial_password: payload.initialPassword?.trim() || null,
         p_admin_id: adminSession.id,
         p_admin_name: adminSession.fullName || adminSession.username,
+        p_mobile_number: payload.mobileNumber?.trim() || null,
+        p_staff_code: payload.staffCode?.trim() || null,
+        p_assigned_manager_id: payload.assignedManagerId?.trim() || null,
+        p_initial_status: payload.initialStatus || 'ACTIVE',
+        p_must_change_password: payload.mustChangePassword ?? true,
       });
 
       if (!error && data?.success) {
-        return { success: true, userId: data.userId };
+        return {
+          success: true,
+          userId: data.userId,
+          staffCode: data.staffCode,
+          username: data.username,
+          role: data.role,
+          status: data.status,
+          assignedManagerId: data.assignedManagerId || null,
+          assignedManagerName: data.assignedManagerName || null,
+          mustChangePassword: Boolean(data.mustChangePassword),
+        };
       }
 
       if (data?.error) {
@@ -376,13 +460,18 @@ export class UserManagementService {
   }
 
   /**
-   * Authoritatively set or update password for any user directly in Supabase Auth
+   * Authoritatively set or reset password for any user directly in Supabase Auth (Super Admin only)
    */
   static async setUserPassword(
     email: string,
     newPassword: string,
-    adminSession: AdminAccount
+    adminSession: AdminAccount,
+    mustChangePassword: boolean = true
   ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isSuperAdminSession(adminSession)) {
+      return { success: false, error: 'UNAUTHORIZED: Only Super Admin can reset passwords.' };
+    }
+
     try {
       if (!newPassword || newPassword.trim().length < 6) {
         return { success: false, error: 'Password must be at least 6 characters long.' };
@@ -393,6 +482,7 @@ export class UserManagementService {
         p_new_password: newPassword.trim(),
         p_admin_id: adminSession.id,
         p_admin_name: adminSession.fullName || adminSession.username,
+        p_must_change_password: mustChangePassword,
       });
 
       if (!error && data?.success) {
@@ -408,6 +498,80 @@ export class UserManagementService {
       }
     } catch (err: any) {
       return { success: false, error: err?.message || 'Failed to update user password' };
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Complete forced temporary password rotation for the currently authenticated user.
+   */
+  static async completeForcedPasswordChange(
+    newPassword: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const clean = newPassword.trim();
+    if (!clean || clean.length < 6) {
+      return { success: false, error: 'New password must be at least 6 characters long.' };
+    }
+
+    try {
+      const { error: authErr } = await supabase.auth.updateUser({
+        password: clean,
+        data: { must_change_password: false },
+      });
+      if (authErr) {
+        return { success: false, error: authErr.message };
+      }
+
+      const { data, error } = await supabase.rpc('rpc_complete_forced_password_change', {
+        p_new_password: clean,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      if (data && data.success === false) {
+        return { success: false, error: data.error || 'Failed to clear temporary password flag.' };
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Unable to update password.' };
+    }
+  }
+
+  /**
+   * Super Admin only: Revoke active Supabase Auth sessions for an account.
+   */
+  static async revokeUserSessions(
+    userId: string,
+    userType: UserType,
+    adminSession: AdminAccount,
+    reason: string = 'Sessions revoked by Super Admin'
+  ): Promise<{ success: boolean; revokedSessions?: number; error?: string }> {
+    if (!this.isSuperAdminSession(adminSession)) {
+      return { success: false, error: 'UNAUTHORIZED: Only Super Admin can revoke sessions.' };
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('rpc_revoke_user_sessions', {
+        p_user_id: userId,
+        p_user_type: userType,
+        p_admin_id: adminSession.id,
+        p_admin_name: adminSession.fullName || adminSession.username,
+        p_reason: reason,
+      });
+
+      if (!error && data?.success) {
+        return { success: true, revokedSessions: Number(data.revokedSessions || 0) };
+      }
+      if (data?.error) {
+        return { success: false, error: data.error };
+      }
+      if (error) {
+        return { success: false, error: error.message };
+      }
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to revoke user sessions.' };
     }
 
     return { success: true };

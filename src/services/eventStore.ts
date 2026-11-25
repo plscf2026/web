@@ -535,20 +535,25 @@ export class EventStore {
   static async fetchStaffAccounts(): Promise<StaffAccount[]> {
     const { data, error } = await supabase
       .from('staff_accounts')
-      .select('id, auth_user_id, full_name, username, email, role, status, assigned_gate, created_at, created_by')
+      .select('id, auth_user_id, full_name, username, email, mobile_number, staff_code, assigned_manager_id, assigned_manager_name, must_change_password, role, department, permissions, status, assigned_gate, created_at, created_by')
       .order('created_at', { ascending: true });
 
     if (error) throw error;
 
-    const accounts: StaffAccount[] = (data || []).map((row) => ({
+    const accounts: StaffAccount[] = (data || []).map((row: any) => ({
       id: row.id,
       authUserId: row.auth_user_id,
       fullName: row.full_name,
       username: row.username,
       email: row.email,
+      mobileNumber: row.mobile_number || undefined,
+      staffCode: row.staff_code || row.id,
+      assignedManagerId: row.assigned_manager_id || undefined,
+      assignedManagerName: row.assigned_manager_name || undefined,
+      mustChangePassword: Boolean(row.must_change_password),
       role: row.role,
-      department: ((row as any).department as DepartmentType) || getDefaultDepartment(row.role),
-      permissions: ((row as any).permissions as StaffPermissionAction[]) || getDefaultPermissions(row.role),
+      department: (row.department as DepartmentType) || getDefaultDepartment(row.role),
+      permissions: (row.permissions as StaffPermissionAction[]) || getDefaultPermissions(row.role),
       status: row.status,
       assignedGate: row.assigned_gate || undefined,
       createdAt: row.created_at,
@@ -556,6 +561,46 @@ export class EventStore {
     }));
     staffAccountsCache = accounts;
     return accounts;
+  }
+
+  /**
+   * Authoritatively fetch Finance Staff scoped strictly to the logged-in Finance Manager
+   * (or all Finance Staff for Super Admin) via server-side SECURITY DEFINER RPC.
+   */
+  static async fetchAssignedFinanceStaff(managerId?: string, isSuperAdmin = false): Promise<StaffAccount[]> {
+    try {
+      const { data, error } = await supabase.rpc('rpc_get_manager_finance_staff');
+      if (!error && Array.isArray(data)) {
+        return data.map((row: any) => ({
+          id: row.id,
+          authUserId: row.authUserId || '',
+          fullName: row.fullName,
+          username: row.username,
+          email: row.email,
+          mobileNumber: row.mobileNumber || undefined,
+          staffCode: row.staffCode || row.id,
+          assignedManagerId: row.assignedManagerId || undefined,
+          assignedManagerName: row.assignedManagerName || undefined,
+          role: row.role,
+          department: (row.department as DepartmentType) || 'FINANCE',
+          permissions: (row.permissions as StaffPermissionAction[]) || ['VIEW', 'SCAN', 'VERIFY'],
+          status: row.status,
+          assignedGate: row.assignedGate || undefined,
+          createdAt: row.createdAt,
+          createdBy: row.createdBy || undefined,
+        }));
+      }
+    } catch (err) {
+      console.warn('[EventStore] rpc_get_manager_finance_staff notice:', err);
+    }
+
+    // Strict local fallback scoped by managerId if non-Super-Admin
+    const all = this.getStaffAccounts();
+    if (isSuperAdmin) {
+      return all.filter((s) => s.role === 'FINANCE_STAFF');
+    }
+    if (!managerId) return [];
+    return all.filter((s) => s.role === 'FINANCE_STAFF' && s.assignedManagerId === managerId);
   }
 
   static saveStaffAccounts(accounts: StaffAccount[]): void {
@@ -596,7 +641,7 @@ export class EventStore {
 
       const { data, error } = await supabase
         .from('staff_accounts')
-        .select('id, auth_user_id, full_name, username, email, role, status, assigned_gate, created_at, created_by')
+        .select('id, auth_user_id, full_name, username, email, mobile_number, staff_code, assigned_manager_id, assigned_manager_name, must_change_password, role, department, permissions, status, assigned_gate, created_at, created_by')
         .eq('auth_user_id', user.id)
         .maybeSingle();
 
@@ -607,6 +652,11 @@ export class EventStore {
         fullName: data.full_name,
         username: data.username,
         email: data.email,
+        mobileNumber: (data as any).mobile_number || undefined,
+        staffCode: (data as any).staff_code || data.id,
+        assignedManagerId: (data as any).assigned_manager_id || undefined,
+        assignedManagerName: (data as any).assigned_manager_name || undefined,
+        mustChangePassword: Boolean((data as any).must_change_password),
         role: data.role,
         department: ((data as any).department as DepartmentType) || getDefaultDepartment(data.role),
         permissions: ((data as any).permissions as StaffPermissionAction[]) || getDefaultPermissions(data.role),
@@ -691,7 +741,7 @@ export class EventStore {
 
     const { data, error } = await supabase
       .from('staff_accounts')
-      .select('id, auth_user_id, full_name, username, email, role, status, assigned_gate, created_at, created_by')
+      .select('id, auth_user_id, full_name, username, email, mobile_number, staff_code, assigned_manager_id, assigned_manager_name, must_change_password, role, department, permissions, status, assigned_gate, created_at, created_by')
       .eq('auth_user_id', authData.user.id)
       .maybeSingle();
 
@@ -716,6 +766,11 @@ export class EventStore {
       fullName: data.full_name,
       username: data.username,
       email: data.email,
+      mobileNumber: (data as any).mobile_number || undefined,
+      staffCode: (data as any).staff_code || data.id,
+      assignedManagerId: (data as any).assigned_manager_id || undefined,
+      assignedManagerName: (data as any).assigned_manager_name || undefined,
+      mustChangePassword: Boolean((data as any).must_change_password),
       role: data.role,
       department: ((data as any).department as DepartmentType) || getDefaultDepartment(data.role),
       permissions: ((data as any).permissions as StaffPermissionAction[]) || getDefaultPermissions(data.role),
@@ -1710,7 +1765,17 @@ export class EventStore {
 
   static saveCentralBudget(budget: CentralBudget): void {
     saveData(KEY_CENTRAL_BUDGET, budget);
-    supabase.from('central_budget').upsert(budget).then(undefined, () => { });
+    supabase
+      .from('central_budget')
+      .upsert({
+        id: budget.id,
+        academic_year: budget.academicYear,
+        total_budget: budget.totalBudget,
+        description: budget.description || 'Grand Reunion 2026 Central Allocated Fund',
+        updated_at: budget.updatedAt,
+        updated_by: budget.updatedBy,
+      })
+      .then(undefined, () => {});
   }
 
   static updateCentralBudget(
@@ -1771,7 +1836,20 @@ export class EventStore {
     };
 
     this.saveStaffAllocations([newAlloc, ...allocations]);
-    supabase.from('staff_allocations').insert(newAlloc).then(undefined, () => { });
+    supabase
+      .from('staff_allocations')
+      .insert({
+        id: newAlloc.id,
+        staff_id: newAlloc.staffId,
+        staff_name: newAlloc.staffName,
+        allocated_amount: newAlloc.allocatedAmount,
+        academic_year: newAlloc.academicYear,
+        status: newAlloc.status,
+        allocated_at: newAlloc.allocatedAt,
+        allocated_by: newAlloc.allocatedBy,
+        notes: newAlloc.notes || null,
+      })
+      .then(undefined, () => {});
 
     // Write to authoritative financial ledger
     this.addLedgerEntry({
@@ -1820,7 +1898,19 @@ export class EventStore {
       createdAt: new Date().toISOString(),
     };
     this.saveFinancialLedger([newEntry, ...list]);
-    supabase.from('financial_ledger').insert(newEntry).then(undefined, () => { });
+    supabase
+      .from('financial_ledger')
+      .insert({
+        id: newEntry.id,
+        staff_id: newEntry.staffId,
+        transaction_type: newEntry.transactionType,
+        amount: newEntry.amount,
+        reference_id: newEntry.referenceId,
+        description: newEntry.description,
+        created_at: newEntry.createdAt,
+        created_by: newEntry.createdBy,
+      })
+      .then(undefined, () => {});
     return newEntry;
   }
 
@@ -1873,7 +1963,23 @@ export class EventStore {
 
     const updated = [newExpense, ...expenses];
     this.saveStaffExpenses(updated);
-    supabase.from('staff_expenses').insert(newExpense).then(undefined, () => { });
+    supabase
+      .from('staff_expenses')
+      .insert({
+        id: newExpense.id,
+        staff_id: newExpense.staffId,
+        staff_name: newExpense.staffName,
+        amount: newExpense.amount,
+        category: newExpense.category,
+        description: newExpense.description,
+        expense_date: newExpense.expenseDate,
+        expense_time: newExpense.expenseTime,
+        vendor_name: newExpense.vendorName || null,
+        receipt_url: newExpense.receiptUrl || null,
+        status: newExpense.status,
+        created_at: newExpense.createdAt,
+      })
+      .then(undefined, () => {});
 
     // Record ledger entry
     this.addLedgerEntry({
@@ -2053,6 +2159,12 @@ export class EventStore {
     });
     this.saveStaffAllocations(allocations);
 
+    supabase
+      .from('staff_allocations')
+      .update({ status: 'CLOSED' })
+      .eq('staff_id', staffId)
+      .then(undefined, () => {});
+
     this.recordAuditHistory({
       adminId,
       adminName,
@@ -2064,6 +2176,93 @@ export class EventStore {
     });
 
     return true;
+  }
+
+  /**
+   * Synchronize Central Budget, Staff Allocations, Staff Expenses, and Ledger from Supabase.
+   * Respects database RLS policies so Finance Managers only receive their assigned Staff's records,
+   * and Finance Staff only receive their own records.
+   */
+  static async syncFinanceWithSupabase(): Promise<void> {
+    try {
+      const [budgetRes, allocRes, expRes, ledgerRes] = await Promise.all([
+        supabase.from('central_budget').select('*').order('updated_at', { ascending: false }).limit(1),
+        supabase.from('staff_allocations').select('*').order('allocated_at', { ascending: false }).limit(2000),
+        supabase.from('staff_expenses').select('*').order('created_at', { ascending: false }).limit(2000),
+        supabase.from('financial_ledger').select('*').order('created_at', { ascending: false }).limit(3000),
+      ]);
+
+      if (budgetRes.data && budgetRes.data.length > 0) {
+        const b = budgetRes.data[0] as any;
+        saveData(KEY_CENTRAL_BUDGET, {
+          id: b.id,
+          academicYear: Number(b.academic_year || 2026),
+          totalBudget: Number(b.total_budget || 0),
+          description: b.description || undefined,
+          updatedAt: b.updated_at || new Date().toISOString(),
+          updatedBy: b.updated_by || 'System',
+        } satisfies CentralBudget);
+      }
+
+      if (!allocRes.error && Array.isArray(allocRes.data) && allocRes.data.length > 0) {
+        const mappedAllocs: StaffAllocation[] = allocRes.data.map((a: any) => ({
+          id: a.id,
+          staffId: a.staff_id,
+          staffName: a.staff_name,
+          allocatedAmount: Number(a.allocated_amount || 0),
+          academicYear: Number(a.academic_year || 2026),
+          status: a.status || 'ACTIVE',
+          allocatedAt: a.allocated_at || new Date().toISOString(),
+          allocatedBy: a.allocated_by || 'System',
+          notes: a.notes || undefined,
+        }));
+        this.saveStaffAllocations(mappedAllocs);
+      }
+
+      if (!expRes.error && Array.isArray(expRes.data)) {
+        const mappedExps: StaffExpense[] = expRes.data.map((e: any) => ({
+          id: e.id,
+          staffId: e.staff_id,
+          staffName: e.staff_name,
+          amount: Number(e.amount || 0),
+          category: e.category,
+          description: e.description,
+          expenseDate: e.expense_date,
+          expenseTime: e.expense_time,
+          vendorName: e.vendor_name || undefined,
+          receiptUrl: e.receipt_url || undefined,
+          status: e.status || 'SUBMITTED',
+          approvedBy: e.approved_by || undefined,
+          approvedAt: e.approved_at || undefined,
+          rejectionReason: e.rejection_reason || undefined,
+          voidReason: e.void_reason || undefined,
+          createdAt: e.created_at || new Date().toISOString(),
+        }));
+        if (mappedExps.length > 0) {
+          this.saveStaffExpenses(mappedExps);
+        }
+      }
+
+      if (!ledgerRes.error && Array.isArray(ledgerRes.data) && ledgerRes.data.length > 0) {
+        const mappedLedger: FinancialLedgerEntry[] = ledgerRes.data.map((l: any) => ({
+          id: l.id,
+          staffId: l.staff_id,
+          transactionType: l.transaction_type,
+          amount: Number(l.amount || 0),
+          referenceId: l.reference_id,
+          description: l.description,
+          createdAt: l.created_at || new Date().toISOString(),
+          createdBy: l.created_by || 'System',
+        }));
+        this.saveFinancialLedger(mappedLedger);
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('plscf_finance_sync'));
+      }
+    } catch (err) {
+      console.warn('[EventStore] syncFinanceWithSupabase notice:', err);
+    }
   }
 
   // ==========================================

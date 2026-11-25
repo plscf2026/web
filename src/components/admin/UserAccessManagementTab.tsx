@@ -29,6 +29,12 @@ import {
   MapPin,
   Eye,
   EyeOff,
+  Phone,
+  Copy,
+  Check,
+  LogOut,
+  UserCheck,
+  Wand2,
 } from 'lucide-react';
 import { AdminAccount, Language, StaffPermissionAction } from '../../types';
 import {
@@ -51,6 +57,8 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
   currentAdmin,
   language,
 }) => {
+  const isSuperAdmin = String(currentAdmin?.role || '').toLowerCase() === 'super_admin';
+
   // State
   const [users, setUsers] = useState<UnifiedSystemUser[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -58,6 +66,22 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
     type: 'success' | 'error' | 'info';
     message: string;
   } | null>(null);
+
+  // One-time ephemeral credential handoff display (NEVER persisted to storage/DB/audit logs)
+  const [oneTimeCredentials, setOneTimeCredentials] = useState<{
+    title: string;
+    fullName: string;
+    userId: string;
+    staffCode?: string;
+    role: string;
+    username: string;
+    email: string;
+    temporaryPassword: string;
+    assignedManagerName?: string | null;
+    status: string;
+    mustChangePassword: boolean;
+  } | null>(null);
+  const [copiedCredentials, setCopiedCredentials] = useState(false);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,8 +111,19 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
   const [passwordModalUser, setPasswordModalUser] = useState<UnifiedSystemUser | null>(null);
   const [directNewPassword, setDirectNewPassword] = useState('');
   const [directConfirmPassword, setDirectConfirmPassword] = useState('');
+  const [directMustChangePassword, setDirectMustChangePassword] = useState(true);
   const [showDirectPassword, setShowDirectPassword] = useState(false);
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
+
+  // Secure random temporary password helper (never persisted outside component state)
+  const generateTempPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%';
+    let pw = 'Plsc@';
+    for (let i = 0; i < 6; i++) {
+      pw += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return pw;
+  };
 
   // Helper to generate RFC4122 compliant UUIDv4
   const generateUuid = () => {
@@ -114,6 +149,11 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
     fullName: '',
     username: '',
     email: '',
+    mobileNumber: '',
+    staffCode: '',
+    assignedManagerId: '',
+    initialStatus: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
+    mustChangePassword: true,
     role: 'super_admin',
     department: 'CENTRAL_ADMIN',
     assignedStation: 'Super Admin 1',
@@ -128,6 +168,9 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
     fullName: '',
     username: '',
     email: '',
+    mobileNumber: '',
+    staffCode: '',
+    assignedManagerId: '',
     role: '',
     department: '',
     assignedStation: '',
@@ -164,6 +207,15 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
     return UserManagementService.computeRoleGroupSummaries(users);
   }, [users]);
 
+  // Compute Finance Managers eligible to supervise Finance Staff
+  const financeManagers = useMemo(() => {
+    return users.filter(
+      (u) =>
+        u.userType === 'ADMIN' &&
+        (u.role.toLowerCase() === 'finance_manager' || u.role.toLowerCase() === 'super_admin')
+    );
+  }, [users]);
+
   // Unique Departments
   const departments = useMemo(() => {
     const set = new Set<string>();
@@ -183,6 +235,9 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
         u.fullName.toLowerCase().includes(q) ||
         u.username.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q) ||
+        (u.mobileNumber || '').toLowerCase().includes(q) ||
+        (u.staffCode || '').toLowerCase().includes(q) ||
+        (u.assignedManagerName || '').toLowerCase().includes(q) ||
         u.id.toLowerCase().includes(q) ||
         u.role.toLowerCase().includes(q) ||
         u.assignedStation.toLowerCase().includes(q) ||
@@ -410,6 +465,14 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
       fullName: '',
       username: '',
       email: '',
+      mobileNumber: '',
+      staffCode: '',
+      assignedManagerId:
+        financeManagers.find((m) => m.role.toLowerCase() === 'finance_manager')?.id ||
+        financeManagers[0]?.id ||
+        '',
+      initialStatus: 'ACTIVE',
+      mustChangePassword: true,
       role: defaultRole,
       department: defaultDept,
       assignedStation: defaultStation,
@@ -424,8 +487,27 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
   const handleCreateSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
 
+    if (!isSuperAdmin) {
+      showNotification('error', 'UNAUTHORIZED: Only Super Admin can create accounts.');
+      return;
+    }
+
     if (!createForm.fullName.trim() || !createForm.username.trim()) {
-      showNotification('error', 'Please fill in Name and Username.');
+      showNotification('error', 'Please fill in Full Name and Login ID / Username.');
+      return;
+    }
+
+    if (selectedCreateCategory === 'FINANCE' && !createForm.mobileNumber.trim()) {
+      showNotification('error', 'Please provide a Mobile Number for Finance personnel.');
+      return;
+    }
+
+    if (
+      selectedCreateCategory === 'FINANCE' &&
+      financeTier === 'STAFF' &&
+      !createForm.assignedManagerId.trim()
+    ) {
+      showNotification('error', 'Please assign this Finance Staff member to a Finance Manager.');
       return;
     }
 
@@ -482,6 +564,10 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
       }
     }
 
+    const rawTempPassword = createForm.initialPassword.trim();
+    const assignedMgrId =
+      finalRole === 'FINANCE_STAFF' ? createForm.assignedManagerId.trim() : undefined;
+
     setIsSubmitting(true);
     try {
       const res = await UserManagementService.createSystemUser(
@@ -495,7 +581,12 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
           assignedStation: finalStation,
           permissions: finalPermissions,
           authUserId: createForm.authUserId || undefined,
-          initialPassword: createForm.initialPassword.trim(),
+          initialPassword: rawTempPassword,
+          mobileNumber: createForm.mobileNumber.trim() || undefined,
+          staffCode: createForm.staffCode.trim() || undefined,
+          assignedManagerId: assignedMgrId,
+          initialStatus: createForm.initialStatus,
+          mustChangePassword: createForm.mustChangePassword,
         },
         currentAdmin
       );
@@ -503,9 +594,23 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
       if (res.success) {
         showNotification(
           'success',
-          `Successfully provisioned ${finalRole} "${createForm.fullName}"! Real-time synchronized to cloud database.`
+          `Successfully provisioned ${finalRole} "${createForm.fullName}" (${res.userId})! Credentials set securely in Supabase Auth.`
         );
         setIsCreateModalOpen(false);
+        setCopiedCredentials(false);
+        setOneTimeCredentials({
+          title: 'Account Created — Share Login Credentials Securely',
+          fullName: createForm.fullName.trim(),
+          userId: res.userId || '',
+          staffCode: res.staffCode || createForm.staffCode.trim() || res.userId,
+          role: finalRole,
+          username: cleanUsername,
+          email: cleanEmail,
+          temporaryPassword: rawTempPassword,
+          assignedManagerName: res.assignedManagerName || null,
+          status: res.status || createForm.initialStatus,
+          mustChangePassword: Boolean(res.mustChangePassword ?? createForm.mustChangePassword),
+        });
 
         // Immediate real-time database and portal event dispatch
         if (typeof window !== 'undefined') {
@@ -532,6 +637,9 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
       fullName: user.fullName,
       username: user.username,
       email: user.email,
+      mobileNumber: user.mobileNumber || '',
+      staffCode: user.staffCode || '',
+      assignedManagerId: user.assignedManagerId || '',
       role: user.role,
       department: user.department,
       assignedStation: user.assignedStation,
@@ -545,7 +653,16 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
   // Execute Edit User
   const handleEditSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
-    if (!editingUser) return;
+    if (!editingUser || !isSuperAdmin) return;
+
+    if (
+      editingUser.userType === 'STAFF' &&
+      editForm.role.toUpperCase() === 'FINANCE_STAFF' &&
+      !editForm.assignedManagerId.trim()
+    ) {
+      showNotification('error', 'Finance Staff must remain assigned to a Finance Manager.');
+      return;
+    }
 
     if (editPassword.trim()) {
       if (editPassword.trim().length < 6) {
@@ -567,6 +684,10 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
           fullName: editForm.fullName,
           username: editForm.username,
           email: editForm.email,
+          mobileNumber: editForm.mobileNumber,
+          staffCode: editForm.staffCode,
+          assignedManagerId:
+            editingUser.userType === 'STAFF' ? editForm.assignedManagerId : undefined,
           role: editForm.role,
           department: editForm.department,
           assignedStation: editForm.assignedStation,
@@ -582,12 +703,13 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
         return;
       }
 
-      // If new password provided, update directly in Supabase Auth
+      // If new password provided, update directly in Supabase Auth (treated as temporary reset)
       if (editPassword.trim()) {
         const pwRes = await UserManagementService.setUserPassword(
           editForm.email,
           editPassword.trim(),
-          currentAdmin
+          currentAdmin,
+          true
         );
         if (!pwRes.success) {
           showNotification('error', `Profile saved, but password update failed: ${pwRes.error}`);
@@ -598,7 +720,7 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
 
       showNotification(
         'success',
-        `Updated profile for "${editForm.fullName}"${editPassword.trim() ? ' and password changed successfully' : ''}.`
+        `Updated profile for "${editForm.fullName}"${editPassword.trim() ? ' and set temporary password (rotation required on next login)' : ''}.`
       );
       setEditingUser(null);
       await loadUsers();
@@ -647,13 +769,14 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
     setPasswordModalUser(user);
     setDirectNewPassword('');
     setDirectConfirmPassword('');
+    setDirectMustChangePassword(true);
     setShowDirectPassword(false);
   };
 
   // Direct Password Update Execution
   const handleExecuteDirectPasswordChange = async (e: React.SyntheticEvent) => {
     e.preventDefault();
-    if (!passwordModalUser) return;
+    if (!passwordModalUser || !isSuperAdmin) return;
     if (directNewPassword.length < 6) {
       showNotification('error', 'Password must be at least 6 characters long.');
       return;
@@ -663,21 +786,40 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
       return;
     }
 
+    const tempPw = directNewPassword.trim();
+    const targetUser = passwordModalUser;
+
     setIsPasswordSubmitting(true);
     try {
       const res = await UserManagementService.setUserPassword(
-        passwordModalUser.email,
-        directNewPassword.trim(),
-        currentAdmin
+        targetUser.email,
+        tempPw,
+        currentAdmin,
+        directMustChangePassword
       );
       if (res.success) {
         showNotification(
           'success',
-          `Password successfully updated in Supabase Auth for "${passwordModalUser.fullName}" (${passwordModalUser.email}).`
+          `Temporary password set in Supabase Auth for "${targetUser.fullName}". Prior sessions revoked.`
         );
         setPasswordModalUser(null);
         setDirectNewPassword('');
         setDirectConfirmPassword('');
+        setCopiedCredentials(false);
+        setOneTimeCredentials({
+          title: 'Password Reset Complete — Share New Temporary Password',
+          fullName: targetUser.fullName,
+          userId: targetUser.id,
+          staffCode: targetUser.staffCode || targetUser.id,
+          role: targetUser.role,
+          username: targetUser.username,
+          email: targetUser.email,
+          temporaryPassword: tempPw,
+          assignedManagerName: targetUser.assignedManagerName || null,
+          status: targetUser.status,
+          mustChangePassword: directMustChangePassword,
+        });
+        await loadUsers();
       } else {
         showNotification('error', res.error || 'Failed to update user password.');
       }
@@ -685,6 +827,25 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
       showNotification('error', err?.message || 'Password update failed.');
     } finally {
       setIsPasswordSubmitting(false);
+    }
+  };
+
+  // Super Admin session revocation without deactivating account
+  const handleRevokeUserSessions = async (user: UnifiedSystemUser) => {
+    if (!isSuperAdmin) return;
+    if (!window.confirm(`Revoke all active login sessions for ${user.fullName} (@${user.username})?`)) {
+      return;
+    }
+    const res = await UserManagementService.revokeUserSessions(
+      user.id,
+      user.userType,
+      currentAdmin,
+      'Manual session revocation by Super Admin'
+    );
+    if (res.success) {
+      showNotification('success', `Revoked active auth sessions for "${user.fullName}".`);
+    } else {
+      showNotification('error', res.error || 'Unable to revoke user sessions.');
     }
   };
 
@@ -739,6 +900,18 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
         return <Shield className="w-5 h-5 text-indigo-500" />;
     }
   };
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="bg-white rounded-3xl border border-rose-200 p-8 sm:p-12 text-center space-y-3 shadow-xs">
+        <ShieldAlert className="w-10 h-10 text-rose-600 mx-auto" />
+        <h3 className="text-lg font-black text-slate-900">Super Admin Access Strictly Required</h3>
+        <p className="text-xs text-slate-600 max-w-md mx-auto">
+          Only the Super Administrator is authorized to create Finance Manager or Finance Staff accounts, assign managers, modify statuses, or reset passwords.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -1096,14 +1269,34 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
-                              <span className="font-mono text-slate-400">ID: {u.id}</span>
+                            <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
+                              <span className="font-mono text-slate-500">ID: {u.staffCode || u.id}</span>
                               <span>•</span>
                               <span>@{u.username}</span>
+                              {u.mobileNumber && (
+                                <>
+                                  <span>•</span>
+                                  <span className="inline-flex items-center gap-0.5 font-mono text-slate-600">
+                                    <Phone className="w-3 h-3 text-slate-400" />
+                                    {u.mobileNumber}
+                                  </span>
+                                </>
+                              )}
                             </div>
-                            <div className="text-[11px] text-slate-600 flex items-center gap-1 mt-0.5">
+                            <div className="text-[11px] text-slate-600 flex items-center gap-1.5 mt-0.5 flex-wrap">
                               <Mail className="w-3 h-3 text-slate-400 shrink-0" />
                               <span className="font-mono">{u.email}</span>
+                              {u.assignedManagerName && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-800 border border-purple-200">
+                                  <UserCheck className="w-3 h-3" />
+                                  Mgr: {u.assignedManagerName}
+                                </span>
+                              )}
+                              {u.mustChangePassword && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                  Temp PW
+                                </span>
+                              )}
                             </div>
                           </td>
 
@@ -1247,6 +1440,16 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                                   Suspend
                                 </button>
                               )}
+
+                              {/* Revoke Active Auth Sessions */}
+                              <button
+                                type="button"
+                                onClick={() => handleRevokeUserSessions(u)}
+                                className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 transition cursor-pointer"
+                                title="Revoke Active Login Sessions"
+                              >
+                                <LogOut className="w-3.5 h-3.5" />
+                              </button>
 
                               {/* View Activity / Audit Trail */}
                               <button
@@ -1785,7 +1988,7 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                     </div>
                   </div>
 
-                  {/* Full Name & Username */}
+                  {/* Full Name & Login ID / Username */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="font-bold text-slate-700 block mb-1">FULL NAME *</label>
@@ -1799,7 +2002,7 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                       />
                     </div>
                     <div>
-                      <label className="font-bold text-slate-700 block mb-1">USERNAME *</label>
+                      <label className="font-bold text-slate-700 block mb-1">LOGIN ID / USERNAME *</label>
                       <input
                         type="text"
                         required
@@ -1812,11 +2015,74 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                             email: val ? `${val.trim().toLowerCase().replace(/^@/, '')}@plscf.edu.bd` : '',
                           });
                         }}
-                        placeholder="e.g. finance1, cfo_admin"
+                        placeholder="e.g. finance1, staff_cash1"
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-semibold focus:bg-white focus:ring-2 focus:ring-purple-500 transition"
                       />
                     </div>
                   </div>
+
+                  {/* Mobile Number, Staff ID / Reg Number & Initial Status */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">MOBILE NUMBER *</label>
+                      <input
+                        type="tel"
+                        required
+                        value={createForm.mobileNumber}
+                        onChange={(e) => setCreateForm({ ...createForm, mobileNumber: e.target.value })}
+                        placeholder="e.g. 017XXXXXXXX"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-semibold focus:bg-white focus:ring-2 focus:ring-purple-500 transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">STAFF ID / REG NO.</label>
+                      <input
+                        type="text"
+                        value={createForm.staffCode}
+                        onChange={(e) => setCreateForm({ ...createForm, staffCode: e.target.value })}
+                        placeholder="Optional (auto if blank)"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-semibold focus:bg-white focus:ring-2 focus:ring-purple-500 transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">ACCOUNT STATUS *</label>
+                      <select
+                        value={createForm.initialStatus}
+                        onChange={(e) =>
+                          setCreateForm({ ...createForm, initialStatus: e.target.value as 'ACTIVE' | 'INACTIVE' })
+                        }
+                        className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-bold focus:bg-white focus:ring-2 focus:ring-purple-500 transition"
+                      >
+                        <option value="ACTIVE">ACTIVE</option>
+                        <option value="INACTIVE">INACTIVE</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Assigned Finance Manager (Required for Finance Staff) */}
+                  {financeTier === 'STAFF' && (
+                    <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-2">
+                      <label className="font-black text-emerald-950 block text-xs uppercase tracking-wider">
+                        ASSIGNED FINANCE MANAGER *
+                      </label>
+                      <select
+                        required
+                        value={createForm.assignedManagerId}
+                        onChange={(e) => setCreateForm({ ...createForm, assignedManagerId: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-emerald-300 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="">-- Select Supervising Finance Manager --</option>
+                        {financeManagers.map((mgr) => (
+                          <option key={mgr.id} value={mgr.id}>
+                            {mgr.fullName} (@{mgr.username} • {mgr.role})
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-emerald-800">
+                        Only the assigned Finance Manager (and Super Admin) will see this staff member in their Staff Directory and approve their expenses.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Email */}
                   <div>
@@ -1868,11 +2134,31 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
               {/* SHARED PASSWORD FIELDS (ENTER PASSWORD & CONFIRM PASSWORD)        */}
               {/* ================================================================= */}
               <div className="pt-2 border-t border-slate-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-700">
+                    Initial Authentication Password (Supabase Auth)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const pw = generateTempPassword();
+                      setCreateForm({ ...createForm, initialPassword: pw, mustChangePassword: true });
+                      setConfirmPassword(pw);
+                      setShowCreatePassword(true);
+                      setShowConfirmPassword(true);
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold border border-indigo-200 cursor-pointer"
+                  >
+                    <Wand2 className="w-3 h-3" />
+                    <span>Generate Temp Password</span>
+                  </button>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Enter Password */}
                   <div>
                     <label className="font-bold text-slate-700 block mb-1">
-                      {language === 'bn' ? 'পাসওয়ার্ড লিখুন (কমপক্ষে ৬ অক্ষর) *' : 'ENTER PASSWORD (MIN 6 CHARACTERS) *'}
+                      {language === 'bn' ? 'পাসওয়ার্ড লিখুন (কমপক্ষে ৬ অক্ষর) *' : 'ENTER INITIAL PASSWORD (MIN 6 CHARS) *'}
                     </label>
                     <div className="relative">
                       <input
@@ -1917,6 +2203,19 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                     </div>
                   </div>
                 </div>
+
+                {/* Temporary password force-change checkbox */}
+                <label className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 text-[11px] font-semibold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={createForm.mustChangePassword}
+                    onChange={(e) => setCreateForm({ ...createForm, mustChangePassword: e.target.checked })}
+                    className="rounded text-indigo-600"
+                  />
+                  <span>
+                    Temporary password: Require user to change password at their next login (recommended)
+                  </span>
+                </label>
 
                 {/* Password Match Status Live Indicator */}
                 <div className="flex items-center justify-between text-[11px] pt-0.5">
@@ -2060,6 +2359,50 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">MOBILE NUMBER</label>
+                  <input
+                    type="tel"
+                    value={editForm.mobileNumber}
+                    onChange={(e) => setEditForm({ ...editForm, mobileNumber: e.target.value })}
+                    placeholder="e.g. 017XXXXXXXX"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">STAFF ID / REG NO.</label>
+                  <input
+                    type="text"
+                    value={editForm.staffCode}
+                    onChange={(e) => setEditForm({ ...editForm, staffCode: e.target.value })}
+                    placeholder="Staff ID / Registration Number"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono font-semibold"
+                  />
+                </div>
+              </div>
+
+              {editingUser.userType === 'STAFF' && (
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    ASSIGNED FINANCE MANAGER {editForm.role.toUpperCase() === 'FINANCE_STAFF' ? '*' : '(OPTIONAL)'}
+                  </label>
+                  <select
+                    required={editForm.role.toUpperCase() === 'FINANCE_STAFF'}
+                    value={editForm.assignedManagerId}
+                    onChange={(e) => setEditForm({ ...editForm, assignedManagerId: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 font-bold text-slate-900"
+                  >
+                    <option value="">-- Unassigned / Select Finance Manager --</option>
+                    {financeManagers.map((mgr) => (
+                      <option key={mgr.id} value={mgr.id}>
+                        {mgr.fullName} (@{mgr.username} • {mgr.role})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Granular Permissions Checkboxes */}
               <div>
                 <label className="font-bold text-slate-700 block mb-2">GRANULAR PERMISSIONS</label>
@@ -2104,12 +2447,15 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                 <div className="flex items-center justify-between">
                   <label className="font-black text-slate-800 flex items-center gap-1.5 uppercase tracking-wider text-xs">
                     <Key className="w-4 h-4 text-indigo-600" />
-                    {language === 'bn' ? 'পাসওয়ার্ড পরিবর্তন করুন (ঐচ্ছিক)' : 'CHANGE ACCOUNT PASSWORD (OPTIONAL)'}
+                    {language === 'bn' ? 'নতুন সাময়িক পাসওয়ার্ড সেট করুন (ঐচ্ছিক)' : 'SET NEW TEMPORARY PASSWORD (OPTIONAL)'}
                   </label>
                   <span className="text-[10px] text-slate-500 font-semibold">
                     {language === 'bn' ? 'পরিবর্তন না করতে চাইলে ফাঁকা রাখুন' : 'Leave blank to keep unchanged'}
                   </span>
                 </div>
+                <p className="text-[11px] text-slate-500">
+                  Existing passwords are cryptographically hashed in Supabase Auth and cannot be viewed or retrieved. Setting a new password revokes active sessions and requires a change on next login.
+                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-[11px] font-bold text-slate-600 block mb-1">
@@ -2341,10 +2687,29 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
             </div>
 
             <form onSubmit={handleExecuteDirectPasswordChange} className="space-y-4 text-xs">
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600">
+                Current passwords are never stored in readable form and cannot be viewed. Assign a new temporary password below to replace it and revoke active sessions.
+              </div>
+
               <div className="space-y-1">
-                <label className="font-bold text-slate-700 block">
-                  {language === 'bn' ? 'সরাসরি নতুন পাসওয়ার্ড দিন *' : 'ENTER NEW PASSWORD DIRECTLY *'}
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-700 block">
+                    {language === 'bn' ? 'সরাসরি নতুন পাসওয়ার্ড দিন *' : 'ENTER NEW TEMPORARY PASSWORD *'}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const pw = generateTempPassword();
+                      setDirectNewPassword(pw);
+                      setDirectConfirmPassword(pw);
+                      setShowDirectPassword(true);
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold border border-indigo-200 cursor-pointer"
+                  >
+                    <Wand2 className="w-3 h-3" />
+                    <span>Generate Temp PW</span>
+                  </button>
+                </div>
                 <div className="relative">
                   <input
                     type={showDirectPassword ? 'text' : 'password'}
@@ -2378,6 +2743,16 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                 />
               </div>
 
+              <label className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 text-[11px] font-semibold cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={directMustChangePassword}
+                  onChange={(e) => setDirectMustChangePassword(e.target.checked)}
+                  className="rounded text-indigo-600"
+                />
+                <span>Require user to change this temporary password at next login</span>
+              </label>
+
               <button
                 type="submit"
                 disabled={isPasswordSubmitting}
@@ -2385,7 +2760,7 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
               >
                 {isPasswordSubmitting
                   ? (language === 'bn' ? 'আপডেট হচ্ছে...' : 'Updating Password...')
-                  : (language === 'bn' ? '🔒 সরাসরি পাসওয়ার্ড আপডেট করুন' : '🔒 Set Password in Supabase Now')}
+                  : (language === 'bn' ? '🔒 সাময়িক পাসওয়ার্ড সেট করুন' : '🔒 Reset Password & Revoke Sessions')}
               </button>
             </form>
 
@@ -2412,6 +2787,126 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
               <p className="text-[10px] text-slate-400 text-center">
                 Dispatches a secure Supabase Auth recovery link to {passwordModalUser.email}.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 10. ONE-TIME CREDENTIAL HANDOFF MODAL (EPHEMERAL IN-MEMORY ONLY)          */}
+      {/* ========================================================================= */}
+      {oneTimeCredentials && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border-2 border-emerald-500 space-y-4">
+            <div className="flex items-start justify-between gap-2 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-2xl bg-emerald-100 text-emerald-700">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">{oneTimeCredentials.title}</h3>
+                  <p className="text-[11px] text-slate-500 font-semibold">
+                    {oneTimeCredentials.fullName} ({oneTimeCredentials.role})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOneTimeCredentials(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 font-semibold leading-relaxed">
+              🔒 Security Notice: This temporary password is shown <strong>once</strong> so you can communicate it securely to the account holder. Once closed, it is discarded from memory and can never be viewed again.
+            </div>
+
+            <div className="bg-slate-900 text-slate-100 rounded-2xl p-4 space-y-2 font-mono text-xs">
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-400">Account ID:</span>
+                <span className="font-bold text-white">{oneTimeCredentials.staffCode || oneTimeCredentials.userId}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-400">Login ID / Username:</span>
+                <span className="font-bold text-emerald-300">{oneTimeCredentials.username}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-400">Portal Email:</span>
+                <span className="font-bold text-sky-300">{oneTimeCredentials.email}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-400">Temporary Password:</span>
+                <span className="font-black text-amber-300 select-all">{oneTimeCredentials.temporaryPassword}</span>
+              </div>
+              {oneTimeCredentials.assignedManagerName && (
+                <div className="flex justify-between gap-2 pt-1 border-t border-slate-800">
+                  <span className="text-slate-400">Assigned Manager:</span>
+                  <span className="font-bold text-purple-300">{oneTimeCredentials.assignedManagerName}</span>
+                </div>
+              )}
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-400">Portal URL:</span>
+                <span className="font-bold text-slate-200">
+                  {oneTimeCredentials.role === 'finance_manager'
+                    ? '/finance'
+                    : oneTimeCredentials.role === 'FINANCE_STAFF'
+                    ? '/scanner'
+                    : '/admin'}
+                </span>
+              </div>
+            </div>
+
+            {oneTimeCredentials.mustChangePassword && (
+              <p className="text-[11px] text-indigo-800 bg-indigo-50 border border-indigo-200 p-2.5 rounded-xl font-medium">
+                The user will be required to change this temporary password immediately upon their next login.
+              </p>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const portalPath =
+                    oneTimeCredentials.role === 'finance_manager'
+                      ? '/finance'
+                      : oneTimeCredentials.role === 'FINANCE_STAFF'
+                      ? '/scanner'
+                      : '/admin';
+                  const msg = [
+                    `PLSCF Reunion 2027 — Account Credentials`,
+                    `Name: ${oneTimeCredentials.fullName}`,
+                    `Role: ${oneTimeCredentials.role}`,
+                    `ID: ${oneTimeCredentials.staffCode || oneTimeCredentials.userId}`,
+                    `Portal: ${typeof window !== 'undefined' ? window.location.origin : ''}${portalPath}`,
+                    `Login ID / Username: ${oneTimeCredentials.username}`,
+                    `Email: ${oneTimeCredentials.email}`,
+                    `Initial Password: ${oneTimeCredentials.temporaryPassword}`,
+                    oneTimeCredentials.assignedManagerName
+                      ? `Assigned Manager: ${oneTimeCredentials.assignedManagerName}`
+                      : '',
+                    oneTimeCredentials.mustChangePassword
+                      ? `Note: You will be prompted to set a new password at first login.`
+                      : '',
+                  ]
+                    .filter(Boolean)
+                    .join('\n');
+                  navigator.clipboard?.writeText(msg);
+                  setCopiedCredentials(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer"
+              >
+                {copiedCredentials ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedCredentials ? 'Copied!' : 'Copy Login Instructions'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setOneTimeCredentials(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold cursor-pointer"
+              >
+                Close & Clear
+              </button>
             </div>
           </div>
         </div>

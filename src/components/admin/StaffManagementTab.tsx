@@ -19,9 +19,14 @@ import { paginate } from '../../utils/pagination';
 
 interface StaffManagementTabProps {
   currentAdminEmail?: string;
+  currentAdminRole?: string;
 }
 
-export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentAdminEmail = '' }) => {
+export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({
+  currentAdminEmail = '',
+  currentAdminRole = '',
+}) => {
+  const isSuperAdmin = String(currentAdminRole).toLowerCase() === 'super_admin';
   const [staffList, setStaffList] = useState<StaffAccount[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
@@ -68,8 +73,21 @@ export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentA
   };
 
   useEffect(() => {
+    if (!isSuperAdmin) return;
     void loadStaff();
-  }, []);
+  }, [isSuperAdmin]);
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="bg-white rounded-2xl border border-rose-200 p-8 text-center space-y-2">
+        <Lock className="w-8 h-8 text-rose-600 mx-auto" />
+        <h3 className="text-base font-black text-slate-900">Super Admin Authorization Required</h3>
+        <p className="text-xs text-slate-600">
+          Only the Super Admin is permitted to create, modify, activate, deactivate, or delete staff accounts.
+        </p>
+      </div>
+    );
+  }
 
   const showNotification = (type: 'success' | 'error', text: string) => {
     setStatusMessage({ type, text });

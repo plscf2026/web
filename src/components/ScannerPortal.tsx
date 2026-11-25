@@ -23,6 +23,7 @@ import { DressScannerModule } from './DressScannerModule';
 import { GateScannerModule } from './GateScannerModule';
 import { StaffFinanceModule } from './StaffFinanceModule';
 import { MultiStationDesk } from './MultiStationDesk';
+import { ForcePasswordChangeGate } from './auth/ForcePasswordChangeGate';
 
 interface ScannerPortalProps {
   language: Language;
@@ -84,6 +85,7 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
         setTotalRegistrationsCount(res.count);
       })
       .catch(() => {});
+    EventStore.syncFinanceWithSupabase().catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -477,7 +479,31 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
     );
   }
 
-  // 2. Authenticated Staff Workspace
+  // 2. Enforce forced temporary password change on next login when flagged
+  if (currentStaff.mustChangePassword) {
+    return (
+      <ForcePasswordChangeGate
+        fullName={currentStaff.fullName}
+        username={currentStaff.username}
+        role={currentStaff.role}
+        language={language}
+        onLogout={handleLogout}
+        onPasswordUpdated={() => {
+          const updated = { ...currentStaff, mustChangePassword: false };
+          setCurrentStaff(updated);
+          try {
+            const raw = localStorage.getItem('plscf_test_staff_session');
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              localStorage.setItem('plscf_test_staff_session', JSON.stringify({ ...parsed, mustChangePassword: false }));
+            }
+          } catch (_) {}
+        }}
+      />
+    );
+  }
+
+  // 3. Authenticated Staff Workspace
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Staff Session Control Strip */}

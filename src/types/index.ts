@@ -580,6 +580,10 @@ export interface AdminAccount {
   fullName: string;
   email: string;
   role: PortalRole | 'gate_scanner';
+  mobileNumber?: string;
+  staffCode?: string;
+  assignedStation?: string;
+  mustChangePassword?: boolean;
   createdAt: string;
 }
 
@@ -668,6 +672,11 @@ export interface StaffAccount {
   fullName: string;
   username: string;
   email: string;
+  mobileNumber?: string;
+  staffCode?: string;
+  assignedManagerId?: string;
+  assignedManagerName?: string;
+  mustChangePassword?: boolean;
   role: EventStaffRole;
   department: DepartmentType;
   permissions: StaffPermissionAction[];

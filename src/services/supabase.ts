@@ -2016,13 +2016,18 @@ export const SupabaseService = {
 
     const { data, error } = await supabase
       .from('admin_accounts')
-      .select('id, username, full_name, email, role, created_at')
+      .select('id, username, full_name, email, role, status, is_locked, mobile_number, staff_code, assigned_station, must_change_password, created_at')
       .eq('auth_user_id', authData.user.id)
       .maybeSingle();
 
     if (error || !data) {
       await supabase.auth.signOut();
       return { success: false, error: 'This account is not authorized as an administrator.' };
+    }
+
+    if (data.is_locked || (data.status && data.status.toUpperCase() !== 'ACTIVE')) {
+      await supabase.auth.signOut();
+      return { success: false, error: 'Access Denied: This administrator account has been deactivated or suspended by the Super Admin.' };
     }
 
     const accountRole = (data.role || 'super_admin') as PortalRole;
@@ -2044,6 +2049,10 @@ export const SupabaseService = {
       fullName: data.full_name || 'Administrator',
       email: data.email || authData.user.email || '',
       role: accountRole,
+      mobileNumber: (data as any).mobile_number || undefined,
+      staffCode: (data as any).staff_code || data.id,
+      assignedStation: (data as any).assigned_station || undefined,
+      mustChangePassword: Boolean((data as any).must_change_password),
       createdAt: data.created_at || new Date().toISOString(),
     };
 
@@ -2112,17 +2121,21 @@ export const SupabaseService = {
 
       const { data, error } = await supabase
         .from('admin_accounts')
-        .select('id, username, full_name, email, role, created_at')
+        .select('id, username, full_name, email, role, status, is_locked, mobile_number, staff_code, assigned_station, must_change_password, created_at')
         .eq('auth_user_id', user.id)
         .maybeSingle();
 
-      if (error || !data) return null;
+      if (error || !data || data.is_locked || (data.status && data.status.toUpperCase() !== 'ACTIVE')) return null;
       const account: AdminAccount = {
         id: data.id,
         username: data.username,
         fullName: data.full_name || 'Administrator',
         email: data.email || user.email || '',
         role: data.role || 'super_admin',
+        mobileNumber: (data as any).mobile_number || undefined,
+        staffCode: (data as any).staff_code || data.id,
+        assignedStation: (data as any).assigned_station || undefined,
+        mustChangePassword: Boolean((data as any).must_change_password),
         createdAt: data.created_at || new Date().toISOString(),
       };
 

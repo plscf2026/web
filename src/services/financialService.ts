@@ -6,6 +6,7 @@
 
 import { supabase } from './supabase';
 import { AppStore } from './store';
+import { EventStore } from './eventStore';
 import { sanitizeInput } from '../utils/security';
 import { RegistrationRecord } from '../types';
 
@@ -645,6 +646,9 @@ export class FinancialService {
     );
 
     const localExpenses = AppStore.getExpenses();
+    const staffExpenses = EventStore.getStaffExpenses().filter((e) => e.status === 'APPROVED');
+    const seenExpenseIds = new Set(localExpenses.map((e) => e.id));
+    const uniqueApprovedStaffExpenses = staffExpenses.filter((se) => !seenExpenseIds.has(se.id));
     const localDonations = AppStore.getDonations();
 
     const onlineRegFees = onlinePaidRegistrations.reduce(
@@ -670,7 +674,9 @@ export class FinancialService {
     const standaloneDonations = localDonations.reduce((sum, d) => sum + (d.amount || 0), 0);
     const totalDonations = regDonations + standaloneDonations;
     const totalCollected = regFees + totalDonations;
-    const totalExpenses = localExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const directExpensesTotal = localExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const staffApprovedExpensesTotal = uniqueApprovedStaffExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const totalExpenses = directExpensesTotal + staffApprovedExpensesTotal;
     const remainingBalance = totalCollected - totalExpenses;
 
     const paidStudents = [...onlinePaidRegistrations, ...manualApprovedRegistrations];
@@ -687,17 +693,32 @@ export class FinancialService {
       { id: 'cat-other', name_en: 'Other Expenses', name_bn: 'অন্যান্য খরচ', icon: 'Coins', color: '#64748B', budget_allocated: 50000, total_spent: 0, expense_count: 0 },
     ];
 
-    const recentExpenses: TransparencyExpenseItem[] = localExpenses.map((e, idx) => ({
-      id: e.id || `EXP-${idx}`,
-      category: e.category,
-      amount: e.amount,
-      expense_date: e.date,
-      description: e.reason,
-      responsible_person: e.responsiblePerson,
-      voucher_number: e.receiptRef,
-      receipt_url: 'https://images.unsplash.com/photo-1555244162-803834f70033?w=800&auto=format&fit=crop&q=80',
-      status: 'approved',
-    }));
+    const recentExpenses: TransparencyExpenseItem[] = [
+      ...localExpenses.map((e, idx) => ({
+        id: e.id || `EXP-${idx}`,
+        category: e.category,
+        amount: e.amount,
+        expense_date: e.date,
+        description: e.reason,
+        responsible_person: e.responsiblePerson,
+        voucher_number: e.receiptRef,
+        receipt_url: 'https://images.unsplash.com/photo-1555244162-803834f70033?w=800&auto=format&fit=crop&q=80',
+        status: 'approved' as const,
+      })),
+      ...uniqueApprovedStaffExpenses.map((se) => ({
+        id: se.id,
+        category: se.category,
+        amount: Number(se.amount) || 0,
+        expense_date: se.expenseDate,
+        description: se.description,
+        vendor_name: se.vendorName,
+        responsible_person: se.staffName,
+        voucher_number: se.id,
+        receipt_url: se.receiptUrl,
+        status: 'approved' as const,
+        created_at: se.createdAt,
+      })),
+    ];
 
     // Collect raw donations from paid registrations
     const regDonationsList: PublicDonationItem[] = mainRegistrations

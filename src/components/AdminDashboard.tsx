@@ -70,6 +70,7 @@ import {
 import { RoleLoginPage } from './auth/RoleLoginPage';
 import { RoleDirectoryPortal } from './auth/RoleDirectoryPortal';
 import { AccessDeniedGate } from './auth/AccessDeniedGate';
+import { ForcePasswordChangeGate } from './auth/ForcePasswordChangeGate';
 import { subscribeToAuthSync } from '../services/authSync';
 import { translations } from '../i18n/translations';
 import { AppStore, INITIAL_STAFF_USERS } from '../services/store';
@@ -600,10 +601,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }).catch((err) => console.warn('Error fetching donations from Supabase on mount:', err));
   }, [selectedYear]);
 
-  // Real-time bidirectional synchronization for staff stations (Food, Dress, Gate, Check-in)
+  // Real-time bidirectional synchronization for staff stations & finance ledger
   useEffect(() => {
     EventStore.initRealtimeSync();
     EventStore.syncDistributionsWithSupabase();
+    EventStore.syncFinanceWithSupabase();
 
     const handleSync = () => {
       syncLocalState();
@@ -1430,6 +1432,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     );
   }
 
+  // ==========================================
+  // VIEW 1.75: ENFORCE TEMPORARY PASSWORD ROTATION ON NEXT LOGIN
+  // ==========================================
+  if (adminSession.mustChangePassword) {
+    return (
+      <ForcePasswordChangeGate
+        fullName={adminSession.fullName}
+        username={adminSession.username}
+        role={adminSession.role}
+        language={language}
+        onLogout={handleLogout}
+        onPasswordUpdated={() => {
+          const updated = { ...adminSession, mustChangePassword: false };
+          setAdminSession(updated);
+          try {
+            const raw = localStorage.getItem('plscf_test_admin_session');
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              localStorage.setItem('plscf_test_admin_session', JSON.stringify({ ...parsed, mustChangePassword: false }));
+            }
+          } catch (_) {}
+        }}
+      />
+    );
+  }
+
   interface NavigationTabItem {
     id: AdminTab;
     label: string;
@@ -1591,12 +1619,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           },
         ]
       : []),
-    {
-      id: 'staffManagement',
-      label: language === 'bn' ? 'স্টাফ অ্যাকাউন্টস ও রোলস' : 'Staff Accounts & Roles',
-      icon: Users,
-      category: 'admin',
-    },
+    ...(isSuperAdminAccount
+      ? [
+          {
+            id: 'staffManagement' as const,
+            label: language === 'bn' ? 'স্টাফ অ্যাকাউন্টস ও রোলস' : 'Staff Accounts & Roles',
+            icon: Users,
+            category: 'admin' as const,
+          },
+        ]
+      : []),
     {
       id: 'auditHistory',
       label: language === 'bn' ? 'সিকিউরিটি অডিট ট্রেইল' : 'Security Audit Trail',
@@ -2158,8 +2190,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* TAB: BUDGET & EXPENSE MANAGEMENT (PART 8) */}
       {activeTab === 'budgetManagement' && (
         <BudgetManagementTab
+          language={language}
+          adminSession={{
+            id: adminSession?.id || effectiveAdmin.id,
+            fullName: adminSession?.fullName || effectiveAdmin.fullName,
+            username: adminSession?.username || effectiveAdmin.username,
+          }}
           adminId={adminSession?.id || effectiveAdmin.id}
           adminName={adminSession?.fullName || effectiveAdmin.fullName}
+          adminRole={adminSession?.role || effectiveAdmin.role}
         />
       )}
 
@@ -2168,9 +2207,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <DailyAnalyticsTab language={language} registrations={registrations} />
       )}
 
-      {/* TAB: STAFF ACCOUNTS & ROLE ISOLATION (PART 2) */}
-      {activeTab === 'staffManagement' && (
-        <StaffManagementTab currentAdminEmail={adminSession?.email || effectiveAdmin.email} />
+      {/* TAB: STAFF ACCOUNTS & ROLE ISOLATION (SUPER ADMIN EXCLUSIVE) */}
+      {activeTab === 'staffManagement' && isSuperAdmin && (
+        <StaffManagementTab
+          currentAdminEmail={adminSession?.email || effectiveAdmin.email}
+          currentAdminRole={adminSession?.role || effectiveAdmin.role}
+        />
       )}
 
       {/* TAB: PRIVILEGED OPERATIONS AUDIT TRAIL (PART 10) */}

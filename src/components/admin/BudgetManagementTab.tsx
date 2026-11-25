@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   DollarSign,
   Wallet,
@@ -10,9 +10,14 @@ import {
   Download,
   Layers,
   Eye,
+  Phone,
+  ShieldAlert,
+  UserCheck,
+  X,
 } from 'lucide-react';
 import {
   StaffExpense,
+  StaffAccount,
   Language,
 } from '../../types';
 import { EventStore } from '../../services/eventStore';
@@ -31,6 +36,7 @@ interface BudgetManagementTabProps {
   adminSession?: { id: string; fullName: string; username?: string };
   adminId?: string;
   adminName?: string;
+  adminRole?: string;
 }
 
 export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
@@ -38,17 +44,27 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
   adminSession: passedSession,
   adminId,
   adminName,
+  adminRole = 'super_admin',
 }) => {
   const adminSession = passedSession || {
     id: adminId || 'SUPER_ADMIN',
     fullName: adminName || 'Super Administrator',
     username: 'superadmin',
   };
+  const isSuperAdmin = String(adminRole || '').toLowerCase() === 'super_admin';
+
   const [centralBudget, setCentralBudget] = useState(() => EventStore.getCentralBudget());
-  const [allocations, setAllocations] = useState(() => EventStore.getStaffAllocations());
-  const [expenses, setExpenses] = useState(() => EventStore.getStaffExpenses());
-  const [ledger, setLedger] = useState(() => EventStore.getFinancialLedger());
-  const [staffList, setStaffList] = useState(() => EventStore.getStaffAccounts());
+  const [rawAllocations, setRawAllocations] = useState(() => EventStore.getStaffAllocations());
+  const [rawExpenses, setRawExpenses] = useState(() => EventStore.getStaffExpenses());
+  const [rawLedger, setRawLedger] = useState(() => EventStore.getFinancialLedger());
+  const [staffList, setStaffList] = useState<StaffAccount[]>(() =>
+    isSuperAdmin
+      ? EventStore.getStaffAccounts()
+      : EventStore.getStaffAccounts().filter(
+          (s) => s.role === 'FINANCE_STAFF' && s.assignedManagerId === adminSession.id
+        )
+  );
+  const [viewingStaffProfile, setViewingStaffProfile] = useState<StaffAccount | null>(null);
 
   // Modals & Forms
   const [showBudgetModal, setShowBudgetModal] = useState(false);
@@ -89,12 +105,68 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
     setExpensePage(1);
   }, [expenseSearch, statusFilter]);
 
+  // Synchronize assigned Staff & Finance records from Supabase (RLS-enforced)
+  const syncScopedStaffAndFinance = async () => {
+    try {
+      await EventStore.syncFinanceWithSupabase();
+      if (isSuperAdmin) {
+        const fetched = await EventStore.fetchStaffAccounts().catch(() => EventStore.getStaffAccounts());
+        setStaffList(fetched);
+      } else {
+        const scoped = await EventStore.fetchAssignedFinanceStaff(adminSession.id, false);
+        setStaffList(scoped);
+      }
+    } catch (_) {}
+    setCentralBudget(EventStore.getCentralBudget());
+    setRawAllocations(EventStore.getStaffAllocations());
+    setRawExpenses(EventStore.getStaffExpenses());
+    setRawLedger(EventStore.getFinancialLedger());
+  };
+
+  useEffect(() => {
+    void syncScopedStaffAndFinance();
+    const onSync = () => {
+      void syncScopedStaffAndFinance();
+    };
+    window.addEventListener('plscf_finance_sync', onSync);
+    window.addEventListener('plscf_staff_sync', onSync);
+    return () => {
+      window.removeEventListener('plscf_finance_sync', onSync);
+      window.removeEventListener('plscf_staff_sync', onSync);
+    };
+  }, [adminSession.id, isSuperAdmin]);
+
+  // Strict Finance Manager Isolation: only see records belonging to assigned Finance Staff
+  const allowedStaffIds = useMemo(() => new Set(staffList.map((s) => s.id)), [staffList]);
+
+  const allocations = useMemo(
+    () => (isSuperAdmin ? rawAllocations : rawAllocations.filter((a) => allowedStaffIds.has(a.staffId))),
+    [isSuperAdmin, rawAllocations, allowedStaffIds]
+  );
+
+  const expenses = useMemo(
+    () => (isSuperAdmin ? rawExpenses : rawExpenses.filter((e) => allowedStaffIds.has(e.staffId))),
+    [isSuperAdmin, rawExpenses, allowedStaffIds]
+  );
+
+  const ledger = useMemo(
+    () =>
+      isSuperAdmin
+        ? rawLedger
+        : rawLedger.filter(
+            (l) => allowedStaffIds.has(l.staffId) || l.transactionType === 'REGISTRATION_INFLOW'
+          ),
+    [isSuperAdmin, rawLedger, allowedStaffIds]
+  );
+
   const refreshAll = () => {
     setCentralBudget(EventStore.getCentralBudget());
-    setAllocations(EventStore.getStaffAllocations());
-    setExpenses(EventStore.getStaffExpenses());
-    setLedger(EventStore.getFinancialLedger());
-    setStaffList(EventStore.getStaffAccounts());
+    setRawAllocations(EventStore.getStaffAllocations());
+    setRawExpenses(EventStore.getStaffExpenses());
+    setRawLedger(EventStore.getFinancialLedger());
+    if (isSuperAdmin) {
+      setStaffList(EventStore.getStaffAccounts());
+    }
   };
 
   const overview = calculateCentralBudgetOverview(
@@ -138,7 +210,10 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
     }
 
     const staff = staffList.find((s) => s.id === selectedStaffId);
-    if (!staff) return;
+    if (!staff || (!isSuperAdmin && !allowedStaffIds.has(staff.id))) {
+      alert('Unauthorized: You may only allocate budget to Finance Staff assigned to you.');
+      return;
+    }
 
     EventStore.allocateMoneyToStaff(
       staff.id,
@@ -167,7 +242,10 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
     if (!returnStaffId || isNaN(amt) || amt <= 0) return;
 
     const staff = staffList.find((s) => s.id === returnStaffId);
-    if (!staff) return;
+    if (!staff || (!isSuperAdmin && !allowedStaffIds.has(staff.id))) {
+      alert('Unauthorized: You may only record cash returns for Finance Staff assigned to you.');
+      return;
+    }
 
     EventStore.recordCashReturned(
       staff.id,
@@ -193,6 +271,10 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
   const handleExecuteExpenseReview = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!selectedExpenseForReview) return;
+    if (!isSuperAdmin && !allowedStaffIds.has(selectedExpenseForReview.staffId)) {
+      alert('Unauthorized: You may only review expenses for Finance Staff assigned to you.');
+      return;
+    }
 
     if (reviewAction === 'APPROVE') {
       EventStore.approveStaffExpense(
@@ -244,6 +326,10 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
 
   // Close Staff Account Handler (Requirement 8J)
   const handleCloseStaffAccount = (staffId: string, staffName: string) => {
+    if (!isSuperAdmin && !allowedStaffIds.has(staffId)) {
+      alert('Unauthorized: You may only reconcile and close accounts for Finance Staff assigned to you.');
+      return;
+    }
     const reason = prompt(`Enter reason for closing financial account for ${staffName}:`);
     if (!reason) return;
 
@@ -375,12 +461,12 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
 
           <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-1">
             <span className="text-[10px] uppercase font-bold text-amber-800 block tracking-wider">
-              TOTAL RECORDED EXPENSES
+              PENDING (SUBMITTED)
             </span>
             <div className="text-lg font-black font-mono text-amber-950">
-              BDT {overview.totalExpensesRecorded.toLocaleString()}
+              BDT {(overview.totalExpensesRecorded - overview.totalApprovedExpenses).toLocaleString()}
             </div>
-            <span className="text-[9px] text-amber-700 block">Submitted + Approved</span>
+            <span className="text-[9px] text-amber-700 block">Awaiting review (excluded from approved)</span>
           </div>
 
           <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-1">
@@ -494,36 +580,138 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
         </div>
       )}
 
-      {/* SECTION B: STAFF-WISE MONEY ALLOCATION & BALANCES TABLE (Requirement 8F) */}
+      {/* SECTION B: FINANCE MANAGER STAFF DIRECTORY & BALANCES TABLE (Requirement 8F) */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-4">
-        <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
           <div className="flex items-center gap-2">
             <Wallet className="w-4 h-4 text-slate-500" />
             <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
-              Staff-wise Allocation & Real-time Balances
+              {isSuperAdmin
+                ? 'Staff Directory, Allocations & Real-time Balances'
+                : 'My Assigned Finance Staff Directory'}
             </h3>
           </div>
           <span className="text-xs text-slate-500 font-mono">
-            {staffList.length} staff personnel
+            {staffList.length} assigned staff personnel
           </span>
         </div>
 
-        {/* Desktop Table View (>= 640px) */}
-        <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
-                <th className="py-2.5 px-3">Staff ID</th>
-                <th className="py-2.5 px-3">Staff Name</th>
-                <th className="py-2.5 px-3">Assigned Role</th>
-                <th className="py-2.5 px-3 text-right">Allocated (BDT)</th>
-                <th className="py-2.5 px-3 text-right">Recorded Spent</th>
-                <th className="py-2.5 px-3 text-right">Remaining Balance</th>
-                <th className="py-2.5 px-3 text-center">Account Status</th>
-                <th className="py-2.5 px-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
+        {!isSuperAdmin && (
+          <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              Showing only Finance Staff assigned to you by the Super Admin. If you need a new Staff account, status change, or password reset, please request it from the Super Administrator.
+            </span>
+          </div>
+        )}
+
+        {staffList.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-500 bg-slate-50 rounded-2xl border border-slate-200">
+            No Finance Staff accounts are currently assigned to your manager profile. Ask the Super Admin to assign Staff under User &amp; Access Control.
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table View (>= 640px) */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
+                    <th className="py-2.5 px-3">Staff ID / Reg No.</th>
+                    <th className="py-2.5 px-3">Staff Name &amp; Mobile</th>
+                    <th className="py-2.5 px-3 text-right">Allocated</th>
+                    <th className="py-2.5 px-3 text-right">Submitted</th>
+                    <th className="py-2.5 px-3 text-right">Approved</th>
+                    <th className="py-2.5 px-3 text-right">Remaining</th>
+                    <th className="py-2.5 px-3 text-center">Status</th>
+                    <th className="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paginate(staffList, staffPage, staffPageSize).map((stf) => {
+                    const sSummary = calculateStaffFinancialSummary(
+                      stf.id,
+                      stf.fullName,
+                      allocations,
+                      expenses,
+                      ledger
+                    );
+                    const sAllocs = allocations.filter((a) => a.staffId === stf.id);
+                    const isClosed = sAllocs.length > 0 && sAllocs.every((a) => a.status === 'CLOSED');
+                    return (
+                      <tr key={stf.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-900">
+                          <div>{stf.staffCode || stf.id}</div>
+                          {stf.staffCode && stf.staffCode !== stf.id && (
+                            <span className="text-[10px] text-slate-400 font-normal">{stf.id}</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <div className="font-semibold text-slate-800">{stf.fullName}</div>
+                          <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                            <span className="inline-flex items-center gap-1 font-mono">
+                              <Phone className="w-3 h-3 text-slate-400" />
+                              {stf.mobileNumber || '—'}
+                            </span>
+                            <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[9px] font-bold">
+                              {stf.role}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap tabular-nums">
+                          BDT {sSummary.totalAllocated.toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono text-amber-700 font-semibold whitespace-nowrap tabular-nums">
+                          BDT {sSummary.totalSubmittedExpenses.toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono text-emerald-700 font-bold whitespace-nowrap tabular-nums">
+                          BDT {sSummary.totalApprovedExpenses.toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-black text-slate-900 whitespace-nowrap tabular-nums">
+                          BDT {sSummary.remainingSpendableBalance.toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                              stf.status === 'ACTIVE'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-slate-200 text-slate-700'
+                            }`}
+                          >
+                            {stf.status}
+                          </span>
+                          {isClosed && (
+                            <span className="block text-[9px] font-bold text-slate-500 mt-0.5">
+                              RECONCILED
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setViewingStaffProfile(stf)}
+                              className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] border border-indigo-200 cursor-pointer"
+                            >
+                              View Profile
+                            </button>
+                            <button
+                              onClick={() => handleCloseStaffAccount(stf.id, stf.fullName)}
+                              className="text-[11px] font-bold text-slate-600 hover:text-rose-600 cursor-pointer"
+                              title="Reconcile and close account"
+                            >
+                              Close Account
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Responsive Cards (< 640px) */}
+            <div className="sm:hidden space-y-3">
               {paginate(staffList, staffPage, staffPageSize).map((stf) => {
                 const sSummary = calculateStaffFinancialSummary(
                   stf.id,
@@ -533,26 +721,16 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
                   ledger
                 );
                 return (
-                  <tr key={stf.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{stf.id}</td>
-                    <td className="py-2.5 px-3 font-semibold text-slate-800">{stf.fullName}</td>
-                    <td className="py-2.5 px-3 text-slate-500">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
-                        {stf.role}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap tabular-nums">
-                      BDT {sSummary.totalAllocated.toLocaleString()}
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-amber-700 font-semibold whitespace-nowrap tabular-nums">
-                      BDT {(sSummary.totalSubmittedExpenses + sSummary.totalApprovedExpenses).toLocaleString()}
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-700 whitespace-nowrap tabular-nums">
-                      BDT {sSummary.remainingSpendableBalance.toLocaleString()}
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
+                  <div key={`mobile-stf-budget-${stf.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-bold text-slate-900 block text-sm">{stf.fullName}</span>
+                        <span className="font-mono text-xs text-slate-500 font-bold">
+                          {stf.staffCode || stf.id} {stf.mobileNumber ? `• ${stf.mobileNumber}` : ''}
+                        </span>
+                      </div>
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase shrink-0 ${
                           stf.status === 'ACTIVE'
                             ? 'bg-emerald-100 text-emerald-800'
                             : 'bg-slate-200 text-slate-700'
@@ -560,83 +738,57 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
                       >
                         {stf.status}
                       </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-right">
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-slate-100">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Allocated</span>
+                        <span className="font-mono font-bold text-slate-900 text-xs whitespace-nowrap inline-block tabular-nums">
+                          BDT {sSummary.totalAllocated.toLocaleString()}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Submitted</span>
+                        <span className="font-mono text-amber-700 font-semibold text-xs whitespace-nowrap inline-block tabular-nums">
+                          BDT {sSummary.totalSubmittedExpenses.toLocaleString()}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Approved</span>
+                        <span className="font-mono text-emerald-700 font-bold text-xs whitespace-nowrap inline-block tabular-nums">
+                          BDT {sSummary.totalApprovedExpenses.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="col-span-3 bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-100 flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-emerald-900 uppercase">Remaining Spendable</span>
+                        <span className="font-mono font-black text-emerald-700 text-sm whitespace-nowrap inline-block tabular-nums">
+                          BDT {sSummary.remainingSpendableBalance.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
                       <button
-                        onClick={() => handleCloseStaffAccount(stf.id, stf.fullName)}
-                        className="text-[11px] font-bold text-slate-600 hover:text-rose-600 cursor-pointer"
-                        title="Reconcile and close account"
+                        type="button"
+                        onClick={() => setViewingStaffProfile(stf)}
+                        className="min-h-[44px] px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center border border-indigo-200"
                       >
-                        Close Account
+                        View Profile
                       </button>
-                    </td>
-                  </tr>
+                      <button
+                        type="button"
+                        onClick={() => handleCloseStaffAccount(stf.id, stf.fullName)}
+                        className="min-h-[44px] px-3 py-2 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center border border-rose-200"
+                      >
+                        Close &amp; Reconcile
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile Responsive Cards (< 640px) */}
-        <div className="sm:hidden space-y-3">
-          {paginate(staffList, staffPage, staffPageSize).map((stf) => {
-            const sSummary = calculateStaffFinancialSummary(
-              stf.id,
-              stf.fullName,
-              allocations,
-              expenses,
-              ledger
-            );
-            return (
-              <div key={`mobile-stf-budget-${stf.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="font-bold text-slate-900 block text-sm">{stf.fullName}</span>
-                    <span className="font-mono text-xs text-slate-500 font-bold">{stf.id}</span>
-                  </div>
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase shrink-0 ${
-                      stf.status === 'ACTIVE'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    {stf.status}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Allocated</span>
-                    <span className="font-mono font-bold text-slate-900 text-xs whitespace-nowrap inline-block tabular-nums">
-                      BDT {sSummary.totalAllocated.toLocaleString()}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Recorded Spent</span>
-                    <span className="font-mono text-amber-700 font-semibold text-xs whitespace-nowrap inline-block tabular-nums">
-                      BDT {(sSummary.totalSubmittedExpenses + sSummary.totalApprovedExpenses).toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="col-span-2 bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-100 flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-emerald-900 uppercase">Remaining Spendable</span>
-                    <span className="font-mono font-black text-emerald-700 text-sm whitespace-nowrap inline-block tabular-nums">
-                      BDT {sSummary.remainingSpendableBalance.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleCloseStaffAccount(stf.id, stf.fullName)}
-                  className="w-full min-h-[44px] px-3 py-2 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center border border-rose-200"
-                >
-                  Close Account & Reconcile
-                </button>
-              </div>
-            );
-          })}
-        </div>
+            </div>
+          </>
+        )}
 
         {/* Staff Allocations Global Pagination */}
         <GlobalPagination
@@ -698,7 +850,7 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
                     <th className="py-2.5 px-3 text-right">Amount (BDT)</th>
                     <th className="py-2.5 px-3 text-center">Receipt</th>
                     <th className="py-2.5 px-3 text-center">Status</th>
-                    <th className="py-2.5 px-3 text-right">Super Admin Action</th>
+                    <th className="py-2.5 px-3 text-right">Manager Review Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1235,6 +1387,219 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
         onClose={() => setViewingVoucherExpense(null)}
         expense={viewingVoucherExpense}
       />
+
+      {/* INDIVIDUAL STAFF FINANCIAL PROFILE MODAL */}
+      {viewingStaffProfile && (isSuperAdmin || allowedStaffIds.has(viewingStaffProfile.id)) && (() => {
+        const prof = viewingStaffProfile;
+        const pSummary = calculateStaffFinancialSummary(
+          prof.id,
+          prof.fullName,
+          allocations,
+          expenses,
+          ledger
+        );
+        const profExpenses = expenses.filter((e) => e.staffId === prof.id);
+        const profAllocations = allocations.filter((a) => a.staffId === prof.id);
+        const isClosed =
+          profAllocations.length > 0 && profAllocations.every((a) => a.status === 'CLOSED');
+
+        return (
+          <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+            <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto space-y-5">
+              <div className="flex items-start justify-between gap-3 pb-4 border-b border-slate-100">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-black text-slate-900">{prof.fullName}</h3>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        prof.status === 'ACTIVE'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {prof.status}
+                    </span>
+                    {isClosed && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-slate-900 text-white">
+                        Reconciled &amp; Closed
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500 font-mono flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                    <span>ID / Reg No: <strong>{prof.staffCode || prof.id}</strong></span>
+                    <span className="inline-flex items-center gap-1">
+                      <Phone className="w-3 h-3 text-slate-400" />
+                      {prof.mobileNumber || '—'}
+                    </span>
+                    {prof.assignedManagerName && (
+                      <span className="inline-flex items-center gap-1 font-sans text-purple-800 font-bold">
+                        <UserCheck className="w-3.5 h-3.5" />
+                        Manager: {prof.assignedManagerName}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setViewingStaffProfile(null)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Staff Financial Summary Strip */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs">
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">Allocated</span>
+                  <span className="font-mono font-black text-slate-900">BDT {pSummary.totalAllocated.toLocaleString()}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200">
+                  <span className="text-[10px] font-bold uppercase text-amber-800 block">Submitted</span>
+                  <span className="font-mono font-black text-amber-900">BDT {pSummary.totalSubmittedExpenses.toLocaleString()}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200">
+                  <span className="text-[10px] font-bold uppercase text-emerald-800 block">Approved</span>
+                  <span className="font-mono font-black text-emerald-900">BDT {pSummary.totalApprovedExpenses.toLocaleString()}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-blue-50 border border-blue-200">
+                  <span className="text-[10px] font-bold uppercase text-blue-800 block">Returned</span>
+                  <span className="font-mono font-black text-blue-900">BDT {pSummary.totalCashReturned.toLocaleString()}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-indigo-50 border border-indigo-200">
+                  <span className="text-[10px] font-bold uppercase text-indigo-800 block">Remaining</span>
+                  <span className="font-mono font-black text-indigo-900">BDT {pSummary.remainingSpendableBalance.toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* Staff Submitted Expenses & Receipt History */}
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                  Submitted Expenses, Receipts &amp; Approval History ({profExpenses.length})
+                </h4>
+                {profExpenses.length === 0 ? (
+                  <p className="text-xs text-slate-400 p-4 text-center bg-slate-50 rounded-2xl border border-slate-200">
+                    No expenses recorded by this staff member yet.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {profExpenses.map((exp) => (
+                      <div key={exp.id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <span className="font-bold text-slate-900">{exp.category}</span>
+                            <span className="font-mono text-[11px] text-slate-500 ml-2">
+                              {exp.expenseDate} {exp.expenseTime}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-black text-slate-900">
+                              BDT {exp.amount.toLocaleString()}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                exp.status === 'APPROVED'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : exp.status === 'SUBMITTED'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : exp.status === 'REJECTED'
+                                  ? 'bg-rose-100 text-rose-800'
+                                  : 'bg-slate-200 text-slate-700'
+                              }`}
+                            >
+                              {exp.status}
+                            </span>
+                          </div>
+                        </div>
+
+                        <p className="text-slate-600">{exp.description}</p>
+                        {exp.vendorName && (
+                          <p className="text-[11px] text-slate-500">Vendor: {exp.vendorName}</p>
+                        )}
+                        {exp.approvedBy && (
+                          <p className="text-[11px] text-emerald-700 font-semibold">
+                            Approved by {exp.approvedBy} {exp.approvedAt ? `on ${new Date(exp.approvedAt).toLocaleString()}` : ''}
+                          </p>
+                        )}
+                        {exp.rejectionReason && (
+                          <p className="text-[11px] text-rose-700 font-semibold">
+                            Rejection Reason: {exp.rejectionReason}
+                          </p>
+                        )}
+                        {exp.voidReason && (
+                          <p className="text-[11px] text-slate-700 font-semibold">
+                            Void Reason: {exp.voidReason}
+                          </p>
+                        )}
+
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          {exp.receiptUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setViewingVoucherExpense(exp)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] border border-indigo-200 cursor-pointer"
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>View Receipt</span>
+                            </button>
+                          )}
+                          {exp.status === 'SUBMITTED' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedExpenseForReview(exp);
+                                  setReviewAction('APPROVE');
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] cursor-pointer"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedExpenseForReview(exp);
+                                  setReviewAction('REJECT');
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] cursor-pointer"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                          {exp.status === 'APPROVED' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedExpenseForReview(exp);
+                                setReviewAction('VOID');
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-bold text-[11px] cursor-pointer"
+                            >
+                              Void
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setViewingStaffProfile(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold cursor-pointer"
+                >
+                  Close Profile
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
