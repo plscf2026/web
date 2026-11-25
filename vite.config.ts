@@ -48,23 +48,8 @@ export default defineConfig(() => {
         'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()',
         'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
       },
-      // PayStation API reverse proxy — avoids CORS during local development.
-      // In production, Supabase Edge Functions handle server-side PayStation calls
-      // so merchant credentials never touch the browser.
-      proxy: {
-        '/api/paystation': {
-          target: 'https://sandbox.paystation.com.bd',
-          changeOrigin: true,
-          secure: true,
-          rewrite: (p) => p.replace(/^\/api\/paystation/, ''),
-        },
-        '/api/paystation-live': {
-          target: 'https://api.paystation.com.bd',
-          changeOrigin: true,
-          secure: true,
-          rewrite: (p) => p.replace(/^\/api\/paystation-live/, ''),
-        },
-      },
+      // PayStation API calls route strictly through the trusted Supabase Edge Function
+      // (`verify-payment`) in both local development and production — no raw browser proxy.
     },
     preview: {
       headers: {

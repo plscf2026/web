@@ -5,17 +5,16 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://api.fontshare.com; font-src 'self' https://api.fontshare.com https://cdn.fontshare.com data:; img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co https://hnthoszbkhvygoowtvau.supabase.co; connect-src 'self' https://*.supabase.co https://hnthoszbkhvygoowtvau.supabase.co wss://*.supabase.co wss://hnthoszbkhvygoowtvau.supabase.co https://api.paystation.com.bd https://sandbox.paystation.com.bd; frame-src 'self' https://api.paystation.com.bd https://sandbox.paystation.com.bd; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self' https://api.paystation.com.bd https://sandbox.paystation.com.bd;"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://api.fontshare.com; font-src 'self' https://api.fontshare.com https://cdn.fontshare.com data:; img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co https://hnthoszbkhvygoowtvau.supabase.co; connect-src 'self' https://*.supabase.co https://hnthoszbkhvygoowtvau.supabase.co wss://*.supabase.co wss://hnthoszbkhvygoowtvau.supabase.co; frame-src 'self' https://api.paystation.com.bd https://sandbox.paystation.com.bd; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self' https://api.paystation.com.bd https://sandbox.paystation.com.bd;"
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(self), microphone=(), geolocation=()"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
 
-[[redirects]]
-  from = "/api/*"
-  to = "/api/:splat"
-  status = 200
+# Note: Netlify hosts static SPA assets from `dist/` only and does not execute
+# Vercel `api/*.ts` serverless functions. Payment calls invoke Supabase Edge Function
+# `verify-payment` directly rather than `/api/*` passthrough routes.
 
 [[redirects]]
   from = "/assets/*"
