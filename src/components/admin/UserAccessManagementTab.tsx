@@ -421,7 +421,7 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
   };
 
   // Execute Create User
-  const handleCreateSubmit = async (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
 
     if (!createForm.fullName.trim() || !createForm.username.trim()) {
@@ -543,7 +543,7 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
   };
 
   // Execute Edit User
-  const handleEditSubmit = async (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!editingUser) return;
 
@@ -651,7 +651,7 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
   };
 
   // Direct Password Update Execution
-  const handleExecuteDirectPasswordChange = async (e: React.FormEvent) => {
+  const handleExecuteDirectPasswordChange = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!passwordModalUser) return;
     if (directNewPassword.length < 6) {

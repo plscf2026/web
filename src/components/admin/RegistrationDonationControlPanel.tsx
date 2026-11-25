@@ -13,15 +13,12 @@ import {
   Check,
   Shield,
   Sliders,
-  Sparkles,
 } from 'lucide-react';
 import { FeeSettings, Language } from '../../types';
 import { AppStore } from '../../services/store';
 import { EventStore } from '../../services/eventStore';
 import {
   isGlobalRegistrationOpen,
-  isAlumniRegistrationOpen,
-  isCurrentStudentRegistrationOpen,
   isDonationOpen,
 } from '../../utils/rules';
 
@@ -85,7 +82,7 @@ export const RegistrationDonationControlPanel: React.FC<RegistrationDonationCont
     return () => window.removeEventListener('plscf_fee_settings_updated', handleSync);
   }, []);
 
-  const handleSave = async (e?: React.FormEvent) => {
+  const handleSave = async (e?: React.SyntheticEvent) => {
     if (e) e.preventDefault();
     setIsSaving(true);
 
@@ -107,13 +104,14 @@ export const RegistrationDonationControlPanel: React.FC<RegistrationDonationCont
 
     // Audit Trail
     try {
-      EventStore.addAuditLog({
+      EventStore.recordAuditHistory({
         adminId: 'SUPER_ADMIN_MASTER',
-        adminUsername: adminName,
-        adminRole: 'super_admin',
-        action: 'SETTINGS_UPDATE',
-        targetId: 'REGISTRATION_DONATION_GOVERNANCE',
-        details: JSON.stringify({
+        adminName,
+        entityType: 'REGISTRATION',
+        entityId: 'REGISTRATION_DONATION_GOVERNANCE',
+        action: 'UPDATE_SETTINGS',
+        reason: `Global=${globalOpen ? 'OPEN' : 'CLOSED'}, Alumni=${alumniOpen ? 'ON' : 'OFF'}, Student=${currentOpen ? 'ON' : 'OFF'}, Donation=${donationOpen ? 'ON' : 'OFF'}`,
+        newValue: JSON.stringify({
           globalRegistration: globalOpen ? 'OPEN' : 'CLOSED',
           alumniRegistration: alumniOpen ? 'ENABLED' : 'DISABLED',
           currentStudentRegistration: currentOpen ? 'ENABLED' : 'DISABLED',

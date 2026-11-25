@@ -366,7 +366,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
   };
 
   // Super Admin Correction Execution
-  const handleSaveAdminCorrection = (e: React.FormEvent) => {
+  const handleSaveAdminCorrection = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!selectedEventForCorrection || !correctionReason.trim()) return;
 

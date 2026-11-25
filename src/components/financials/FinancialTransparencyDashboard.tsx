@@ -160,7 +160,7 @@ export const FinancialTransparencyDashboard: React.FC<FinancialTransparencyDashb
   }, [top10Donors]);
 
   // ── Personal Lookup Handler ─────────────────────────────────────────────────
-  const handleVerifyPersonalDonations = async (e: React.FormEvent) => {
+  const handleVerifyPersonalDonations = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!personalRegId.trim()) {
       setPersonalError(isBangla ? 'অনুগ্রহ করে রেজিস্ট্রেশন আইডি দিন।' : 'Please enter your Registration ID.');

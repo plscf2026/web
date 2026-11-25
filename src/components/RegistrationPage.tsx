@@ -623,15 +623,23 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (isSubmitting) return; // Prevent duplicate submissions (Requirement 10)
     if (!isGlobalRegistrationOpen(feeSettings)) {
-      setPaymentError(getRegistrationClosedMessage(feeSettings, 'global', language));
+      const msg = getRegistrationClosedMessage(feeSettings, 'global', language);
+      setValidationErrors((current) => ({
+        ...current,
+        termsAccepted: { en: msg, bn: msg },
+      }));
       return;
     }
     if (!isCategoryRegistrationOpen(category, feeSettings)) {
-      setPaymentError(getRegistrationClosedMessage(feeSettings, category, language));
+      const msg = getRegistrationClosedMessage(feeSettings, category, language);
+      setValidationErrors((current) => ({
+        ...current,
+        termsAccepted: { en: msg, bn: msg },
+      }));
       return;
     }
 

@@ -903,7 +903,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const tshirtCollectedCount = registrationsForYear.filter((r) => r.isTShirtCollected).length;
 
   // Handlers
-  const handleSaveFeeSettings = (e: React.FormEvent) => {
+  const handleSaveFeeSettings = (e: React.SyntheticEvent) => {
     e.preventDefault();
     const currentLatest = AppStore.getFeeSettings();
     const updated: FeeSettings = {
@@ -950,7 +950,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     );
   };
 
-  const handleAddExpense = (e: React.FormEvent) => {
+  const handleAddExpense = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!expenseAmount || !expenseReason) return;
     const newExp: ExpenseRecord = {
@@ -985,7 +985,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setExpenseReason('');
   };
 
-  const handleAddNotice = (e: React.FormEvent) => {
+  const handleAddNotice = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!noticeTitleEn || !noticeContentEn) return;
     const updated = editingNoticeId

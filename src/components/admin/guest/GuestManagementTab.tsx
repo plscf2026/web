@@ -173,7 +173,7 @@ export const GuestManagementTab: React.FC<GuestManagementTabProps> = ({
   }, [searchQuery, statusFilter, categoryFilter, batchFilter]);
 
   // Handle Generate Guest Cards (Requirement 1 & 7)
-  const handleGenerateCards = async (e: React.FormEvent) => {
+  const handleGenerateCards = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     const qty = Number(generateQuantity);
     if (!qty || qty <= 0 || qty > 1000) {
@@ -335,7 +335,7 @@ export const GuestManagementTab: React.FC<GuestManagementTabProps> = ({
       return;
     }
 
-    const facilities = await GuestService.getMealFacilities(guest.id);
+    const facilities = GuestService.getMealFacilities(guest.id);
     setAdminScannedGuest(guest);
     setAdminScannedFacilities(facilities);
   };

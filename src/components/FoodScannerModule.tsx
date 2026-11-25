@@ -231,7 +231,7 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
       }
 
       // Guest card is ACTIVE! Query independent meal facilities
-      const facilities = await GuestService.getMealFacilities(guest.id);
+      const facilities = GuestService.getMealFacilities(guest.id);
       setScannedGuest(guest);
       setGuestFacilities(facilities);
 
@@ -615,7 +615,7 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
 
     if (res.success && res.record) {
       playScanSuccessSound();
-      const updatedFacilities = await GuestService.getMealFacilities(scannedGuest.id);
+      const updatedFacilities = GuestService.getMealFacilities(scannedGuest.id);
       setGuestFacilities(updatedFacilities);
       setGuestNotice({
         type: 'success',
@@ -712,7 +712,7 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
   };
 
   // Super Admin Correction Execution
-  const handleSaveAdminCorrection = (e: React.FormEvent) => {
+  const handleSaveAdminCorrection = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!selectedRecordForCorrection || !correctionReason.trim()) return;
 

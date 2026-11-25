@@ -237,7 +237,7 @@ export const GalleryService = {
 
   async saveItem(item: GalleryMediaItem): Promise<{ success: boolean; item: GalleryMediaItem; error?: string }> {
     const current = this.getLocalCache();
-    const index = current.findIndex((i) => i.id === item.id);
+    const index = current.findIndex((i: GalleryMediaItem) => i.id === item.id);
     let updatedList: GalleryMediaItem[];
 
     const preparedItem: GalleryMediaItem = {
@@ -274,7 +274,7 @@ export const GalleryService = {
 
   async deleteItem(id: string): Promise<{ success: boolean; error?: string }> {
     const current = this.getLocalCache();
-    const updated = current.filter((i) => i.id !== id);
+    const updated = current.filter((i: GalleryMediaItem) => i.id !== id);
     this.setLocalCache(updated);
 
     try {

@@ -183,7 +183,7 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
     return () => window.clearInterval(timer);
   }, [currentStaff]);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setLoginError('');
     setIsLoggingIn(true);

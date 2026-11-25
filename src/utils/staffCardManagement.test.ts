@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { StaffCardService } from '../services/staffCardService';
 import { MealControlService } from '../services/mealControlService';
-import { StaffMealType } from '../types/staffCard';
 
 // Polyfill in-memory localStorage for Node test runner
 const mockStorage: Record<string, string> = {};
@@ -29,17 +28,16 @@ test('Staff Card System: 1. Bulk Staff Card Generation', async () => {
     5,
     'Logistics & Security',
     'Event Volunteer',
-    'superadmin@plscf.org',
-    'Super Admin Convener'
+    'superadmin@plscf.org'
   );
 
   assert.equal(batchRes.success, true);
-  assert.equal(batchRes.cards.length, 5);
+  assert.equal(batchRes.cards!.length, 5);
   assert.ok(batchRes.batch);
   assert.equal(batchRes.batch.totalCards, 5);
 
   // Validate card properties: all must start in INACTIVE state
-  const firstCard = batchRes.cards[0];
+  const firstCard = batchRes.cards![0];
   assert.equal(firstCard.id, 'STF-0001');
   assert.equal(firstCard.regNumber, 'PLSCF-STF-2027-0001');
   assert.equal(firstCard.status, 'INACTIVE');
@@ -48,7 +46,7 @@ test('Staff Card System: 1. Bulk Staff Card Generation', async () => {
   assert.ok(firstCard.token.length >= 6);
   assert.deepEqual(firstCard.mealFacilities, []);
 
-  const fifthCard = batchRes.cards[4];
+  const fifthCard = batchRes.cards![4];
   assert.equal(fifthCard.id, 'STF-0005');
   assert.equal(fifthCard.regNumber, 'PLSCF-STF-2027-0005');
   assert.equal(fifthCard.status, 'INACTIVE');
@@ -269,7 +267,7 @@ test('Staff Card System: 8. Card Revocation & Reactivation Lifecycle', async () 
 });
 
 test('Staff Card System: 9. Directory Search, Filtering and Statistics', async () => {
-  const stats = await StaffCardService.getStatistics();
+  const stats = StaffCardService.getStatistics();
   assert.equal(stats.totalCards, 5);
   assert.equal(stats.activeCards, 1);
   assert.equal(stats.inactiveCards, 4);

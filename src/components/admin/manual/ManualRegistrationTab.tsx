@@ -185,7 +185,7 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
   };
 
   // Submit Handler: Generate Student Ticket
-  const handleGenerateTicket = async (e: React.FormEvent) => {
+  const handleGenerateTicket = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 

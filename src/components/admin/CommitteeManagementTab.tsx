@@ -120,7 +120,7 @@ export const CommitteeManagementTab: React.FC<CommitteeManagementTabProps> = ({
   };
 
   // Submit Form (Add or Edit)
-  const handleSubmitForm = (e: React.FormEvent) => {
+  const handleSubmitForm = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!formData.name?.trim() || !formData.role?.trim()) {
       alert(isBn ? 'অনুগ্রহ করে সদস্যের নাম এবং পদবি পূরণ করুন।' : 'Please fill in member name and role.');

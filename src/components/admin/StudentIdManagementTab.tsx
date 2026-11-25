@@ -118,7 +118,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
   }, [studentIds, selectedClass, selectedYear, selectedUsage, searchQuery]);
 
   // Handle Add Single ID
-  const handleAddSingleId = async (e: React.FormEvent) => {
+  const handleAddSingleId = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!newId.trim()) return;
 
@@ -249,7 +249,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
   };
 
   // Handle Edit Update
-  const handleUpdateRecord = (e: React.FormEvent) => {
+  const handleUpdateRecord = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!editingRecord) return;
 

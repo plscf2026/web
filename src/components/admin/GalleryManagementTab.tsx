@@ -148,7 +148,7 @@ export const GalleryManagementTab: React.FC<GalleryManagementTabProps> = ({ lang
     setShowModal(true);
   };
 
-  const handleSaveForm = async (e: React.FormEvent) => {
+  const handleSaveForm = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!formTitleEn.trim() && !formTitleBn.trim()) {
       setStatusMessage({

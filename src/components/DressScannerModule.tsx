@@ -303,7 +303,7 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
   };
 
   // Super Admin Correction Execution
-  const handleSaveAdminCorrection = (e: React.FormEvent) => {
+  const handleSaveAdminCorrection = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!selectedRecordForCorrection || !correctionReason.trim()) return;
 

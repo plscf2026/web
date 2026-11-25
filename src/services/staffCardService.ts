@@ -362,15 +362,8 @@ export class StaffCardService {
    */
   static async activateStaffCard(
     codeOrToken: string,
-    tokenParam?: string | any,
-    details?: {
-      staffName?: string;
-      designation?: string;
-      mobileNumber?: string;
-      department?: string;
-      notes?: string;
-      mealFacilities?: StaffMealType[];
-    },
+    tokenParam?: any,
+    details?: any,
     gateId: string = 'Main Gate / Admin Desk',
     operatorId: string = 'SUPER_ADMIN',
     operatorName: string = 'Super Admin'

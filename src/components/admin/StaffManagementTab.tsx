@@ -76,7 +76,7 @@ export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentA
     setTimeout(() => setStatusMessage(null), 4000);
   };
 
-  const handleCreateStaff = async (e: React.FormEvent) => {
+  const handleCreateStaff = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!newStaffForm.fullName || !newStaffForm.username || !newStaffForm.email || !newStaffForm.authUserId) {
       showNotification('error', 'Please fill in all mandatory fields.');

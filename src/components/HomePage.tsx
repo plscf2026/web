@@ -148,7 +148,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [statusLookupError, setStatusLookupError] = useState('');
 
-  const handleCheckStatus = async (e: React.FormEvent) => {
+  const handleCheckStatus = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setSearchAttempted(true);
     setFoundRegistration(null);

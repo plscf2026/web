@@ -105,7 +105,7 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
   );
 
   // Update Central Budget Handler (Requirement 8A & 8G)
-  const handleUpdateBudget = (e: React.FormEvent) => {
+  const handleUpdateBudget = (e: React.SyntheticEvent) => {
     e.preventDefault();
     const amt = Number(newBudgetAmount);
     if (isNaN(amt) || amt < 0) return;
@@ -127,7 +127,7 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
   };
 
   // Staff Allocation Handler (Requirement 8B)
-  const handleAllocateMoney = (e: React.FormEvent) => {
+  const handleAllocateMoney = (e: React.SyntheticEvent) => {
     e.preventDefault();
     const amt = Number(allocationAmount);
     if (!selectedStaffId || isNaN(amt) || amt <= 0) return;
@@ -161,7 +161,7 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
   };
 
   // Cash Return Settlement Handler (Requirement 8D & 8H)
-  const handleRecordCashReturn = (e: React.FormEvent) => {
+  const handleRecordCashReturn = (e: React.SyntheticEvent) => {
     e.preventDefault();
     const amt = Number(returnAmount);
     if (!returnStaffId || isNaN(amt) || amt <= 0) return;
@@ -190,7 +190,7 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
   };
 
   // Review Expense Handler (Approve / Reject / Void) (Requirement 8G & 8I)
-  const handleExecuteExpenseReview = (e: React.FormEvent) => {
+  const handleExecuteExpenseReview = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!selectedExpenseForReview) return;
 

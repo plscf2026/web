@@ -42,7 +42,7 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
     }
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!isFormValid || submitting) return;
 

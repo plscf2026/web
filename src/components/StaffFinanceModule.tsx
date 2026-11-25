@@ -112,7 +112,7 @@ export const StaffFinanceModule: React.FC<StaffFinanceModuleProps> = ({
     }
   };
 
-  const handleExpenseSubmit = (e: React.FormEvent) => {
+  const handleExpenseSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     setFormError('');
     setFormSuccess('');

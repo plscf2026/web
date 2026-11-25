@@ -28,7 +28,7 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
   const [matchedDonation, setMatchedDonation] = useState<DonationRecord | null>(null);
   const [showThankYouModal, setShowThankYouModal] = useState(false);
 
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setSearchError('');
     setMatchedRecord(null);

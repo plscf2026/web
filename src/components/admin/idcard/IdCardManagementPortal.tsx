@@ -557,7 +557,7 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
   // ==========================================================================
   // SUPER ADMIN: STAFF MANAGEMENT ACTIONS
   // ==========================================================================
-  const handleCreateStaff = (e: React.FormEvent) => {
+  const handleCreateStaff = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!newStaffForm.fullName || !newStaffForm.username || !newStaffForm.email) {
       showToast('error', 'Please fill in all mandatory staff fields.');
