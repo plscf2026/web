@@ -621,18 +621,27 @@ export class FinancialService {
   // ── Private Local Fallbacks ────────────────────────────────────────────────
 
   private static computeLocalFinancialSummary(): FinancialTransparencySummary {
-    const allRegistrations = AppStore.getRegistrations();
-    const onlinePaidRegistrations = allRegistrations.filter(
+    const mainRegistrations = AppStore.getRegistrations();
+    const manualMap = new Map<string, any>();
+    for (const r of mainRegistrations) {
+      if (r.isManualRegistration) manualMap.set(r.id, r);
+    }
+    for (const r of AppStore.getManualRegistrations()) {
+      manualMap.set(r.id, r);
+    }
+    const manualList = Array.from(manualMap.values());
+
+    const onlinePaidRegistrations = mainRegistrations.filter(
       (r) => !r.isManualRegistration && r.paymentStatus === 'paid'
     );
-    const manualApprovedRegistrations = allRegistrations.filter(
-      (r) => r.isManualRegistration && r.financialApprovalStatus === 'approved'
+    const manualApprovedRegistrations = manualList.filter(
+      (r) => r.financialApprovalStatus === 'approved'
     );
-    const manualPendingRegistrations = allRegistrations.filter(
-      (r) => r.isManualRegistration && r.financialApprovalStatus === 'pending'
+    const manualPendingRegistrations = manualList.filter(
+      (r) => r.financialApprovalStatus === 'pending'
     );
-    const manualRejectedRegistrations = allRegistrations.filter(
-      (r) => r.isManualRegistration && r.financialApprovalStatus === 'rejected'
+    const manualRejectedRegistrations = manualList.filter(
+      (r) => r.financialApprovalStatus === 'rejected'
     );
 
     const localExpenses = AppStore.getExpenses();
@@ -691,7 +700,7 @@ export class FinancialService {
     }));
 
     // Collect raw donations from paid registrations
-    const regDonationsList: PublicDonationItem[] = allRegistrations
+    const regDonationsList: PublicDonationItem[] = mainRegistrations
       .filter((r: RegistrationRecord) => (r.donationAmount || 0) > 0)
       .map((r: RegistrationRecord) => ({
         id: `DON-REG-${r.id}`,

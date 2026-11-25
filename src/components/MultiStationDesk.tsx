@@ -128,6 +128,11 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
           type: 'error',
           message: 'Network Connection Error: Unable to reach verification server. Please check your internet connection.',
         });
+      } else if (verifyRes.errorType === 'PENDING_APPROVAL' || verifyRes.errorType === 'REGISTRATION_REJECTED') {
+        setActionNotice({
+          type: 'error',
+          message: verifyRes.error || 'ID Card Not Approved by Admin',
+        });
       } else if (verifyRes.errorType === 'UNPAID') {
         setActionNotice({
           type: 'error',

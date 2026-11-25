@@ -892,9 +892,11 @@ export class EventStore {
       };
     }
 
-    // 2. Student Lookup via 6-character token, ID, or parsed QR payload
+    // 2. Student Lookup via 6-character token, ID, or parsed QR payload (Main DB + Dedicated Manual DB)
     const registrations = AppStore.getRegistrations();
-    const student = findRegistrationByTokenOrId(registrations, tokenOrId);
+    const student =
+      findRegistrationByTokenOrId(registrations, tokenOrId) ||
+      AppStore.findManualRegistration(tokenOrId);
     if (!student) {
       return {
         valid: false,
@@ -908,14 +910,14 @@ export class EventStore {
       return {
         valid: false,
         status: 'NOT_ELIGIBLE',
-        message: 'REGISTRATION_PENDING_APPROVAL: Manual registration is pending Super Admin approval. QR code is inactive. No entry or services permitted.',
+        message: 'REGISTRATION_PENDING_APPROVAL: ID Card Not Approved by Admin (awaiting Super Admin approval). QR code is inactive.',
       };
     }
     if (student.registrationApprovalStatus === 'rejected') {
       return {
         valid: false,
         status: 'NOT_ELIGIBLE',
-        message: 'REGISTRATION_REJECTED: Manual registration was rejected by Super Admin. QR code is inactive. No entry or services permitted.',
+        message: 'REGISTRATION_REJECTED: ID Card Not Approved by Admin (rejected by Super Admin). QR code is inactive.',
       };
     }
 
@@ -1060,7 +1062,9 @@ export class EventStore {
     }
 
     // Inactive QR Code check for pending/rejected manual registrations
-    const studentCheck = AppStore.getRegistrations().find((r) => r.id === registrationId);
+    const studentCheck =
+      AppStore.getRegistrations().find((r) => r.id === registrationId) ||
+      AppStore.findManualRegistration(registrationId);
     if (studentCheck && studentCheck.registrationApprovalStatus === 'pending') {
       return {
         success: false,
@@ -1267,7 +1271,9 @@ export class EventStore {
     }
 
     // Inactive QR Code check for pending/rejected manual registrations
-    const studentCheck = AppStore.getRegistrations().find((r) => r.id === registrationId);
+    const studentCheck =
+      AppStore.getRegistrations().find((r) => r.id === registrationId) ||
+      AppStore.findManualRegistration(registrationId);
     if (studentCheck && studentCheck.registrationApprovalStatus === 'pending') {
       return {
         success: false,
@@ -1555,7 +1561,9 @@ export class EventStore {
     }
 
     // Inactive QR Code check for pending/rejected manual registrations
-    const studentCheck = AppStore.getRegistrations().find((r) => r.id === registrationId);
+    const studentCheck =
+      AppStore.getRegistrations().find((r) => r.id === registrationId) ||
+      AppStore.findManualRegistration(registrationId);
     if (studentCheck && studentCheck.registrationApprovalStatus === 'pending') {
       return {
         success: false,

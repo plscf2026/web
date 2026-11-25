@@ -23,6 +23,10 @@ import {
   Phone,
   Camera,
   DoorOpen,
+  FileText,
+  Eye,
+  XCircle,
+  Users,
 } from 'lucide-react';
 import {
   Language,
@@ -31,9 +35,7 @@ import {
   RegistrationApprovalStatus,
   FinancialApprovalStatus,
 } from '../../../types';
-import { ManualRegistrationService } from '../../../services/manualRegistrationService';
-import { AppStore } from '../../../services/store';
-import { SupabaseService } from '../../../services/supabase';
+import { ManualRegistrationService, EVENT_MANUAL_REG_SYNC } from '../../../services/manualRegistrationService';
 import { TicketView } from '../../TicketView';
 import { AdminStudentPhotoModal } from '../photos/AdminStudentPhotoModal';
 import { DEFAULT_STUDENT_AVATAR_PLACEHOLDER } from '../../../services/studentPhotoStorageService';
@@ -47,37 +49,21 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
   language,
   currentAdmin,
 }) => {
-  // Cloud & local list refresh trigger
+  // Cloud & dedicated manual database list refresh trigger
   const [refreshKey, setRefreshKey] = useState(0);
   const [isCloudSyncing, setIsCloudSyncing] = useState(false);
-  const [allRegistrations, setAllRegistrations] = useState<RegistrationRecord[]>(() =>
-    AppStore.getRegistrations()
+  const [manualRegistrations, setManualRegistrations] = useState<RegistrationRecord[]>(() =>
+    ManualRegistrationService.getManualRegistrations()
   );
 
   const syncRegistrationsFromCloud = useCallback(async () => {
     setIsCloudSyncing(true);
     try {
-      // 1. Backfill local manual registrations to Supabase if any were created offline
-      const localManual = AppStore.getRegistrations().filter((r) => r.isManualRegistration);
-      for (const lm of localManual) {
-        try {
-          await SupabaseService.saveRegistration(lm, 2027);
-        } catch {}
-      }
-
-      // 2. Fetch authoritative registrations from Supabase
-      const res = await SupabaseService.fetchRegistrations(2027, { forceRefresh: true });
-      if (res.data && res.data.length > 0) {
-        res.data.forEach((item) => {
-          AppStore.addRegistration(item, 2027);
-        });
-        setAllRegistrations(AppStore.getRegistrations());
-      } else {
-        setAllRegistrations(AppStore.getRegistrations());
-      }
+      const synced = await ManualRegistrationService.syncFromSupabase();
+      setManualRegistrations(synced);
     } catch (err) {
       console.warn('[ManualApprovalTab] Cloud sync warning:', err);
-      setAllRegistrations(AppStore.getRegistrations());
+      setManualRegistrations(ManualRegistrationService.getManualRegistrations());
     } finally {
       setIsCloudSyncing(false);
     }
@@ -87,12 +73,15 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
     syncRegistrationsFromCloud();
   }, [syncRegistrationsFromCloud, refreshKey]);
 
-  const handleRefresh = () => setRefreshKey((prev) => prev + 1);
+  useEffect(() => {
+    const handleSync = () => {
+      setManualRegistrations(ManualRegistrationService.getManualRegistrations());
+    };
+    window.addEventListener(EVENT_MANUAL_REG_SYNC, handleSync);
+    return () => window.removeEventListener(EVENT_MANUAL_REG_SYNC, handleSync);
+  }, []);
 
-  // Filter to manual venue registrations
-  const manualRegistrations = useMemo(() => {
-    return allRegistrations.filter((r) => r.isManualRegistration);
-  }, [allRegistrations]);
+  const handleRefresh = () => setRefreshKey((prev) => prev + 1);
 
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -103,9 +92,11 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
     'all' | 'pending' | 'approved' | 'rejected' | 'none'
   >('all');
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'former' | 'current'>('all');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<'all' | 'cash' | 'bkash' | 'bank transfer'>('all');
 
   // Modal states
   const [viewTicketRecord, setViewTicketRecord] = useState<RegistrationRecord | null>(null);
+  const [viewSlipRecord, setViewSlipRecord] = useState<RegistrationRecord | null>(null);
   const [rejectingRecord, setRejectingRecord] = useState<RegistrationRecord | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isSubmittingRejection, setIsSubmittingRejection] = useState(false);
@@ -182,6 +173,12 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
       // Category filter
       if (categoryFilter !== 'all' && r.category !== categoryFilter) return false;
 
+      // Payment Method filter
+      if (paymentMethodFilter !== 'all') {
+        const m = (r.financialMethod || r.paymentMethod || 'cash').toLowerCase().replace(/_/g, ' ');
+        if (m !== paymentMethodFilter) return false;
+      }
+
       // Registration approval filter
       const regStatus = r.registrationApprovalStatus || 'pending';
       if (filterRegStatus !== 'all' && regStatus !== filterRegStatus) return false;
@@ -207,11 +204,41 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
 
       return true;
     });
-  }, [manualRegistrations, searchTerm, filterRegStatus, filterFinStatus, categoryFilter]);
+  }, [manualRegistrations, searchTerm, filterRegStatus, filterFinStatus, categoryFilter, paymentMethodFilter]);
 
   // ==========================================
   // ACTION HANDLERS
   // ==========================================
+
+  // 0. Unified Verify Payment & Approve Registration + Transfer to Main DB + Activate QR & Card Management
+  const handleVerifyPaymentAndApprove = async (rec: RegistrationRecord) => {
+    const amt = Number(rec.financialAmount) || Number(rec.registrationFee) || 0;
+    const methodLabel = rec.financialMethod || rec.paymentMethod || 'Cash';
+    const refText = rec.financialReference ? ` (Ref: ${rec.financialReference})` : '';
+    const confirm = window.confirm(
+      language === 'bn'
+        ? `আপনি কি নিশ্চিত যে ${rec.fullName} এর ${methodLabel} পেমেন্ট (৳${amt}${refText}) যাচাই করে রেজিস্ট্রেশন অনুমোদন করতে চান? এটি মূল ডাটাবেজে যুক্ত হয়ে QR কোড ও কেন্দ্রীয় কার্ড সিস্টেমে সক্রিয় হবে।`
+        : `Verify ${methodLabel} payment (৳${amt}${refText}) and approve registration for ${rec.fullName}? This transfers the record to the Main Database, activates the QR code, and publishes it to Centralized Card Management.`
+    );
+    if (!confirm) return;
+
+    const res = await ManualRegistrationService.verifyPaymentAndApproveRegistration(
+      rec.id,
+      { id: currentAdmin.id, name: currentAdmin.fullName || currentAdmin.username },
+      `Payment (${methodLabel} ৳${amt}) verified & registration approved by Super Admin ${currentAdmin.fullName || currentAdmin.username}`
+    );
+
+    if (res.success) {
+      showNotification(
+        language === 'bn'
+          ? `পেমেন্ট যাচাই ও ${rec.fullName} এর নিবন্ধন অনুমোদিত! মূল ডাটাবেজ ও কার্ড সিস্টেমে যুক্ত হয়েছে।`
+          : `Payment verified & ${rec.fullName} approved! Synced to Main DB, Centralized Cards, and QR activated.`
+      );
+      handleRefresh();
+    } else {
+      showNotification(res.error || 'Failed to verify payment and approve registration.', true);
+    }
+  };
 
   // 1. Approve Registration (Activates QR Code)
   const handleApproveRegistration = async (rec: RegistrationRecord) => {
@@ -356,7 +383,11 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
       const res = await ManualRegistrationService.updateRegistrationDetails(
         editingRecord.id,
         editFormData,
-        { id: currentAdmin.id, name: currentAdmin.fullName || currentAdmin.username }
+        {
+          id: currentAdmin.id,
+          name: currentAdmin.fullName || currentAdmin.username,
+          role: currentAdmin.role,
+        }
       );
 
       if (res.success) {
@@ -455,8 +486,19 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
           </div>
         </div>
 
-        {/* Real-time KPI Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-white/10">
+        {/* Real-time KPI Cards (5 Required Counters) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-6 pt-6 border-t border-white/10">
+          <div className="bg-white/5 rounded-2xl p-3 border border-white/10">
+            <div className="flex items-center justify-between text-sky-300 text-xs font-bold mb-1">
+              <span>{language === 'bn' ? 'মোট ম্যানুয়াল' : 'Total Manual'}</span>
+              <Users className="w-4 h-4" />
+            </div>
+            <div className="text-2xl font-black text-white">{stats.total}</div>
+            <span className="text-[10px] text-slate-400">
+              {language === 'bn' ? 'সর্বমোট আবেদন' : 'All manual submissions'}
+            </span>
+          </div>
+
           <div className="bg-white/5 rounded-2xl p-3 border border-white/10">
             <div className="flex items-center justify-between text-amber-300 text-xs font-bold mb-1">
               <span>{language === 'bn' ? 'অপেক্ষমান নিবন্ধন' : 'Pending Reg'}</span>
@@ -470,12 +512,12 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
 
           <div className="bg-white/5 rounded-2xl p-3 border border-white/10">
             <div className="flex items-center justify-between text-indigo-300 text-xs font-bold mb-1">
-              <span>{language === 'bn' ? 'অপেক্ষমান ফান্ড' : 'Pending Funds'}</span>
+              <span>{language === 'bn' ? 'পেমেন্ট যাচাই বাকি' : 'Pending Payment'}</span>
               <DollarSign className="w-4 h-4" />
             </div>
             <div className="text-2xl font-black text-white">৳{stats.pendingFinAmount.toLocaleString()}</div>
             <span className="text-[10px] text-slate-400">
-              {stats.pendingFinCount} {language === 'bn' ? 'টি এন্ট্রি পর্যালোচনায়' : 'entries under review'}
+              {stats.pendingFinCount} {language === 'bn' ? 'টি যাচাই বাকি' : 'pending verification'}
             </span>
           </div>
 
@@ -486,18 +528,18 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
             </div>
             <div className="text-2xl font-black text-white">{stats.approvedReg}</div>
             <span className="text-[10px] text-emerald-400 font-semibold">
-              {language === 'bn' ? 'কিউআর সক্রিয়' : 'QR codes active'}
+              {language === 'bn' ? 'মূল ডাটাবেজ ও QR সক্রিয়' : 'Synced & QR active'}
             </span>
           </div>
 
-          <div className="bg-white/5 rounded-2xl p-3 border border-white/10">
-            <div className="flex items-center justify-between text-teal-300 text-xs font-bold mb-1">
-              <span>{language === 'bn' ? 'অনুমোদিত ফান্ড' : 'Approved Funds'}</span>
-              <DollarSign className="w-4 h-4" />
+          <div className="bg-white/5 rounded-2xl p-3 border border-white/10 col-span-2 sm:col-span-1">
+            <div className="flex items-center justify-between text-rose-300 text-xs font-bold mb-1">
+              <span>{language === 'bn' ? 'প্রত্যাখ্যাত' : 'Rejected Reg'}</span>
+              <XCircle className="w-4 h-4" />
             </div>
-            <div className="text-2xl font-black text-white">৳{stats.approvedFinAmount.toLocaleString()}</div>
+            <div className="text-2xl font-black text-white">{stats.rejectedReg}</div>
             <span className="text-[10px] text-slate-400">
-              {language === 'bn' ? 'অফিসিয়াল ফান্ডে যুক্ত' : 'Added to official ledger'}
+              ৳{stats.approvedFinAmount.toLocaleString()} {language === 'bn' ? 'অনুমোদিত' : 'verified'}
             </span>
           </div>
         </div>
@@ -587,6 +629,18 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
             <option value="former">{language === 'bn' ? 'প্রাক্তন শিক্ষার্থী' : 'Former Student'}</option>
             <option value="current">{language === 'bn' ? 'বর্তমান শিক্ষার্থী' : 'Current Student'}</option>
           </select>
+
+          {/* Payment Method Filter */}
+          <select
+            value={paymentMethodFilter}
+            onChange={(e) => setPaymentMethodFilter(e.target.value as any)}
+            className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+          >
+            <option value="all">{language === 'bn' ? 'সকল পেমেন্ট মাধ্যম' : 'All Payment Methods'}</option>
+            <option value="cash">Cash</option>
+            <option value="bkash">bKash</option>
+            <option value="bank transfer">Bank Transfer</option>
+          </select>
         </div>
 
         {/* Quick status tabs */}
@@ -639,6 +693,7 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
               setFilterFinStatus('all');
               setSearchTerm('');
               setCategoryFilter('all');
+              setPaymentMethodFilter('all');
             }}
             className="px-3 py-1 rounded-full font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all ml-auto"
           >
@@ -930,6 +985,19 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
                       <span>{language === 'bn' ? 'টিকিট' : 'Ticket'}</span>
                     </button>
 
+                    {/* View Payment Slip (if uploaded) */}
+                    {rec.documentUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setViewSlipRecord(rec)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-xs font-bold transition-colors cursor-pointer"
+                        title={rec.documentName || 'View uploaded payment slip'}
+                      >
+                        <Eye className="w-3.5 h-3.5 text-sky-600" />
+                        <span>{language === 'bn' ? 'পেমেন্ট স্লিপ' : 'Slip'}</span>
+                      </button>
+                    )}
+
                     {/* Edit Details */}
                     <button
                       type="button"
@@ -954,15 +1022,31 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
 
                     {/* Registration Approval Actions */}
                     {regStatus === 'pending' && (
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleVerifyPaymentAndApprove(rec)}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-colors shadow-xs cursor-pointer"
+                          title={
+                            language === 'bn'
+                              ? 'পেমেন্ট যাচাই, নিবন্ধন অনুমোদন, মূল ডাটাবেজ ও QR সক্রিয় করুন'
+                              : 'Verify Payment, Approve Registration, Sync to Main DB & Activate QR'
+                          }
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>
+                            {language === 'bn' ? 'পেমেন্ট ও নিবন্ধন অনুমোদন' : 'Verify Pay & Approve'}
+                          </span>
+                        </button>
+
                         <button
                           type="button"
                           onClick={() => handleApproveRegistration(rec)}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
-                          title={language === 'bn' ? 'রেজিস্ট্রেশন অনুমোদন ও কিউআর চালু করুন' : 'Approve Registration & Activate QR'}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-colors cursor-pointer"
+                          title={language === 'bn' ? 'শুধু রেজিস্ট্রেশন অনুমোদন ও কিউআর চালু করুন' : 'Approve Registration Only & Activate QR'}
                         >
                           <Check className="w-3.5 h-3.5" />
-                          <span>{language === 'bn' ? 'অনুমোদন' : 'Approve Reg'}</span>
+                          <span>{language === 'bn' ? 'শুধু রেজিস্ট্রেশন' : 'Approve Reg'}</span>
                         </button>
 
                         <button
@@ -1337,6 +1421,65 @@ export const ManualApprovalTab: React.FC<ManualApprovalTabProps> = ({
             setRefreshKey((k) => k + 1);
           }}
         />
+      )}
+
+      {/* Payment Slip / Screenshot Preview Modal */}
+      {viewSlipRecord && viewSlipRecord.documentUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-sky-600" />
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    {language === 'bn' ? 'পেমেন্ট স্লিপ / প্রমাণক প্রিভিউ' : 'Uploaded Payment Slip / Proof'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-mono">
+                    {viewSlipRecord.id} • {viewSlipRecord.financialMethod || 'Payment'} • ৳
+                    {(Number(viewSlipRecord.financialAmount) || 0).toLocaleString()}
+                    {viewSlipRecord.financialReference ? ` • Trx: ${viewSlipRecord.financialReference}` : ''}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewSlipRecord(null)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200 flex items-center justify-center max-h-[65vh] overflow-auto">
+              {viewSlipRecord.documentUrl.startsWith('data:application/pdf') ? (
+                <iframe
+                  src={viewSlipRecord.documentUrl}
+                  title={viewSlipRecord.documentName || 'Payment Slip PDF'}
+                  className="w-full h-[55vh] rounded-xl"
+                />
+              ) : (
+                <img
+                  src={viewSlipRecord.documentUrl}
+                  alt={viewSlipRecord.documentName || 'Payment Slip'}
+                  className="max-w-full max-h-[60vh] object-contain rounded-xl"
+                />
+              )}
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-xs text-slate-500 font-mono truncate">
+                {viewSlipRecord.documentName || 'payment_slip'}
+              </span>
+              <a
+                href={viewSlipRecord.documentUrl}
+                download={viewSlipRecord.documentName || `${viewSlipRecord.id}_slip`}
+                className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800"
+              >
+                {language === 'bn' ? 'ডাউনলোড স্লিপ' : 'Download Slip'}
+              </a>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

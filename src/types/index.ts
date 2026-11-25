@@ -115,8 +115,13 @@ export interface ManualRegistrationInput {
   bloodGroup?: string;
   hasParent?: boolean;
   parentName?: string;
+  parentAge?: number | string;
   parentRelation?: string;
   parentPhone?: string;
+  parentPhotoUrl?: string;
+  parentPhotoStoragePath?: string;
+  parentFee?: number;
+  registrationFee?: number;
   notes?: string;
   documentUrl?: string;
   documentName?: string;

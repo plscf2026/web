@@ -381,7 +381,7 @@ function toRegistrationDbRow(reg: RegistrationRecord, year: number = 2027) {
 /**
  * Normalize database row into application RegistrationRecord
  */
-function fromRegistrationDbRow(row: any): RegistrationRecord {
+export function fromRegistrationDbRow(row: any): RegistrationRecord {
   const photoStoragePath = row.photo_storage_path || row.photoStoragePath || null;
   const parentPhotoStoragePath = row.parent_photo_storage_path || row.parentPhotoStoragePath || null;
 
@@ -1542,7 +1542,7 @@ export const SupabaseService = {
             success: false,
             verified: false,
             errorType: 'PENDING_APPROVAL' as any,
-            error: res.error || `PENDING APPROVAL: Manual registration "${safeId}" is pending Super Admin approval. QR code is inactive.`,
+            error: res.error || `ID Card Not Approved by Admin (PENDING APPROVAL: awaiting Super Admin approval for "${safeId}"). QR code is inactive.`,
           };
         }
         if (res.status === 'REGISTRATION_REJECTED') {
@@ -1550,7 +1550,7 @@ export const SupabaseService = {
             success: false,
             verified: false,
             errorType: 'REGISTRATION_REJECTED' as any,
-            error: res.error || `REGISTRATION REJECTED: Registration "${safeId}" was rejected. QR code is invalid.`,
+            error: res.error || `ID Card Not Approved by Admin — REGISTRATION REJECTED: Registration "${safeId}" was rejected. QR code is invalid.`,
           };
         }
         if (res.status === 'UNPAID') {

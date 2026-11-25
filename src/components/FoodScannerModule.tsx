@@ -404,6 +404,17 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
           type: 'error',
           message: 'Network Connection Error: Unable to reach verification server. Please check your internet connection.',
         });
+      } else if (verifyRes.errorType === 'PENDING_APPROVAL' || verifyRes.errorType === 'REGISTRATION_REJECTED') {
+        setValidationResult({
+          canCollect: false,
+          status: 'INVALID_REGISTRATION',
+          messageEn: verifyRes.error || 'ID Card Not Approved by Admin',
+          messageBn: 'অ্যাডমিন কর্তৃক আইডি কার্ড অনুমোদিত নয় (সুপার অ্যাডমিনের অনুমোদনের অপেক্ষায়)।',
+        });
+        setFeedbackNotice({
+          type: 'error',
+          message: verifyRes.error || 'ID Card Not Approved by Admin',
+        });
       } else if (verifyRes.errorType === 'UNPAID') {
         setValidationResult({
           canCollect: false,

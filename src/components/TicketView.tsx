@@ -162,13 +162,19 @@ export const TicketView: React.FC<TicketViewProps> = ({
           </button>
         )}
 
-        {isPaid && (
+        {(isPaid || isManual) && (
           <button
             onClick={handlePrint}
             className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#0F172A] hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold shadow-md transition-all cursor-pointer"
           >
             <Printer className="w-4 h-4 text-[#38BDF8]" />
-            <span>{t.btnPrintTicket}</span>
+            <span>
+              {isPendingApproval
+                ? language === 'bn'
+                  ? 'কার্ড প্রিন্ট করুন (অনুমোদন অপেক্ষমান)'
+                  : 'Print Card (Pending Approval)'
+                : t.btnPrintTicket}
+            </span>
           </button>
         )}
 

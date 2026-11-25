@@ -179,10 +179,12 @@ test('Master Prompt Verification: 14 Scenarios for Manual Registration & Super A
     assert.equal(isValidSixCharToken(student1QrToken), true, 'QR token must be a valid 6-character token');
     assert.equal(student1QrToken.length, 6, 'Token length is exactly 6');
 
-    // Stored in database
-    const saved = AppStore.getRegistrations().find((r) => r.id === student1RegId);
-    assert.ok(saved, 'Record must be saved in AppStore registrations');
-    assert.equal(saved?.qrToken, student1QrToken, 'Stored QR token matches generated token');
+    // Stored in dedicated Manual Database BEFORE approval (NOT yet in Main AppStore!)
+    const savedManual = ManualRegistrationService.getManualRegistrations().find((r) => r.id === student1RegId);
+    assert.ok(savedManual, 'Record must be saved in dedicated ManualRegistrationService');
+    assert.equal(savedManual?.qrToken, student1QrToken, 'Stored QR token matches generated token');
+    const inMainBeforeApproval = AppStore.getRegistrations().find((r) => r.id === student1RegId);
+    assert.equal(inMainBeforeApproval, undefined, 'Unapproved manual record must NOT be inserted into main registrations before approval');
   });
 
   // --------------------------------------------------------------------------
@@ -362,7 +364,7 @@ test('Master Prompt Verification: 14 Scenarios for Manual Registration & Super A
     // Official treasury summary
     const finSummary = await FinancialService.getFinancialTransparencySummary();
     assert.equal(finSummary.total_pending_collection, breakdown.totalPendingCollection);
-    const student2Record = AppStore.getRegistrations().find((r) => r.id === student2RegId);
+    const student2Record = ManualRegistrationService.getManualRegistrations().find((r) => r.id === student2RegId);
     assert.equal(student2Record?.financialApprovalStatus, 'pending');
     assert.equal(student2Record?.totalPaid, 0, 'Unapproved manual funds do not contribute to totalPaid');
   });

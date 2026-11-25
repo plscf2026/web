@@ -469,11 +469,41 @@ export class AppStore {
     }
   }
 
+  private static manualLookupProvider: ((input: string) => RegistrationRecord | undefined) | null = null;
+  private static manualListProvider: (() => RegistrationRecord[]) | null = null;
+
+  static registerManualLookup(fn: (input: string) => RegistrationRecord | undefined): void {
+    this.manualLookupProvider = fn;
+  }
+
+  static registerManualListProvider(fn: () => RegistrationRecord[]): void {
+    this.manualListProvider = fn;
+  }
+
+  static getManualRegistrations(): RegistrationRecord[] {
+    if (this.manualListProvider) {
+      return this.manualListProvider();
+    }
+    return getStored<RegistrationRecord[]>('plscf_manual_registrations_v1', []);
+  }
+
   /**
-   * Synchronous lookup in local store.
+   * Synchronous lookup in local approved store.
    */
   static findRegistration(input: string): RegistrationRecord | undefined {
     return findRegistrationByTokenOrId(this.getRegistrations(), input);
+  }
+
+  /**
+   * Synchronous lookup in dedicated manual registrations store.
+   */
+  static findManualRegistration(input: string): RegistrationRecord | undefined {
+    if (this.manualLookupProvider) {
+      const provided = this.manualLookupProvider(input);
+      if (provided) return provided;
+    }
+    const manualList = getStored<RegistrationRecord[]>('plscf_manual_registrations_v1', []);
+    return findRegistrationByTokenOrId(manualList, input);
   }
 
   /**
@@ -521,7 +551,7 @@ export class AppStore {
           verified: false,
           status: 'PENDING_APPROVAL',
           errorType: 'PENDING_APPROVAL',
-          error: `PENDING APPROVAL: Manual registration "${local.id}" is awaiting Super Admin approval. QR Code is currently inactive.`,
+          error: `ID Card Not Approved by Admin (PENDING APPROVAL: awaiting Super Admin approval for "${local.id}"). QR Code is currently inactive.`,
         };
       }
       if (local.registrationApprovalStatus === 'rejected') {
@@ -530,7 +560,7 @@ export class AppStore {
           verified: false,
           status: 'REGISTRATION_REJECTED',
           errorType: 'REGISTRATION_REJECTED',
-          error: `REGISTRATION REJECTED: Registration "${local.id}" was rejected by Super Admin. Facility access denied.`,
+          error: `ID Card Not Approved by Admin — REGISTRATION REJECTED: Registration "${local.id}" was rejected by Super Admin. Facility access denied.`,
         };
       }
       if (local.paymentStatus !== 'paid' && local.registrationApprovalStatus !== 'approved') {
@@ -570,6 +600,33 @@ export class AppStore {
 
     if ((cloudRes as any).errorType === 'PENDING_APPROVAL') {
       return { ...cloudRes, status: 'PENDING_APPROVAL' };
+    }
+
+    if ((cloudRes as any).errorType === 'REGISTRATION_REJECTED') {
+      return { ...cloudRes, status: 'REGISTRATION_REJECTED' };
+    }
+
+    // 2.5 Check dedicated manual registration storage before NOT_FOUND (handles offline / pending / rejected)
+    const manualLocal = this.findManualRegistration(clean);
+    if (manualLocal) {
+      if (manualLocal.registrationApprovalStatus === 'rejected') {
+        return {
+          success: false,
+          verified: false,
+          status: 'REGISTRATION_REJECTED',
+          errorType: 'REGISTRATION_REJECTED',
+          error: `ID Card Not Approved by Admin — REGISTRATION REJECTED: Registration "${manualLocal.id}" was rejected by Super Admin.`,
+        };
+      }
+      if (manualLocal.registrationApprovalStatus !== 'approved') {
+        return {
+          success: false,
+          verified: false,
+          status: 'PENDING_APPROVAL',
+          errorType: 'PENDING_APPROVAL',
+          error: `ID Card Not Approved by Admin (PENDING APPROVAL: awaiting Super Admin approval for "${manualLocal.id}"). QR Code is currently inactive.`,
+        };
+      }
     }
 
     // Fallback check against lookupRegistrationByIdOrToken (for test mocks)

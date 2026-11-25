@@ -458,7 +458,12 @@ export class IdCardStore {
 
   static syncWithRegistrations(): StudentIdCardRecord[] {
     const registrations = AppStore.getRegistrations();
-    const paidRegistrations = registrations.filter((r) => r.paymentStatus === 'paid');
+    const paidRegistrations = registrations.filter(
+      (r) =>
+        r.paymentStatus === 'paid' &&
+        r.registrationApprovalStatus !== 'pending' &&
+        r.registrationApprovalStatus !== 'rejected'
+    );
     const existingCards = this.getIdCards();
     const existingMap = new Map(existingCards.map((c) => [c.registrationId, c]));
 
