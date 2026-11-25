@@ -45,6 +45,61 @@ export default async function handler(req: any, res: any) {
       });
     }
 
+    // Backend Governance & Settings Enforcement
+    const supabaseUrl =
+      process.env.SUPABASE_URL ||
+      process.env.VITE_SUPABASE_URL ||
+      'https://hnthoszbkhvygoowtvau.supabase.co';
+    const supabaseKey =
+      process.env.SUPABASE_SECRET_KEY ||
+      process.env.VITE_SUPABASE_ANON_KEY ||
+      'sb_publishable_yEnHiM0NTIxuKNQnNHQu3Q_IRJ7zfur';
+
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const { data: settingRow } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'portal_fee_settings')
+        .maybeSingle();
+
+      if (settingRow?.value) {
+        const val = typeof settingRow.value === 'string' ? JSON.parse(settingRow.value) : settingRow.value;
+        if (opt_a === 'DONATION') {
+          if (val.donationOpen === false) {
+            return res.status(403).json({
+              status_code: '403',
+              status: 'failed',
+              message: 'Online donations are currently disabled by Super Admin.'
+            });
+          }
+        } else {
+          if (val.registrationOpen === false) {
+            return res.status(403).json({
+              status_code: '403',
+              status: 'failed',
+              message: 'Online registration is currently closed by Super Admin.'
+            });
+          }
+          if (opt_b === 'former' && val.alumniRegistrationOpen === false) {
+            return res.status(403).json({
+              status_code: '403',
+              status: 'failed',
+              message: 'Alumni registration is currently closed.'
+            });
+          }
+          if (opt_b === 'current' && val.currentStudentRegistrationOpen === false) {
+            return res.status(403).json({
+              status_code: '403',
+              status: 'failed',
+              message: 'Current student registration is currently closed.'
+            });
+          }
+        }
+      }
+    } catch (_) {}
+
     const params = new URLSearchParams();
     params.append('merchantId', merchantId);
     params.append('password', password);

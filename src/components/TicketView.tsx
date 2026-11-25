@@ -22,6 +22,8 @@ import { formatSafeQrPayload } from '../utils/tokenGenerator';
 import { StudentIdCardBadge } from './idcard/StudentIdCardBadge';
 import { ParentIdCardBadge } from './idcard/ParentIdCardBadge';
 import { IdCardStore } from '../services/idCardStore';
+import { AppStore } from '../services/store';
+import { isGlobalRegistrationOpen } from '../utils/rules';
 
 interface TicketViewProps {
   registration: RegistrationRecord;
@@ -150,7 +152,7 @@ export const TicketView: React.FC<TicketViewProps> = ({
 
       {/* Action Buttons (Hidden on Print) */}
       <div className="no-print flex flex-wrap items-center justify-center gap-3 mb-8">
-        {onRegisterAnother && (
+        {onRegisterAnother && isGlobalRegistrationOpen(AppStore.getFeeSettings()) && (
           <button
             onClick={onRegisterAnother}
             className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white text-xs sm:text-sm font-bold shadow-md shadow-sky-600/30 transition-all cursor-pointer"

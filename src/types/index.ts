@@ -232,12 +232,17 @@ export interface FeeSettings {
   formerStudentFee: number;
   currentStudentFee: number;
   registrationOpen: boolean;
+  alumniRegistrationOpen?: boolean;
+  currentStudentRegistrationOpen?: boolean;
+  donationOpen?: boolean;
   startDate: string;
   endDate: string;
   lateFeeEnabled: boolean;
   lateFeeAmount: number;
   closedMessageEn?: string;
   closedMessageBn?: string;
+  donationClosedMessageEn?: string;
+  donationClosedMessageBn?: string;
   eventTargetDate?: string;
   simulateEventCompleted?: boolean;
   homePageSections?: HomePageSectionSetting[];

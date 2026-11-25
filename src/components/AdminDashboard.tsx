@@ -88,6 +88,7 @@ import { StaffManagementTab } from './admin/StaffManagementTab';
 import { AuditHistoryTab } from './admin/AuditHistoryTab';
 import { StudentIdManagementTab } from './admin/StudentIdManagementTab';
 import { MealTimeScannerControlPanel } from './admin/MealTimeScannerControlPanel';
+import { RegistrationDonationControlPanel } from './admin/RegistrationDonationControlPanel';
 import { StudentIdService } from '../services/studentIdStore';
 import { EventStore } from '../services/eventStore';
 import { IdCardStore } from '../services/idCardStore';
@@ -328,6 +329,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'studentIds'
     | 'registrations'
     | 'feeSettings'
+    | 'registrationControl'
     | 'mealControl'
     | 'payments'
     | 'donations'
@@ -903,13 +905,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Handlers
   const handleSaveFeeSettings = (e: React.FormEvent) => {
     e.preventDefault();
+    const currentLatest = AppStore.getFeeSettings();
     const updated: FeeSettings = {
+      ...currentLatest,
       ...feeSettings,
       formerStudentFee: Number(formerFeeInput),
       currentStudentFee: Number(currentFeeInput),
       registrationOpen: Boolean(registrationOpenInput),
+      alumniRegistrationOpen: currentLatest.alumniRegistrationOpen !== false,
+      currentStudentRegistrationOpen: currentLatest.currentStudentRegistrationOpen !== false,
+      donationOpen: currentLatest.donationOpen !== false,
       closedMessageEn: closedMessageEnInput,
       closedMessageBn: closedMessageBnInput,
+      donationClosedMessageEn: currentLatest.donationClosedMessageEn,
+      donationClosedMessageBn: currentLatest.donationClosedMessageBn,
       eventTargetDate: eventTargetDateInput,
       simulateEventCompleted: Boolean(simulateEventCompletedInput),
       homePageSections: homePageSectionsInput,
@@ -1591,9 +1600,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     },
     {
       id: 'feeSettings',
-      label: language === 'bn' ? 'ফি ও ইভেন্ট সেটিংস' : 'Fee & Event Settings',
+      label: language === 'bn' ? 'রেজিস্ট্রেশন, অনুদান ও সেটিংস' : 'Registration, Donation & Settings',
       icon: Settings,
       category: 'admin',
+      highlight: true,
+      badge: 'Controls',
+      badgeColor: 'amber',
     },
 
     // 5. Media & Content
@@ -3255,8 +3267,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* TAB 4: FEE SETTINGS & REGISTRATION STATUS */}
-      {activeTab === 'feeSettings' && (
+      {(activeTab === 'feeSettings' || (activeTab as any) === 'registrationControl') && (
         <div className="space-y-6 max-w-4xl">
+          {/* Registration & Donation Governance Control System */}
+          <RegistrationDonationControlPanel
+            language={language}
+            adminName={effectiveAdmin.fullName || 'Super Admin'}
+            onSettingsChanged={(updated) => {
+              setFeeSettings(updated);
+              setRegistrationOpenInput(updated.registrationOpen);
+            }}
+          />
+
           {/* Meal Time & Scanner Control System */}
           <MealTimeScannerControlPanel
             language={language}

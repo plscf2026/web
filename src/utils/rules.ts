@@ -452,3 +452,113 @@ export function generateRegistrationId(category: StudentCategory, index: number)
   const num = (index + 1001).toString();
   return `${prefix}${num}`;
 }
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Registration & Donation Availability Governance Helpers
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+/**
+ * Master Global Registration check.
+ * When OFF, all registration categories and registration processes are strictly disabled.
+ */
+export function isGlobalRegistrationOpen(settings?: FeeSettings | null): boolean {
+  if (!settings) return false;
+  return Boolean(settings.registrationOpen);
+}
+
+/**
+ * Alumni (Former Student) Registration check.
+ * Requires Global Registration to be ON and alumniRegistrationOpen to not be false.
+ */
+export function isAlumniRegistrationOpen(settings?: FeeSettings | null): boolean {
+  if (!isGlobalRegistrationOpen(settings)) return false;
+  return settings?.alumniRegistrationOpen !== false;
+}
+
+/**
+ * Current Student Registration check.
+ * Requires Global Registration to be ON and currentStudentRegistrationOpen to not be false.
+ */
+export function isCurrentStudentRegistrationOpen(settings?: FeeSettings | null): boolean {
+  if (!isGlobalRegistrationOpen(settings)) return false;
+  return settings?.currentStudentRegistrationOpen !== false;
+}
+
+/**
+ * Category-specific Registration check ('former' or 'current').
+ */
+export function isCategoryRegistrationOpen(
+  category: StudentCategory,
+  settings?: FeeSettings | null
+): boolean {
+  if (!isGlobalRegistrationOpen(settings)) return false;
+  if (category === 'former') return isAlumniRegistrationOpen(settings);
+  if (category === 'current') return isCurrentStudentRegistrationOpen(settings);
+  return false;
+}
+
+/**
+ * Independent Donation check.
+ * Completely independent of registration settings.
+ */
+export function isDonationOpen(settings?: FeeSettings | null): boolean {
+  if (!settings) return false;
+  return settings.donationOpen !== false;
+}
+
+/**
+ * Returns user-friendly status message when a registration category is closed.
+ */
+export function getRegistrationClosedMessage(
+  settings: FeeSettings | null | undefined,
+  category: StudentCategory | 'global',
+  lang: 'en' | 'bn' = 'en'
+): string {
+  if (!settings || !isGlobalRegistrationOpen(settings)) {
+    if (lang === 'bn') {
+      return (
+        settings?.closedMessageBn ||
+        'অনলাইন রেজিস্ট্রেশন কার্যক্রম বর্তমানে বন্ধ রয়েছে। জরুরি প্রয়োজনে অনুগ্রহ করে পুনর্মিলনী সচিবালয়ে যোগাযোগ করুন।'
+      );
+    }
+    return (
+      settings?.closedMessageEn ||
+      'Online registration is currently closed. If you need special authorization, please contact the Reunion Secretariat.'
+    );
+  }
+
+  if (category === 'former' && !isAlumniRegistrationOpen(settings)) {
+    return lang === 'bn'
+      ? 'প্রাক্তন শিক্ষার্থী (অ্যালামনাই) রেজিস্ট্রেশন কার্যক্রম বর্তমানে বন্ধ রয়েছে।'
+      : 'Alumni (Former Student) registration is currently closed.';
+  }
+
+  if (category === 'current' && !isCurrentStudentRegistrationOpen(settings)) {
+    return lang === 'bn'
+      ? 'বর্তমান শিক্ষার্থী রেজিস্ট্রেশন কার্যক্রম বর্তমানে বন্ধ রয়েছে।'
+      : 'Current Student registration is currently closed.';
+  }
+
+  return '';
+}
+
+/**
+ * Returns user-friendly status message when donation is closed.
+ */
+export function getDonationClosedMessage(
+  settings: FeeSettings | null | undefined,
+  lang: 'en' | 'bn' = 'en'
+): string {
+  if (lang === 'bn') {
+    return (
+      settings?.donationClosedMessageBn ||
+      'অনলাইন অনুদান কার্যক্রম বর্তমানে সাময়িকভাবে বন্ধ রয়েছে। পুনর্মিলনী তহবিলে সহযোগিতার জন্য আন্তরিক ধন্যবাদ।'
+    );
+  }
+  return (
+    settings?.donationClosedMessageEn ||
+    'Online donations are currently paused by the Reunion Secretariat. Thank you for your continued support.'
+  );
+}

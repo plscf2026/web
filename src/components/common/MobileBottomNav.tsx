@@ -1,30 +1,58 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Home, UserPlus, Ticket, QrCode, Shield } from 'lucide-react';
-import { Language } from '../../types';
+import { Language, FeeSettings } from '../../types';
+import { AppStore } from '../../services/store';
+import { isGlobalRegistrationOpen } from '../../utils/rules';
 
 interface MobileBottomNavProps {
   language: Language;
   activeView: string;
   onNavigate: (view: string) => void;
+  feeSettings?: FeeSettings;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   language,
   activeView,
   onNavigate,
+  feeSettings: initialFeeSettings,
 }) => {
+  const [feeSettings, setFeeSettings] = useState<FeeSettings>(
+    () => initialFeeSettings || AppStore.getFeeSettings()
+  );
+
+  useEffect(() => {
+    if (initialFeeSettings) {
+      setFeeSettings(initialFeeSettings);
+    }
+  }, [initialFeeSettings]);
+
+  useEffect(() => {
+    const handleSync = (e: any) => {
+      if (e.detail) {
+        setFeeSettings(e.detail);
+      }
+    };
+    window.addEventListener('plscf_fee_settings_updated', handleSync);
+    return () => window.removeEventListener('plscf_fee_settings_updated', handleSync);
+  }, []);
+
   const navItems = [
     {
       id: 'home',
       label: language === 'bn' ? 'হোম' : 'Home',
       icon: Home,
     },
-    {
-      id: 'register',
-      label: language === 'bn' ? 'নিবন্ধন' : 'Register',
-      icon: UserPlus,
-      highlight: true,
-    },
+    ...(isGlobalRegistrationOpen(feeSettings)
+      ? [
+          {
+            id: 'register',
+            label: language === 'bn' ? 'নিবন্ধন' : 'Register',
+            icon: UserPlus,
+            highlight: true,
+          },
+        ]
+      : []),
     {
       id: 'find-ticket',
       label: language === 'bn' ? 'টিকিট' : 'Ticket',

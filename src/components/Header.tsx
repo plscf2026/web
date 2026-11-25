@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Home,
   UserPlus,
@@ -11,14 +11,17 @@ import {
   Image as ImageIcon,
   Info,
 } from 'lucide-react';
-import { Language } from '../types';
+import { Language, FeeSettings } from '../types';
 import { translations } from '../i18n/translations';
+import { AppStore } from '../services/store';
+import { isGlobalRegistrationOpen, isDonationOpen } from '../utils/rules';
 
 interface HeaderProps {
   language: Language;
   onLanguageChange: (lang: Language) => void;
   activeView: string;
   onNavigate: (view: string) => void;
+  feeSettings?: FeeSettings;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -26,8 +29,29 @@ export const Header: React.FC<HeaderProps> = ({
   onLanguageChange,
   activeView,
   onNavigate,
+  feeSettings: initialFeeSettings,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [feeSettings, setFeeSettings] = useState<FeeSettings>(
+    () => initialFeeSettings || AppStore.getFeeSettings()
+  );
+
+  useEffect(() => {
+    if (initialFeeSettings) {
+      setFeeSettings(initialFeeSettings);
+    }
+  }, [initialFeeSettings]);
+
+  useEffect(() => {
+    const handleSync = (e: any) => {
+      if (e.detail) {
+        setFeeSettings(e.detail);
+      }
+    };
+    window.addEventListener('plscf_fee_settings_updated', handleSync);
+    return () => window.removeEventListener('plscf_fee_settings_updated', handleSync);
+  }, []);
+
   const t = translations[language];
 
   const handleNav = (view: string) => {
@@ -43,15 +67,21 @@ export const Header: React.FC<HeaderProps> = ({
     highlight?: boolean;
   }
 
-  const navItems: NavItem[] = [
+  const rawNavItems: NavItem[] = [
     { id: 'home', label: t.navHome, icon: Home },
-    { id: 'register', label: t.navRegister, icon: UserPlus, highlight: true },
-    { id: 'donate', label: t.navDonate, icon: HeartHandshake },
+    ...(isGlobalRegistrationOpen(feeSettings)
+      ? [{ id: 'register', label: t.navRegister, icon: UserPlus, highlight: true }]
+      : []),
+    ...(isDonationOpen(feeSettings)
+      ? [{ id: 'donate', label: t.navDonate, icon: HeartHandshake }]
+      : []),
     { id: 'find-ticket', label: t.navFindTicket, icon: Search },
     { id: 'notices', label: t.navNotices, icon: Bell },
     { id: 'gallery', label: t.navGallery, icon: ImageIcon },
     { id: 'about', label: t.navAbout, icon: Info },
   ];
+
+  const navItems = rawNavItems;
 
   return (
     <header className="sticky top-0 z-50 bg-[#F0F6FA]/95 backdrop-blur-md border-b border-[#E2EEF8] shadow-xs">

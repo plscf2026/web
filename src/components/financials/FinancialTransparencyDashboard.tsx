@@ -27,7 +27,9 @@ import {
   Crown,
   Sparkles,
 } from 'lucide-react';
-import { Language } from '../../types';
+import { Language, FeeSettings } from '../../types';
+import { AppStore } from '../../services/store';
+import { isDonationOpen } from '../../utils/rules';
 import {
   FinancialService,
   FinancialTransparencySummary,
@@ -47,6 +49,16 @@ export const FinancialTransparencyDashboard: React.FC<FinancialTransparencyDashb
   onNavigateDonate,
 }) => {
   const isBangla = language === 'bn';
+
+  // ── Governance Settings ─────────────────────────────────────────────────────
+  const [feeSettings, setFeeSettings] = useState<FeeSettings>(() => AppStore.getFeeSettings());
+  useEffect(() => {
+    const handleSync = (e: any) => {
+      if (e.detail) setFeeSettings(e.detail);
+    };
+    window.addEventListener('plscf_fee_settings_updated', handleSync);
+    return () => window.removeEventListener('plscf_fee_settings_updated', handleSync);
+  }, []);
 
   // ── States ──────────────────────────────────────────────────────────────────
   const [summary, setSummary] = useState<FinancialTransparencySummary | null>(null);
@@ -256,7 +268,7 @@ export const FinancialTransparencyDashboard: React.FC<FinancialTransparencyDashb
               <span>{isBangla ? 'CSV রিপোর্ট ডাউনলোড' : 'Download CSV'}</span>
             </button>
 
-            {onNavigateDonate && (
+            {onNavigateDonate && isDonationOpen(feeSettings) && (
               <button
                 type="button"
                 onClick={onNavigateDonate}

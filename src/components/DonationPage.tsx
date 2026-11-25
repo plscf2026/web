@@ -21,7 +21,7 @@ import { translations } from '../i18n/translations';
 import { AppStore } from '../services/store';
 import { SupabaseService } from '../services/supabase';
 import { PayStationService, PayStationPaymentResult } from '../services/paystation';
-import { isValidBangladeshiMobile, normalizeBangladeshiMobileNumber } from '../utils/rules';
+import { isValidBangladeshiMobile, normalizeBangladeshiMobileNumber, isDonationOpen, getDonationClosedMessage } from '../utils/rules';
 import { sanitizeInput } from '../utils/security';
 import { ThankYouCardBadge } from './ThankYouCardBadge';
 
@@ -89,6 +89,12 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
         AppStore.saveDonations(res.data);
       }
     }).catch((err) => console.warn('Error fetching live donations from Supabase:', err));
+
+    const handleSync = (e: any) => {
+      if (e.detail) setFeeSettings(e.detail);
+    };
+    window.addEventListener('plscf_fee_settings_updated', handleSync);
+    return () => window.removeEventListener('plscf_fee_settings_updated', handleSync);
   }, [completedDonation]);
 
   // 3. Auto-handle return from PayStation gateway callback
@@ -308,6 +314,11 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
   const handleInitiateDonation = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
+
+    if (!isDonationOpen(feeSettings)) {
+      setErrorMessage(getDonationClosedMessage(feeSettings, language));
+      return;
+    }
 
     if (!donorName.trim()) {
       setErrorMessage(isBangla ? 'অনুগ্রহ করে আপনার পুরো নাম লিখুন।' : 'Please enter your full name.');
@@ -602,6 +613,20 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
           {/* Left: Donation Causes & Form */}
           <div className="lg:col-span-8 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
             <form onSubmit={handleInitiateDonation} className="space-y-6">
+              {!isDonationOpen(feeSettings) && (
+                <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-900 flex items-start gap-3">
+                  <Lock className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-amber-800">
+                      {isBangla ? 'অনলাইন অনুদান কার্যক্রম সাময়িকভাবে স্থগিত' : 'Online Donations Temporarily Paused'}
+                    </h4>
+                    <p className="text-xs text-amber-800 mt-1">
+                      {getDonationClosedMessage(feeSettings, language)}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Step 1: Amount Selector */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
@@ -838,27 +863,38 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
               )}
 
               {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isProcessing}
-                className="w-full py-4 px-6 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-extrabold text-base shadow-lg shadow-sky-600/30 hover:shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isProcessing ? (
-                  <>
-                    <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>{isBangla ? 'PayStation গেটওয়ে সংযুক্ত হচ্ছে...' : 'Connecting PayStation Gateway...'}</span>
-                  </>
-                ) : (
-                  <>
-                    <Heart className="w-5 h-5 fill-white" />
-                    <span>
-                      {isBangla
-                        ? `৳${effectiveAmount.toLocaleString('en-US')} অনুদান প্রদান করুন`
-                        : `Donate ৳${effectiveAmount.toLocaleString('en-US')} BDT via PayStation`}
-                    </span>
-                  </>
-                )}
-              </button>
+              {!isDonationOpen(feeSettings) ? (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full py-4 px-6 rounded-full bg-slate-200 text-slate-500 font-extrabold text-base cursor-not-allowed flex items-center justify-center gap-2 border border-slate-300"
+                >
+                  <Lock className="w-5 h-5 text-slate-400" />
+                  <span>{isBangla ? 'অনুদান কার্যক্রম সাময়িকভাবে বন্ধ' : 'Donations Currently Closed'}</span>
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={isProcessing}
+                  className="w-full py-4 px-6 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-extrabold text-base shadow-lg shadow-sky-600/30 hover:shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isProcessing ? (
+                    <>
+                      <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>{isBangla ? 'PayStation গেটওয়ে সংযুক্ত হচ্ছে...' : 'Connecting PayStation Gateway...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Heart className="w-5 h-5 fill-white" />
+                      <span>
+                        {isBangla
+                          ? `৳${effectiveAmount.toLocaleString('en-US')} অনুদান প্রদান করুন`
+                          : `Donate ৳${effectiveAmount.toLocaleString('en-US')} BDT via PayStation`}
+                      </span>
+                    </>
+                  )}
+                </button>
+              )}
 
               <div className="flex items-center justify-center gap-4 text-[11px] text-slate-500 pt-1">
                 <span className="flex items-center gap-1">

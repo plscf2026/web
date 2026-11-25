@@ -36,6 +36,11 @@ import {
   normalizeBangladeshiMobileNumber,
   RegistrationFormData,
   isStudentBelowClass6,
+  isGlobalRegistrationOpen,
+  isAlumniRegistrationOpen,
+  isCurrentStudentRegistrationOpen,
+  isCategoryRegistrationOpen,
+  getRegistrationClosedMessage,
 } from '../utils/rules';
 import { StudentIdService } from '../services/studentIdStore';
 import { readValidatedImage } from '../utils/fileValidation';
@@ -152,6 +157,15 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   useEffect(() => {
     StudentIdService.syncWithSupabase().catch(() => {});
   }, []);
+
+  // Auto-switch category if the current selected category is disabled
+  useEffect(() => {
+    if (category === 'former' && !isAlumniRegistrationOpen(feeSettings) && isCurrentStudentRegistrationOpen(feeSettings)) {
+      setCategory('current');
+    } else if (category === 'current' && !isCurrentStudentRegistrationOpen(feeSettings) && isAlumniRegistrationOpen(feeSettings)) {
+      setCategory('former');
+    }
+  }, [feeSettings, category]);
 
   // Comprehensive form reset — clears all input fields, previews, file input, and state
   const resetForm = () => {
@@ -612,7 +626,12 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return; // Prevent duplicate submissions (Requirement 10)
-    if (!feeSettings.registrationOpen) {
+    if (!isGlobalRegistrationOpen(feeSettings)) {
+      setPaymentError(getRegistrationClosedMessage(feeSettings, 'global', language));
+      return;
+    }
+    if (!isCategoryRegistrationOpen(category, feeSettings)) {
+      setPaymentError(getRegistrationClosedMessage(feeSettings, category, language));
       return;
     }
 
@@ -776,19 +795,27 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           {t.regPageSubtitle}
         </p>
 
-        {!feeSettings.registrationOpen && (
+        {!isGlobalRegistrationOpen(feeSettings) ? (
           <div className="mt-4 p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-900 max-w-2xl mx-auto text-left shadow-sm">
             <div className="flex items-center gap-2 font-bold text-rose-800 mb-1">
               <Lock className="w-4 h-4 text-rose-600" />
               <span>{t.regStatusClosedBadge}</span>
             </div>
             <p className="text-xs text-rose-700 leading-relaxed">
-              {language === 'bn'
-                ? feeSettings.closedMessageBn || t.regClosedNoticeDefault
-                : feeSettings.closedMessageEn || t.regClosedNoticeDefault}
+              {getRegistrationClosedMessage(feeSettings, 'global', language)}
             </p>
           </div>
-        )}
+        ) : !isAlumniRegistrationOpen(feeSettings) && !isCurrentStudentRegistrationOpen(feeSettings) ? (
+          <div className="mt-4 p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-900 max-w-2xl mx-auto text-left shadow-sm">
+            <div className="flex items-center gap-2 font-bold text-amber-800 mb-1">
+              <Lock className="w-4 h-4 text-amber-600" />
+              <span>{t.regStatusClosedBadge}</span>
+            </div>
+            <p className="text-xs text-amber-800 leading-relaxed">
+              {getRegistrationClosedMessage(feeSettings, 'global', language)}
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8" noValidate>
@@ -798,9 +825,12 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             {t.categoryLabel} *
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Alumni Button */}
             <button
               type="button"
+              disabled={!isAlumniRegistrationOpen(feeSettings)}
               onClick={() => {
+                if (!isAlumniRegistrationOpen(feeSettings)) return;
                 setCategory('former');
                 setIdVerificationResult(null);
                 if (validationErrors.passingYear || validationErrors.studentId) {
@@ -810,19 +840,28 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   setValidationErrors(next);
                 }
               }}
-              className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
-                category === 'former'
-                  ? 'border-[#0284C7] bg-[#E2EEF8]/40 shadow-xs'
-                  : 'border-[#E2EEF8] hover:border-slate-300 bg-white'
+              className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                !isAlumniRegistrationOpen(feeSettings)
+                  ? 'border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed'
+                  : category === 'former'
+                  ? 'border-[#0284C7] bg-[#E2EEF8]/40 shadow-xs cursor-pointer'
+                  : 'border-[#E2EEF8] hover:border-slate-300 bg-white cursor-pointer'
               }`}
             >
               <div className="flex items-center justify-between">
                 <span className="font-bold text-[#0F172A] text-base">
                   {t.categoryFormer}
                 </span>
-                <span className="px-3 py-1 rounded-full bg-[#0284C7] text-white font-extrabold text-xs">
-                  ৳ {feeSettings.formerStudentFee}
-                </span>
+                {isAlumniRegistrationOpen(feeSettings) ? (
+                  <span className="px-3 py-1 rounded-full bg-[#0284C7] text-white font-extrabold text-xs">
+                    ৳ {feeSettings.formerStudentFee}
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 rounded-full bg-slate-300 text-slate-700 font-bold text-xs flex items-center gap-1">
+                    <Lock className="w-3 h-3" />
+                    <span>{language === 'bn' ? 'বন্ধ (Closed)' : 'Closed'}</span>
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-500 mt-1">
                 {language === 'bn'
@@ -831,9 +870,12 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               </p>
             </button>
 
+            {/* Current Student Button */}
             <button
               type="button"
+              disabled={!isCurrentStudentRegistrationOpen(feeSettings)}
               onClick={() => {
+                if (!isCurrentStudentRegistrationOpen(feeSettings)) return;
                 setCategory('current');
                 if (validationErrors.currentClass) {
                   const next = { ...validationErrors };
@@ -841,19 +883,28 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   setValidationErrors(next);
                 }
               }}
-              className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
-                category === 'current'
-                  ? 'border-[#0EA5E9] bg-[#E2EEF8]/40 shadow-xs'
-                  : 'border-[#E2EEF8] hover:border-slate-300 bg-white'
+              className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                !isCurrentStudentRegistrationOpen(feeSettings)
+                  ? 'border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed'
+                  : category === 'current'
+                  ? 'border-[#0EA5E9] bg-[#E2EEF8]/40 shadow-xs cursor-pointer'
+                  : 'border-[#E2EEF8] hover:border-slate-300 bg-white cursor-pointer'
               }`}
             >
               <div className="flex items-center justify-between">
                 <span className="font-bold text-[#0F172A] text-base">
                   {t.categoryCurrent}
                 </span>
-                <span className="px-3 py-1 rounded-full bg-[#0EA5E9] text-white font-extrabold text-xs">
-                  ৳ {feeSettings.currentStudentFee}
-                </span>
+                {isCurrentStudentRegistrationOpen(feeSettings) ? (
+                  <span className="px-3 py-1 rounded-full bg-[#0EA5E9] text-white font-extrabold text-xs">
+                    ৳ {feeSettings.currentStudentFee}
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 rounded-full bg-slate-300 text-slate-700 font-bold text-xs flex items-center gap-1">
+                    <Lock className="w-3 h-3" />
+                    <span>{language === 'bn' ? 'বন্ধ (Closed)' : 'Closed'}</span>
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-500 mt-1">
                 {language === 'bn'
@@ -2064,7 +2115,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             </div>
           </div>
 
-          {feeSettings.registrationOpen ? (
+          {isGlobalRegistrationOpen(feeSettings) && isCategoryRegistrationOpen(category, feeSettings) ? (
             <button
               type="submit"
               disabled={isSubmitting || isProcessingPayment}

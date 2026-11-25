@@ -43,6 +43,12 @@ import { AppStore } from '../services/store';
 import { SupabaseService } from '../services/supabase';
 import { FinancialTransparencyDashboard } from './financials/FinancialTransparencyDashboard';
 import { ThankYouCardModal } from './ThankYouCardModal';
+import {
+  isGlobalRegistrationOpen,
+  isAlumniRegistrationOpen,
+  isCurrentStudentRegistrationOpen,
+  isDonationOpen,
+} from '../utils/rules';
 
 interface HomePageProps {
   language: Language;
@@ -276,7 +282,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
             {/* Action Buttons */}
             <div className="flex flex-wrap items-center gap-3 pt-2">
-              {feeSettings.registrationOpen ? (
+              {isGlobalRegistrationOpen(feeSettings) && (
                 <button
                   onClick={() => onNavigate('register')}
                   className="px-7 py-3.5 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-black text-sm sm:text-base shadow-lg shadow-sky-600/30 hover:shadow-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center gap-2 group"
@@ -285,23 +291,17 @@ export const HomePage: React.FC<HomePageProps> = ({
                   <span>{language === 'bn' ? 'নিবন্ধন করুন' : 'Register Now'}</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
-              ) : (
-                <button
-                  disabled
-                  className="px-7 py-3.5 rounded-full bg-slate-800 text-slate-400 font-bold text-sm sm:text-base border border-slate-700 cursor-not-allowed flex items-center gap-2 opacity-80"
-                >
-                  <Lock className="w-4 h-4 text-slate-500" />
-                  <span>{t.btnRegistrationClosed}</span>
-                </button>
               )}
 
-              <button
-                onClick={() => onNavigate('donate')}
-                className="px-6 py-3.5 rounded-full bg-[#E2EEF8] hover:bg-white text-[#0F172A] border border-[#0284C7]/30 font-bold text-sm sm:text-base shadow-xs hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer flex items-center gap-2"
-              >
-                <HeartHandshake className="w-4 h-4 text-[#0284C7]" />
-                <span>{language === 'bn' ? 'অনুদান / সহায়তা' : 'Contribute / Donate'}</span>
-              </button>
+              {isDonationOpen(feeSettings) && (
+                <button
+                  onClick={() => onNavigate('donate')}
+                  className="px-6 py-3.5 rounded-full bg-[#E2EEF8] hover:bg-white text-[#0F172A] border border-[#0284C7]/30 font-bold text-sm sm:text-base shadow-xs hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer flex items-center gap-2"
+                >
+                  <HeartHandshake className="w-4 h-4 text-[#0284C7]" />
+                  <span>{language === 'bn' ? 'অনুদান / সহায়তা' : 'Contribute / Donate'}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -584,13 +584,15 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
 
             {/* Action CTA Button */}
-            <button
-              onClick={() => onNavigate('register')}
-              className="px-6 py-3.5 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-black text-xs sm:text-sm shadow-lg shadow-sky-600/30 transition-all transform hover:scale-105 active:scale-100 cursor-pointer flex items-center gap-2 shrink-0"
-            >
-              <span>{language === 'bn' ? 'রিইউনিয়ন যাত্রায় যোগ দিন' : 'Join the Reunion Journey'}</span>
-              <ArrowRight className="w-4 h-4 text-white" />
-            </button>
+            {isGlobalRegistrationOpen(feeSettings) && (
+              <button
+                onClick={() => onNavigate('register')}
+                className="px-6 py-3.5 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-black text-xs sm:text-sm shadow-lg shadow-sky-600/30 transition-all transform hover:scale-105 active:scale-100 cursor-pointer flex items-center gap-2 shrink-0"
+              >
+                <span>{language === 'bn' ? 'রিইউনিয়ন যাত্রায় যোগ দিন' : 'Join the Reunion Journey'}</span>
+                <ArrowRight className="w-4 h-4 text-white" />
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -979,119 +981,133 @@ export const HomePage: React.FC<HomePageProps> = ({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          {/* Former Student Card */}
-          <div className="bg-white rounded-3xl p-8 border-2 border-[#0284C7] shadow-xl relative overflow-hidden flex flex-col justify-between">
-            <div className="absolute top-0 right-0 bg-[#0284C7] text-white text-[10px] font-black uppercase px-4 py-1 rounded-bl-xl tracking-wider">
-              {language === 'bn' ? 'অ্যালামনাই ক্যাটাগরি' : 'Alumni'}
+        {!isGlobalRegistrationOpen(feeSettings) ? (
+          <div className="max-w-2xl mx-auto p-8 bg-white rounded-3xl border border-slate-200 text-center space-y-3 shadow-xs">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+              <Lock className="w-6 h-6" />
             </div>
-
-            <div className="space-y-4">
-              <div>
-                <span className="text-xs font-bold text-[#0284C7] uppercase tracking-wider block">
-                  {t.feeFormerTitle}
-                </span>
-                <h3 className="text-3xl font-black text-slate-900 mt-1">
-                  ৳ {feeSettings.formerStudentFee} BDT
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">{t.feeFormerSubtitle}</p>
-              </div>
-
-              <div className="space-y-2.5 text-xs text-slate-700 pt-4 border-t border-slate-100">
-                <div className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-[#0284C7] shrink-0 mt-0.5" />
-                  <span>{t.feeFormerIncludes}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Shirt className="w-4 h-4 text-[#0284C7] shrink-0" />
-                  <span>
-                    {language === 'bn' ? 'কাস্টম সাইজ টি-শার্ট অন্তর্ভুক্ত' : 'T-shirt Included (S-XXXL)'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Award className="w-4 h-4 text-[#0284C7] shrink-0" />
-                  <span>
-                    {language === 'bn' ? '৬৪ বছর পূর্তি স্মারক স্মরণিকা' : 'Anniversary Souvenir Magazine'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-8">
-              {feeSettings.registrationOpen ? (
-                <button
-                  onClick={() => onNavigate('register')}
-                  className="w-full py-3.5 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold text-sm shadow-lg shadow-sky-600/30 transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <span>{language === 'bn' ? 'প্রাক্তন শিক্ষার্থী নিবন্ধন' : 'Register as Alumni'}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              ) : (
-                <button
-                  disabled
-                  className="w-full py-3.5 rounded-full bg-slate-200 text-slate-500 font-bold text-sm cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  <Lock className="w-4 h-4" />
-                  <span>{t.btnRegistrationClosed}</span>
-                </button>
-              )}
-            </div>
+            <h3 className="text-base font-bold text-slate-900">
+              {language === 'bn' ? 'অনলাইন রেজিস্ট্রেশন কার্যক্রম বর্তমানে বন্ধ রয়েছে' : 'Online Registration is Currently Closed'}
+            </h3>
+            <p className="text-xs text-slate-600 max-w-md mx-auto">
+              {closedNotice}
+            </p>
           </div>
-
-          {/* Current Student Card */}
-          <div className="bg-white rounded-3xl p-8 border border-[#E2EEF8] shadow-lg relative overflow-hidden flex flex-col justify-between">
-            <div className="space-y-4">
-              <div>
-                <span className="text-xs font-bold text-[#0EA5E9] uppercase tracking-wider block">
-                  {t.feeCurrentTitle}
-                </span>
-                <h3 className="text-3xl font-black text-slate-900 mt-1">
-                  ৳ {feeSettings.currentStudentFee} BDT
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">{t.feeCurrentSubtitle}</p>
-              </div>
-
-              <div className="space-y-2.5 text-xs text-slate-700 pt-4 border-t border-slate-100">
-                <div className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-[#0EA5E9] shrink-0 mt-0.5" />
-                  <span>{t.feeCurrentIncludes}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Shirt className="w-4 h-4 text-[#0EA5E9] shrink-0" />
-                  <span>
-                    {language === 'bn' ? 'পুনর্মিলনী টি-শার্ট অন্তর্ভুক্ত' : 'Reunion T-shirt Included'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-[#0EA5E9] shrink-0" />
-                  <span>
-                    {language === 'bn' ? 'বিশেষ ছাত্র মধ্যাহ্নভোজ ও কনসার্ট' : 'Student Banquet & Live Concert'}
-                  </span>
-                </div>
-              </div>
+        ) : !isAlumniRegistrationOpen(feeSettings) && !isCurrentStudentRegistrationOpen(feeSettings) ? (
+          <div className="max-w-2xl mx-auto p-8 bg-white rounded-3xl border border-slate-200 text-center space-y-3 shadow-xs">
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+              <Lock className="w-6 h-6" />
             </div>
-
-            <div className="pt-8">
-              {feeSettings.registrationOpen ? (
-                <button
-                  onClick={() => onNavigate('register')}
-                  className="w-full py-3.5 rounded-full bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <span>{language === 'bn' ? 'বর্তমান শিক্ষার্থী নিবন্ধন' : 'Register as Current Student'}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              ) : (
-                <button
-                  disabled
-                  className="w-full py-3.5 rounded-full bg-slate-200 text-slate-500 font-bold text-sm cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  <Lock className="w-4 h-4" />
-                  <span>{t.btnRegistrationClosed}</span>
-                </button>
-              )}
-            </div>
+            <h3 className="text-base font-bold text-slate-900">
+              {language === 'bn' ? 'সকল ক্যাটাগরির রেজিস্ট্রেশন সাময়িকভাবে বন্ধ' : 'Registration for All Categories is Currently Paused'}
+            </h3>
+            <p className="text-xs text-slate-600 max-w-md mx-auto">
+              {closedNotice}
+            </p>
           </div>
-        </div>
+        ) : (
+          <div className={`grid gap-8 max-w-4xl mx-auto ${
+            isAlumniRegistrationOpen(feeSettings) && isCurrentStudentRegistrationOpen(feeSettings)
+              ? 'grid-cols-1 md:grid-cols-2'
+              : 'grid-cols-1 max-w-md'
+          }`}>
+            {/* Former Student Card */}
+            {isAlumniRegistrationOpen(feeSettings) && (
+              <div className="bg-white rounded-3xl p-8 border-2 border-[#0284C7] shadow-xl relative overflow-hidden flex flex-col justify-between">
+                <div className="absolute top-0 right-0 bg-[#0284C7] text-white text-[10px] font-black uppercase px-4 py-1 rounded-bl-xl tracking-wider">
+                  {language === 'bn' ? 'অ্যালামনাই ক্যাটাগরি' : 'Alumni'}
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <span className="text-xs font-bold text-[#0284C7] uppercase tracking-wider block">
+                      {t.feeFormerTitle}
+                    </span>
+                    <h3 className="text-3xl font-black text-slate-900 mt-1">
+                      ৳ {feeSettings.formerStudentFee} BDT
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">{t.feeFormerSubtitle}</p>
+                  </div>
+
+                  <div className="space-y-2.5 text-xs text-slate-700 pt-4 border-t border-slate-100">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-[#0284C7] shrink-0 mt-0.5" />
+                      <span>{t.feeFormerIncludes}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Shirt className="w-4 h-4 text-[#0284C7] shrink-0" />
+                      <span>
+                        {language === 'bn' ? 'কাস্টম সাইজ টি-শার্ট অন্তর্ভুক্ত' : 'T-shirt Included (S-XXXL)'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Award className="w-4 h-4 text-[#0284C7] shrink-0" />
+                      <span>
+                        {language === 'bn' ? '৬৪ বছর পূর্তি স্মারক স্মরণিকা' : 'Anniversary Souvenir Magazine'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-8">
+                  <button
+                    onClick={() => onNavigate('register')}
+                    className="w-full py-3.5 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold text-sm shadow-lg shadow-sky-600/30 transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <span>{language === 'bn' ? 'প্রাক্তন শিক্ষার্থী নিবন্ধন' : 'Register as Alumni'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Current Student Card */}
+            {isCurrentStudentRegistrationOpen(feeSettings) && (
+              <div className="bg-white rounded-3xl p-8 border border-[#E2EEF8] shadow-lg relative overflow-hidden flex flex-col justify-between">
+                <div className="space-y-4">
+                  <div>
+                    <span className="text-xs font-bold text-[#0EA5E9] uppercase tracking-wider block">
+                      {t.feeCurrentTitle}
+                    </span>
+                    <h3 className="text-3xl font-black text-slate-900 mt-1">
+                      ৳ {feeSettings.currentStudentFee} BDT
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">{t.feeCurrentSubtitle}</p>
+                  </div>
+
+                  <div className="space-y-2.5 text-xs text-slate-700 pt-4 border-t border-slate-100">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-[#0EA5E9] shrink-0 mt-0.5" />
+                      <span>{t.feeCurrentIncludes}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Shirt className="w-4 h-4 text-[#0EA5E9] shrink-0" />
+                      <span>
+                        {language === 'bn' ? 'পুনর্মিলনী টি-শার্ট অন্তর্ভুক্ত' : 'Reunion T-shirt Included'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-[#0EA5E9] shrink-0" />
+                      <span>
+                        {language === 'bn' ? 'বিশেষ ছাত্র মধ্যাহ্নভোজ ও কনসার্ট' : 'Student Banquet & Live Concert'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-8">
+                  <button
+                    onClick={() => onNavigate('register')}
+                    className="w-full py-3.5 rounded-full bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <span>{language === 'bn' ? 'বর্তমান শিক্ষার্থী নিবন্ধন' : 'Register as Current Student'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* ── FINANCIAL TRANSPARENCY DASHBOARD ── */}

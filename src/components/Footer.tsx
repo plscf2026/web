@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   MapPin,
   Phone,
@@ -9,16 +9,39 @@ import {
   Lock,
   QrCode,
 } from 'lucide-react';
-import { Language } from '../types';
+import { Language, FeeSettings } from '../types';
 import { translations } from '../i18n/translations';
 import { SupabaseService } from '../services/supabase';
+import { AppStore } from '../services/store';
+import { isGlobalRegistrationOpen, isDonationOpen } from '../utils/rules';
 
 interface FooterProps {
   language: Language;
   onNavigate: (view: string, replace?: boolean, extraParams?: Record<string, string>) => void;
+  feeSettings?: FeeSettings;
 }
 
-export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
+export const Footer: React.FC<FooterProps> = ({ language, onNavigate, feeSettings: initialFeeSettings }) => {
+  const [feeSettings, setFeeSettings] = useState<FeeSettings>(
+    () => initialFeeSettings || AppStore.getFeeSettings()
+  );
+
+  useEffect(() => {
+    if (initialFeeSettings) {
+      setFeeSettings(initialFeeSettings);
+    }
+  }, [initialFeeSettings]);
+
+  useEffect(() => {
+    const handleSync = (e: any) => {
+      if (e.detail) {
+        setFeeSettings(e.detail);
+      }
+    };
+    window.addEventListener('plscf_fee_settings_updated', handleSync);
+    return () => window.removeEventListener('plscf_fee_settings_updated', handleSync);
+  }, []);
+
   const t = translations[language];
 
   const handleDirectPortalNav = async (view: string) => {
@@ -76,16 +99,18 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
               {language === 'bn' ? 'প্রয়োজনীয় লিংক' : 'Quick Links'}
             </h4>
             <ul className="space-y-2 text-xs">
-              <li>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('register')}
-                  className="hover:text-sky-400 transition-colors flex items-center gap-1 cursor-pointer"
-                >
-                  <ArrowUpRight className="w-3 h-3 text-sky-500" />
-                  <span>{t.navRegister}</span>
-                </button>
-              </li>
+              {isGlobalRegistrationOpen(feeSettings) && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('register')}
+                    className="hover:text-sky-400 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <ArrowUpRight className="w-3 h-3 text-sky-500" />
+                    <span>{t.navRegister}</span>
+                  </button>
+                </li>
+              )}
               <li>
                 <button
                   type="button"
@@ -96,16 +121,18 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
                   <span>{t.navFindTicket}</span>
                 </button>
               </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('donate')}
-                  className="hover:text-sky-400 transition-colors flex items-center gap-1 cursor-pointer"
-                >
-                  <ArrowUpRight className="w-3 h-3 text-sky-500" />
-                  <span>{t.navDonate}</span>
-                </button>
-              </li>
+              {isDonationOpen(feeSettings) && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('donate')}
+                    className="hover:text-sky-400 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <ArrowUpRight className="w-3 h-3 text-sky-500" />
+                    <span>{t.navDonate}</span>
+                  </button>
+                </li>
+              )}
               <li>
                 <button
                   type="button"

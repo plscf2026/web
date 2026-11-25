@@ -143,6 +143,16 @@ export default function App() {
   // Fee settings
   const [feeSettings, setFeeSettings] = useState<FeeSettings>(() => AppStore.getFeeSettings());
 
+  useEffect(() => {
+    const handleSettingsSync = (e: any) => {
+      if (e.detail) {
+        setFeeSettings(e.detail);
+      }
+    };
+    window.addEventListener('plscf_fee_settings_updated', handleSettingsSync);
+    return () => window.removeEventListener('plscf_fee_settings_updated', handleSettingsSync);
+  }, []);
+
   // Payment Modal State
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentModalStep, setPaymentModalStep] = useState<ModalStep>('select');
@@ -359,6 +369,7 @@ export default function App() {
           onLanguageChange={handleLanguageChange}
           activeView={activeView}
           onNavigate={handleNavigate}
+          feeSettings={feeSettings}
         />
       </div>
 
@@ -486,6 +497,7 @@ export default function App() {
         <Footer
           language={language}
           onNavigate={handleNavigate}
+          feeSettings={feeSettings}
         />
       </div>
 
@@ -495,6 +507,7 @@ export default function App() {
           language={language}
           activeView={activeView}
           onNavigate={handleNavigate}
+          feeSettings={feeSettings}
         />
       </div>
 

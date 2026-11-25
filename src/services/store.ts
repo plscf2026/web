@@ -119,12 +119,17 @@ export const INITIAL_FEE_SETTINGS: FeeSettings = {
   formerStudentFee: 1500,
   currentStudentFee: 500,
   registrationOpen: true,
+  alumniRegistrationOpen: true,
+  currentStudentRegistrationOpen: true,
+  donationOpen: true,
   startDate: '2026-01-01',
   endDate: '2027-01-20',
   lateFeeEnabled: false,
   lateFeeAmount: 300,
   closedMessageEn: 'Online registration is currently closed. If you need special authorization, please contact the Reunion Secretariat.',
   closedMessageBn: 'অনলাইন রেজিস্ট্রেশন কার্যক্রম বর্তমানে বন্ধ রয়েছে। জরুরি প্রয়োজনে অনুগ্রহ করে পুনর্মিলনী সচিবালয়ে যোগাযোগ করুন।',
+  donationClosedMessageEn: 'Online donations are currently paused by the Reunion Secretariat. Thank you for your continued support.',
+  donationClosedMessageBn: 'অনলাইন অনুদান কার্যক্রম বর্তমানে সাময়িকভাবে বন্ধ রয়েছে। পুনর্মিলনী তহবিলে সহযোগিতার জন্য আন্তরিক ধন্যবাদ।',
   eventTargetDate: '2027-01-29T09:00:00',
   simulateEventCompleted: false,
   hideDonationAmounts: false,
@@ -661,6 +666,10 @@ export class AppStore {
     const settings = getStored<FeeSettings>(STORAGE_KEY_SETTINGS, INITIAL_FEE_SETTINGS);
     return {
       ...settings,
+      registrationOpen: typeof settings.registrationOpen === 'boolean' ? settings.registrationOpen : true,
+      alumniRegistrationOpen: typeof settings.alumniRegistrationOpen === 'boolean' ? settings.alumniRegistrationOpen : true,
+      currentStudentRegistrationOpen: typeof settings.currentStudentRegistrationOpen === 'boolean' ? settings.currentStudentRegistrationOpen : true,
+      donationOpen: typeof settings.donationOpen === 'boolean' ? settings.donationOpen : true,
       homePageSections: reconcileHomePageSections(settings.homePageSections),
     };
   }
@@ -677,7 +686,17 @@ export class AppStore {
   }
 
   static saveFeeSettings(settings: FeeSettings): void {
-    setStored(STORAGE_KEY_SETTINGS, settings);
+    const normalized: FeeSettings = {
+      ...settings,
+      registrationOpen: Boolean(settings.registrationOpen),
+      alumniRegistrationOpen: settings.alumniRegistrationOpen !== false,
+      currentStudentRegistrationOpen: settings.currentStudentRegistrationOpen !== false,
+      donationOpen: settings.donationOpen !== false,
+    };
+    setStored(STORAGE_KEY_SETTINGS, normalized);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('plscf_fee_settings_updated', { detail: normalized }));
+    }
   }
 
   static getScanLogs(): ScanLog[] {

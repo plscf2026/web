@@ -4,6 +4,8 @@ import { RegistrationRecord, DonationRecord, Language } from '../types';
 import { translations } from '../i18n/translations';
 import { SupabaseService } from '../services/supabase';
 import { ThankYouCardModal } from './ThankYouCardModal';
+import { AppStore } from '../services/store';
+import { isGlobalRegistrationOpen } from '../utils/rules';
 
 interface TicketLookupModalProps {
   language: Language;
@@ -252,17 +254,19 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
           </div>
         )}
 
-        <div className="pt-4 border-t border-slate-100 text-center">
-          <p className="text-xs text-slate-500">
-            {language === 'bn' ? 'এখনো নিবন্ধন করেননি?' : "Haven't registered yet?"}{' '}
-            <button
-              onClick={onNavigateRegister}
-              className="text-[#0284C7] font-bold hover:underline cursor-pointer"
-            >
-              {language === 'bn' ? 'এখনই রেজিস্ট্রেশন করুন' : 'Register Now'}
-            </button>
-          </p>
-        </div>
+        {isGlobalRegistrationOpen(AppStore.getFeeSettings()) && (
+          <div className="pt-4 border-t border-slate-100 text-center">
+            <p className="text-xs text-slate-500">
+              {language === 'bn' ? 'এখনো নিবন্ধন করেননি?' : "Haven't registered yet?"}{' '}
+              <button
+                onClick={onNavigateRegister}
+                className="text-[#0284C7] font-bold hover:underline cursor-pointer"
+              >
+                {language === 'bn' ? 'এখনই রেজিস্ট্রেশন করুন' : 'Register Now'}
+              </button>
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Thank You Card Modal for Matched Donor */}

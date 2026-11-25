@@ -17,7 +17,14 @@
  */
 
 import { PaymentMethod, RegistrationRecord, DonationRecord } from '../types';
-import { RegistrationFormData } from '../utils/rules';
+import {
+  RegistrationFormData,
+  isGlobalRegistrationOpen,
+  isAlumniRegistrationOpen,
+  isCurrentStudentRegistrationOpen,
+  isCategoryRegistrationOpen,
+  isDonationOpen,
+} from '../utils/rules';
 import { generateServerPaymentSignature, sanitizeInput } from '../utils/security';
 import { generateUniqueSixCharToken } from '../utils/tokenGenerator';
 import { AppStore } from './store';
@@ -267,6 +274,42 @@ export class PayStationService {
     invoiceNumber?: string;
     error?: string;
   }> {
+    // 0. Super Admin Governance Enforcement (Security Validation)
+    const settings = AppStore.getFeeSettings();
+    const isDonationOrder =
+      order.opt_a === 'DONATION' ||
+      (typeof order.reference === 'string' && order.reference.startsWith('DON-'));
+
+    if (isDonationOrder) {
+      if (!isDonationOpen(settings)) {
+        return {
+          success: false,
+          error: 'Online donations are currently disabled by Super Admin.',
+        };
+      }
+    } else {
+      if (!isGlobalRegistrationOpen(settings)) {
+        return {
+          success: false,
+          error: 'Online registration is currently closed by Super Admin.',
+        };
+      }
+      const rawCat = (order as any).category || order.opt_b || (order.reference?.includes('-C') ? 'current' : 'former');
+      const category = rawCat === 'current' ? 'current' : 'former';
+      if (category === 'former' && !isAlumniRegistrationOpen(settings)) {
+        return {
+          success: false,
+          error: 'Alumni registration is currently closed.',
+        };
+      }
+      if (category === 'current' && !isCurrentStudentRegistrationOpen(settings)) {
+        return {
+          success: false,
+          error: 'Current student registration is currently closed.',
+        };
+      }
+    }
+
     const config = this.getConfig();
 
     // 1. Try Supabase Edge Function first if in production mode
@@ -890,6 +933,14 @@ export class PayStationService {
     invoiceNumber: string,
     existingRegId?: string
   ): Promise<RegistrationRecord> {
+    const settings = AppStore.getFeeSettings();
+    if (!isGlobalRegistrationOpen(settings)) {
+      throw new Error('Online registration is currently closed by Super Admin.');
+    }
+    if (!isCategoryRegistrationOpen(formData.category, settings)) {
+      throw new Error(`${formData.category === 'former' ? 'Alumni' : 'Current student'} registration is closed.`);
+    }
+
     const year = (formData as any).year || AppStore.getActiveEventYear() || 2027;
     const nowIso = new Date().toISOString();
 
@@ -1273,6 +1324,11 @@ export class PayStationService {
     },
     payment: PayStationPaymentResult
   ): Promise<DonationRecord> {
+    const settings = AppStore.getFeeSettings();
+    if (!isDonationOpen(settings)) {
+      throw new Error('Online donations are currently disabled by Super Admin.');
+    }
+
     const year = AppStore.getActiveEventYear() || 2027;
     const nowIso = new Date().toISOString();
     const donationId = `DON-${year}-${Math.floor(1000 + Math.random() * 9000)}`;
