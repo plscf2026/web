@@ -366,6 +366,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     } catch (_) {}
   };
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [navSearchQuery, setNavSearchQuery] = useState('');
 
   // Delete Booking Confirmation State (pop-up with mandatory reason)
   const [bookingToDelete, setBookingToDelete] = useState<RegistrationRecord | null>(null);
@@ -1408,98 +1409,290 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     );
   }
 
-  const allNavigationTabs = [
-    ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('userAccessManagement' as any)
-      ? [
-          {
-            id: 'userAccessManagement' as const,
-            label: language === 'bn' ? '👥 ইউজার ও এক্সেস ম্যানেজমেন্ট' : '👥 User & Access Management',
-            icon: Users,
-            highlight: true,
-            badge: 'RBAC Suite',
-          },
-        ]
-      : []),
-    ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('guestManagement' as any)
-      ? [
-          {
-            id: 'guestManagement' as const,
-            label: language === 'bn' ? '👑 গেস্ট পাস ও ফুড ম্যানেজমেন্ট' : '👑 Guest Pass & Food',
-            icon: Crown,
-            highlight: true,
-            badge: 'VIP Pass',
-          },
-        ]
-      : []),
+  interface NavigationTabItem {
+    id: AdminTab;
+    label: string;
+    icon: any;
+    category: 'operations' | 'credentials' | 'finance' | 'admin' | 'media';
+    highlight?: boolean;
+    badge?: string;
+    badgeColor?: 'emerald' | 'amber' | 'indigo' | 'sky' | 'rose' | 'violet' | 'teal' | 'blue';
+  }
+
+  const allNavigationTabs: NavigationTabItem[] = [
+    // 1. Operations & Gate
     {
-      id: 'idCardManagement',
-      label: language === 'bn' ? '🪪 আইডি কার্ড পোর্টাল' : '🪪 Student ID Cards',
-      icon: CreditCard,
+      id: 'masterOverview',
+      label: language === 'bn' ? 'মাস্টার ইভেন্ট ওভারভিউ' : 'Event Master Overview',
+      icon: Sparkles,
+      category: 'operations',
+    },
+    {
+      id: 'gateManagement',
+      label: language === 'bn' ? 'গেইট কন্ট্রোল ও স্ক্যানার' : 'Gate Entry & Scanner',
+      icon: DoorOpen,
+      category: 'operations',
       highlight: true,
-      badge: 'ID Suite',
+      badge: 'LIVE',
+      badgeColor: 'emerald',
     },
     {
       id: 'manualRegistration',
-      label: language === 'bn' ? '📝 ভেন্যু শিক্ষার্থী নিবন্ধন' : '📝 Manual Student Reg',
+      label: language === 'bn' ? 'ভেন্যু শিক্ষার্থী নিবন্ধন' : 'Venue Registration Desk',
       icon: UserPlus,
+      category: 'operations',
       highlight: true,
-      badge: 'Venue Desk',
+      badge: 'Desk',
+      badgeColor: 'sky',
     },
     ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('manualApproval' as any)
       ? [
           {
             id: 'manualApproval' as const,
-            label: language === 'bn' ? '🛡️ ম্যানুয়াল নিবন্ধন অনুমোদন' : '🛡️ Manual Reg Approval',
+            label: language === 'bn' ? 'ম্যানুয়াল নিবন্ধন অনুমোদন' : 'Registration Approvals',
             icon: ShieldCheck,
+            category: 'operations' as const,
             highlight: true,
-            badge: 'Super Admin',
+            badge: 'Admin',
+            badgeColor: 'amber' as const,
           },
         ]
       : []),
-    { id: 'masterOverview', label: language === 'bn' ? 'মাস্টার ইভেন্ট ড্যাশবোর্ড' : 'Master Overview', icon: Sparkles },
-    { id: 'budgetManagement', label: language === 'bn' ? 'বাজেট ও ব্যয়' : 'Budget & Expenses', icon: DollarSign },
-    { id: 'dailyAnalytics', label: language === 'bn' ? 'দৈনিক অ্যানালিটিক্স' : 'Daily Analytics', icon: BarChart3 },
-    { id: 'staffManagement', label: language === 'bn' ? 'স্টাফ ও রোলস' : 'Staff & Roles', icon: Users },
-    { id: 'auditHistory', label: language === 'bn' ? 'অডিট হিস্ট্রি' : 'Audit Trail', icon: ShieldAlert },
-    { id: 'allBookings', label: language === 'bn' ? 'সকল বুকিং (সুপাবেস)' : 'All Bookings (Supabase)', icon: Database },
     {
-      id: 'gateManagement',
-      label: language === 'bn' ? '🚪 গেইট কন্ট্রোল ও স্ক্যানার' : '🚪 Gate Access & Scanner',
-      icon: DoorOpen,
+      id: 'allBookings',
+      label: language === 'bn' ? 'সকল বুকিং ডেটাবেজ' : 'All Bookings Database',
+      icon: Database,
+      category: 'operations',
+    },
+
+    // 2. Credentials & Passes
+    {
+      id: 'idCardManagement',
+      label: language === 'bn' ? 'শিক্ষার্থী আইডি কার্ড' : 'Student ID Cards',
+      icon: CreditCard,
+      category: 'credentials',
       highlight: true,
-      badge: 'Live Gate',
+      badge: 'Cards',
+      badgeColor: 'indigo',
+    },
+    {
+      id: 'studentIds',
+      label: language === 'bn' ? 'স্টুডেন্ট আইডি ডেটাবেজ' : 'Student ID Database',
+      icon: ShieldCheck,
+      category: 'credentials',
+    },
+    ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('guestManagement' as any)
+      ? [
+          {
+            id: 'guestManagement' as const,
+            label: language === 'bn' ? 'ভিআইপি গেস্ট ও খাবার' : 'VIP Guest Pass & Meals',
+            icon: Crown,
+            category: 'credentials' as const,
+            highlight: true,
+            badge: 'VIP',
+            badgeColor: 'amber' as const,
+          },
+        ]
+      : []),
+    {
+      id: 'tickets',
+      label: language === 'bn' ? 'কিউআর টিকিট ভেরিফিকেশন' : 'QR Ticket Verification',
+      icon: QrCode,
+      category: 'credentials',
+    },
+
+    // 3. Finance & Analytics
+    {
+      id: 'budgetManagement',
+      label: language === 'bn' ? 'বাজেট ও ব্যয় হিসাব' : 'Budget & Expenses',
+      icon: DollarSign,
+      category: 'finance',
     },
     {
       id: 'donations',
-      label: language === 'bn' ? '❤️ অনুদান ও ডোনার্স তালিকা' : '❤️ Donations & Patrons',
+      label: language === 'bn' ? 'অনুদান ও ডোনার্স তালিকা' : 'Donations & Patrons',
       icon: Heart,
+      category: 'finance',
       highlight: true,
       badge: 'Patrons',
+      badgeColor: 'rose',
     },
-    { id: 'studentIds', label: language === 'bn' ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা' : 'Student ID Management', icon: ShieldCheck },
-    { id: 'feeSettings', label: t.tabFeeSettings, icon: Settings },
-    { id: 'tickets', label: t.tabTickets, icon: QrCode },
-    { id: 'notices', label: t.tabNoticesAdmin, icon: FileText },
+    {
+      id: 'dailyAnalytics',
+      label: language === 'bn' ? 'দৈনিক অ্যানালিটিক্স' : 'Daily Analytics',
+      icon: BarChart3,
+      category: 'finance',
+    },
+    {
+      id: 'reports',
+      label: language === 'bn' ? 'এক্সপোর্ট ও রিপোর্টস' : 'Export & Reports',
+      icon: Download,
+      category: 'finance',
+    },
+
+    // 4. Security & Access
+    ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('userAccessManagement' as any)
+      ? [
+          {
+            id: 'userAccessManagement' as const,
+            label: language === 'bn' ? 'ইউজার ও এক্সেস কন্ট্রোল' : 'User & Access Control',
+            icon: Users,
+            category: 'admin' as const,
+            highlight: true,
+            badge: 'RBAC',
+            badgeColor: 'violet' as const,
+          },
+        ]
+      : []),
+    {
+      id: 'staffManagement',
+      label: language === 'bn' ? 'স্টাফ অ্যাকাউন্টস ও রোলস' : 'Staff Accounts & Roles',
+      icon: Users,
+      category: 'admin',
+    },
+    {
+      id: 'auditHistory',
+      label: language === 'bn' ? 'সিকিউরিটি অডিট ট্রেইল' : 'Security Audit Trail',
+      icon: ShieldAlert,
+      category: 'admin',
+    },
+    {
+      id: 'feeSettings',
+      label: language === 'bn' ? 'ফি ও ইভেন্ট সেটিংস' : 'Fee & Event Settings',
+      icon: Settings,
+      category: 'admin',
+    },
+
+    // 5. Media & Content
     {
       id: 'galleryManagement',
-      label: language === 'bn' ? '📸 ফটো ও ভিডিও মেমোরিজ' : '📸 Photo & Video Gallery',
+      label: language === 'bn' ? 'ফটো ও ভিডিও গ্যালারি' : 'Photo & Video Gallery',
       icon: Camera,
+      category: 'media',
       highlight: true,
-      badge: 'Media CMS',
+      badge: 'CMS',
+      badgeColor: 'blue',
     },
     {
       id: 'committeeManagement',
-      label: language === 'bn' ? '👥 পরিচালনা পরিষদ (১৬ জন)' : '👥 Committee Members (16)',
-      icon: Users,
+      label: language === 'bn' ? 'পরিচালনা পরিষদ (১৬)' : 'Executive Committee (16)',
+      icon: Award,
+      category: 'media',
       highlight: true,
       badge: '16 Cards',
+      badgeColor: 'teal',
     },
-    { id: 'reports', label: t.tabReports, icon: Download },
+    {
+      id: 'notices',
+      label: language === 'bn' ? 'নোটিশ ও মিডিয়া পাবলিকেশন' : 'Notices & Media',
+      icon: FileText,
+      category: 'media',
+    },
   ];
 
   const visibleNavTabs = isSuperAdminAccount
     ? allNavigationTabs
     : allNavigationTabs.filter((tab) => currentPortalConfig.allowedTabs.includes(tab.id as any));
+
+  const navCategories = [
+    { id: 'operations', title: language === 'bn' ? 'অপারেশনস ও গেইট' : 'Operations & Gate' },
+    { id: 'credentials', title: language === 'bn' ? 'আইডি ও পাস' : 'Credentials & Passes' },
+    { id: 'finance', title: language === 'bn' ? 'আর্থিক ও অ্যানালিটিক্স' : 'Finance & Analytics' },
+    { id: 'admin', title: language === 'bn' ? 'সিকিউরিটি ও এক্সেস' : 'Security & Access' },
+    { id: 'media', title: language === 'bn' ? 'মিডিয়া ও প্রকাশনা' : 'Media & Content' },
+  ] as const;
+
+  const filteredNavTabs = navSearchQuery.trim()
+    ? visibleNavTabs.filter((tab) => {
+        const q = navSearchQuery.toLowerCase().trim();
+        return (
+          tab.label.toLowerCase().includes(q) ||
+          tab.id.toLowerCase().includes(q) ||
+          (tab.badge && tab.badge.toLowerCase().includes(q))
+        );
+      })
+    : visibleNavTabs;
+
+  const getBadgeClasses = (color?: string, isActive?: boolean) => {
+    if (isActive) {
+      return 'bg-white/15 text-sky-200 border-white/20';
+    }
+    switch (color) {
+      case 'emerald':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'amber':
+        return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'rose':
+        return 'bg-rose-50 text-rose-700 border-rose-200';
+      case 'violet':
+        return 'bg-purple-50 text-purple-700 border-purple-200';
+      case 'sky':
+        return 'bg-sky-50 text-sky-700 border-sky-200';
+      case 'teal':
+        return 'bg-teal-50 text-teal-700 border-teal-200';
+      case 'indigo':
+        return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      case 'blue':
+      default:
+        return 'bg-blue-50 text-blue-700 border-blue-200';
+    }
+  };
+
+  const renderNavTabButton = (tab: (typeof allNavigationTabs)[number], onClickExtra?: () => void) => {
+    const isActive = activeTab === tab.id;
+    const Icon = tab.icon;
+    return (
+      <button
+        key={tab.id}
+        type="button"
+        onClick={() => {
+          handleTabChange(tab.id as any);
+          if (onClickExtra) onClickExtra();
+        }}
+        className={`w-full group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
+          isActive
+            ? 'bg-slate-900 text-white shadow-sm ring-1 ring-slate-800 font-bold'
+            : tab.highlight
+            ? 'text-slate-700 bg-sky-50/50 hover:bg-sky-50 hover:text-sky-900'
+            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+        }`}
+      >
+        <div className="flex items-center gap-2.5 min-w-0 pr-1.5">
+          <Icon
+            className={`w-4 h-4 shrink-0 transition-colors ${
+              isActive
+                ? 'text-sky-400'
+                : tab.highlight
+                ? 'text-sky-600 group-hover:text-sky-700'
+                : 'text-slate-400 group-hover:text-slate-600'
+            }`}
+          />
+          <span className="truncate tracking-tight text-left">{tab.label}</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {tab.badge && (
+            <span
+              className={`text-[9px] font-bold px-1.5 py-0.5 rounded border leading-none inline-flex items-center gap-1 shrink-0 ${getBadgeClasses(
+                tab.badgeColor,
+                isActive
+              )}`}
+            >
+              {tab.badge === 'LIVE' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              )}
+              {tab.badge}
+            </span>
+          )}
+          {isActive ? (
+            <ChevronRight className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+          )}
+        </div>
+      </button>
+    );
+  };
 
   // ==========================================
   // VIEW 2: AUTHENTICATED CENTRAL COMMAND DASHBOARD
@@ -1570,55 +1763,95 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* ======================================================== */}
         {/* 1. LEFT SIDEBAR NAVIGATION (Desktop: lg+)                */}
         {/* ======================================================== */}
-        <aside className="hidden lg:block w-64 xl:w-72 shrink-0 bg-white rounded-3xl p-3.5 border border-slate-200 shadow-xs sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto">
-          {/* Sidebar Title */}
-          <div className="px-3 py-2 flex items-center justify-between border-b border-slate-100 mb-2">
-            <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-[#0284C7]" />
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                {language === 'bn'
-                  ? `${currentPortalConfig.badgeLabelBn} (${visibleNavTabs.length}টি)`
-                  : `${currentPortalConfig.badgeLabelEn} (${visibleNavTabs.length})`}
+        <aside className="hidden lg:flex flex-col w-72 xl:w-80 shrink-0 bg-white rounded-3xl p-3.5 border border-slate-200/90 shadow-sm sticky top-20 max-h-[calc(100vh-6rem)]">
+          {/* Header Section */}
+          <div className="px-2 pb-3 border-b border-slate-100 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center border border-sky-100">
+                  <Layers className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-black tracking-wide text-slate-800 uppercase block leading-tight">
+                    {language === 'bn' ? currentPortalConfig.badgeLabelBn : currentPortalConfig.badgeLabelEn}
+                  </span>
+                  <span className="text-[10px] font-medium text-slate-400">
+                    {language === 'bn' ? `${visibleNavTabs.length}টি মডিউল উপলব্ধ` : `${visibleNavTabs.length} active modules`}
+                  </span>
+                </div>
+              </div>
+              <span className="text-[10px] font-mono font-bold bg-slate-900 text-sky-400 px-2 py-0.5 rounded-full shadow-xs">
+                {currentPortalConfig.badgeLabelEn.split(' ')[0]}
               </span>
             </div>
-            <span className="text-[10px] font-mono font-bold bg-[#E2EEF8] text-[#0284C7] px-1.5 py-0.5 rounded">
-              {currentPortalConfig.badgeLabelEn.split(' ')[0]}
-            </span>
+
+            {/* Live Search Input */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={navSearchQuery}
+                onChange={(e) => setNavSearchQuery(e.target.value)}
+                placeholder={language === 'bn' ? 'মডিউল খুঁজুন...' : 'Search modules...'}
+                className="w-full bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-slate-900 text-xs rounded-xl pl-8 pr-7 py-1.5 border border-slate-200 focus:border-sky-500 focus:ring-2 focus:ring-sky-100 transition-all outline-hidden placeholder:text-slate-400"
+              />
+              {navSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setNavSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Navigation Items List */}
-          <nav className="space-y-1">
-            {visibleNavTabs.map((tab) => {
-              const isActive = activeTab === tab.id;
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => handleTabChange(tab.id as any)}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-[#0F172A] text-white shadow-md'
-                      : tab.highlight
-                      ? 'text-[#0284C7] bg-[#E2EEF8]/40 hover:bg-[#E2EEF8] font-black'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#38BDF8]' : tab.highlight ? 'text-[#0284C7]' : 'text-slate-400'}`} />
-                    <span className="truncate">{tab.label}</span>
+          {/* Navigation Items List with smooth scroll */}
+          <div className="flex-1 overflow-y-auto pt-2 space-y-3 pr-1 scrollbar-thin">
+            {navSearchQuery.trim() ? (
+              /* Search Results Mode */
+              filteredNavTabs.length === 0 ? (
+                <div className="py-8 text-center px-2">
+                  <p className="text-xs font-semibold text-slate-500">
+                    {language === 'bn' ? 'কোনো মডিউল পাওয়া যায়নি' : 'No modules found'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setNavSearchQuery('')}
+                    className="mt-2 text-[11px] font-bold text-sky-600 hover:underline cursor-pointer"
+                  >
+                    {language === 'bn' ? 'অনুসন্ধান মুছুন' : 'Clear search query'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2.5 pb-1">
+                    {language === 'bn' ? `ফলাফল (${filteredNavTabs.length})` : `Matches (${filteredNavTabs.length})`}
                   </div>
-                  {isActive ? (
-                    <ChevronRight className="w-3.5 h-3.5 text-[#38BDF8] shrink-0" />
-                  ) : tab.badge ? (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                      {tab.badge}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </nav>
+                  {filteredNavTabs.map((tab) => renderNavTabButton(tab))}
+                </div>
+              )
+            ) : (
+              /* Categorized Mode */
+              navCategories.map((category) => {
+                const categoryTabs = visibleNavTabs.filter((t) => t.category === category.id);
+                if (categoryTabs.length === 0) return null;
+                return (
+                  <div key={category.id} className="space-y-1">
+                    <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 px-2.5 pt-1 pb-1 flex items-center justify-between">
+                      <span>{category.title}</span>
+                      <span className="text-[9px] font-bold text-slate-400/80 bg-slate-100 rounded px-1.5 py-0.2">
+                        {categoryTabs.length}
+                      </span>
+                    </div>
+                    {categoryTabs.map((tab) => renderNavTabButton(tab))}
+                  </div>
+                );
+              })
+            )}
+          </div>
         </aside>
 
         {/* ======================================================== */}
@@ -1633,15 +1866,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             />
 
             {/* Drawer Content */}
-            <div className="relative w-72 max-w-[85vw] bg-white h-full shadow-2xl p-4 flex flex-col z-10 overflow-y-auto">
+            <div className="relative w-80 max-w-[85vw] bg-white h-full shadow-2xl p-4 flex flex-col z-10">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
                 <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-[#0284C7]" />
-                  <span className="text-xs font-black text-slate-900">
-                    {language === 'bn'
-                      ? `${currentPortalConfig.badgeLabelBn} মডিউলসমূহ`
-                      : `${currentPortalConfig.badgeLabelEn} Modules`}
-                  </span>
+                  <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center border border-sky-100">
+                    <Layers className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-black text-slate-900 block leading-tight">
+                      {language === 'bn'
+                        ? `${currentPortalConfig.badgeLabelBn} মডিউলসমূহ`
+                        : `${currentPortalConfig.badgeLabelEn} Modules`}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      {language === 'bn' ? `${visibleNavTabs.length}টি মডিউল` : `${visibleNavTabs.length} modules`}
+                    </span>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -1652,35 +1892,69 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
               </div>
 
-              <nav className="space-y-1 flex-1">
-                {visibleNavTabs.map((tab) => {
-                  const Icon = tab.icon;
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => {
-                        handleTabChange(tab.id as any);
-                        setIsMobileDrawerOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-                        isActive
-                          ? 'bg-[#0F172A] text-white shadow-md'
-                          : tab.highlight
-                          ? 'text-[#0284C7] bg-[#E2EEF8]/40 hover:bg-[#E2EEF8] font-black'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 truncate">
-                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#38BDF8]' : 'text-slate-400'}`} />
-                        <span className="truncate">{tab.label}</span>
+              {/* Mobile Drawer Search */}
+              <div className="relative mb-3">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={navSearchQuery}
+                  onChange={(e) => setNavSearchQuery(e.target.value)}
+                  placeholder={language === 'bn' ? 'মডিউল খুঁজুন...' : 'Search modules...'}
+                  className="w-full bg-slate-50 focus:bg-white text-slate-900 text-xs rounded-xl pl-8 pr-7 py-2 border border-slate-200 focus:border-sky-500 focus:ring-2 focus:ring-sky-100 transition-all outline-hidden placeholder:text-slate-400"
+                />
+                {navSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setNavSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Navigation Items List */}
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin">
+                {navSearchQuery.trim() ? (
+                  filteredNavTabs.length === 0 ? (
+                    <div className="py-8 text-center px-2">
+                      <p className="text-xs font-semibold text-slate-500">
+                        {language === 'bn' ? 'কোনো মডিউল পাওয়া যায়নি' : 'No modules found'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setNavSearchQuery('')}
+                        className="mt-2 text-[11px] font-bold text-sky-600 hover:underline cursor-pointer"
+                      >
+                        {language === 'bn' ? 'অনুসন্ধান মুছুন' : 'Clear search query'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2.5 pb-1">
+                        {language === 'bn' ? `ফলাফল (${filteredNavTabs.length})` : `Matches (${filteredNavTabs.length})`}
                       </div>
-                      {isActive && <ChevronRight className="w-3.5 h-3.5 text-[#38BDF8] shrink-0" />}
-                    </button>
-                  );
-                })}
-              </nav>
+                      {filteredNavTabs.map((tab) => renderNavTabButton(tab, () => setIsMobileDrawerOpen(false)))}
+                    </div>
+                  )
+                ) : (
+                  navCategories.map((category) => {
+                    const categoryTabs = visibleNavTabs.filter((t) => t.category === category.id);
+                    if (categoryTabs.length === 0) return null;
+                    return (
+                      <div key={category.id} className="space-y-1">
+                        <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 px-2.5 pt-1 pb-1 flex items-center justify-between">
+                          <span>{category.title}</span>
+                          <span className="text-[9px] font-bold text-slate-400/80 bg-slate-100 rounded px-1.5 py-0.2">
+                            {categoryTabs.length}
+                          </span>
+                        </div>
+                        {categoryTabs.map((tab) => renderNavTabButton(tab, () => setIsMobileDrawerOpen(false)))}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -1692,53 +1966,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* Mobile Current Module Quick-Selector Bar (< lg) */}
           <div className="lg:hidden bg-white border border-slate-200 rounded-2xl p-3 shadow-xs flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-[#0F172A] text-[#38BDF8] flex items-center justify-center shrink-0">
-                <Layers className="w-4 h-4" />
+              <div className="w-8 h-8 rounded-xl bg-slate-900 text-sky-400 flex items-center justify-center shrink-0 shadow-xs">
+                {(() => {
+                  const CurrentIcon = visibleNavTabs.find((t) => t.id === activeTab)?.icon || Layers;
+                  return <CurrentIcon className="w-4 h-4" />;
+                })()}
               </div>
               <div className="truncate">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">
                   {language === 'bn' ? 'বর্তমান সেকশন' : 'Current Section'}
                 </span>
                 <span className="text-xs font-black text-slate-900 truncate block">
-                  {activeTab === 'userAccessManagement'
-                    ? (language === 'bn' ? '👥 ইউজার ও এক্সেস ম্যানেজমেন্ট' : '👥 User & Access Management')
-                    : activeTab === 'guestManagement'
-                    ? (language === 'bn' ? '👑 গেস্ট পাস ও ফুড ম্যানেজমেন্ট' : '👑 Guest Pass & Food')
-                    : activeTab === 'idCardManagement'
-                    ? (language === 'bn' ? '🪪 আইডি কার্ড পোর্টাল' : '🪪 Student ID Cards')
-                    : activeTab === 'manualRegistration'
-                    ? (language === 'bn' ? '📝 ভেন্যু শিক্ষার্থী নিবন্ধন' : '📝 Manual Student Reg')
-                    : activeTab === 'manualApproval'
-                    ? (language === 'bn' ? '🛡️ ম্যানুয়াল নিবন্ধন অনুমোদন' : '🛡️ Manual Reg Approval')
-                    : activeTab === 'masterOverview'
-                    ? (language === 'bn' ? 'মাস্টার ইভেন্ট ড্যাশবোর্ড' : 'Master Overview')
-                    : activeTab === 'budgetManagement'
-                    ? (language === 'bn' ? 'বাজেট ও ব্যয়' : 'Budget & Expenses')
-                    : activeTab === 'dailyAnalytics'
-                    ? (language === 'bn' ? 'দৈনিক অ্যানালিটিক্স' : 'Daily Analytics')
-                    : activeTab === 'staffManagement'
-                    ? (language === 'bn' ? 'স্টাফ ও রোলস' : 'Staff & Roles')
-                    : activeTab === 'auditHistory'
-                    ? (language === 'bn' ? 'অডিট হিস্ট্রি' : 'Audit Trail')
-                    : activeTab === 'allBookings'
-                    ? (language === 'bn' ? 'সকল বুকিং (সুপাবেস)' : 'All Bookings (Supabase)')
-                    : activeTab === 'donations'
-                    ? (language === 'bn' ? '❤️ অনুদান ও ডোনার্স তালিকা' : '❤️ Donations & Patrons')
-                    : activeTab === 'studentIds'
-                    ? (language === 'bn' ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা' : 'Student ID Management')
-                    : activeTab === 'feeSettings'
-                    ? t.tabFeeSettings
-                    : activeTab === 'tickets'
-                    ? t.tabTickets
-                    : activeTab === 'notices'
-                    ? t.tabNoticesAdmin
-                    : activeTab === 'galleryManagement'
-                    ? (language === 'bn' ? '📸 ফটো ও ভিডিও মেমোরিজ' : '📸 Photo & Video Gallery')
-                    : activeTab === 'committeeManagement'
-                    ? (language === 'bn' ? '👥 পরিচালনা পরিষদ (১৬ জন)' : '👥 Committee Members (16)')
-                    : activeTab === 'reports'
-                    ? t.tabReports
-                    : activeTab}
+                  {allNavigationTabs.find((t) => t.id === activeTab)?.label || activeTab}
                 </span>
               </div>
             </div>
@@ -1746,9 +1985,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <button
               type="button"
               onClick={() => setIsMobileDrawerOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold shrink-0 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shrink-0 transition-colors cursor-pointer shadow-xs"
             >
-              <Menu className="w-4 h-4" />
+              <Menu className="w-4 h-4 text-sky-400" />
               <span>{language === 'bn' ? 'সকল মেনু' : 'All Modules'}</span>
             </button>
           </div>
