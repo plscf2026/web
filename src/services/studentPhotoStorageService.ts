@@ -439,23 +439,49 @@ export const StudentPhotoStorageService = {
         extension,
       });
 
-      // 4. Upload to Supabase Storage Bucket 'student-photos'
-      const { data, error } = await supabase.storage
+      // 4. Upload to Supabase Storage Bucket 'student-photos' using INSERT-only semantics (upsert: false).
+      // Keeping upsert: false avoids requiring SELECT/UPDATE RLS on public storage.objects,
+      // preventing bucket-wide file listing while still supporting re-uploads via a unique suffix.
+      let uploadPath = storagePath;
+      let { data, error } = await supabase.storage
         .from(STUDENT_PHOTOS_BUCKET)
-        .upload(storagePath, uploadBlob, {
+        .upload(uploadPath, uploadBlob, {
           contentType: mimeType,
-          upsert: true,
+          upsert: false,
           cacheControl: '31536000', // 1 year cache for CDN performance
         });
+
+      const isAlreadyExists =
+        error &&
+        (String((error as any).statusCode) === '409' ||
+          (error as any).code === 'KeyAlreadyExists' ||
+          /already exists|duplicate/i.test(error.message || ''));
+
+      if (isAlreadyExists) {
+        const dotIdx = storagePath.lastIndexOf('.');
+        const base = dotIdx !== -1 ? storagePath.slice(0, dotIdx) : storagePath;
+        const extPart = dotIdx !== -1 ? storagePath.slice(dotIdx) : '';
+        uploadPath = `${base}-${Date.now()}${extPart}`;
+
+        const retryRes = await supabase.storage
+          .from(STUDENT_PHOTOS_BUCKET)
+          .upload(uploadPath, uploadBlob, {
+            contentType: mimeType,
+            upsert: false,
+            cacheControl: '31536000',
+          });
+        data = retryRes.data;
+        error = retryRes.error;
+      }
 
       if (error) {
         // If offline / network error, generate public URL fallback for resilience
         if (isNetworkException(error)) {
           console.warn('[StudentPhotoStorage] Network error during upload; fallback to CDN path:', error.message);
-          const offlinePublicUrl = this.getPublicUrl(storagePath);
+          const offlinePublicUrl = this.getPublicUrl(uploadPath);
           return {
             success: true,
-            storagePath,
+            storagePath: uploadPath,
             publicUrl: offlinePublicUrl,
             sizeBytes: uploadBlob.size,
           };
@@ -468,7 +494,7 @@ export const StudentPhotoStorageService = {
         };
       }
 
-      const finalPath = data?.path || storagePath;
+      const finalPath = data?.path || uploadPath;
       const publicUrl = this.getPublicUrl(finalPath);
 
       return {
