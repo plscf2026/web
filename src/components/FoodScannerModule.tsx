@@ -38,6 +38,9 @@ import { QrCameraScanner } from './common/QrCameraScanner';
 import { GlobalPagination } from './common/GlobalPagination';
 import { paginate } from '../utils/pagination';
 import { DEFAULT_STUDENT_AVATAR_PLACEHOLDER } from '../services/studentPhotoStorageService';
+import { MealControlService, EVENT_MEAL_CONTROL_SYNC } from '../services/mealControlService';
+import { MealTimeScannerControlPanel } from './admin/MealTimeScannerControlPanel';
+import { formatTime24to12 } from '../types/mealControl';
 
 interface FoodScannerModuleProps {
   language: Language;
@@ -78,6 +81,23 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
   // Global Pagination State (Default 10, options 10, 20, 30, 40)
   const [logPage, setLogPage] = useState(1);
   const [logPageSize, setLogPageSize] = useState(10);
+
+  // Meal Time & Scanner Control System state
+  const [isMealControlOpen, setIsMealControlOpen] = useState(false);
+  const [mealControlTick, setMealControlTick] = useState(0);
+
+  // Re-evaluate whenever sync happens
+  useEffect(() => {
+    const onControlSync = () => setMealControlTick((t) => t + 1);
+    window.addEventListener(EVENT_MEAL_CONTROL_SYNC, onControlSync);
+    const cleanupRealtime = MealControlService.initRealtimeSync();
+    return () => {
+      window.removeEventListener(EVENT_MEAL_CONTROL_SYNC, onControlSync);
+      cleanupRealtime();
+    };
+  }, []);
+
+  const currentMealStatus = MealControlService.evaluateMealStatus(mealType);
 
   // Reset page when mealType changes
   React.useEffect(() => {
@@ -155,6 +175,22 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
           type: 'error',
           message: `Guest Pass "${cleanLabel}" not found in system database.`,
           messageBn: `গেস্ট পাস "${cleanLabel}" সিস্টেমে পাওয়া যায়নি।`,
+        });
+        setIsResultPopupOpen(true);
+        return;
+      }
+
+      // Check Meal Time & Scanner Control System for Guest (Requirement 4)
+      const guestTimeControl = MealControlService.evaluateMealStatus(mealType);
+      if (!guestTimeControl.isOpen) {
+        playScanErrorSound();
+        setScannedGuest(guest);
+        const facilities = GuestService.getMealFacilities(guest.id);
+        setGuestFacilities(facilities);
+        setGuestNotice({
+          type: 'error',
+          message: `Time Out: ${guestTimeControl.reasonEn}`,
+          messageBn: `Time Out (সময় শেষ): ${guestTimeControl.reasonBn}`,
         });
         setIsResultPopupOpen(true);
         return;
@@ -276,8 +312,27 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
     const gateStatus = EventStore.getStudentGateStatus(student.id);
     const isInside = gateStatus === 'ENTRY';
 
+    // 1. Meal Time & Scanner Control System check (Requirement 4: Time Out)
+    const mealControl = MealControlService.evaluateMealStatus(mealType);
+    if (!mealControl.isOpen) {
+      playScanErrorSound();
+      setScannedStudent(student);
+      setValidationResult({
+        canCollect: false,
+        status: 'TIMEOUT',
+        messageEn: mealControl.reasonEn,
+        messageBn: mealControl.reasonBn,
+      });
+      setFeedbackNotice({
+        type: 'error',
+        message: mealControl.reasonEn,
+      });
+      setIsResultPopupOpen(true);
+      return;
+    }
+
     const currentDistributions = EventStore.getFoodDistributions();
-    const result = validateMealCollection(student, mealType, currentDistributions, new Date(), gateStatus);
+    const result = validateMealCollection(student, mealType, currentDistributions, new Date(), gateStatus, { checkMealSchedule: true });
 
     if (!isInside) {
       playScanErrorSound();
@@ -338,6 +393,17 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
       return;
     }
 
+    // Meal Time & Scanner Control System check (Asia/Dhaka)
+    const mealControl = MealControlService.evaluateMealStatus(mealType);
+    if (!mealControl.isOpen) {
+      playScanErrorSound();
+      setFeedbackNotice({
+        type: 'error',
+        message: mealControl.reasonEn,
+      });
+      return;
+    }
+
     const res = EventStore.confirmFoodDistribution(
       scannedStudent.id,
       scannedStudent.fullName,
@@ -346,7 +412,8 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
       staffUser.id,
       staffUser.fullName,
       undefined,
-      staffUser
+      staffUser,
+      { checkSchedule: true }
     );
 
     if (res.success && res.record) {
@@ -391,13 +458,25 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
       return;
     }
 
+    // Meal Time & Scanner Control System check (Asia/Dhaka)
+    const mealControl = MealControlService.evaluateMealStatus(mealType);
+    if (!mealControl.isOpen) {
+      playScanErrorSound();
+      setGuestNotice({
+        type: 'error',
+        message: mealControl.reasonEn,
+      });
+      return;
+    }
+
     const res = await GuestService.collectMeal(
       scannedGuest.id,
       mealType,
       scannedGuest.token,
       staffUser.id,
       staffUser.fullName,
-      staffUser.assignedGate || 'Food Counter'
+      staffUser.assignedGate || 'Food Counter',
+      { checkSchedule: true }
     );
 
     if (res.success && res.record) {
@@ -517,6 +596,71 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Live Meal Scanner Time & Status Strip */}
+      <div
+        className={`p-4 rounded-3xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs transition-all ${
+          currentMealStatus.isOpen
+            ? 'bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/40 border-emerald-300 text-emerald-950'
+            : 'bg-gradient-to-r from-rose-50/90 via-white to-rose-50/50 border-rose-300 text-rose-950'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className={`w-3.5 h-3.5 rounded-full shrink-0 ${
+              currentMealStatus.isOpen ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
+            }`}
+          />
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black uppercase tracking-wider">
+                {currentMealStatus.isOpen ? '● SCANNER ACTIVE' : '● SCANNER TIME OUT'}
+              </span>
+              <span
+                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border ${
+                  currentMealStatus.isOpen
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : 'bg-rose-100 text-rose-800 border-rose-300'
+                }`}
+              >
+                Mode: {currentMealStatus.mode}
+              </span>
+              <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
+                {currentMealStatus.timeString12} BST
+              </span>
+            </div>
+            <p className="text-xs font-semibold mt-0.5">
+              {language === 'bn' ? currentMealStatus.reasonBn : currentMealStatus.reasonEn}
+            </p>
+          </div>
+        </div>
+
+        {/* Super Admin Control Toggle */}
+        {(isSuperAdmin || staffUser.role === 'SUPER_ADMIN') && (
+          <button
+            type="button"
+            onClick={() => setIsMealControlOpen(!isMealControlOpen)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shrink-0 transition-all cursor-pointer shadow-xs"
+          >
+            <Clock className="w-3.5 h-3.5 text-sky-400" />
+            <span>
+              {isMealControlOpen
+                ? (language === 'bn' ? 'কন্ট্রোল প্যানেল লুকান' : 'Hide Control Panel')
+                : (language === 'bn' ? 'সময়সূচী ও স্ক্যানার নিয়ন্ত্রণ' : 'Meal Time & Scanner Controls')}
+            </span>
+          </button>
+        )}
+      </div>
+
+      {/* Expandable Super Admin Meal Time & Scanner Control Panel */}
+      {(isSuperAdmin || staffUser.role === 'SUPER_ADMIN') && isMealControlOpen && (
+        <div className="animate-fade-in">
+          <MealTimeScannerControlPanel
+            language={language}
+            adminName={staffUser.fullName}
+          />
+        </div>
+      )}
 
       {/* Main Scanner & Verification Interface */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -924,13 +1068,32 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                       <span className="text-sm font-black text-emerald-600 flex items-center gap-1.5">
                         <CheckCircle className="w-4 h-4" /> NOT COLLECTED (ELIGIBLE)
                       </span>
-                    ) : validationResult?.status === 'BACK_TO_THE_GATE' ? (
+                    ) : validationResult?.status === 'TIMEOUT' ? (
+                <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-500 text-rose-950 text-center font-bold text-xs space-y-2 shadow-md">
+                  <div className="flex items-center justify-center gap-2 text-rose-700 text-sm font-black uppercase tracking-wider">
+                    <Clock className="w-5 h-5 text-rose-600 animate-pulse" />
+                    <span>TIME OUT</span>
+                  </div>
+                  <p className="text-xs text-rose-900 font-extrabold leading-snug">
+                    {language === 'bn'
+                      ? 'খাবার বিতরণের সময় শেষ অথবা স্ক্যানার নিষ্ক্রিয় রয়েছে।'
+                      : 'Meal scanner is inactive or scheduled time has expired.'}
+                  </p>
+                  <p className="text-[11px] font-semibold text-rose-700">
+                    {language === 'bn' ? validationResult.messageBn : validationResult.messageEn}
+                  </p>
+                </div>
+              ) : validationResult?.status === 'BACK_TO_THE_GATE' ? (
                       <span className="text-sm font-black text-rose-600 flex items-center gap-1.5 animate-pulse">
                         <AlertOctagon className="w-4 h-4 text-rose-600" /> GATE ENTRY REQUIRED (BACK)
                       </span>
                     ) : validationResult?.status === 'GATE_ENTRY_REQUIRED' ? (
                       <span className="text-sm font-black text-rose-600 flex items-center gap-1.5">
                         <DoorOpen className="w-4 h-4 text-rose-600" /> GATE ENTRY REQUIRED (NOT ENTERED)
+                      </span>
+                    ) : validationResult?.status === 'TIMEOUT' ? (
+                      <span className="text-sm font-black text-rose-600 flex items-center gap-1.5 animate-pulse">
+                        <Clock className="w-4 h-4 text-rose-600" /> TIME OUT
                       </span>
                     ) : (
                       <span className="text-sm font-black text-rose-700 flex items-center gap-1.5">
@@ -967,6 +1130,21 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                   <CheckCircle className="w-5 h-5" />
                   <span>[ CONFIRM {mealType.toUpperCase()} RECEIVED ]</span>
                 </button>
+              ) : validationResult?.status === 'TIMEOUT' ? (
+                <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-500 text-rose-950 text-center font-bold text-xs space-y-2 shadow-md">
+                  <div className="flex items-center justify-center gap-2 text-rose-700 text-sm font-black uppercase tracking-wider">
+                    <Clock className="w-5 h-5 text-rose-600 animate-pulse" />
+                    <span>TIME OUT</span>
+                  </div>
+                  <p className="text-xs text-rose-900 font-extrabold leading-snug">
+                    {language === 'bn'
+                      ? 'খাবার বিতরণের সময় শেষ অথবা স্ক্যানার নিষ্ক্রিয় রয়েছে।'
+                      : 'Meal scanner is inactive or scheduled time has expired.'}
+                  </p>
+                  <p className="text-[11px] font-semibold text-rose-700">
+                    {language === 'bn' ? validationResult.messageBn : validationResult.messageEn}
+                  </p>
+                </div>
               ) : validationResult?.status === 'BACK_TO_THE_GATE' ? (
                 <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-500 text-rose-950 text-center font-bold text-xs space-y-2 shadow-md">
                   <div className="flex items-center justify-center gap-2 text-rose-700 text-sm font-black uppercase tracking-wider">
@@ -1552,6 +1730,10 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                           <span className="text-xs font-black text-emerald-600 flex items-center gap-1">
                             <CheckCircle className="w-4 h-4" /> NOT COLLECTED (ELIGIBLE)
                           </span>
+                        ) : validationResult?.status === 'TIMEOUT' ? (
+                          <span className="text-xs font-black text-rose-600 flex items-center gap-1 animate-pulse">
+                            <Clock className="w-4 h-4 text-rose-600" /> TIME OUT
+                          </span>
                         ) : validationResult?.status === 'BACK_TO_THE_GATE' ? (
                           <span className="text-xs font-black text-rose-600 flex items-center gap-1 animate-pulse">
                             <AlertOctagon className="w-4 h-4 text-rose-600" /> GATE ENTRY REQUIRED (BACK)
@@ -1592,7 +1774,22 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                       <CheckCircle className="w-5 h-5" />
                       <span>[ CONFIRM {mealType.toUpperCase()} COLLECTED ]</span>
                     </button>
-                  ) : validationResult?.status === 'BACK_TO_THE_GATE' ? (
+                  ) : validationResult?.status === 'TIMEOUT' ? (
+                <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-500 text-rose-950 text-center font-bold text-xs space-y-2 shadow-md">
+                  <div className="flex items-center justify-center gap-2 text-rose-700 text-sm font-black uppercase tracking-wider">
+                    <Clock className="w-5 h-5 text-rose-600 animate-pulse" />
+                    <span>TIME OUT</span>
+                  </div>
+                  <p className="text-xs text-rose-900 font-extrabold leading-snug">
+                    {language === 'bn'
+                      ? 'খাবার বিতরণের সময় শেষ অথবা স্ক্যানার নিষ্ক্রিয় রয়েছে।'
+                      : 'Meal scanner is inactive or scheduled time has expired.'}
+                  </p>
+                  <p className="text-[11px] font-semibold text-rose-700">
+                    {language === 'bn' ? validationResult.messageBn : validationResult.messageEn}
+                  </p>
+                </div>
+              ) : validationResult?.status === 'BACK_TO_THE_GATE' ? (
                     <div className="p-4 rounded-2xl bg-rose-600 text-white text-center font-bold text-xs space-y-1.5 shadow-md">
                       <div className="flex items-center justify-center gap-1.5 text-amber-300 text-sm font-black tracking-wider uppercase">
                         <AlertOctagon className="w-5 h-5 text-amber-300" />

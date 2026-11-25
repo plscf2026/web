@@ -103,6 +103,7 @@ import {
   validateExpenseSubmission,
   isBreakfastCollectionOpen,
 } from '../utils/eventRules';
+import { MealControlService } from './mealControlService';
 
 // Storage Keys for Local Resilience
 const KEY_FOOD_DISTRIBUTIONS = 'plscf_event_food_distributions_v2';
@@ -1045,7 +1046,8 @@ export class EventStore {
     staffId: string,
     staffName: string,
     notes?: string,
-    staffUser?: StaffAccount
+    staffUser?: StaffAccount,
+    options?: { checkSchedule?: boolean }
   ): { success: boolean; record?: FoodDistributionRecord; error?: string } {
     // 1. Department Access Control Verification
     const staff = staffUser || this.getStaffAccounts().find((s) => s.id === staffId);
@@ -1087,7 +1089,16 @@ export class EventStore {
       }
     }
 
-    if (mealType === 'breakfast' && !isBreakfastCollectionOpen()) {
+    // Meal Time & Scanner Control System check (when scanner validation requested)
+    if (options?.checkSchedule) {
+      const mealControl = MealControlService.evaluateMealStatus(mealType);
+      if (!mealControl.isOpen) {
+        return {
+          success: false,
+          error: `Time Out: ${mealControl.reasonEn}`,
+        };
+      }
+    } else if (mealType === 'breakfast' && !isBreakfastCollectionOpen()) {
       return {
         success: false,
         error: 'Breakfast service is closed after 1:00 PM Bangladesh time.',

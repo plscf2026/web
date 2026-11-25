@@ -15,6 +15,7 @@ import {
   GuestPortalStatistics,
 } from '../types/guest';
 import { parseScannedInput, getCleanPassDisplayLabel } from '../utils/tokenGenerator';
+import { MealControlService } from './mealControlService';
 
 const KEY_GUEST_CARDS = 'plscf_guest_cards_v1';
 const KEY_GUEST_BATCHES = 'plscf_guest_batches_v1';
@@ -617,7 +618,8 @@ export class GuestService {
     tokenParam?: string,
     staffId: string = 'FOOD_STAFF',
     staffName: string = 'Food Staff',
-    counterId: string = 'Food Counter 01'
+    counterId: string = 'Food Counter 01',
+    options?: { checkSchedule?: boolean }
   ): Promise<{
     success: boolean;
     record?: GuestFoodCollection;
@@ -630,6 +632,19 @@ export class GuestService {
     const cleanLabel = getCleanPassDisplayLabel(clean, parsed);
     const lookupId = parsed.id || parsed.regNumber || (clean.startsWith('{') ? '' : clean);
     const lookupToken = tokenParam || parsed.token || null;
+
+    // Meal Time & Scanner Control System check (Bangladesh Standard Time: Asia/Dhaka)
+    if (options?.checkSchedule) {
+      const mealControl = MealControlService.evaluateMealStatus(mealType);
+      if (!mealControl.isOpen) {
+        return {
+          success: false,
+          errorType: 'TIMEOUT',
+          error: 'Time Out',
+          message: mealControl.reasonEn,
+        };
+      }
+    }
 
     // 1. Try Supabase RPC first
     try {

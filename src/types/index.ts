@@ -372,6 +372,7 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
       'idCardManagement',
       'reunionManagement',
       'feeSettings',
+      'mealControl',
       'payments',
       'donations',
       'tshirts',
@@ -819,3 +820,5 @@ export interface ContactInquiry {
   createdAt: string;
   status: 'NEW' | 'RESOLVED';
 }
+
+export * from './mealControl';

@@ -86,6 +86,7 @@ import { DailyAnalyticsTab } from './admin/DailyAnalyticsTab';
 import { StaffManagementTab } from './admin/StaffManagementTab';
 import { AuditHistoryTab } from './admin/AuditHistoryTab';
 import { StudentIdManagementTab } from './admin/StudentIdManagementTab';
+import { MealTimeScannerControlPanel } from './admin/MealTimeScannerControlPanel';
 import { StudentIdService } from '../services/studentIdStore';
 import { EventStore } from '../services/eventStore';
 import { IdCardStore } from '../services/idCardStore';
@@ -322,6 +323,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'studentIds'
     | 'registrations'
     | 'feeSettings'
+    | 'mealControl'
     | 'payments'
     | 'donations'
     | 'tshirts'
@@ -1454,6 +1456,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             category: 'operations' as const,
             highlight: true,
             badge: 'Admin',
+            badgeColor: 'amber' as const,
+          },
+        ]
+      : []),
+    ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('mealControl' as any)
+      ? [
+          {
+            id: 'mealControl' as const,
+            label: language === 'bn' ? 'খাবার সময়সূচী ও স্ক্যানার' : 'Meal Time & Scanner Control',
+            icon: Clock,
+            category: 'operations' as const,
+            highlight: true,
+            badge: 'Food',
             badgeColor: 'amber' as const,
           },
         ]
@@ -3211,7 +3226,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* TAB 4: FEE SETTINGS & REGISTRATION STATUS */}
       {activeTab === 'feeSettings' && (
-        <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-xs max-w-3xl space-y-6">
+        <div className="space-y-6 max-w-4xl">
+          {/* Meal Time & Scanner Control System */}
+          <MealTimeScannerControlPanel
+            language={language}
+            adminName={effectiveAdmin.fullName || 'Super Admin'}
+          />
+
+          <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
           <div>
             <h2 className="text-lg font-bold text-slate-900">
               {language === 'bn' ? 'রেজিস্ট্রেশন স্ট্যাটাস ও ফি কনফিগারেশন' : 'Registration Status & Event Settings'}
@@ -3546,6 +3568,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </div>
           </form>
+        </div>
+        </div>
+      )}
+
+      {/* TAB: MEAL TIME & SCANNER CONTROL SYSTEM (SUPER ADMIN & DESK) */}
+      {activeTab === 'mealControl' && (
+        <div className="space-y-6 max-w-4xl">
+          <MealTimeScannerControlPanel
+            language={language}
+            adminName={effectiveAdmin.fullName || 'Super Admin'}
+          />
         </div>
       )}
 

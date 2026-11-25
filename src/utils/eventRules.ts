@@ -18,6 +18,7 @@ import {
   FinancialLedgerEntry,
   RegistrationRecord,
 } from '../types';
+import { MealControlService } from '../services/mealControlService';
 
 /**
  * 1. RBAC Module Access Checks
@@ -68,6 +69,7 @@ export interface FoodValidationResult {
     | 'INVALID_REGISTRATION'
     | 'UNPAID'
     | 'CLOSED'
+    | 'TIMEOUT'
     | 'GATE_ENTRY_REQUIRED'
     | 'BACK_TO_THE_GATE';
   messageEn: string;
@@ -80,7 +82,8 @@ export function validateMealCollection(
   mealType: 'breakfast' | 'lunch' | 'dinner',
   existingDistributions: FoodDistributionRecord[],
   now: Date = new Date(),
-  gateStatusOrInside?: boolean | 'ENTRY' | 'BACK' | 'NOT_ENTERED'
+  gateStatusOrInside?: boolean | 'ENTRY' | 'BACK' | 'NOT_ENTERED',
+  options?: { checkMealSchedule?: boolean }
 ): FoodValidationResult {
   if (!registration) {
     return {
@@ -89,6 +92,19 @@ export function validateMealCollection(
       messageEn: 'Student ticket not found in registration database.',
       messageBn: 'শিক্ষার্থীর টিকিট নিবন্ধন ডেটাবেজে পাওয়া যায়নি।',
     };
+  }
+
+  // Active Scanner Time Check if requested (e.g. live scanning desks)
+  if (options?.checkMealSchedule) {
+    const timeStatus = MealControlService.evaluateMealStatus(mealType, now);
+    if (!timeStatus.isOpen) {
+      return {
+        canCollect: false,
+        status: 'TIMEOUT',
+        messageEn: timeStatus.reasonEn,
+        messageBn: timeStatus.reasonBn,
+      };
+    }
   }
 
   if (registration.paymentStatus !== 'paid') {
