@@ -44,6 +44,7 @@ import {
   EyeOff,
   Heart,
   Crown,
+  FileEdit,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -119,6 +120,9 @@ const GuestManagementTab = lazy(() =>
 );
 const StaffCardManagementTab = lazy(() =>
   import('./admin/staffCard/StaffCardManagementTab').then((m) => ({ default: m.StaffCardManagementTab }))
+);
+const AboutContactManagementTab = lazy(() =>
+  import('./admin/AboutContactManagementTab').then((m) => ({ default: m.AboutContactManagementTab }))
 );
 
 const AdminTabFallback = () => (
@@ -340,6 +344,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'notices'
     | 'galleryManagement'
     | 'committeeManagement'
+    | 'aboutContactManagement'
     | 'reports';
 
   const isSuperAdmin = adminSession?.role === 'super_admin';
@@ -1627,6 +1632,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       badge: '16 Cards',
       badgeColor: 'teal',
     },
+    ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('aboutContactManagement' as any)
+      ? [
+          {
+            id: 'aboutContactManagement' as const,
+            label: language === 'bn' ? 'About ও Contact পেজ এডিট' : 'Edit About & Contact Page',
+            icon: FileEdit,
+            category: 'media' as const,
+            highlight: true,
+            badge: 'Edit',
+            badgeColor: 'emerald' as const,
+          },
+        ]
+      : []),
     {
       id: 'notices',
       label: language === 'bn' ? 'নোটিশ ও মিডিয়া পাবলিকেশন' : 'Notices & Media',
@@ -1783,6 +1801,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
+          {isSuperAdminAccount && (
+            <button
+              type="button"
+              onClick={() => handleTabChange('aboutContactManagement')}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
+                activeTab === 'aboutContactManagement'
+                  ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md'
+                  : 'bg-sky-600/90 hover:bg-sky-500 text-white border-sky-400/50'
+              }`}
+              title={language === 'bn' ? 'About & Contact পেজ সম্পাদনা করুন' : 'Edit About & Contact Page Content'}
+            >
+              <FileEdit className="w-3.5 h-3.5" />
+              <span>{language === 'bn' ? 'About & Contact এডিট' : 'Edit About & Contact'}</span>
+            </button>
+          )}
+
           <button
             onClick={refreshAll}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition-colors cursor-pointer"
@@ -3261,6 +3295,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div>Dates: Dec 25-26, 2026</div>
                 <div>Security: High District Police Protection</div>
               </div>
+              {isSuperAdminAccount && (
+                <button
+                  type="button"
+                  onClick={() => handleTabChange('aboutContactManagement')}
+                  className="w-full py-2 px-3 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#0284C7] border border-sky-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <FileEdit className="w-3.5 h-3.5" />
+                  <span>
+                    {language === 'bn' ? 'About & Contact পেজ এডিট করুন' : 'Edit About & Contact Page'}
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -4540,6 +4586,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {activeTab === 'committeeManagement' && (
         <Suspense fallback={<AdminTabFallback />}>
           <CommitteeManagementTab language={language} onNavigateHome={onNavigateHome} />
+        </Suspense>
+      )}
+
+      {/* TAB 14: ABOUT & CONTACT PAGE LIVE CMS EDITOR (SUPER ADMIN ONLY) */}
+      {activeTab === 'aboutContactManagement' && isSuperAdminAccount && (
+        <Suspense fallback={<AdminTabFallback />}>
+          <AboutContactManagementTab language={language} adminName={effectiveAdmin.fullName} />
         </Suspense>
       )}
 

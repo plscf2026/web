@@ -7,6 +7,7 @@ import {
   DollarSign,
   ArrowUpRight,
   Camera,
+  FileEdit,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -126,6 +127,14 @@ export const MasterEventOverview: React.FC<MasterEventOverviewProps> = ({
               >
                 <Users className="w-4 h-4 text-sky-400" />
                 <span>👥 Edit Committee Members (16)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigateTab('aboutContactManagement')}
+                className="px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/25 flex items-center gap-2 cursor-pointer"
+              >
+                <FileEdit className="w-4 h-4" />
+                <span>📝 Edit About &amp; Contact Page</span>
               </button>
             </div>
           </div>

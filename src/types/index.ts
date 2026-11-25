@@ -387,6 +387,8 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
       'finances',
       'notices',
       'galleryManagement',
+      'committeeManagement',
+      'aboutContactManagement',
       'reports',
     ],
     demoCredentials: {

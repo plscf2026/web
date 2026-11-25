@@ -10,6 +10,8 @@ import {
   QrCode,
 } from 'lucide-react';
 import { Language, FeeSettings } from '../types';
+import { AboutContactContent } from '../types/aboutContact';
+import { AboutContactService } from '../services/aboutContactService';
 import { translations } from '../i18n/translations';
 import { SupabaseService } from '../services/supabase';
 import { AppStore } from '../services/store';
@@ -25,6 +27,9 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate, feeSetting
   const [feeSettings, setFeeSettings] = useState<FeeSettings>(
     () => initialFeeSettings || AppStore.getFeeSettings()
   );
+  const [aboutContent, setAboutContent] = useState<AboutContactContent>(() =>
+    AboutContactService.getContent()
+  );
 
   useEffect(() => {
     if (initialFeeSettings) {
@@ -39,7 +44,13 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate, feeSetting
       }
     };
     window.addEventListener('plscf_fee_settings_updated', handleSync);
-    return () => window.removeEventListener('plscf_fee_settings_updated', handleSync);
+    const unsubAbout = AboutContactService.subscribe((updated) => {
+      setAboutContent(updated);
+    });
+    return () => {
+      window.removeEventListener('plscf_fee_settings_updated', handleSync);
+      unsubAbout();
+    };
   }, []);
 
   const t = translations[language];
@@ -205,20 +216,20 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate, feeSetting
           {/* Col 4: Secretariat Contact */}
           <div>
             <h4 className="text-white font-semibold text-sm uppercase tracking-wider mb-4 border-l-2 border-sky-400 pl-2">
-              {t.helpdeskTitle}
+              {language === 'bn' ? aboutContent.helpdeskTitleBn : aboutContent.helpdeskTitleEn}
             </h4>
             <div className="space-y-2.5 text-xs text-slate-300">
               <div className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
-                <span>{t.addressText}</span>
+                <span>{language === 'bn' ? aboutContent.addressBn : aboutContent.addressEn}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-sky-400 shrink-0" />
-                <span>{t.helplinePhone}</span>
+                <span>{language === 'bn' ? aboutContent.helplinePhoneBn : aboutContent.helplinePhoneEn}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-sky-500 shrink-0" />
-                <span>{t.helplineEmail}</span>
+                <span>{aboutContent.helplineEmail}</span>
               </div>
             </div>
           </div>

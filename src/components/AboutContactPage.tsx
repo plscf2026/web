@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   History,
   Target,
@@ -11,7 +11,8 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { Language, ContactInquiry } from '../types';
-import { translations } from '../i18n/translations';
+import { AboutContactContent } from '../types/aboutContact';
+import { AboutContactService } from '../services/aboutContactService';
 import { supabase } from '../services/supabase';
 
 interface AboutContactPageProps {
@@ -19,13 +20,30 @@ interface AboutContactPageProps {
 }
 
 export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) => {
-  const t = translations[language];
+  const isBn = language === 'bn';
+  const [content, setContent] = useState<AboutContactContent>(() => AboutContactService.getContent());
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
   const [phoneTouched, setPhoneTouched] = useState(false);
+
+  useEffect(() => {
+    const cleanup = AboutContactService.initRealtimeSync();
+    const unsub = AboutContactService.subscribe((updated) => {
+      setContent(updated);
+    });
+    AboutContactService.fetchFromSupabase().then((res) => {
+      if (res.success) {
+        setContent(res.data);
+      }
+    });
+    return () => {
+      unsub();
+      cleanup();
+    };
+  }, []);
 
   // Exact Bangladeshi 11-digit mobile validation: starts with 01 followed by [3-9] and 8 more digits
   const isPhoneValid = /^01[3-9]\d{8}$/.test(phone.trim());
@@ -107,13 +125,13 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
           </div>
           <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#E2EEF8] text-[#0284C7] text-xs font-bold border border-[#0284C7]/20">
             <img src="/assets/school_logo.png" alt="School Logo" className="w-4 h-4 object-contain rounded-full" />
-            <span>{t.institutionSubtitle}</span>
+            <span>{isBn ? content.institutionSubtitleBn : content.institutionSubtitleEn}</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-black text-[#0F172A] tracking-tight">
-            {t.aboutHeading}
+            {isBn ? content.aboutHeadingBn : content.aboutHeadingEn}
           </h1>
           <p className="text-sm text-slate-600 leading-relaxed">
-            {t.tagline}
+            {isBn ? content.taglineBn : content.taglineEn}
           </p>
         </div>
 
@@ -121,21 +139,32 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-[#0F172A]">
               <History className="w-5 h-5 text-[#0284C7]" />
-              <h2 className="text-xl font-bold text-[#0F172A]">{t.historyTitle}</h2>
+              <h2 className="text-xl font-bold text-[#0F172A]">
+                {isBn ? content.historyTitleBn : content.historyTitleEn}
+              </h2>
             </div>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              {t.historyContent}
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed whitespace-pre-line">
+              {isBn ? content.historyContentBn : content.historyContentEn}
             </p>
             <div className="pt-2 text-xs text-slate-500 space-y-1 border-t border-[#E2EEF8]">
-              <div>• <strong>Location:</strong> Joyrampur, Faridpur Sadar, Dhaka Division</div>
-              <div>• <strong>Affiliation:</strong> Board of Intermediate & Secondary Education, Dhaka</div>
-              <div>• <strong>Patron:</strong> Faridpur District Police Force</div>
+              <div>
+                • <strong>{isBn ? content.locationLabelBn : content.locationLabelEn}:</strong>{' '}
+                {isBn ? content.locationValueBn : content.locationValueEn}
+              </div>
+              <div>
+                • <strong>{isBn ? content.affiliationLabelBn : content.affiliationLabelEn}:</strong>{' '}
+                {isBn ? content.affiliationValueBn : content.affiliationValueEn}
+              </div>
+              <div>
+                • <strong>{isBn ? content.patronLabelBn : content.patronLabelEn}:</strong>{' '}
+                {isBn ? content.patronValueBn : content.patronValueEn}
+              </div>
             </div>
           </div>
 
           <div className="rounded-2xl overflow-hidden aspect-4/3 shadow-md border border-[#E2EEF8] bg-slate-100">
             <img
-              src="https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=800&auto=format&fit=crop&q=80"
+              src={content.campusImageUrl}
               alt="Police Lines Campus Grounds"
               className="w-full h-full object-cover"
             />
@@ -148,58 +177,43 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
         <div className="flex items-center gap-2 justify-center">
           <Target className="w-5 h-5 text-[#0284C7]" />
           <h2 className="text-2xl font-black text-[#0F172A]">
-            {language === 'bn' ? 'পুনর্মিলনী ২০২৭-এর মূল উদ্দেশ্য' : 'Reunion 2027 Core Objectives'}
+            {isBn ? content.objectivesHeadingBn : content.objectivesHeadingEn}
           </h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-2xl p-6 border border-[#E2EEF8] shadow-xs space-y-2">
-            <h3 className="font-bold text-[#0F172A] text-base">
-              {language === 'bn' ? '১. প্রাক্তন ও বর্তমানের মেলবন্ধন' : '1. Cross-Generation Network'}
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              {language === 'bn'
-                ? '১৯৬২ থেকে ২০২৫ সাল পর্যন্ত সকল ব্যাচের শিক্ষার্থীদের মধ্যে পেশাগত ও ভ্রাতৃত্বপূর্ণ সুসম্পর্ক সৃষ্টি করা।'
-                : 'Uniting alumni across civil service, defense, medicine, technology, academia and commerce with current students.'}
-            </p>
-          </div>
-
-          <div className="bg-white rounded-2xl p-6 border border-[#E2EEF8] shadow-xs space-y-2">
-            <h3 className="font-bold text-[#0F172A] text-base">
-              {language === 'bn' ? '২. ক্যাম্পাস ও ল্যাব আধুনিকায়ন' : '2. Campus Modernization'}
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              {language === 'bn'
-                ? 'সংগৃহীত অনুদানের মাধ্যমে অত্যাধুনিক বিজ্ঞান গবেষণাগার, স্মার্ট ক্লাসরুম ও কেন্দ্রীয় লাইব্রেরির আধুনিকায়ন।'
-                : 'Directing reunion development funds towards modern science laboratories, robotics clubs, and smart classrooms.'}
-            </p>
-          </div>
-
-          <div className="bg-white rounded-2xl p-6 border border-[#E2EEF8] shadow-xs space-y-2">
-            <h3 className="font-bold text-[#0F172A] text-base">
-              {language === 'bn' ? '৩. অসচ্ছল শিক্ষার্থী কল্যাণ তহবিল' : '3. Student Welfare & Trust'}
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              {language === 'bn'
-                ? 'মেধাবী অথচ আর্থিক সংকটে থাকা শিক্ষার্থীদের শিক্ষাবৃত্তি ও চিকিৎসা সহায়তা প্রদানে স্থায়ী ট্রাস্ট গঠন।'
-                : 'Establishing a perpetual scholarship endowment fund for underprivileged meritorious students.'}
-            </p>
-          </div>
+          {content.objectives.map((objective) => (
+            <div
+              key={objective.id}
+              className="bg-white rounded-2xl p-6 border border-[#E2EEF8] shadow-xs space-y-2"
+            >
+              <h3 className="font-bold text-[#0F172A] text-base">
+                {isBn ? objective.titleBn : objective.titleEn}
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                {isBn ? objective.descriptionBn : objective.descriptionEn}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 
       {/* Contact & Secretariat Helpdesk Form */}
-      <section className="bg-white rounded-3xl p-8 sm:p-12 border border-[#E2EEF8] shadow-sm grid grid-cols-1 md:grid-cols-2 gap-10">
+      <section
+        className={`bg-white rounded-3xl p-8 sm:p-12 border border-[#E2EEF8] shadow-sm grid grid-cols-1 ${
+          content.showInquiryForm ? 'md:grid-cols-2' : ''
+        } gap-10`}
+      >
         <div className="space-y-6">
           <div>
             <span className="text-xs font-bold text-[#0284C7] uppercase tracking-wider block">
-              Direct Contact
+              {isBn ? content.contactBadgeBn : content.contactBadgeEn}
             </span>
-            <h2 className="text-2xl font-black text-[#0F172A] mt-1">{t.helpdeskTitle}</h2>
+            <h2 className="text-2xl font-black text-[#0F172A] mt-1">
+              {isBn ? content.helpdeskTitleBn : content.helpdeskTitleEn}
+            </h2>
             <p className="text-xs text-slate-500 mt-1">
-              {language === 'bn'
-                ? 'যেকোনো জিজ্ঞাসা, টিকিট সংক্রান্ত সমস্যা বা সহায়তার জন্য যোগাযোগ করুন।'
-                : 'Reach out to the Reunion secretariat team for queries, gate passes or batch coordination.'}
+              {isBn ? content.helpdeskSubtitleBn : content.helpdeskSubtitleEn}
             </p>
           </div>
 
@@ -207,30 +221,37 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
             <div className="flex items-start gap-3">
               <MapPin className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
               <div>
-                <strong className="block text-slate-900">Physical Campus Secretariat:</strong>
-                <span>{t.addressText}</span>
+                <strong className="block text-slate-900">
+                  {isBn ? 'ক্যাম্পাস সচিবালয় ঠিকানা:' : 'Physical Campus Secretariat:'}
+                </strong>
+                <span>{isBn ? content.addressBn : content.addressEn}</span>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
               <Phone className="w-5 h-5 text-amber-600 shrink-0" />
               <div>
-                <strong className="block text-slate-900">Helpline Hotlines:</strong>
-                <span>{t.helplinePhone}</span>
+                <strong className="block text-slate-900">
+                  {isBn ? 'হেল্পলাইন হটলাইন:' : 'Helpline Hotlines:'}
+                </strong>
+                <span>{isBn ? content.helplinePhoneBn : content.helplinePhoneEn}</span>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
               <Mail className="w-5 h-5 text-[#0284C7] shrink-0" />
               <div>
-                <strong className="block text-slate-900">Official Secretariat Email:</strong>
-                <span>{t.helplineEmail}</span>
+                <strong className="block text-slate-900">
+                  {isBn ? 'অফিসিয়াল সচিবালয় ইমেইল:' : 'Official Secretariat Email:'}
+                </strong>
+                <span>{content.helplineEmail}</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Quick Helpdesk Message Form with Strict Real-time Bangladeshi Mobile Validation */}
+        {content.showInquiryForm && (
         <div className="bg-[#F3F4F6] p-6 rounded-2xl border border-slate-200 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-slate-900 text-sm">
@@ -376,6 +397,7 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
             </form>
           )}
         </div>
+        )}
       </section>
     </div>
   );

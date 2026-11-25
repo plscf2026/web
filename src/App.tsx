@@ -22,6 +22,7 @@ import type { ModalStep } from './components/PaymentModal';
 import { resolveRouteFromLocation, syncRouteHistory } from './utils/navigation';
 import { SupabaseService } from './services/supabase';
 import { subscribeToAuthSync } from './services/authSync';
+import { AboutContactService } from './services/aboutContactService';
 
 // Route-level code-splitting: heavy pages and portals are loaded on-demand
 const RegistrationPage = lazy(() => import('./components/RegistrationPage').then((m) => ({ default: m.RegistrationPage })));
@@ -184,9 +185,13 @@ export default function App() {
     setFeeSettings(AppStore.getFeeSettings());
   }, [activeView]);
 
-  // Synchronize registrations bidirectionally with Supabase on startup
+  // Synchronize registrations and About & Contact CMS bidirectionally with Supabase on startup
   useEffect(() => {
     AppStore.syncWithSupabase(2027).catch(() => { });
+    const cleanupAboutSync = AboutContactService.initRealtimeSync();
+    return () => {
+      cleanupAboutSync();
+    };
   }, []);
 
   // Deep-link routing: auto-handle QR scans, verification URLs, and PayStation payment returns
