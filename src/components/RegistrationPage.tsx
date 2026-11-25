@@ -1254,7 +1254,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
             {/* Blood Group Selection */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+              <label className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
                 <Droplet className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                 <span>{language === 'bn' ? 'রক্তের গ্রুপ (Blood Group)' : 'Blood Group'}</span>
                 <span className="text-rose-600">*</span>
@@ -1292,7 +1292,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
             {/* Profile Photo Upload & Live Camera Capture (Requirement 4) */}
             <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
                 <span>
                   {t.photoLabel} <span className="text-rose-600">*</span>
                 </span>
@@ -1694,7 +1694,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
                   {/* Parent Photo Upload & Camera Capture */}
                   <div className="md:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
                       <span>
                         {language === 'bn' ? 'অভিভাবকের পাসপোর্ট সাইজ ছবি' : 'Parent / Guardian Photo'} <span className="text-rose-600">*</span>
                       </span>

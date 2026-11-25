@@ -585,7 +585,7 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
 
               {/* T-Shirt Size */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                <label className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
                   <Shirt className="w-3.5 h-3.5 text-indigo-600" />
                   <span>{isBangla ? 'টি-শার্ট সাইজ' : 'T-Shirt Size'}</span> <span className="text-rose-500">*</span>
                 </label>

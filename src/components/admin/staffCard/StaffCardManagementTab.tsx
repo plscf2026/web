@@ -346,7 +346,7 @@ export const StaffCardManagementTab: React.FC<StaffCardManagementTabProps> = ({
           <span className="text-[10px] text-slate-500 block mt-0.5">Staff badges created</span>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-emerald-200/80 bg-emerald-50/20 shadow-xs">
+        <div className="p-4 rounded-2xl border border-emerald-200/80 bg-emerald-50/20 shadow-xs">
           <div className="flex items-center justify-between text-emerald-600 mb-1">
             <span className="text-[11px] font-bold uppercase tracking-wider">Active Staff</span>
             <CheckCircle className="w-4 h-4" />
@@ -355,7 +355,7 @@ export const StaffCardManagementTab: React.FC<StaffCardManagementTabProps> = ({
           <span className="text-[10px] text-emerald-600 font-semibold block mt-0.5">Activated & Verified</span>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-amber-200/80 bg-amber-50/20 shadow-xs">
+        <div className="p-4 rounded-2xl border border-amber-200/80 bg-amber-50/20 shadow-xs">
           <div className="flex items-center justify-between text-amber-600 mb-1">
             <span className="text-[11px] font-bold uppercase tracking-wider">Inactive</span>
             <Clock className="w-4 h-4" />

@@ -1183,7 +1183,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                       <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
                         Gate Status
                       </span>
-                      <span className="text-base font-black block flex items-center gap-1.5 mt-0.5">
+                      <span className="text-base font-black flex items-center gap-1.5 mt-0.5">
                         {isInside ? (
                           <span className="text-emerald-700 flex items-center gap-1.5">
                             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />

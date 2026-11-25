@@ -2305,7 +2305,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             {/* Consolidated Registration Database Status & Sync Control */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800">
+              <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200">
                 <Calendar className="w-3.5 h-3.5 text-emerald-600" />
                 <span>{language === 'bn' ? 'কনসোলিডেটেড ডাটাবেস:' : 'Consolidated Table:'} <code className="font-mono font-bold text-[11px] text-emerald-900">registrations_2027</code></span>
               </span>

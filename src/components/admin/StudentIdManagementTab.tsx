@@ -369,7 +369,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
         </div>
 
         {/* Available */}
-        <div className="bg-white p-4 rounded-xl border border-emerald-200 bg-emerald-50/20 shadow-xs">
+        <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/20 shadow-xs">
           <div className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">
             {language === 'bn' ? 'রেজিস্ট্রেশনের জন্য প্রস্তুত' : 'Available IDs'}
           </div>
@@ -382,7 +382,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
         </div>
 
         {/* Reserved */}
-        <div className="bg-white p-4 rounded-xl border border-sky-200 bg-sky-50/20 shadow-xs">
+        <div className="p-4 rounded-xl border border-sky-200 bg-sky-50/20 shadow-xs">
           <div className="text-[11px] font-bold text-[#0284C7] uppercase tracking-wider">
             {language === 'bn' ? 'পেমেন্ট অপেক্ষমাণ' : 'Reserved in Checkout'}
           </div>
@@ -395,7 +395,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
         </div>
 
         {/* Used / Registered */}
-        <div className="bg-white p-4 rounded-xl border border-purple-200 bg-purple-50/20 shadow-xs">
+        <div className="p-4 rounded-xl border border-purple-200 bg-purple-50/20 shadow-xs">
           <div className="text-[11px] font-bold text-purple-700 uppercase tracking-wider">
             {language === 'bn' ? 'সফলভাবে নিবন্ধিত' : 'Successfully Registered'}
           </div>
@@ -408,7 +408,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
         </div>
 
         {/* Inactive */}
-        <div className="bg-white p-4 rounded-xl border border-amber-200 bg-amber-50/20 shadow-xs">
+        <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/20 shadow-xs">
           <div className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">
             {language === 'bn' ? 'স্থগিত / নিষ্ক্রিয়' : 'Inactive / Suspended'}
           </div>

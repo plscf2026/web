@@ -1065,7 +1065,7 @@ export const FinancialTransparencyDashboard: React.FC<FinancialTransparencyDashb
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
                     <span>{isBangla ? 'নিবন্ধিত মোবাইলের শেষ ৪টি সংখ্যা' : 'Registered Mobile (Last 4 Digits)'} *</span>
                     <span className="text-[10px] text-emerald-700 font-normal bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                       {isBangla ? 'পরিচয় নিশ্চিতকরণ' : 'Identity Verification'}

@@ -629,7 +629,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
 
               {/* Step 1: Amount Selector */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                   <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">1</span>
                   <span>{isBangla ? 'অনুদানের পরিমাণ নির্বাচন করুন (টাকা) *' : 'Select Donation Amount (BDT) *'}</span>
                 </label>
@@ -669,7 +669,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
 
               {/* Step 2: Donor Details */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                   <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">2</span>
                   <span>{isBangla ? 'আপনার তথ্য দিন' : 'Donor Information'}</span>
                 </label>
@@ -750,7 +750,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
 
               {/* Step 3: Payment Method Selection */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                   <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">3</span>
                   <span>{isBangla ? 'পেমেন্ট মাধ্যম (PayStation Gateway)' : 'Payment Method (PayStation Gateway)'}</span>
                 </label>
@@ -1004,7 +1004,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
 
             {/* Transparency Note */}
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-900 space-y-1">
-              <span className="font-bold block flex items-center gap-1 text-amber-800">
+              <span className="font-bold flex items-center gap-1 text-amber-800">
                 <ShieldCheck className="w-4 h-4 text-amber-700" />
                 {isBangla ? 'আর্থিক স্বচ্ছতা ও জবাবদিহিতা' : 'Financial Transparency Guarantee'}
               </span>
