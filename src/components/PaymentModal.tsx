@@ -574,11 +574,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-slate-950/85 backdrop-blur-xs p-3 sm:p-6 flex items-start sm:items-center justify-center min-h-[100dvh] min-h-screen">
+    <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-slate-950/85 backdrop-blur-xs p-3 sm:p-6 flex items-start sm:items-center justify-center min-h-[100dvh]">
       <section
         aria-labelledby="paystation-modal-title"
         aria-modal="true"
-        className="relative w-full max-w-lg rounded-3xl border border-slate-700 bg-white p-5 sm:p-7 shadow-2xl my-auto max-h-[92dvh] max-h-[92vh] flex flex-col overflow-hidden"
+        className="relative w-full max-w-lg rounded-3xl border border-slate-700 bg-white p-5 sm:p-7 shadow-2xl my-auto max-h-[92dvh] flex flex-col overflow-hidden"
         role="dialog"
       >
         {/* Background ambient */}
