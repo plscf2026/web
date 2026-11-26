@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   Key,
+  Lock,
   RefreshCw,
   Search,
   Clock,
@@ -138,8 +139,8 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
   };
 
   // Create Form State & Conditional Controls
-  const [selectedCreateCategory, setSelectedCreateCategory] = useState<RoleCategory>('SUPER_ADMIN');
-  const [customModelLabel, setCustomModelLabel] = useState('Super Admin 1');
+  const [selectedCreateCategory, setSelectedCreateCategory] = useState<RoleCategory>('ADMIN');
+  const [customModelLabel, setCustomModelLabel] = useState('Admin 1');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [financeTier, setFinanceTier] = useState<'MANAGER' | 'STAFF'>('MANAGER');
@@ -154,10 +155,10 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
     assignedManagerId: '',
     initialStatus: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
     mustChangePassword: true,
-    role: 'super_admin',
+    role: 'admin',
     department: 'CENTRAL_ADMIN',
-    assignedStation: 'Super Admin 1',
-    permissions: ['VIEW', 'SCAN', 'VERIFY', 'APPROVE', 'EXPORT', 'MANAGE'] as StaffPermissionAction[],
+    assignedStation: 'Admin 1',
+    permissions: ['VIEW', 'VERIFY', 'APPROVE', 'EXPORT'] as StaffPermissionAction[],
     authUserId: '',
     initialPassword: '',
   });
@@ -293,23 +294,14 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
 
   // Switch Category inside Provisioning Modal
   const handleSwitchCategory = (cat: RoleCategory) => {
+    if (cat === 'SUPER_ADMIN') {
+      showNotification('error', 'Super Admin account creation is permanently locked.');
+      return;
+    }
     setSelectedCreateCategory(cat);
     const newUUID = generateUuid();
 
-    if (cat === 'SUPER_ADMIN') {
-      const nextNum = users.filter((u) => u.roleCategory === 'SUPER_ADMIN').length + 1;
-      const label = `Super Admin ${nextNum}`;
-      setCustomModelLabel(label);
-      setCreateForm((prev) => ({
-        ...prev,
-        userType: 'ADMIN',
-        role: 'super_admin',
-        department: 'CENTRAL_ADMIN',
-        assignedStation: label,
-        authUserId: newUUID,
-        permissions: ['VIEW', 'SCAN', 'VERIFY', 'APPROVE', 'EXPORT', 'MANAGE'],
-      }));
-    } else if (cat === 'ADMIN') {
+    if (cat === 'ADMIN') {
       const nextNum = users.filter((u) => u.roleCategory === 'ADMIN').length + 1;
       const label = `Admin ${nextNum}`;
       setCustomModelLabel(label);
@@ -420,6 +412,10 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
 
   // Open Create Modal for specific category
   const handleOpenCreateForCategory = (category: RoleCategory) => {
+    if (category === 'SUPER_ADMIN') {
+      showNotification('error', 'Super Admin account creation is permanently locked.');
+      return;
+    }
     setSelectedCreateCategory(category);
     const newUUID = generateUuid();
     setConfirmPassword('');
@@ -431,15 +427,7 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
     let defaultDept = 'GATE';
     let defaultStation = 'Gate 01 - Main Entrance Checkpoint';
 
-    if (category === 'SUPER_ADMIN') {
-      const nextNum = users.filter((u) => u.roleCategory === 'SUPER_ADMIN').length + 1;
-      const label = `Super Admin ${nextNum}`;
-      setCustomModelLabel(label);
-      defaultRole = 'super_admin';
-      defaultType = 'ADMIN';
-      defaultDept = 'CENTRAL_ADMIN';
-      defaultStation = label;
-    } else if (category === 'ADMIN') {
+    if (category === 'ADMIN') {
       const nextNum = users.filter((u) => u.roleCategory === 'ADMIN').length + 1;
       const label = `Admin ${nextNum}`;
       setCustomModelLabel(label);
@@ -632,6 +620,10 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
 
   // Open Edit Modal
   const handleOpenEdit = (user: UnifiedSystemUser) => {
+    if (UserManagementService.isProtectedSuperAdminTarget(user)) {
+      showNotification('error', 'Super Admin ID and profile are permanently locked.');
+      return;
+    }
     setEditingUser(user);
     setEditForm({
       fullName: user.fullName,
@@ -766,6 +758,10 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
 
   // Open Direct Password Modal
   const handleOpenPasswordModal = (user: UnifiedSystemUser) => {
+    if (UserManagementService.isProtectedSuperAdminTarget(user)) {
+      showNotification('error', 'Super Admin password cannot be changed.');
+      return;
+    }
     setPasswordModalUser(user);
     setDirectNewPassword('');
     setDirectConfirmPassword('');
@@ -851,6 +847,10 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
 
   // Password Reset Trigger via Email
   const handleResetPassword = async (user: UnifiedSystemUser) => {
+    if (UserManagementService.isProtectedSuperAdminTarget(user)) {
+      showNotification('error', 'Super Admin password reset is disabled.');
+      return;
+    }
     const confirmed = window.confirm(
       `Send official password reset email to ${user.fullName} (${user.email})?`
     );
@@ -1359,97 +1359,106 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                           {/* Action Menu */}
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                              {/* Edit Profile */}
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEdit(u)}
-                                className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
-                                title="Edit Account & Permissions"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-
-                              {/* Reset Password */}
-                              <button
-                                type="button"
-                                onClick={() => handleOpenPasswordModal(u)}
-                                className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition cursor-pointer"
-                                title="Set / Reset User Password"
-                              >
-                                <Key className="w-3.5 h-3.5" />
-                              </button>
-
-                              {/* Status Toggle Button (Active <-> Inactive) */}
-                              {u.status === 'ACTIVE' ? (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setStatusConfirmUser({
-                                      user: u,
-                                      targetStatus: 'INACTIVE',
-                                    })
-                                  }
-                                  className="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-200 cursor-pointer"
-                                  title="Deactivate account (locks sessions)"
-                                >
-                                  Deactivate
-                                </button>
+                              {u.roleCategory === 'SUPER_ADMIN' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 text-[10px] font-black border border-amber-200">
+                                  <Lock className="w-3 h-3" />
+                                  Immutable (Locked)
+                                </span>
                               ) : (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setStatusConfirmUser({
-                                      user: u,
-                                      targetStatus: 'ACTIVE',
-                                    })
-                                  }
-                                  className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200 cursor-pointer"
-                                  title="Activate and unlock account"
-                                >
-                                  Activate
-                                </button>
-                              )}
+                                <>
+                                  {/* Edit Profile */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEdit(u)}
+                                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+                                    title="Edit Account & Permissions"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
 
-                              {/* Suspend / Restore Button */}
-                              {u.status === 'SUSPENDED' ? (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setStatusConfirmUser({
-                                      user: u,
-                                      targetStatus: 'ACTIVE',
-                                    })
-                                  }
-                                  className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 text-[10px] font-bold border border-blue-200 cursor-pointer"
-                                  title="Restore suspended account"
-                                >
-                                  Restore
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setStatusConfirmUser({
-                                      user: u,
-                                      targetStatus: 'SUSPENDED',
-                                    })
-                                  }
-                                  className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-800 text-[10px] font-bold border border-rose-200 cursor-pointer"
-                                  title="Suspend account"
-                                >
-                                  Suspend
-                                </button>
-                              )}
+                                  {/* Reset Password */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenPasswordModal(u)}
+                                    className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition cursor-pointer"
+                                    title="Set / Reset User Password"
+                                  >
+                                    <Key className="w-3.5 h-3.5" />
+                                  </button>
 
-                              {/* Revoke Active Auth Sessions */}
-                              <button
-                                type="button"
-                                onClick={() => handleRevokeUserSessions(u)}
-                                className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 transition cursor-pointer"
-                                title="Revoke Active Login Sessions"
-                              >
-                                <LogOut className="w-3.5 h-3.5" />
-                              </button>
+                                  {/* Status Toggle Button (Active <-> Inactive) */}
+                                  {u.status === 'ACTIVE' ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setStatusConfirmUser({
+                                          user: u,
+                                          targetStatus: 'INACTIVE',
+                                        })
+                                      }
+                                      className="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-200 cursor-pointer"
+                                      title="Deactivate account (locks sessions)"
+                                    >
+                                      Deactivate
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setStatusConfirmUser({
+                                          user: u,
+                                          targetStatus: 'ACTIVE',
+                                        })
+                                      }
+                                      className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200 cursor-pointer"
+                                      title="Activate and unlock account"
+                                    >
+                                      Activate
+                                    </button>
+                                  )}
+
+                                  {/* Suspend / Restore Button */}
+                                  {u.status === 'SUSPENDED' ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setStatusConfirmUser({
+                                          user: u,
+                                          targetStatus: 'ACTIVE',
+                                        })
+                                      }
+                                      className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 text-[10px] font-bold border border-blue-200 cursor-pointer"
+                                      title="Restore suspended account"
+                                    >
+                                      Restore
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setStatusConfirmUser({
+                                          user: u,
+                                          targetStatus: 'SUSPENDED',
+                                        })
+                                      }
+                                      className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-800 text-[10px] font-bold border border-rose-200 cursor-pointer"
+                                      title="Suspend account"
+                                    >
+                                      Suspend
+                                    </button>
+                                  )}
+
+                                  {/* Revoke Active Auth Sessions */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRevokeUserSessions(u)}
+                                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 transition cursor-pointer"
+                                    title="Revoke Active Login Sessions"
+                                  >
+                                    <LogOut className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              )}
 
                               {/* View Activity / Audit Trail */}
                               <button
@@ -1517,32 +1526,41 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                     </div>
 
                     <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-200">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEdit(u)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-200 text-slate-800 text-xs font-bold"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenPasswordModal(u)}
-                        className="px-3 py-1.5 rounded-xl bg-indigo-100 text-indigo-800 text-xs font-bold"
-                      >
-                        Password
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setStatusConfirmUser({
-                            user: u,
-                            targetStatus: u.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE',
-                          })
-                        }
-                        className="px-3 py-1.5 rounded-xl bg-slate-800 text-white text-xs font-bold"
-                      >
-                        {u.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
-                      </button>
+                      {u.roleCategory === 'SUPER_ADMIN' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 text-xs font-black border border-amber-200">
+                          <Lock className="w-3.5 h-3.5" />
+                          Immutable (Locked)
+                        </span>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(u)}
+                            className="px-3 py-1.5 rounded-xl bg-slate-200 text-slate-800 text-xs font-bold"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPasswordModal(u)}
+                            className="px-3 py-1.5 rounded-xl bg-indigo-100 text-indigo-800 text-xs font-bold"
+                          >
+                            Password
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setStatusConfirmUser({
+                                user: u,
+                                targetStatus: u.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE',
+                              })
+                            }
+                            className="px-3 py-1.5 rounded-xl bg-slate-800 text-white text-xs font-bold"
+                          >
+                            {u.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1597,15 +1615,12 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1 bg-slate-100 rounded-2xl">
                   <button
                     type="button"
-                    onClick={() => handleSwitchCategory('SUPER_ADMIN')}
-                    className={`py-2 px-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition cursor-pointer ${
-                      selectedCreateCategory === 'SUPER_ADMIN'
-                        ? 'bg-amber-500 text-white shadow-sm'
-                        : 'text-slate-700 hover:bg-white/60'
-                    }`}
+                    disabled
+                    title="Super Admin creation is permanently locked"
+                    className="py-2 px-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 bg-slate-200/70 text-slate-400 cursor-not-allowed"
                   >
-                    <Crown className="w-3.5 h-3.5" />
-                    <span>Super Admin</span>
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Super Admin (Locked)</span>
                   </button>
                   <button
                     type="button"

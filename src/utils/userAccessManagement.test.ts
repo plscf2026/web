@@ -207,3 +207,61 @@ test('setUserPassword rejects passwords shorter than 6 characters', async () => 
   assert.strictEqual(shortRes.success, false);
   assert.match(shortRes.error || '', /at least 6 characters/i);
 });
+
+test('Super admin immutability guards block creating or altering super admin ID and password', async () => {
+  const superAdmin = {
+    id: 'ADM-SUPER-ROOT-001',
+    fullName: 'Super Administrator',
+    username: 'sagarsaha3371@gmail.com',
+    email: 'sagarsaha3371@gmail.com',
+    role: 'super_admin' as const,
+    createdAt: new Date().toISOString(),
+  };
+
+  const createRes = await UserManagementService.createSystemUser(
+    {
+      userType: 'ADMIN',
+      fullName: 'Fake Super Admin',
+      username: 'fake_sa',
+      email: 'fake_sa@example.com',
+      role: 'super_admin',
+      department: 'CENTRAL_ADMIN',
+      permissions: ['VIEW', 'MANAGE'],
+      initialPassword: 'StrongPassword123!',
+    },
+    superAdmin
+  );
+  assert.strictEqual(createRes.success, false);
+  assert.match(createRes.error || '', /SUPER_ADMIN_IMMUTABLE/i);
+
+  const editRes = await UserManagementService.updateUserProfile(
+    'ADM-SUPER-ROOT-001',
+    'ADMIN',
+    {
+      fullName: 'Hacked Admin',
+      username: 'hacked',
+      email: 'hacked@example.com',
+      role: 'super_admin',
+      department: 'CENTRAL_ADMIN',
+      assignedStation: 'HQ',
+      permissions: ['VIEW'],
+    },
+    superAdmin,
+    'Attempted ID change'
+  );
+  assert.strictEqual(editRes.success, false);
+  assert.match(editRes.error || '', /SUPER_ADMIN_IMMUTABLE/i);
+
+  const pwRes = await UserManagementService.setUserPassword(
+    'sagarsaha3371@gmail.com',
+    'NewPass@1234',
+    superAdmin,
+    false
+  );
+  assert.strictEqual(pwRes.success, false);
+  assert.match(pwRes.error || '', /SUPER_ADMIN_IMMUTABLE/i);
+
+  const resetRes = await UserManagementService.resetPasswordForEmail('sagarsaha3371@gmail.com');
+  assert.strictEqual(resetRes.success, false);
+  assert.match(resetRes.error || '', /SUPER_ADMIN_IMMUTABLE/i);
+});

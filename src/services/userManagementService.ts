@@ -59,6 +59,27 @@ export class UserManagementService {
   }
 
   /**
+   * Returns true if the supplied role or identity targets the immutable Super Admin account.
+   */
+  static isProtectedSuperAdminRole(role?: string | null): boolean {
+    const clean = String(role || '').trim().toLowerCase();
+    return clean === 'super_admin' || clean === 'superadmin';
+  }
+
+  static isProtectedSuperAdminTarget(target?: {
+    id?: string | null;
+    role?: string | null;
+    email?: string | null;
+    username?: string | null;
+  }): boolean {
+    if (!target) return false;
+    if (this.isProtectedSuperAdminRole(target.role)) return true;
+    const cleanId = String(target.id || '').trim();
+    if (cleanId === 'ADM-SUPER-ROOT-001') return true;
+    return false;
+  }
+
+  /**
    * Fetch Finance Manager accounts authorized for supervising Finance Staff.
    */
   static async fetchFinanceManagers(): Promise<UnifiedSystemUser[]> {
@@ -281,6 +302,9 @@ export class UserManagementService {
     if (!this.isSuperAdminSession(adminSession)) {
       return { success: false, error: 'UNAUTHORIZED: Only Super Admin can activate or deactivate accounts.' };
     }
+    if (userType === 'ADMIN' && this.isProtectedSuperAdminTarget({ id: userId })) {
+      return { success: false, error: 'SUPER_ADMIN_IMMUTABLE: Super Admin account status cannot be modified.' };
+    }
 
     try {
       const { data, error } = await supabase.rpc('rpc_manage_user_status', {
@@ -333,6 +357,20 @@ export class UserManagementService {
   ): Promise<{ success: boolean; error?: string }> {
     if (!this.isSuperAdminSession(adminSession)) {
       return { success: false, error: 'UNAUTHORIZED: Only Super Admin can modify account profiles.' };
+    }
+    if (
+      userType === 'ADMIN' &&
+      this.isProtectedSuperAdminTarget({
+        id: userId,
+        role: payload.role,
+        email: payload.email,
+        username: payload.username,
+      })
+    ) {
+      return { success: false, error: 'SUPER_ADMIN_IMMUTABLE: Super Admin ID, role, and profile are permanently locked.' };
+    }
+    if (this.isProtectedSuperAdminRole(payload.role)) {
+      return { success: false, error: 'SUPER_ADMIN_IMMUTABLE: Cannot create or promote a Super Admin account.' };
     }
 
     try {
@@ -409,6 +447,9 @@ export class UserManagementService {
     if (!this.isSuperAdminSession(adminSession)) {
       return { success: false, error: 'UNAUTHORIZED: Only Super Admin can create accounts.' };
     }
+    if (this.isProtectedSuperAdminRole(payload.role)) {
+      return { success: false, error: 'SUPER_ADMIN_IMMUTABLE: Super Admin account creation is permanently locked.' };
+    }
 
     try {
       const { data, error } = await supabase.rpc('rpc_create_system_user', {
@@ -472,6 +513,17 @@ export class UserManagementService {
       return { success: false, error: 'UNAUTHORIZED: Only Super Admin can reset passwords.' };
     }
 
+    const cleanEmail = email.trim().toLowerCase();
+    const superEmail = (adminSession.email || '').trim().toLowerCase();
+    const superUsername = (adminSession.username || '').trim().toLowerCase();
+    if (
+      cleanEmail === 'sagarsaha3371@gmail.com' ||
+      (superEmail && cleanEmail === superEmail) ||
+      (superUsername && cleanEmail === superUsername)
+    ) {
+      return { success: false, error: 'SUPER_ADMIN_IMMUTABLE: Super Admin password cannot be changed.' };
+    }
+
     try {
       if (!newPassword || newPassword.trim().length < 6) {
         return { success: false, error: 'Password must be at least 6 characters long.' };
@@ -515,6 +567,18 @@ export class UserManagementService {
     }
 
     try {
+      const { data: userRes } = await supabase.auth.getUser();
+      if (userRes?.user?.id) {
+        const { data: adminRow } = await supabase
+          .from('admin_accounts')
+          .select('role')
+          .eq('auth_user_id', userRes.user.id)
+          .maybeSingle();
+        if (this.isProtectedSuperAdminRole(adminRow?.role)) {
+          return { success: false, error: 'SUPER_ADMIN_IMMUTABLE: Super Admin password cannot be changed.' };
+        }
+      }
+
       const { error: authErr } = await supabase.auth.updateUser({
         password: clean,
         data: { must_change_password: false },
@@ -581,6 +645,9 @@ export class UserManagementService {
    * Trigger Supabase Auth Password Reset Email
    */
   static async resetPasswordForEmail(email: string): Promise<{ success: boolean; error?: string }> {
+    if (email.trim().toLowerCase() === 'sagarsaha3371@gmail.com') {
+      return { success: false, error: 'SUPER_ADMIN_IMMUTABLE: Super Admin password reset is disabled.' };
+    }
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
         redirectTo: `${window.location.origin}/admin`,
