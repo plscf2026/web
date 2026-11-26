@@ -14,35 +14,113 @@ test('PayStation Configuration contains no client password or hardcoded credenti
   assert.equal(typeof config.merchantId, 'string');
 });
 
-test('PayStation Grant Token and Payment Creation pipeline', async () => {
+test('PayStation createPayment fails closed without server Edge response and returns hosted checkout URL when server responds', async () => {
   const tokenRes = await PayStationService.grantToken();
   assert.equal(tokenRes.success, true);
   assert.ok(tokenRes.token);
 
-  const createRes = await PayStationService.createPayment(
+  // Without mocked Edge Function, createPayment must fail closed (never synthesize fake URL or simulated token)
+  const unmockedRes = await PayStationService.createPayment(
     {
-      invoice_number: 'INV-TEST-001',
+      invoice_number: 'INV-FAIL-CLOSED-001',
       currency: 'BDT',
       payment_amount: 1500,
       reference: 'ALUMNI',
       cust_name: 'Tanvir Hossain',
       cust_phone: '01712345678',
       cust_email: 'tanvir@example.com',
-      callback_url: 'http://localhost:3000/api/checkout/callback',
+      callback_url: 'https://plscf.org/?payment_return=1',
     },
     tokenRes.token
   );
+  assert.equal(unmockedRes.success, false);
+  assert.equal(unmockedRes.paymentUrl, undefined);
 
-  assert.equal(createRes.success, true);
-  assert.ok(createRes.paymentUrl);
-  assert.ok(createRes.trxId);
+  const origFunctionsDesc = Object.getOwnPropertyDescriptor(supabase, 'functions');
+  Object.defineProperty(supabase, 'functions', {
+    configurable: true,
+    value: {
+      invoke: async () => ({
+        data: {
+          success: true,
+          paymentUrl: 'https://sandbox.paystation.com.bd/checkout/REAL-SESSION-001',
+          trxId: 'PST-REAL-001',
+          invoiceNumber: 'INV-TEST-001',
+        },
+        error: null,
+      }),
+    },
+  });
+
+  try {
+    const createRes = await PayStationService.createPayment(
+      {
+        invoice_number: 'INV-TEST-001',
+        currency: 'BDT',
+        payment_amount: 1500,
+        reference: 'ALUMNI',
+        cust_name: 'Tanvir Hossain',
+        cust_phone: '01712345678',
+        cust_email: 'tanvir@example.com',
+        callback_url: 'https://plscf.org/?payment_return=1',
+      },
+      tokenRes.token
+    );
+
+    assert.equal(createRes.success, true);
+    assert.equal(createRes.paymentUrl, 'https://sandbox.paystation.com.bd/checkout/REAL-SESSION-001');
+    assert.equal(createRes.trxId, 'PST-REAL-001');
+  } finally {
+    if (origFunctionsDesc) {
+      Object.defineProperty(supabase, 'functions', origFunctionsDesc);
+    } else {
+      delete (supabase as any).functions;
+    }
+  }
 });
 
-test('PayStation Transaction Retrieval and Status Check', async () => {
-  const res = await PayStationService.retrieveTransaction('INV-TEST-001', 'TRX-TEST-9988');
-  assert.equal(res.success, true);
-  assert.equal(res.status, 'Success');
-  assert.ok(res.data);
+test('PayStation retrieveTransaction fails closed offline and verifies real server status response', async () => {
+  const unmockedRes = await PayStationService.retrieveTransaction('INV-FAIL-CLOSED-002', 'TRX-NONE');
+  assert.equal(unmockedRes.success, false);
+  assert.equal(unmockedRes.status, 'Failed');
+
+  const origFunctionsDesc = Object.getOwnPropertyDescriptor(supabase, 'functions');
+  Object.defineProperty(supabase, 'functions', {
+    configurable: true,
+    value: {
+      invoke: async () => ({
+        data: {
+          status_code: '200',
+          status: 'success',
+          data: {
+            invoice_number: 'INV-TEST-001',
+            trx_status: 'Successful',
+            trx_id: 'TRX-TEST-9988',
+            payment_amount: '1500',
+            order_date_time: '2026-11-26 11:00:00',
+            payer_mobile_no: '01712345678',
+            payment_method: 'bKash',
+            reference: 'ALUMNI',
+            checkout_items: 'Reunion Registration',
+          },
+        },
+        error: null,
+      }),
+    },
+  });
+
+  try {
+    const res = await PayStationService.retrieveTransaction('INV-TEST-001', 'TRX-TEST-9988');
+    assert.equal(res.success, true);
+    assert.equal(res.status, 'Success');
+    assert.equal(res.data?.trx_id, 'TRX-TEST-9988');
+  } finally {
+    if (origFunctionsDesc) {
+      Object.defineProperty(supabase, 'functions', origFunctionsDesc);
+    } else {
+      delete (supabase as any).functions;
+    }
+  }
 });
 
 test('PayStation Complete Registration and Authoritative Ticket Generation (2027 dynamic default)', async () => {
@@ -83,8 +161,8 @@ test('PayStation Complete Registration and Authoritative Ticket Generation (2027
   assert.equal(ticket.qrToken.length, 6);
   assert.ok(
     ticket.serverVerificationSignature?.startsWith('SIG_HMAC256_') ||
-      ticket.serverVerificationSignature?.startsWith('SIG_SANDBOX_'),
-    'Signature must come from server or non-secret sandbox tag (never hardcoded client signing secret)'
+      ticket.serverVerificationSignature === 'SIG_PENDING_SERVER_VERIFY',
+    'Signature must come from server or be marked SIG_PENDING_SERVER_VERIFY (never simulated)'
   );
 
   // Verify it exists in local store

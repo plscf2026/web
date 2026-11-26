@@ -496,3 +496,47 @@ test('P0-3 Initiation Gate: succeeds for valid registration & donation when auth
   assert.equal(persistedOrders[1].order_type, 'donation');
   assert.equal(gatewayUrls.length, 2);
 });
+
+test('P0-3 Initiation Gate: fails closed when PayStation gateway errors, returns invalid domain, or throws (never simulates)', async () => {
+  const errRes = await executeInitiatePayment(VALID_REG_ORDER, {
+    loadSettings: async () => ({ value: BASE_TEST_FEE_SETTINGS }),
+    upsertPendingOrder: async () => ({}),
+    fetchGateway: async () => ({
+      status: 200,
+      text: JSON.stringify({ status_code: '400', status: 'failed', message: 'Invalid merchant credentials' }),
+    }),
+    config: BASE_GATE_CONFIG,
+  });
+  assert.equal(errRes.status, 502);
+  assert.equal(errRes.body.success, false);
+  assert.equal(errRes.body.error, 'GATEWAY_INITIATION_FAILED');
+  assert.equal('simulated' in errRes.body, false);
+  assert.equal('paymentUrl' in errRes.body, false);
+
+  const badDomainRes = await executeInitiatePayment(VALID_REG_ORDER, {
+    loadSettings: async () => ({ value: BASE_TEST_FEE_SETTINGS }),
+    upsertPendingOrder: async () => ({}),
+    fetchGateway: async () => ({
+      status: 200,
+      text: JSON.stringify({ status_code: '200', status: 'success', payment_url: 'https://evil.example/pay' }),
+    }),
+    config: BASE_GATE_CONFIG,
+  });
+  assert.equal(badDomainRes.status, 502);
+  assert.equal(badDomainRes.body.success, false);
+  assert.equal(badDomainRes.body.error, 'GATEWAY_INVALID_CHECKOUT_URL');
+  assert.equal('simulated' in badDomainRes.body, false);
+
+  const netRes = await executeInitiatePayment(VALID_REG_ORDER, {
+    loadSettings: async () => ({ value: BASE_TEST_FEE_SETTINGS }),
+    upsertPendingOrder: async () => ({}),
+    fetchGateway: async () => {
+      throw new Error('Gateway TCP reset');
+    },
+    config: BASE_GATE_CONFIG,
+  });
+  assert.equal(netRes.status, 502);
+  assert.equal(netRes.body.success, false);
+  assert.equal(netRes.body.error, 'GATEWAY_UNREACHABLE');
+  assert.equal('simulated' in netRes.body, false);
+});

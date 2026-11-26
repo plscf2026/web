@@ -603,17 +603,15 @@ export const SupabaseService = {
 
     // For paid records, finalize authoritatively via Edge Function / server-side verification ONLY.
     // Direct anon upsert fallback to registrations_2027 is permanently removed.
-    const sig =
-      reg.serverVerificationSignature ||
-      `SIG_VERIFIED_${Date.now().toString(36).toUpperCase()}`;
+    const sig = reg.serverVerificationSignature || 'SIG_PENDING_SERVER_VERIFY';
 
     const res = await this.verifyPayment(
       reg.id,
-      reg.transactionId || `TRX-MANUAL-${Date.now()}`,
-      reg.paymentMethod || 'manual',
-      reg.totalPaid || reg.registrationFee || 1500,
+      reg.transactionId || '',
+      reg.paymentMethod || 'bkash',
+      reg.totalPaid || reg.registrationFee || 0,
       sig,
-      reg.verifiedBy || 'SYSTEM_CONFIRM',
+      reg.verifiedBy || 'PAYSTATION_EDGE_FUNCTION',
       reg
     );
 

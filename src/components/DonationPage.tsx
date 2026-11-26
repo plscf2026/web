@@ -19,8 +19,8 @@ import {
 import { Language, DonationRecord, PaymentMethod, FeeSettings } from '../types';
 import { translations } from '../i18n/translations';
 import { AppStore } from '../services/store';
-import { SupabaseService, isDevTestBypassAllowed } from '../services/supabase';
-import { PayStationService, PayStationPaymentResult } from '../services/paystation';
+import { SupabaseService } from '../services/supabase';
+import { PayStationService } from '../services/paystation';
 import { isValidBangladeshiMobile, normalizeBangladeshiMobileNumber, isDonationOpen, getDonationClosedMessage } from '../utils/rules';
 import { sanitizeInput } from '../utils/security';
 import { ThankYouCardBadge } from './ThankYouCardBadge';
@@ -143,37 +143,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
           PayStationService.clearPendingSession();
           setPendingPayment(null);
         } else {
-          // If in test/dev environment (blocked on production project), fallback to complete immediately
-          const isTestAllowed = isDevTestBypassAllowed();
-          if (isTestAllowed) {
-            const simulatedResult: PayStationPaymentResult = {
-              invoiceNumber: activeInvoice,
-              trxId: `TRX-${Date.now().toString(36).toUpperCase()}`,
-              status: 'Success',
-              amount: pending.amount,
-              method: pending.paymentMethod || 'bkash',
-              payerMobile: pending.mobileNumber,
-              timestamp: new Date().toISOString(),
-            };
-            const donation = await PayStationService.completeDonationAfterPayment(
-              {
-                donorName: pending.donorName,
-                mobileNumber: pending.mobileNumber,
-                email: pending.email,
-                amount: pending.amount,
-                purpose: pending.purpose,
-              },
-              simulatedResult
-            );
-            setCompletedDonation(donation);
-            setDonationsList(AppStore.getDonations());
-            sessionStorage.removeItem('plscf_pending_donation');
-            localStorage.removeItem('plscf_pending_donation');
-            PayStationService.clearPendingSession();
-            setPendingPayment(null);
-          } else {
-            setErrorMessage(verifyRes.error || (isBangla ? 'পেমেন্ট এখনও সম্পন্ন হয়নি।' : 'Payment verification could not be completed.'));
-          }
+          setErrorMessage(verifyRes.error || (isBangla ? 'পেমেন্ট এখনও সম্পন্ন হয়নি।' : 'Payment verification could not be completed.'));
         }
       } catch (err) {
         console.warn('Error handling donation return callback:', err);
@@ -245,41 +215,11 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
     setCustomAmount(cleaned);
   };
 
-  const handleVerifyPendingDonation = async (forceSimulate = false) => {
+  const handleVerifyPendingDonation = async () => {
     if (!pendingPayment) return;
     setIsVerifyingPending(true);
     setErrorMessage('');
     try {
-      const isTestAllowed = isDevTestBypassAllowed();
-      if (forceSimulate || isTestAllowed) {
-        const simRes: PayStationPaymentResult = {
-          invoiceNumber: pendingPayment.invoiceNumber,
-          trxId: `PST-TEST-${Date.now().toString(36).toUpperCase()}`,
-          status: 'Success',
-          amount: pendingPayment.amount,
-          method: paymentMethod,
-          payerMobile: pendingPayment.mobileNumber || mobileNumber,
-          timestamp: new Date().toISOString(),
-        };
-        const pendingRaw = sessionStorage.getItem('plscf_pending_donation');
-        const pending = pendingRaw ? JSON.parse(pendingRaw) : null;
-        const donation = await PayStationService.completeDonationAfterPayment(
-          {
-            donorName: pending?.donorName || pendingPayment.donorName || donorName || 'Honored Patron',
-            mobileNumber: pending?.mobileNumber || pendingPayment.mobileNumber || mobileNumber || '01700000000',
-            email: pending?.email || pendingPayment.email || email,
-            amount: pendingPayment.amount,
-            purpose: pending?.purpose || pendingPayment.purpose || defaultCauseTitle,
-          },
-          simRes
-        );
-        setCompletedDonation(donation);
-        setDonationsList(AppStore.getDonations());
-        sessionStorage.removeItem('plscf_pending_donation');
-        setPendingPayment(null);
-        return;
-      }
-
       const verifyRes = await PayStationService.verifyReturnedPayment(
         pendingPayment.invoiceNumber,
         pendingPayment.amount
@@ -404,55 +344,44 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
         throw new Error(createRes.error || 'Failed to initiate donation payment gateway.');
       }
 
-      if (createRes.paymentUrl) {
-        const isSandboxSim = createRes.paymentUrl.includes('checkout/pay?invoice=');
-        if (!isSandboxSim) {
-          const popup = window.open(createRes.paymentUrl, '_blank', 'noopener,noreferrer');
-          if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-            // Popup was blocked by browser or on mobile device — redirect directly
-            window.location.href = createRes.paymentUrl;
-            return;
-          }
-          setPendingPayment({
-            invoiceNumber,
-            amount: effectiveAmount,
-            paymentUrl: createRes.paymentUrl,
-            donorName: finalDonorName,
-            mobileNumber: normalizedMobile,
-            email: email.trim(),
-            purpose: causeTitle,
-          });
-          setIsProcessing(false);
-          return;
-        }
+      if (!createRes.paymentUrl) {
+        throw new Error('PayStation did not return a hosted checkout URL.');
       }
 
-      // Sandbox simulation / fallback: complete the donation record immediately
-      const paymentResult: PayStationPaymentResult = {
+      let parsedCheckoutUrl: URL;
+      try {
+        parsedCheckoutUrl = new URL(createRes.paymentUrl);
+      } catch {
+        throw new Error('Invalid PayStation hosted checkout URL returned.');
+      }
+
+      if (
+        parsedCheckoutUrl.protocol !== 'https:' ||
+        (parsedCheckoutUrl.hostname !== 'paystation.com.bd' &&
+          !parsedCheckoutUrl.hostname.endsWith('.paystation.com.bd'))
+      ) {
+        throw new Error('Refusing redirect to unverified payment gateway domain.');
+      }
+
+      const checkoutUrl = parsedCheckoutUrl.toString();
+      const popup = window.open(checkoutUrl, '_blank', 'noopener,noreferrer');
+      if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+        // Popup was blocked by browser or on mobile device — redirect directly
+        window.location.href = checkoutUrl;
+        return;
+      }
+
+      setPendingPayment({
         invoiceNumber,
-        trxId: createRes.trxId || `PST-${Date.now().toString(36).toUpperCase()}`,
-        status: 'Success',
         amount: effectiveAmount,
-        method: paymentMethod,
-        payerMobile: normalizedMobile,
-        timestamp: new Date().toISOString(),
-      };
-
-      const donation = await PayStationService.completeDonationAfterPayment(
-        {
-          donorName: finalDonorName,
-          mobileNumber: normalizedMobile,
-          email: email.trim(),
-          amount: effectiveAmount,
-          purpose: causeTitle,
-        },
-        paymentResult
-      );
-
-      setCompletedDonation(donation);
-      setDonationsList(AppStore.getDonations());
-      sessionStorage.removeItem('plscf_pending_donation');
-      setPendingPayment(null);
+        paymentUrl: checkoutUrl,
+        donorName: finalDonorName,
+        mobileNumber: normalizedMobile,
+        email: email.trim(),
+        purpose: causeTitle,
+      });
+      setIsProcessing(false);
+      return;
     } catch (err: any) {
       console.error('Donation checkout error:', err);
       setErrorMessage(
@@ -820,7 +749,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
                     )}
                     <button
                       type="button"
-                      onClick={() => handleVerifyPendingDonation(false)}
+                      onClick={() => handleVerifyPendingDonation()}
                       disabled={isVerifyingPending}
                       className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0EA5E9] text-white text-xs font-black transition-all cursor-pointer shadow-xs disabled:opacity-50"
                     >
@@ -831,17 +760,6 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
                       )}
                       <span>{isBangla ? 'পেমেন্ট নিশ্চিত ও যাচাই করুন' : 'Verify Payment Status'}</span>
                     </button>
-                    {isDevTestBypassAllowed() && (
-                      <button
-                        type="button"
-                        onClick={() => handleVerifyPendingDonation(true)}
-                        disabled={isVerifyingPending}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>{isBangla ? 'টেস্ট মোড নিশ্চিতকরণ' : 'Test Mode Instant Verify'}</span>
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={() => {

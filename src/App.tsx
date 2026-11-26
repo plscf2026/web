@@ -263,8 +263,8 @@ export default function App() {
             } else {
               setPaymentModalError(
                 language === 'bn'
-                  ? 'PayStation গেটওয়েতে পেমেন্ট সম্পন্ন হয়নি (বা বাতিল হয়েছে)। আপনার পূরণকৃত সব তথ্য সংরক্ষিত রয়েছে। টেস্ট মোডে তাৎক্ষণিক নিশ্চিত করতে নিচের সবুজ বাটনে চাপুন।'
-                  : 'Payment was not completed or cancelled on PayStation gateway. All your entered data is preserved. Click the green button below to verify in test mode and issue your ticket.'
+                  ? 'PayStation গেটওয়েতে পেমেন্ট সম্পন্ন হয়নি বা বাতিল হয়েছে। আপনার পূরণকৃত সব তথ্য সংরক্ষিত রয়েছে — অনুগ্রহ করে আবার চেষ্টা করুন।'
+                  : 'Payment was not completed or was cancelled on PayStation gateway. All your entered details are preserved — please try again.'
               );
             }
           } else {

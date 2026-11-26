@@ -283,48 +283,42 @@ export class PayStationService {
       }
     }
 
-    const config = this.getConfig();
-    const isNodeOfflineTest =
-      typeof window === 'undefined' &&
-      typeof process !== 'undefined' &&
-      !process.env?.VITE_SUPABASE_URL;
-
     // 1. Initiate payment exclusively via trusted Supabase Edge Function (`verify-payment`)
     let edgeReachedWithHttpError = false;
     let edgeErrorMessage = '';
 
-    if (!isNodeOfflineTest) {
-      try {
-        const { data, error } = await supabase.functions.invoke('verify-payment', {
-          body: { action: 'create-payment', order },
-        });
-        if (!error && data?.success && data?.paymentUrl) {
-          return {
-            success: true,
-            paymentUrl: data.paymentUrl,
-            trxId: data.trxId,
-            invoiceNumber: data.invoiceNumber || order.invoice_number,
-          };
-        }
-        if (!error && data && !data.success) {
-          edgeReachedWithHttpError = true;
-          edgeErrorMessage = data.error || data.message || 'PayStation payment initiation failed.';
-        } else if (error) {
-          if ((error as any).name === 'FunctionsHttpError') {
-            edgeReachedWithHttpError = true;
-            try {
-              const errJson = await (error as any).context?.json?.();
-              edgeErrorMessage = errJson?.error || errJson?.message || error.message;
-            } catch {
-              edgeErrorMessage = error.message;
-            }
-          } else {
-            console.warn('[PayStation] Edge create-payment notice:', error);
-          }
-        }
-      } catch (e) {
-        console.warn('[PayStation] Edge Function unavailable:', e);
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-payment', {
+        body: { action: 'create-payment', order },
+      });
+      if (!error && data?.success && data?.paymentUrl) {
+        return {
+          success: true,
+          paymentUrl: data.paymentUrl,
+          trxId: data.trxId,
+          invoiceNumber: data.invoiceNumber || order.invoice_number,
+        };
       }
+      if (!error && data && !data.success) {
+        edgeReachedWithHttpError = true;
+        edgeErrorMessage = data.error || data.message || 'PayStation payment initiation failed.';
+      } else if (error) {
+        if ((error as any).name === 'FunctionsHttpError') {
+          edgeReachedWithHttpError = true;
+          try {
+            const errJson = await (error as any).context?.json?.();
+            edgeErrorMessage = errJson?.error || errJson?.message || error.message;
+          } catch {
+            edgeErrorMessage = error.message;
+          }
+        } else {
+          edgeErrorMessage = error.message || edgeErrorMessage;
+          console.warn('[PayStation] Edge create-payment notice:', error);
+        }
+      }
+    } catch (e: any) {
+      edgeErrorMessage = e?.message || edgeErrorMessage;
+      console.warn('[PayStation] Edge Function unavailable:', e);
     }
 
     if (edgeReachedWithHttpError) {
@@ -334,23 +328,9 @@ export class PayStationService {
       };
     }
 
-    // 2. Local/Offline Sandbox Simulation Fallback (ONLY when Edge Function is unreachable in sandbox/test)
-    if (config.isSandbox) {
-      const simTrxId = `PST-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-      const fallbackUrl = order.callback_url
-        ? `${order.callback_url}&status=Successful&trx_id=${simTrxId}&simulated=true`
-        : `${config.baseUrl}/checkout/${order.invoice_number}`;
-      return {
-        success: true,
-        paymentUrl: fallbackUrl,
-        trxId: simTrxId,
-        invoiceNumber: order.invoice_number,
-      };
-    }
-
     return {
       success: false,
-      error: 'Production payment gateway server could not be reached. Please try again shortly.',
+      error: edgeErrorMessage || 'Payment gateway server could not be reached. Please try again shortly.',
     };
   }
 
@@ -358,7 +338,7 @@ export class PayStationService {
 
   /**
    * POST /transaction-status (v1) via trusted Supabase Edge Function `verify-payment` ONLY.
-   * Never calls PayStation directly from the browser.
+   * Never calls PayStation directly from the browser and never returns synthetic success statuses.
    */
   static async getTransactionStatusV1(invoiceNumber: string): Promise<{
     success: boolean;
@@ -366,63 +346,34 @@ export class PayStationService {
     data?: PayStationTrxStatusV1Response['data'];
     error?: string;
   }> {
-    const config = this.getConfig();
-    const isNodeOfflineTest =
-      typeof window === 'undefined' &&
-      typeof process !== 'undefined' &&
-      !process.env?.VITE_SUPABASE_URL;
-
-    if (!isNodeOfflineTest) {
-      try {
-        const { data, error } = await supabase.functions.invoke('verify-payment', {
-          body: { action: 'transaction-status-v1', invoice_number: invoiceNumber },
-        });
-        if (!error && data?.status_code === '200' && data?.data) {
-          const rawStatus = (data.data?.trx_status || '').toLowerCase().trim();
-          const isSuccess =
-            rawStatus === 'success' ||
-            rawStatus === 'successful' ||
-            rawStatus === 'completed' ||
-            rawStatus === 'captured' ||
-            rawStatus === 'paid' ||
-            rawStatus.includes('success');
-          const trxStatus = isSuccess ? 'success' : (rawStatus as any);
-          return { success: true, status: trxStatus, data: data.data };
-        }
-        if (error) {
-          console.warn('[PayStation] Edge txn-status-v1 notice:', error);
-        }
-      } catch (e) {
-        console.warn('[PayStation] Edge txn-status-v1 exception:', e);
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-payment', {
+        body: { action: 'transaction-status-v1', invoice_number: invoiceNumber },
+      });
+      if (!error && data?.status_code === '200' && data?.data) {
+        const rawStatus = (data.data?.trx_status || '').toLowerCase().trim();
+        const isSuccess =
+          rawStatus === 'success' ||
+          rawStatus === 'successful';
+        const trxStatus = isSuccess ? 'success' : (rawStatus as any);
+        return { success: true, status: trxStatus, data: data.data };
       }
-    }
-
-    // Fallback for Sandbox/Offline Test ONLY when server is unreachable
-    if (config.isSandbox) {
-      const pendingSession = this.getPendingSession();
-      const dynamicAmount = pendingSession?.amount ? String(pendingSession.amount) : '1500';
-      const invoiceHash = invoiceNumber
-        ? invoiceNumber.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase()
-        : 'SBX';
-      const simTrxId = `PST-SIM-${invoiceHash || 'SANDBOX'}`;
+      if (error) {
+        console.warn('[PayStation] Edge txn-status-v1 notice:', error);
+      }
       return {
-        success: true,
-        status: 'success',
-        data: {
-          invoice_number: invoiceNumber,
-          trx_status: 'Success',
-          trx_id: simTrxId,
-          payment_amount: dynamicAmount,
-          order_date_time: new Date().toISOString().replace('T', ' ').substring(0, 19),
-          payer_mobile_no: pendingSession?.formData?.mobileNumber || '',
-          payment_method: 'bKash',
-          reference: '',
-          checkout_items: '',
-        },
+        success: false,
+        status: 'failed',
+        error: data?.message || data?.error || error?.message || 'Payment status could not be verified.',
+      };
+    } catch (e: any) {
+      console.warn('[PayStation] Edge txn-status-v1 exception:', e);
+      return {
+        success: false,
+        status: 'failed',
+        error: e?.message || 'Failed to verify payment status from server.',
       };
     }
-
-    return { success: false, status: 'failed', error: 'Payment status could not be verified' };
   }
 
   // ── Core API: Transaction Status v2 (by trxId) ────────────────────────────
@@ -436,25 +387,18 @@ export class PayStationService {
     data?: PayStationTrxStatusV2Response['data'];
     error?: string;
   }> {
-    const isNodeOfflineTest =
-      typeof window === 'undefined' &&
-      typeof process !== 'undefined' &&
-      !process.env?.VITE_SUPABASE_URL;
-
-    if (!isNodeOfflineTest) {
-      try {
-        const { data, error } = await supabase.functions.invoke('verify-payment', {
-          body: { action: 'transaction-status-v2', trxId },
-        });
-        if (!error && data?.status_code === '200' && data?.data) {
-          return { success: true, data: data.data };
-        }
-        if (error) {
-          console.warn('[PayStation] Edge txn-status-v2 notice:', error);
-        }
-      } catch (e) {
-        console.warn('[PayStation] Edge txn-status-v2 exception:', e);
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-payment', {
+        body: { action: 'transaction-status-v2', trxId },
+      });
+      if (!error && data?.status_code === '200' && data?.data) {
+        return { success: true, data: data.data };
       }
+      if (error) {
+        console.warn('[PayStation] Edge txn-status-v2 notice:', error);
+      }
+    } catch (e) {
+      console.warn('[PayStation] Edge txn-status-v2 exception:', e);
     }
 
     return { success: false, error: 'Could not verify transaction' };
@@ -663,17 +607,7 @@ export class PayStationService {
     }
 
     const paidAmount = Number(d.payment_amount);
-    const requestedAmount = d.request_amount ? Number(d.request_amount) : paidAmount;
-
-    // 1. Check if paid amount matches the invoice requested amount (with 5 BDT tolerance)
-    const matchesRequested = Math.abs(paidAmount - requestedAmount) <= 5;
-    // 2. Check if paid amount satisfies expected amount from caller
-    const matchesExpected = paidAmount >= expectedAmount - 5;
-    // 3. Resilient check: as long as customer paid at least the minimum registration fee (1000 BDT)
-    // and cleared the full requested amount of the invoice, accept the payment authoritatively
-    const isAmountValid = matchesRequested || matchesExpected || (paidAmount >= 1000 && paidAmount >= requestedAmount - 5);
-
-    if (!isAmountValid) {
+    if (!Number.isFinite(paidAmount) || paidAmount <= 0 || Math.abs(paidAmount - expectedAmount) > 0.01) {
       return {
         verified: false,
         error: `Amount mismatch: paid ${paidAmount}, expected ${expectedAmount}`,
@@ -894,29 +828,20 @@ export class PayStationService {
       qrToken = generateUniqueSixCharToken(existingTokens);
     }
 
-    const isNodeOfflineTest =
-      typeof window === 'undefined' &&
-      typeof process !== 'undefined' &&
-      !process.env?.VITE_SUPABASE_URL;
-
     let signature = '';
-    if (!isNodeOfflineTest) {
-      const edgeVerify = await this.verifyWithSupabaseEdge(
-        regId,
-        payment.invoiceNumber,
-        payment.trxId,
-        payment.amount,
-        payment.method
-      );
-      if (edgeVerify.success && edgeVerify.result?.signature) {
-        signature = String(edgeVerify.result.signature);
-      }
+    const edgeVerify = await this.verifyWithSupabaseEdge(
+      regId,
+      payment.invoiceNumber,
+      payment.trxId,
+      payment.amount,
+      payment.method
+    );
+    if (edgeVerify.success && edgeVerify.result?.signature) {
+      signature = String(edgeVerify.result.signature);
     }
 
     if (!signature) {
-      signature = this.getConfig().isSandbox
-        ? `SIG_SANDBOX_${Date.now().toString(36).toUpperCase()}`
-        : 'SIG_PENDING_SERVER_VERIFY';
+      signature = 'SIG_PENDING_SERVER_VERIFY';
     }
 
     const hasParent = Boolean(formData.hasParent);

@@ -293,12 +293,33 @@ export async function executeInitiatePayment(
     }
 
     if (createData && (createData.status_code === '200' || createData.status === 'success') && createData.payment_url) {
+      let validGatewayUrl: URL | null = null;
+      try {
+        const parsed = new URL(String(createData.payment_url));
+        if (parsed.protocol === 'https:' && parsed.hostname.endsWith('paystation.com.bd')) {
+          validGatewayUrl = parsed;
+        }
+      } catch {
+        validGatewayUrl = null;
+      }
+
+      if (!validGatewayUrl) {
+        return {
+          status: 502,
+          body: {
+            success: false,
+            error: 'GATEWAY_INVALID_CHECKOUT_URL',
+            message: 'PayStation returned an invalid or non-PayStation checkout URL.',
+          },
+        };
+      }
+
       return {
         status: 200,
         body: {
           success: true,
           status_code: createData.status_code,
-          paymentUrl: createData.payment_url,
+          paymentUrl: validGatewayUrl.toString(),
           invoiceNumber: createData.invoice_number || cleanInvoice,
           registrationId,
           payment_amount: String(feeEval.expectedTotal!),
@@ -307,50 +328,23 @@ export async function executeInitiatePayment(
       };
     }
 
-    // Sandbox simulation ONLY when env=sandbox AND finalization is explicitly disabled
-    if (deps.config.paystationEnv === 'sandbox' && !deps.config.allowPaymentFinalization) {
-      const simTrxId = `PST-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-      return {
-        status: 200,
-        body: {
-          success: true,
-          status_code: '200',
-          paymentUrl: `${cbEval.callbackUrl!}&status=Successful&trx_id=${simTrxId}&simulated=true`,
-          trxId: simTrxId,
-          invoiceNumber: cleanInvoice,
-          registrationId,
-          payment_amount: String(feeEval.expectedTotal!),
-          message: 'Sandbox simulation payment URL created (finalization disabled).',
-        },
-      };
-    }
-
     return {
-      status: 400,
+      status: createRes.status >= 400 && createRes.status < 600 ? createRes.status : 502,
       body: {
         success: false,
-        error: createData?.message || `PayStation error ${createRes.status}`,
+        error: 'GATEWAY_INITIATION_FAILED',
+        status_code: createData?.status_code,
+        message: createData?.message || `PayStation gateway rejected payment initiation (HTTP ${createRes.status}).`,
       },
     };
   } catch (err: any) {
-    if (deps.config.paystationEnv === 'sandbox' && !deps.config.allowPaymentFinalization) {
-      const simTrxId = `PST-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-      return {
-        status: 200,
-        body: {
-          success: true,
-          status_code: '200',
-          paymentUrl: `${cbEval.callbackUrl!}&status=Successful&trx_id=${simTrxId}&simulated=true`,
-          trxId: simTrxId,
-          invoiceNumber: cleanInvoice,
-          registrationId,
-          payment_amount: String(feeEval.expectedTotal!),
-        },
-      };
-    }
     return {
       status: 502,
-      body: { success: false, error: err?.message || 'Payment initiation failed' },
+      body: {
+        success: false,
+        error: 'GATEWAY_UNREACHABLE',
+        message: err?.message || 'Payment initiation failed to reach PayStation.',
+      },
     };
   }
 }

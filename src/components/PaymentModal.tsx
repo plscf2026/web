@@ -24,7 +24,6 @@ import { StudentIdCardBadge } from './idcard/StudentIdCardBadge';
 import { ParentIdCardBadge } from './idcard/ParentIdCardBadge';
 import { IdCardStore } from '../services/idCardStore';
 import { AppStore } from '../services/store';
-import { isDevTestBypassAllowed } from '../services/supabase';
 import { StudentPhotoStorageService, isBase64DataUrl, extractStoragePathFromPublicUrl } from '../services/studentPhotoStorageService';
 
 export interface PaymentModalProps {
@@ -91,7 +90,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [activeCardTab, setActiveCardTab] = useState<'student' | 'parent'>('student');
   const [pollCount, setPollCount] = useState(0);
   const [copiedField, setCopiedField] = useState('');
-  const [showSandboxGuide, setShowSandboxGuide] = useState(false);
 
   // Dynamic fee, parent pass, and gateway charge calculation
   // Official gateway charges:
@@ -285,101 +283,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   // ── Hosted checkout launch (real gateway) ───────────────────────────────
 
-  const handleInstantSandboxPayment = async (method: PaymentMethod = selectedMethod) => {
+  const handlePayStationHostedCheckout = async () => {
     if (!registrationData) {
       setErrorMessage(isBangla ? 'নিবন্ধন ডেটা অনুপস্থিত।' : 'Registration data missing.');
       return;
     }
     if (isFinalizingRef.current || completedTicket) return;
-
-    setStep('processing');
-    setErrorMessage('');
-    const methodTitle =
-      method === 'nagad'
-        ? 'Nagad'
-        : method === 'rocket'
-        ? 'Rocket'
-        : method === 'card'
-        ? 'Card'
-        : method === 'amex'
-        ? 'Amex Card'
-        : 'bKash';
-    setProcessingStep(
-      isBangla
-        ? `${methodTitle} পেমেন্ট সম্পন্ন করা হচ্ছে...`
-        : `Completing ${methodTitle} payment...`
-    );
-
-    try {
-      // 1. Authoritatively create or update pending registration in Supabase (payment_status='pending', total_paid=0)
-      const currentCharge = calculateGatewayCharge(subtotal, method);
-      const chargeAmount = Math.round((subtotal + currentCharge) * 100) / 100;
-
-      const enrichedFormData: RegistrationFormData = {
-        ...registrationData,
-        parentFee,
-        gatewayCharge: currentCharge,
-      };
-
-      await PayStationService.createPendingRegistration(
-        enrichedFormData,
-        {
-          registrationFee,
-          donationAmount,
-          parentFee,
-          gatewayCharge: currentCharge,
-          totalPayable: chargeAmount,
-        },
-        invoiceRef.current,
-        pendingSession?.registrationId
-      );
-
-      // 2. Build verified transaction result with deterministic channel-specific prefix
-      const prefix =
-        method === 'nagad'
-          ? 'NGD'
-          : method === 'rocket'
-          ? 'RKT'
-          : method === 'card'
-          ? 'CRD'
-          : method === 'amex'
-          ? 'AMX'
-          : 'BKS';
-      const cleanInvoice = (invoiceRef.current || '').replace(/[^A-Za-z0-9]/g, '').slice(-8).toUpperCase();
-      const simTrxId = `${prefix}-SBX-${cleanInvoice || 'VALID'}`;
-
-      const paymentResult: PayStationPaymentResult = {
-        invoiceNumber: invoiceRef.current,
-        trxId: simTrxId,
-        status: 'Success',
-        amount: chargeAmount,
-        method: method,
-        payerMobile: registrationData.mobileNumber,
-        timestamp: new Date().toISOString(),
-      };
-
-      // 3. Complete authoritative finalization (persists to Supabase, updates status to paid, records ledger)
-      await finalizeRegistration(paymentResult);
-    } catch (err: any) {
-      console.error('[PaymentModal] Instant payment failure:', err);
-      setErrorMessage(err.message || 'Payment initiation failed.');
-      setStep('failed');
-    }
-  };
-
-  const handlePayStationHostedCheckout = async (forceHostedExternal = false) => {
-    if (!registrationData) {
-      setErrorMessage(isBangla ? 'নিবন্ধন ডেটা অনুপস্থিত।' : 'Registration data missing.');
-      return;
-    }
-    if (isFinalizingRef.current || completedTicket) return;
-
-    // P0-3: Instant sandbox simulation is strictly gated behind isDevTestBypassAllowed()
-    // so live/production project builds can NEVER bypass gateway payment verification.
-    if (config.isSandbox && !forceHostedExternal && isDevTestBypassAllowed()) {
-      await handleInstantSandboxPayment(selectedMethod);
-      return;
-    }
 
     setStep('processing');
     setErrorMessage('');
@@ -536,12 +445,24 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         opt_c: pendingRecord.id,
       });
 
-      if (!createRes.success || !createRes.paymentUrl) {
-        throw new Error(createRes.error || 'PayStation did not return a checkout URL.');
+      let parsedCheckoutUrl: URL | null = null;
+      if (createRes.success && createRes.paymentUrl) {
+        try {
+          const u = new URL(createRes.paymentUrl);
+          if (u.protocol === 'https:' && u.hostname.endsWith('paystation.com.bd')) {
+            parsedCheckoutUrl = u;
+          }
+        } catch {
+          parsedCheckoutUrl = null;
+        }
+      }
+
+      if (!createRes.success || !parsedCheckoutUrl) {
+        throw new Error(createRes.error || 'PayStation did not return a valid hosted checkout URL.');
       }
 
       setProcessingStep(
-        isBangla ? 'পেমেন্ট পেজে নিয়ে যাওয়া হচ্ছে...' : 'Opening PayStation checkout...'
+        isBangla ? 'PayStation চেকআউট পেজে নিয়ে যাওয়া হচ্ছে...' : 'Redirecting to PayStation checkout...'
       );
 
       // Persist full pending registration session before redirecting
@@ -562,8 +483,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         qrToken: pendingRecord.qrToken,
       });
 
-      // Redirect in the current window to ensure mobile Safari history & "GO BACK" redirects work seamlessly
-      window.location.href = createRes.paymentUrl;
+      // Redirect in the current window to the genuine PayStation Hosted Checkout page
+      window.location.href = parsedCheckoutUrl.toString();
     } catch (err: any) {
       console.error('[PayStation] Checkout error:', err);
       setErrorMessage(err.message || 'Payment initiation failed.');
@@ -846,37 +767,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <p className="text-xs text-rose-700 max-w-xs mx-auto leading-relaxed">{errorMessage}</p>
             </div>
 
-            {/* Sandbox explanation box */}
-            {config.isSandbox && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-900 space-y-2 text-left">
-                <div className="font-bold flex items-center gap-1.5 text-amber-800">
-                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>{isBangla ? 'কেন PayStation/bKash এ ত্রুটি হলো?' : 'Why did the payment fail?'}</span>
-                </div>
-                <p className="text-[11px] leading-relaxed text-amber-800">
-                  {isBangla
-                    ? 'স্যান্ডবক্স টেস্ট মোডে bKash গেটওয়ে ব্যক্তিগত নম্বর দিয়ে পেমেন্ট সম্পন্ন করতে পারে না ("The input wallet is not eligible / Insufficient balance")। আপনার রেজিস্ট্রেশনের সমস্ত তথ্য ডেটাবেজে সংরক্ষিত রয়েছে। নিচের সবুজ বাটনে ক্লিক করে তাৎক্ষণিক নিশ্চিতকরণ টিকিট সংগ্রহ করুন।'
-                    : 'In Sandbox mode, bKash rejects personal mobile numbers after OTP verification because they do not exist in the sandbox mock ledger. All your entered registration details are safely preserved. Click below to instantly complete registration and get your verified ticket.'}
-                </p>
-              </div>
-            )}
-
             <div className="space-y-2.5 pt-1">
-              {config.isSandbox && (
-                <button
-                  type="button"
-                  onClick={() => handleInstantSandboxPayment(selectedMethod || 'bkash')}
-                  className="w-full py-4 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold text-sm cursor-pointer transition shadow-lg shadow-sky-600/30 flex items-center justify-center gap-2"
-                >
-                  <CheckCircle2 className="w-5 h-5 text-white" />
-                  <span>
-                    {isBangla
-                      ? 'স্যান্ডবক্স টেস্ট মোডে নিশ্চিত করুন ও টিকিট সংগ্রহ করুন'
-                      : 'Complete in Test Mode & Get Verified Ticket'}
-                  </span>
-                </button>
-              )}
-
               <button
                 type="button"
                 onClick={() => {
@@ -1308,92 +1199,73 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               {selectedMethod === 'bkash' ? (
                 <button
                   type="button"
-                  onClick={() => handlePayStationHostedCheckout(false)}
+                  onClick={() => handlePayStationHostedCheckout()}
                   className="w-full py-4 rounded-2xl bg-[#BE185D] hover:bg-[#9D174D] text-white font-bold text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Lock className="w-4 h-4 text-pink-200" />
                   <span>
-                    {config.isSandbox
-                      ? (isBangla
-                          ? `বিকাশ-এ ৳${finalTotalPayable.toLocaleString()} পে করুন (নিশ্চিত ও টিকিট তৈরি)`
-                          : `Pay ৳${finalTotalPayable.toLocaleString()} via bKash (Confirm & Ticket)`)
-                      : (isBangla
-                          ? `বিকাশ (PayStation)-এ ৳${finalTotalPayable.toLocaleString()} পে করুন`
-                          : `Pay ৳${finalTotalPayable.toLocaleString()} via bKash (PayStation)`)}
+                    {isBangla
+                      ? `বিকাশ (PayStation)-এ ৳${finalTotalPayable.toLocaleString()} পে করুন`
+                      : `Pay ৳${finalTotalPayable.toLocaleString()} via bKash (PayStation)`}
                   </span>
                   <ArrowRight className="w-3.5 h-3.5 opacity-80" />
                 </button>
               ) : selectedMethod === 'nagad' ? (
                 <button
                   type="button"
-                  onClick={() => handlePayStationHostedCheckout(false)}
+                  onClick={() => handlePayStationHostedCheckout()}
                   className="w-full py-4 rounded-2xl bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Lock className="w-4 h-4 text-orange-200" />
                   <span>
                     {isBangla
-                      ? `নগদ-এ ৳${finalTotalPayable.toLocaleString()} পে করুন (নিশ্চিত ও টিকিট তৈরি)`
-                      : `Pay ৳${finalTotalPayable.toLocaleString()} via Nagad (Confirm & Ticket)`}
+                      ? `নগদ (PayStation)-এ ৳${finalTotalPayable.toLocaleString()} পে করুন`
+                      : `Pay ৳${finalTotalPayable.toLocaleString()} via Nagad (PayStation)`}
                   </span>
                   <ArrowRight className="w-3.5 h-3.5 opacity-80" />
                 </button>
               ) : selectedMethod === 'rocket' ? (
                 <button
                   type="button"
-                  onClick={() => handlePayStationHostedCheckout(false)}
+                  onClick={() => handlePayStationHostedCheckout()}
                   className="w-full py-4 rounded-2xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Lock className="w-4 h-4 text-purple-200" />
                   <span>
                     {isBangla
-                      ? `রকেট-এ ৳${finalTotalPayable.toLocaleString()} পে করুন (নিশ্চিত ও টিকিট তৈরি)`
-                      : `Pay ৳${finalTotalPayable.toLocaleString()} via Rocket (Confirm & Ticket)`}
+                      ? `রকেট (PayStation)-এ ৳${finalTotalPayable.toLocaleString()} পে করুন`
+                      : `Pay ৳${finalTotalPayable.toLocaleString()} via Rocket (PayStation)`}
                   </span>
                   <ArrowRight className="w-3.5 h-3.5 opacity-80" />
                 </button>
               ) : selectedMethod === 'amex' ? (
                 <button
                   type="button"
-                  onClick={() => handlePayStationHostedCheckout(false)}
+                  onClick={() => handlePayStationHostedCheckout()}
                   className="w-full py-4 rounded-2xl bg-[#4338CA] hover:bg-[#3730A3] text-white font-bold text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <CreditCard className="w-4 h-4 text-indigo-200" />
                   <span>
                     {isBangla
-                      ? `Amex Card-এ ৳${finalTotalPayable.toLocaleString()} পে করুন (নিশ্চিত ও টিকিট তৈরি)`
-                      : `Pay ৳${finalTotalPayable.toLocaleString()} via Amex Card (Confirm & Ticket)`}
+                      ? `Amex Card (PayStation)-এ ৳${finalTotalPayable.toLocaleString()} পে করুন`
+                      : `Pay ৳${finalTotalPayable.toLocaleString()} via Amex Card (PayStation)`}
                   </span>
                   <ArrowRight className="w-3.5 h-3.5 opacity-80" />
                 </button>
               ) : (
                 <button
                   type="button"
-                  onClick={() => handlePayStationHostedCheckout(false)}
+                  onClick={() => handlePayStationHostedCheckout()}
                   className="w-full py-4 rounded-2xl bg-[#0F172A] hover:bg-[#1E293B] text-white font-bold text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <CreditCard className="w-4 h-4 text-sky-400" />
                   <span>
                     {isBangla
-                      ? `কার্ড (ভিসা/মাস্টার)-এ ৳${finalTotalPayable.toLocaleString()} পে করুন (নিশ্চিত ও টিকিট তৈরি)`
-                      : `Pay ৳${finalTotalPayable.toLocaleString()} via Card (Confirm & Ticket)`}
+                      ? `কার্ড (ভিসা/মাস্টার - PayStation)-এ ৳${finalTotalPayable.toLocaleString()} পে করুন`
+                      : `Pay ৳${finalTotalPayable.toLocaleString()} via Card (PayStation)`}
                   </span>
                   <ArrowRight className="w-3.5 h-3.5 opacity-80" />
                 </button>
-              )}
-
-              {/* In Sandbox Mode: Option to test raw external PayStation hosted checkout URL */}
-              {config.isSandbox && (
-                <div className="text-center pt-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setShowSandboxGuide(true)}
-                    className="text-[10px] text-slate-400 hover:text-slate-600 underline cursor-pointer transition"
-                  >
-                    {isBangla
-                      ? 'PayStation বাহ্যিক গেটওয়ে পেজ টেস্ট করুন (স্যান্ডবক্স সার্ভার লিঙ্ক)'
-                      : 'Test external PayStation sandbox hosted page'}
-                  </button>
-                </div>
               )}
 
               {/* Secondary: Go Back to Registration Form */}
@@ -1412,69 +1284,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <span>{config.merchantId ? `Merchant ID: ${config.merchantId}` : 'PayStation Secure Gateway'}</span>
               <span>•</span>
               <span className="text-emerald-600 font-semibold">bKash (Active) · Nagad (Active) · Rocket (Active) · Cards (Active) · Amex (Active)</span>
-            </div>
-          </div>
-        )}
-
-        {/* Sandbox test wallet guide modal */}
-        {showSandboxGuide && (
-          <div className="fixed inset-0 z-60 bg-black/75 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-slate-200 text-left animate-in fade-in zoom-in-95 duration-150">
-              <div className="flex items-center gap-2 text-amber-600">
-                <AlertCircle className="w-5 h-5 shrink-0" />
-                <h3 className="font-bold text-sm text-slate-900">
-                  {isBangla ? 'PayStation স্যান্ডবক্স টেস্ট ওয়ালেট নির্দেশিকা' : 'PayStation Sandbox Test Wallet Guide'}
-                </h3>
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                {isBangla
-                  ? 'বিকাশ স্যান্ডবক্সে ব্যক্তিগত নম্বর (যেমন 017..., 018...) দিলে ওটিপি ভেরিফিকেশন সফল দেখালেও পেমেন্ট "Sorry! Payment Failed" দেখাবে। টেস্ট করতে নিচের অফিসিয়াল স্যান্ডবক্স নম্বর ব্যবহার করুন:'
-                  : 'In bKash Sandbox, personal numbers will verify OTP but fail payment with "Sorry! Payment Failed". Please use the official sandbox credentials:'}
-              </p>
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5 font-mono">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 font-sans">Wallet / Number:</span>
-                  <span className="font-bold text-slate-900">01770618575</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 font-sans">OTP:</span>
-                  <span className="font-bold text-slate-900">123456</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 font-sans">PIN:</span>
-                  <span className="font-bold text-slate-900">12121</span>
-                </div>
-              </div>
-              <div className="space-y-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowSandboxGuide(false);
-                    handleInstantSandboxPayment(selectedMethod || 'bkash');
-                  }}
-                  className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer transition flex items-center justify-center gap-2 shadow"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{isBangla ? 'তাৎক্ষণিক টেস্ট ভেরিফাই করুন (সুপারিশকৃত)' : 'Instant Test Verify (Recommended)'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowSandboxGuide(false);
-                    handlePayStationHostedCheckout(true);
-                  }}
-                  className="w-full py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs cursor-pointer transition"
-                >
-                  {isBangla ? 'বাহ্যিক গেটওয়েতে যান (01770618575 দিয়ে)' : 'Continue to External Gateway (with test wallet)'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowSandboxGuide(false)}
-                  className="w-full py-1.5 text-slate-400 hover:text-slate-600 text-xs font-medium cursor-pointer transition"
-                >
-                  {isBangla ? 'বন্ধ করুন' : 'Cancel'}
-                </button>
-              </div>
             </div>
           </div>
         )}
