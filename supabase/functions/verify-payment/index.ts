@@ -22,6 +22,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { computeAuthoritativeOrderAmount } from './feeValidation.ts';
 import { parseAllowlistedOrigins } from './callbackUrl.ts';
 import { executeInitiatePayment } from './initiationHandler.ts';
+import { verifyPayStationTransaction } from './statusClient.ts';
+import { PendingOrderCurrencyBinding } from './currencyStrategy.ts';
 
 // ── Required env secrets (fail closed if missing) ───────────────────────────
 const PAYSTATION_MERCHANT_ID = Deno.env.get('PAYSTATION_MERCHANT_ID');
@@ -32,6 +34,11 @@ const PAYMENT_SIGNING_SECRET = Deno.env.get('PAYMENT_SIGNING_SECRET');
 // CRITICAL: payment finalization disabled by default.
 // Edge Function will only call payment-confirming RPCs when this is 'true'.
 const ALLOW_PAYMENT_FINALIZATION = Deno.env.get('PAYSTATION_ALLOW_PAYMENT_FINALIZATION') === 'true';
+
+// Explicitly attested BDT-only order binding when PayStation omits `currency` in status payloads.
+// Must remain false in production unless merchant BDT settlement lock is verified.
+const ALLOW_ORDER_BOUND_CURRENCY_ATTESTATION =
+  Deno.env.get('PAYSTATION_ALLOW_ORDER_BOUND_CURRENCY_ATTESTATION') === 'true';
 
 const ALLOWED_ORIGINS_RAW = Deno.env.get('APP_ALLOWED_ORIGINS') ?? '';
 const allowedOrigins = parseAllowlistedOrigins(ALLOWED_ORIGINS_RAW, PAYSTATION_ENV);
@@ -98,103 +105,66 @@ interface GatewayStatusVerification {
   rawData?: Record<string, unknown>;
 }
 
+async function loadPendingOrderBinding(
+  sbAdmin: any,
+  invoiceNumber?: string
+): Promise<PendingOrderCurrencyBinding | null> {
+  const cleanInvoice = typeof invoiceNumber === 'string' ? invoiceNumber.trim() : '';
+  if (!cleanInvoice || !sbAdmin) return null;
+  try {
+    const { data } = await sbAdmin
+      .from('pending_orders')
+      .select('invoice_number, currency, amount')
+      .eq('invoice_number', cleanInvoice)
+      .maybeSingle();
+    return data ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function verifyGatewayTransactionStatus(
   trxId: string,
-  expectedInvoiceNumber?: string
+  expectedInvoiceNumber?: string,
+  pendingOrder?: PendingOrderCurrencyBinding | null
 ): Promise<GatewayStatusVerification> {
-  const cleanTrx = trxId.trim();
-  if (!cleanTrx) {
-    return { ok: false, statusCode: 400, error: 'INVALID_TRX_ID', message: 'Transaction ID is required.' };
-  }
+  // Authoritative verification delegates to v2/v1 PayStation status client and
+  // enforces exact status (`['success', 'successful'].includes(...)`), trx_id,
+  // invoice_number, positive amount, and explicit/order-bound currency checks.
+  const verified = await verifyPayStationTransaction(trxId, expectedInvoiceNumber, {
+    baseUrl: PAYSTATION_BASE_URL,
+    merchantId: PAYSTATION_MERCHANT_ID!,
+    allowOrderBoundCurrencyAttestation: ALLOW_ORDER_BOUND_CURRENCY_ATTESTATION,
+    pendingOrder,
+  });
 
-  let data: any;
-  try {
-    const queryRes = await fetch(`${PAYSTATION_BASE_URL}/v2/transaction-status`, {
-      method: 'POST',
-      headers: { 'merchantId': PAYSTATION_MERCHANT_ID!, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ trxId: cleanTrx }),
-    });
-    data = await queryRes.json();
-  } catch (err: any) {
+  if (!verified.ok) {
     return {
       ok: false,
-      statusCode: 502,
-      error: 'GATEWAY_UNREACHABLE',
-      message: err?.message || 'Failed to verify transaction with PayStation.',
+      statusCode: verified.statusCode,
+      error: verified.error,
+      message: verified.message,
     };
   }
 
-  const rawTrxStatus = typeof data?.data?.trx_status === 'string' ? data.data.trx_status.toLowerCase().trim() : '';
-  if (data?.status_code !== '200' || !data?.data || !['success', 'successful'].includes(rawTrxStatus)) {
+  const rawSt = String(verified.rawData?.trx_status || '').toLowerCase().trim();
+  if (!['success', 'successful'].includes(rawSt)) {
     return {
       ok: false,
       statusCode: 402,
       error: 'TRANSACTION_NOT_VERIFIED',
-      message: 'PayStation transaction could not be verified or is not in Success status.',
-    };
-  }
-
-  // Condition 2 (HARD BLOCKER): Official PayStation /transaction-status & IPN schemas do not
-  // guarantee a returned `currency` field on all accounts. NEVER default missing currency to BDT.
-  const rawCurrency = data.data.currency;
-  const gwCurrency = typeof rawCurrency === 'string' && rawCurrency.trim() !== ''
-    ? rawCurrency.trim().toUpperCase()
-    : null;
-  if (gwCurrency === null) {
-    return {
-      ok: false,
-      statusCode: 402,
-      error: 'CURRENCY_MISSING',
-      message: 'PayStation response did not include a currency field. Payment finalization requires explicit currency confirmation.',
-    };
-  }
-  if (gwCurrency !== 'BDT') {
-    return {
-      ok: false,
-      statusCode: 402,
-      error: 'CURRENCY_MISMATCH',
-      message: `Unexpected currency: ${gwCurrency}. Only BDT is accepted.`,
-    };
-  }
-
-  const gatewayAmount = Number(data.data.payment_amount ?? data.data.trx_amount);
-  if (!Number.isFinite(gatewayAmount) || gatewayAmount <= 0) {
-    return {
-      ok: false,
-      statusCode: 402,
-      error: 'INVALID_AMOUNT',
-      message: 'PayStation transaction amount is missing or invalid.',
-    };
-  }
-
-  const gwTrxId = data.data.trx_id ? String(data.data.trx_id).trim() : cleanTrx;
-  if (gwTrxId.toUpperCase() !== cleanTrx.toUpperCase()) {
-    return {
-      ok: false,
-      statusCode: 402,
-      error: 'TRX_ID_MISMATCH',
-      message: 'PayStation returned a mismatched transaction ID.',
-    };
-  }
-
-  const gwInvoice = data.data.invoice_number ? String(data.data.invoice_number).trim() : null;
-  if (expectedInvoiceNumber && gwInvoice && gwInvoice !== expectedInvoiceNumber.trim()) {
-    return {
-      ok: false,
-      statusCode: 402,
-      error: 'INVOICE_MISMATCH',
-      message: 'PayStation transaction invoice does not match the requested order.',
+      message: 'PayStation transaction status is not verified as successful.',
     };
   }
 
   return {
     ok: true,
-    amount: gatewayAmount,
-    method: data.data.payment_method ? String(data.data.payment_method) : null,
-    currency: gwCurrency,
-    trxId: gwTrxId,
-    invoiceNumber: gwInvoice,
-    rawData: data.data,
+    amount: verified.amount,
+    method: verified.method,
+    currency: verified.currency,
+    trxId: verified.trxId,
+    invoiceNumber: verified.invoiceNumber,
+    rawData: verified.rawData,
   };
 }
 
@@ -318,20 +288,22 @@ serve(async (req) => {
         return jsonResponse({ success: false, error: 'INVALID_REQUEST', message: 'id and transaction_id are required.' }, 400, corsHeaders);
       }
 
-      const gwCheck = await verifyGatewayTransactionStatus(
-        String(transaction_id),
-        invoice_number ? String(invoice_number) : undefined
-      );
-      if (!gwCheck.ok) {
-        return jsonResponse({ success: false, error: gwCheck.error, message: gwCheck.message }, gwCheck.statusCode || 402, corsHeaders);
-      }
-
       const supabaseUrl        = Deno.env.get('SUPABASE_URL');
       const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
       if (!supabaseUrl || !supabaseServiceKey) {
         return jsonResponse({ success: false, error: 'DB_CONFIG_MISSING' }, 503, corsHeaders);
       }
       const sbAdmin = createClient(supabaseUrl, supabaseServiceKey);
+      const pendingOrder = await loadPendingOrderBinding(sbAdmin, invoice_number ? String(invoice_number) : undefined);
+
+      const gwCheck = await verifyGatewayTransactionStatus(
+        String(transaction_id),
+        invoice_number ? String(invoice_number) : undefined,
+        pendingOrder
+      );
+      if (!gwCheck.ok) {
+        return jsonResponse({ success: false, error: gwCheck.error, message: gwCheck.message }, gwCheck.statusCode || 402, corsHeaders);
+      }
       const { data: settingsRow } = await sbAdmin.from('system_settings').select('value').eq('key', 'portal_fee_settings').maybeSingle();
       if (!settingsRow?.value) {
         return jsonResponse({ success: false, error: 'FEE_SETTINGS_MISSING' }, 503, corsHeaders);
@@ -430,8 +402,23 @@ serve(async (req) => {
         return jsonResponse({ status: 'error', error: 'CURRENCY_MISMATCH', message: `Unexpected IPN currency: ${body.currency}` }, 402, corsHeaders);
       }
 
-      // Verify authoritatively against PayStation /v2/transaction-status using server credentials
-      const gwCheck = await verifyGatewayTransactionStatus(String(trx_id), String(invoice_number));
+      const supabaseUrl        = Deno.env.get('SUPABASE_URL');
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+      if (!supabaseUrl || !supabaseServiceKey) {
+        console.error('[IPN] Supabase service role credentials missing.');
+        return jsonResponse({ status: 'error', message: 'DB credentials missing' }, 503, corsHeaders);
+      }
+
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      const pendingOrder = await loadPendingOrderBinding(supabase, String(invoice_number));
+
+      // Verify authoritatively against PayStation status API using server credentials
+      const gwCheck = await verifyGatewayTransactionStatus(
+        String(trx_id),
+        String(invoice_number),
+        pendingOrder
+      );
       if (!gwCheck.ok) {
         return jsonResponse({ status: 'error', error: gwCheck.error, message: gwCheck.message }, gwCheck.statusCode || 402, corsHeaders);
       }
@@ -446,16 +433,6 @@ serve(async (req) => {
           }, 402, corsHeaders);
         }
       }
-
-      const supabaseUrl        = Deno.env.get('SUPABASE_URL');
-      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-      if (!supabaseUrl || !supabaseServiceKey) {
-        console.error('[IPN] Supabase service role credentials missing.');
-        return jsonResponse({ status: 'error', message: 'DB credentials missing' }, 503, corsHeaders);
-      }
-
-      const supabase = createClient(supabaseUrl, supabaseServiceKey);
       const verifiedMethod = gwCheck.method || payment_method || 'bkash';
       const { data: ipnRes, error: ipnErr } = await supabase.rpc('rpc_handle_paystation_ipn', {
         p_invoice_number:  String(invoice_number).trim(),
@@ -502,9 +479,23 @@ serve(async (req) => {
       return jsonResponse({ success: false, error: 'INVALID_REQUEST', message: 'registration_id or invoice_number is required.' }, 400, corsHeaders);
     }
 
+    const supabaseUrl        = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return jsonResponse({ success: false, error: 'DB credentials missing.' }, 503, corsHeaders);
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const pendingOrder = await loadPendingOrderBinding(
+      supabase,
+      invoice_number ? String(invoice_number) : undefined
+    );
+
     const gwCheck = await verifyGatewayTransactionStatus(
       String(trx_id),
-      invoice_number ? String(invoice_number) : undefined
+      invoice_number ? String(invoice_number) : undefined,
+      pendingOrder
     );
     if (!gwCheck.ok) {
       return jsonResponse({ success: false, error: gwCheck.error, message: gwCheck.message }, gwCheck.statusCode || 402, corsHeaders);
@@ -519,15 +510,6 @@ serve(async (req) => {
       verifiedAmount,
       PAYMENT_SIGNING_SECRET!
     );
-
-    const supabaseUrl        = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return jsonResponse({ success: false, error: 'DB credentials missing.' }, 503, corsHeaders);
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const pendingHint = invoice_number ? { gatewayInvoiceNumber: String(invoice_number).trim() } : null;
     const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_verify_payment', {
       p_reg_id:       String(registration_id || invoice_number),

@@ -4,6 +4,8 @@ import { PayStationService, PayStationPaymentResult } from '../services/paystati
 import { RegistrationFormData } from './rules';
 import { AppStore } from '../services/store';
 import { supabase } from '../services/supabase';
+import { resolveCurrencyVerification } from '../../supabase/functions/verify-payment/currencyStrategy.ts';
+import { verifyPayStationTransaction } from '../../supabase/functions/verify-payment/statusClient.ts';
 
 test('PayStation Configuration contains no client password or hardcoded credentials', () => {
   const config = PayStationService.getConfig() as unknown as Record<string, unknown>;
@@ -480,5 +482,123 @@ test('PayStation payment initiation and transaction status route exclusively thr
     } else {
       process.env.VITE_SUPABASE_URL = prevUrl;
     }
+  }
+});
+
+test('Currency verification strategy never assumes currency and fails closed unless explicit or order-bound attested', () => {
+  // 1. Default behavior: omitted currency MUST fail closed with CURRENCY_MISSING
+  const omittedDefault = resolveCurrencyVerification({
+    rawGatewayCurrency: undefined,
+    gatewayAmount: 1528,
+    gatewayRequestAmount: '1528.00',
+    allowOrderBoundAttestation: false,
+    pendingOrder: { invoice_number: 'INV-CUR-1', currency: 'BDT', amount: 1528 },
+  });
+  assert.equal(omittedDefault.ok, false);
+  assert.equal(omittedDefault.error, 'CURRENCY_MISSING');
+
+  // 2. Explicit non-BDT gateway currency MUST fail closed
+  const usdMismatch = resolveCurrencyVerification({
+    rawGatewayCurrency: 'USD',
+    gatewayAmount: 1528,
+    allowOrderBoundAttestation: true,
+    pendingOrder: { invoice_number: 'INV-CUR-2', currency: 'BDT', amount: 1528 },
+  });
+  assert.equal(usdMismatch.ok, false);
+  assert.equal(usdMismatch.error, 'CURRENCY_MISMATCH');
+
+  // 3. Attested mode without pendingOrder MUST fail closed
+  const missingBinding = resolveCurrencyVerification({
+    rawGatewayCurrency: undefined,
+    gatewayAmount: 1528,
+    allowOrderBoundAttestation: true,
+    pendingOrder: null,
+  });
+  assert.equal(missingBinding.ok, false);
+  assert.equal(missingBinding.error, 'ORDER_BINDING_MISSING');
+
+  // 4. Attested mode with mismatched request_amount MUST fail closed
+  const amtMismatch = resolveCurrencyVerification({
+    rawGatewayCurrency: undefined,
+    gatewayAmount: 1528,
+    gatewayRequestAmount: '1000.00',
+    allowOrderBoundAttestation: true,
+    pendingOrder: { invoice_number: 'INV-CUR-3', currency: 'BDT', amount: 1528 },
+  });
+  assert.equal(amtMismatch.ok, false);
+  assert.equal(amtMismatch.error, 'AMOUNT_MISMATCH');
+
+  // 5. Attested mode with matching BDT pendingOrder succeeds without inventing gateway currency
+  const attestedOk = resolveCurrencyVerification({
+    rawGatewayCurrency: undefined,
+    gatewayAmount: 1528,
+    gatewayRequestAmount: '1528.00',
+    allowOrderBoundAttestation: true,
+    pendingOrder: { invoice_number: 'INV-CUR-4', currency: 'BDT', amount: 1528 },
+  });
+  assert.equal(attestedOk.ok, true);
+  assert.equal(attestedOk.currency, 'BDT');
+  assert.equal(attestedOk.mode, 'ORDER_BOUND_ATTESTED_BDT');
+});
+
+test('verifyPayStationTransaction falls back from v2 HTTP 500 to v1 and rejects failed/pending/mismatched status', async () => {
+  const calls: string[] = [];
+  const resOk = await verifyPayStationTransaction('DKQ40Q4YKK', 'INV-V1V2-1', {
+    baseUrl: 'https://sandbox.paystation.com.bd',
+    merchantId: '104-1653730183',
+    allowOrderBoundCurrencyAttestation: true,
+    pendingOrder: { invoice_number: 'INV-V1V2-1', currency: 'BDT', amount: 1500 },
+    fetchFn: (async (url: string) => {
+      calls.push(url);
+      if (url.includes('/v2/transaction-status')) {
+        return new Response(JSON.stringify({ message: 'Server Error' }), { status: 500 });
+      }
+      return new Response(
+        JSON.stringify({
+          status_code: '200',
+          status: 'success',
+          data: {
+            invoice_number: 'INV-V1V2-1',
+            trx_status: 'successful',
+            trx_id: 'DKQ40Q4YKK',
+            request_amount: '1500.00',
+            payment_amount: '1500.00',
+            payment_method: 'bKash',
+          },
+        }),
+        { status: 200 }
+      );
+    }) as any,
+  });
+
+  assert.equal(resOk.ok, true);
+  assert.equal(resOk.verificationSource, 'transaction-status-v1');
+  assert.equal(resOk.currencyVerificationMode, 'ORDER_BOUND_ATTESTED_BDT');
+  assert.equal(resOk.trxId, 'DKQ40Q4YKK');
+  assert.equal(calls.length, 2);
+
+  // Processing / Failed must be rejected
+  for (const st of ['processing', 'failed', 'cancelled']) {
+    const resBad = await verifyPayStationTransaction('DKQ40Q4YKK', 'INV-V1V2-1', {
+      baseUrl: 'https://sandbox.paystation.com.bd',
+      merchantId: '104-1653730183',
+      allowOrderBoundCurrencyAttestation: true,
+      pendingOrder: { invoice_number: 'INV-V1V2-1', currency: 'BDT', amount: 1500 },
+      fetchFn: (async () =>
+        new Response(
+          JSON.stringify({
+            status_code: '200',
+            data: {
+              invoice_number: 'INV-V1V2-1',
+              trx_status: st,
+              trx_id: st === 'processing' ? '' : 'DKQ40Q4YKK',
+              payment_amount: '1500.00',
+            },
+          }),
+          { status: 200 }
+        )) as any,
+    });
+    assert.equal(resBad.ok, false);
+    assert.equal(resBad.error, 'TRANSACTION_NOT_VERIFIED');
   }
 });

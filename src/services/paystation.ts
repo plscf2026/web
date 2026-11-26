@@ -660,14 +660,14 @@ export class PayStationService {
     };
   }
 
-  /** Server-side Supabase Edge verification (backward compat) */
+  /** Server-side Supabase Edge verification */
   static async verifyWithSupabaseEdge(
     registrationId: string,
     invoiceNumber: string,
     trxId: string,
     amount: number,
     method: string
-  ): Promise<{ success: boolean; result?: any; error?: string }> {
+  ): Promise<{ success: boolean; rejected?: boolean; result?: any; error?: string }> {
     try {
       const { data, error } = await supabase.functions.invoke('verify-payment', {
         body: {
@@ -675,12 +675,30 @@ export class PayStationService {
           registration_id: registrationId,
           invoice_number: invoiceNumber,
           trx_id: trxId,
-          payment_amount: amount,
           payment_method: method,
+          payment_amount: amount,
         },
       });
       if (!error && data?.success) return { success: true, result: data };
-      if (error) console.warn('[Supabase Edge verify-payment notice]:', error);
+      if (data && data.success === false) {
+        return {
+          success: false,
+          rejected: true,
+          error: data.message || data.error || 'Server payment verification rejected.',
+        };
+      }
+      if (error) {
+        const msg = String(error?.message || '');
+        const isFetchError =
+          msg.includes('Failed to send') ||
+          msg.includes('fetch failed') ||
+          msg.includes('ENOTFOUND') ||
+          msg.includes('FunctionsFetchError');
+        console.warn('[Supabase Edge verify-payment notice]:', error);
+        if (!isFetchError && msg) {
+          return { success: false, rejected: true, error: msg };
+        }
+      }
     } catch (err) {
       console.warn('[Supabase Edge verify-payment unhandled]:', err);
     }
@@ -836,6 +854,11 @@ export class PayStationService {
       payment.amount,
       payment.method
     );
+    if (edgeVerify.rejected) {
+      throw new Error(
+        `Database persistence failed: ${edgeVerify.error || 'Server payment verification rejected.'}`
+      );
+    }
     if (edgeVerify.success && edgeVerify.result?.signature) {
       signature = String(edgeVerify.result.signature);
     }
@@ -948,63 +971,60 @@ export class PayStationService {
       verifiedBy: 'PAYSTATION_GATEWAY',
     };
 
-    // Authoritative payment verification on Supabase server via SECURITY DEFINER rpc_verify_payment
-    // Pass record as pendingData so rpc_verify_payment can self-heal atomically if pending insert was dropped
-    try {
-      const verifyRes = await SupabaseService.verifyPayment(
-        record.id,
-        payment.trxId,
-        payment.method,
-        payment.amount,
-        signature,
-        'PAYSTATION_GATEWAY',
-        record
-      );
+    // Authoritative payment verification on Supabase server via SECURITY DEFINER rpc_verify_payment.
+    // Skip redundant verification RPC if verifyWithSupabaseEdge already verified and persisted atomically.
+    if (!edgeVerify.success) {
+      try {
+        const verifyRes = await SupabaseService.verifyPayment(
+          record.id,
+          payment.trxId,
+          payment.method,
+          payment.amount,
+          signature,
+          'PAYSTATION_GATEWAY',
+          record
+        );
 
-      if (!verifyRes.success) {
-        console.error('[PayStation] Database payment verification notice:', verifyRes.error);
-        const isOnline =
-          typeof window === 'undefined' ||
-          typeof navigator === 'undefined' ||
-          navigator.onLine !== false;
-        const isTestEnv =
-          typeof process !== 'undefined' &&
-          (process.env?.NODE_ENV === 'test' || !process.env?.VITE_SUPABASE_URL);
+        if (!verifyRes.success) {
+          console.error('[PayStation] Database payment verification notice:', verifyRes.error);
+          const isOnline =
+            typeof window === 'undefined' ||
+            typeof navigator === 'undefined' ||
+            navigator.onLine !== false;
+          const isTestEnv =
+            typeof process !== 'undefined' &&
+            (process.env?.NODE_ENV === 'test' || !process.env?.VITE_SUPABASE_URL);
 
-        const isPermissionError =
-          verifyRes.error?.includes('permission denied') ||
-          verifyRes.error?.includes('42501');
+          const isPermissionError =
+            verifyRes.error?.includes('permission denied') ||
+            verifyRes.error?.includes('42501');
 
-        // If the error is the unique mobile_normalized constraint, the pending row for this
-        // student ALREADY EXISTS in the database (savePendingRegistration ran at checkout).
-        // The payment was confirmed by bKash/PayStation. The mobile uniqueness clash means
-        // the database already has this student's record — treat as successful persistence.
-        const isMobileNormalizedConflict =
-          verifyRes.error?.includes('uq_registrations_2027_mobile_normalized') ||
-          verifyRes.error?.includes('mobile_normalized');
+          const isMobileNormalizedConflict =
+            verifyRes.error?.includes('uq_registrations_2027_mobile_normalized') ||
+            verifyRes.error?.includes('mobile_normalized');
 
-        if (isMobileNormalizedConflict) {
-          console.warn(
-            '[PayStation] Mobile-normalized unique constraint hit — pending record for this student already exists. ' +
-            'Payment confirmed by gateway. Continuing as successful registration.'
-          );
-          // Fall through — record is in DB, we can display the success screen
-        } else if (isTestEnv && isPermissionError) {
-          // Offline Node/test harness only (no Supabase backend): do not break offline unit tests
-          console.warn('[PayStation] Offline test mode RPC bypass; never active in browser runtime.');
-        } else if (!isTestEnv && isOnline && !verifyRes.isNetworkError) {
-          throw new Error(
-            `Database persistence failed: ${verifyRes.error || 'Unable to confirm registration in central database.'}`
-          );
+          if (isMobileNormalizedConflict) {
+            console.warn(
+              '[PayStation] Mobile-normalized unique constraint hit — pending record for this student already exists. ' +
+              'Payment confirmed by gateway. Continuing as successful registration.'
+            );
+          } else if (isTestEnv && isPermissionError) {
+            // Offline Node/test harness only (no Supabase backend): do not break offline unit tests
+            console.warn('[PayStation] Offline test mode RPC bypass; never active in browser runtime.');
+          } else if (!isTestEnv && isOnline && !verifyRes.isNetworkError) {
+            throw new Error(
+              `Database persistence failed: ${verifyRes.error || 'Unable to confirm registration in central database.'}`
+            );
+          }
+        } else {
+          console.log(`[PayStation] Authoritatively verified payment for ${record.id} in Supabase`);
         }
-      } else {
-        console.log(`[PayStation] Authoritatively verified payment for ${record.id} in Supabase`);
+      } catch (err: any) {
+        if (err.message && err.message.startsWith('Database persistence failed')) {
+          throw err;
+        }
+        console.warn('[PayStation] Supabase verification notice:', err);
       }
-    } catch (err: any) {
-      if (err.message && err.message.startsWith('Database persistence failed')) {
-        throw err;
-      }
-      console.warn('[PayStation] Supabase verification notice:', err);
     }
 
     AppStore.addRegistration(record, year);
