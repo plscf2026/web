@@ -6,6 +6,26 @@
 
 import { CommitteeMember, CommitteeSettings } from '../types';
 import { supabase } from './supabase';
+import {
+  compressStudentPhoto,
+  validateStudentImage,
+  PhotoUploadResult,
+} from './studentPhotoStorageService';
+
+export const COMMITTEE_PHOTOS_BUCKET = 'committee-photos';
+
+export function buildCommitteePhotoStoragePath(
+  memberIdOrName?: string,
+  extension: string = 'webp'
+): string {
+  const cleanSlug = (memberIdOrName || 'member')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'member';
+  const ext = extension.replace(/^\./, '').toLowerCase() || 'webp';
+  return `members/${cleanSlug}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+}
 
 const STORAGE_KEY_MEMBERS = 'plscf_committee_members_v1';
 const STORAGE_KEY_SETTINGS = 'plscf_committee_settings_v1';
@@ -434,5 +454,72 @@ export class CommitteeService {
     }
 
     return updated;
+  }
+
+  /**
+   * Validates, compresses, and uploads a committee member photo to Supabase Storage.
+   */
+  static async uploadMemberPhoto(
+    file: File | Blob,
+    memberIdOrName?: string
+  ): Promise<PhotoUploadResult> {
+    try {
+      const validation = await validateStudentImage(file);
+      if (!validation.valid) {
+        return {
+          success: false,
+          storagePath: '',
+          publicUrl: '',
+          error: validation.error || 'Invalid image file.',
+        };
+      }
+
+      const compressed = await compressStudentPhoto(file, {
+        maxDimension: 800,
+        maxBytes: 150 * 1024,
+        preferredMime: 'image/webp',
+      });
+      const extension = compressed.mimeType.includes('webp')
+        ? 'webp'
+        : compressed.mimeType.includes('png')
+        ? 'png'
+        : 'jpg';
+      const storagePath = buildCommitteePhotoStoragePath(memberIdOrName, extension);
+
+      const { error } = await supabase.storage
+        .from(COMMITTEE_PHOTOS_BUCKET)
+        .upload(storagePath, compressed.blob, {
+          contentType: compressed.mimeType,
+          upsert: false,
+          cacheControl: '31536000',
+        });
+
+      if (error) {
+        return {
+          success: false,
+          storagePath: '',
+          publicUrl: '',
+          error: error.message || 'Failed to upload photo to Supabase Storage.',
+        };
+      }
+
+      const { data: pub } = supabase.storage
+        .from(COMMITTEE_PHOTOS_BUCKET)
+        .getPublicUrl(storagePath);
+
+      return {
+        success: true,
+        storagePath,
+        publicUrl: pub?.publicUrl || '',
+        sizeBytes: compressed.sizeBytes,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        storagePath: '',
+        publicUrl: '',
+        error: err?.message || 'Unexpected error uploading committee photo.',
+      };
+    }
   }
 }

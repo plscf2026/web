@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Users,
   Plus,
@@ -17,6 +17,9 @@ import {
   Grid,
   CheckCircle2,
   Sparkles,
+  Upload,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { CommitteeMember, CommitteeSettings, Language } from '../../types';
 import { CommitteeService } from '../../services/committeeService';
@@ -53,6 +56,10 @@ export const CommitteeManagementTab: React.FC<CommitteeManagementTabProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<CommitteeMember | null>(null);
   const [toastMessage, setToastMessage] = useState<string>('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoUploadError, setPhotoUploadError] = useState('');
+  const [photoUploadInfo, setPhotoUploadInfo] = useState('');
+  const photoFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Form State
   const [formData, setFormData] = useState<Partial<CommitteeMember>>({
@@ -97,6 +104,8 @@ export const CommitteeManagementTab: React.FC<CommitteeManagementTabProps> = ({
   const handleOpenCreateModal = () => {
     const maxOrder = members.reduce((max, m) => Math.max(max, m.order || 0), 0);
     setEditingMember(null);
+    setPhotoUploadError('');
+    setPhotoUploadInfo('');
     setFormData({
       name: '',
       nameBn: '',
@@ -115,8 +124,40 @@ export const CommitteeManagementTab: React.FC<CommitteeManagementTabProps> = ({
   // Open Edit Modal
   const handleOpenEditModal = (member: CommitteeMember) => {
     setEditingMember(member);
+    setPhotoUploadError('');
+    setPhotoUploadInfo('');
     setFormData({ ...member });
     setIsModalOpen(true);
+  };
+
+  // Upload committee member photo directly to Supabase Storage
+  const handlePhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setPhotoUploadError('');
+    setPhotoUploadInfo('');
+    setIsUploadingPhoto(true);
+    try {
+      const targetKey = editingMember?.id || formData.name || `member-${Date.now()}`;
+      const res = await CommitteeService.uploadMemberPhoto(file, targetKey);
+      if (res.success && res.publicUrl) {
+        setFormData((prev) => ({ ...prev, img: res.publicUrl }));
+        const kb = res.sizeBytes ? Math.max(1, Math.round(res.sizeBytes / 1024)) : null;
+        setPhotoUploadInfo(
+          isBn
+            ? `সুপাবেজ স্টোরেজে সংরক্ষিত হয়েছে${kb ? ` (${kb} KB)` : ''}`
+            : `Saved to Supabase Storage${kb ? ` (${kb} KB)` : ''}`
+        );
+      } else {
+        setPhotoUploadError(res.error || (isBn ? 'ছবি আপলোড ব্যর্থ হয়েছে।' : 'Failed to upload photo.'));
+      }
+    } catch (err: any) {
+      setPhotoUploadError(err?.message || (isBn ? 'ছবি আপলোড করতে ত্রুটি হয়েছে।' : 'Unexpected photo upload error.'));
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   };
 
   // Submit Form (Add or Edit)
@@ -470,11 +511,38 @@ export const CommitteeManagementTab: React.FC<CommitteeManagementTabProps> = ({
             </div>
 
             <form onSubmit={handleSubmitForm} className="space-y-4">
-              {/* Photo Preview and Quick Presets */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700">
-                  {isBn ? 'সদস্যের ছবি (URL)' : 'Photo URL'}
-                </label>
+              {/* Photo Preview, Upload to Supabase Storage, and Quick Presets */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-bold text-slate-700">
+                    {isBn ? 'সদস্যের ছবি (আপলোড অথবা URL)' : 'Member Photo (Upload or URL)'}
+                  </label>
+                  <button
+                    type="button"
+                    disabled={isUploadingPhoto}
+                    onClick={() => photoFileInputRef.current?.click()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#0284C7] border border-sky-200 text-[11px] font-bold transition-colors disabled:opacity-60 cursor-pointer shadow-2xs"
+                  >
+                    {isUploadingPhoto ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="w-3.5 h-3.5" />
+                    )}
+                    <span>
+                      {isUploadingPhoto
+                        ? (isBn ? 'আপলোড হচ্ছে...' : 'Uploading...')
+                        : (isBn ? 'ছবি আপলোড করুন' : 'Upload Photo')}
+                    </span>
+                  </button>
+                  <input
+                    ref={photoFileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handlePhotoFileChange}
+                    className="hidden"
+                  />
+                </div>
+
                 <div className="flex items-center gap-3">
                   <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-[#0284C7] shrink-0 bg-slate-100 shadow-sm">
                     <img
@@ -486,14 +554,39 @@ export const CommitteeManagementTab: React.FC<CommitteeManagementTabProps> = ({
                       }}
                     />
                   </div>
-                  <input
-                    type="url"
-                    value={formData.img || ''}
-                    onChange={(e) => setFormData({ ...formData, img: e.target.value })}
-                    placeholder="https://images.unsplash.com/..."
-                    className="flex-1 px-3 py-2 rounded-xl text-xs border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
-                  />
+                  <div className="flex-1 space-y-1">
+                    <input
+                      type="url"
+                      value={formData.img || ''}
+                      onChange={(e) => {
+                        setPhotoUploadError('');
+                        setPhotoUploadInfo('');
+                        setFormData({ ...formData, img: e.target.value });
+                      }}
+                      placeholder="https://images.unsplash.com/..."
+                      className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
+                    />
+                    <span className="text-[10px] text-slate-400 block">
+                      {isBn
+                        ? 'JPG, PNG বা WebP (সর্বোচ্চ ৫ মেগাবাইট) সরাসরি সুপাবেজ স্টোরেজে সেভ হবে।'
+                        : 'JPG, PNG or WebP (max 5 MB) — compressed & saved directly to Supabase Storage.'}
+                    </span>
+                  </div>
                 </div>
+
+                {photoUploadError && (
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-xl">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{photoUploadError}</span>
+                  </div>
+                )}
+
+                {photoUploadInfo && (
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>{photoUploadInfo}</span>
+                  </div>
+                )}
 
                 {/* Quick Avatar Presets */}
                 <div className="pt-1">

@@ -206,9 +206,17 @@ export async function validateStudentImage(
 /**
  * Converts a File or Blob or Base64 string to a HTMLImageElement or dataUrl
  */
-function toDataUrl(input: File | Blob | string): Promise<string> {
+async function toDataUrl(input: File | Blob | string): Promise<string> {
   if (typeof input === 'string') {
-    return Promise.resolve(input);
+    return input;
+  }
+  if (typeof FileReader === 'undefined') {
+    const bytes = new Uint8Array(await input.arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) {
+      bin += String.fromCharCode(bytes[i]);
+    }
+    return `data:${input.type || 'image/webp'};base64,${btoa(bin)}`;
   }
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

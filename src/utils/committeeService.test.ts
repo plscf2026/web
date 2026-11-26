@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CommitteeService } from '../services/committeeService';
+import {
+  CommitteeService,
+  COMMITTEE_PHOTOS_BUCKET,
+  buildCommitteePhotoStoragePath,
+} from '../services/committeeService';
 
 test('1. CommitteeService: Loads default 16 committee members', () => {
   const members = CommitteeService.getMembers();
@@ -80,4 +84,40 @@ test('7. CommitteeService: Manages carousel and grid settings', () => {
 
   // Restore default
   CommitteeService.saveSettings({ displayMode: 'carousel', autoScrollSpeedMs: 3500 });
+});
+
+test('8. CommitteeService: buildCommitteePhotoStoragePath formats member folder path cleanly', () => {
+  const path = buildCommitteePhotoStoragePath('Dr. M. A. Kashem', 'webp');
+  assert.ok(path.startsWith('members/dr-m-a-kashem-'));
+  assert.ok(path.endsWith('.webp'));
+});
+
+test('9. CommitteeService: uploadMemberPhoto rejects invalid image files and uploads valid images to committee-photos bucket', async () => {
+  const invalidFile = new File(['not-an-image'], 'bad.txt', { type: 'text/plain' });
+  const invalidRes = await CommitteeService.uploadMemberPhoto(invalidFile, 'COM-TEST');
+  assert.equal(invalidRes.success, false);
+  assert.ok(invalidRes.error);
+
+  const originalFetch = globalThis.fetch;
+  let capturedUrl = '';
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    capturedUrl = String(input);
+    return new Response(JSON.stringify({ Key: `${COMMITTEE_PHOTOS_BUCKET}/members/com-99-test.webp` }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }) as any;
+
+  try {
+    // Valid PNG magic bytes header
+    const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+    const validPng = new File([pngBytes], 'member.png', { type: 'image/png' });
+    const res = await CommitteeService.uploadMemberPhoto(validPng, 'COM-99');
+
+    assert.equal(res.success, true);
+    assert.ok(capturedUrl.includes(`/storage/v1/object/${COMMITTEE_PHOTOS_BUCKET}/members/com-99-`));
+    assert.ok(res.publicUrl.includes(`/storage/v1/object/public/${COMMITTEE_PHOTOS_BUCKET}/members/com-99-`));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
