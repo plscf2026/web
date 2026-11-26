@@ -685,7 +685,8 @@ export class EventStore {
    */
   static async authenticateStaff(
     identifier: string,
-    passwordAttempt: string
+    passwordAttempt: string,
+    expectedRole?: EventStaffRole | 'ALL'
   ): Promise<{ success: boolean; staff?: StaffAccount; error?: string }> {
     const normalized = identifier.trim().toLowerCase();
 
@@ -701,6 +702,12 @@ export class EventStore {
       if (match) {
         if (match.status !== 'ACTIVE') {
           return { success: false, error: 'Access denied: this staff account is disabled.' };
+        }
+        if (expectedRole && expectedRole !== 'ALL' && match.role !== 'SUPER_ADMIN' && match.role !== expectedRole) {
+          return {
+            success: false,
+            error: `Role mismatch: this account is assigned to ${match.role}, not ${expectedRole}. Select ${match.role} or "All Staff (Auto-Detect)".`,
+          };
         }
         const sessionWithExpiry = { ...match, expiresAt: Date.now() + STAFF_SESSION_TTL_MS };
         if (typeof window !== 'undefined') {
@@ -763,6 +770,19 @@ export class EventStore {
     if (data.status !== 'ACTIVE') {
       await supabase.auth.signOut();
       return { success: false, error: 'Access denied: this staff account is disabled.' };
+    }
+
+    if (
+      expectedRole &&
+      expectedRole !== 'ALL' &&
+      data.role !== 'SUPER_ADMIN' &&
+      data.role !== expectedRole
+    ) {
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        error: `Role mismatch: this account is assigned to ${data.role}, not ${expectedRole}. Select ${data.role} or "All Staff (Auto-Detect)".`,
+      };
     }
 
     if (data.role === 'BREAKFAST_STAFF' && !isBreakfastCollectionOpen()) {

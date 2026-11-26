@@ -12,7 +12,7 @@ import {
   RefreshCw,
   CheckCircle2,
 } from 'lucide-react';
-import { StaffAccount, Language } from '../types';
+import { StaffAccount, EventStaffRole, Language } from '../types';
 import { EventStore } from '../services/eventStore';
 import { AppStore } from '../services/store';
 import { isDevTestBypassAllowed, supabase } from '../services/supabase';
@@ -29,11 +29,67 @@ interface ScannerPortalProps {
   language: Language;
 }
 
+const STAFF_TYPE_OPTIONS: Array<{
+  value: EventStaffRole | 'ALL';
+  labelEn: string;
+  labelBn: string;
+  moduleId?: string;
+}> = [
+  {
+    value: 'ALL',
+    labelEn: 'All Staff (Auto-Detect Assigned Module)',
+    labelBn: 'সকল স্টাফ (স্বয়ংক্রিয় মডিউল)',
+  },
+  {
+    value: 'GATE_STAFF',
+    labelEn: 'Gate Entry & Exit Staff (GATE_STAFF)',
+    labelBn: 'গেট এন্ট্রি ও প্রস্থান স্টাফ',
+    moduleId: 'gate_entry',
+  },
+  {
+    value: 'BREAKFAST_STAFF',
+    labelEn: 'Breakfast Pavilion Staff (BREAKFAST_STAFF)',
+    labelBn: 'সকালের নাশতা কাউন্টার স্টাফ',
+    moduleId: 'food_breakfast',
+  },
+  {
+    value: 'LUNCH_STAFF',
+    labelEn: 'Lunch Pavilion Staff (LUNCH_STAFF)',
+    labelBn: 'দুপুরের খাবার কাউন্টার স্টাফ',
+    moduleId: 'food_lunch',
+  },
+  {
+    value: 'DINNER_STAFF',
+    labelEn: 'Dinner Banquet Staff (DINNER_STAFF)',
+    labelBn: 'রাতের ডিনার কাউন্টার স্টাফ',
+    moduleId: 'food_dinner',
+  },
+  {
+    value: 'DRESS_STAFF',
+    labelEn: 'T-Shirt & Kit Distribution Staff (DRESS_STAFF)',
+    labelBn: 'টি-শার্ট ও কিট বিতরণ স্টাফ',
+    moduleId: 'dress_distribution',
+  },
+  {
+    value: 'FINANCE_STAFF',
+    labelEn: 'Finance & Cash Counter Staff (FINANCE_STAFF)',
+    labelBn: 'ফাইন্যান্স ও ক্যাশ কাউন্টার স্টাফ',
+    moduleId: 'staff_finance',
+  },
+  {
+    value: 'SUPER_ADMIN',
+    labelEn: 'Super Administrator — Multi-Station (SUPER_ADMIN)',
+    labelBn: 'সুপার অ্যাডমিনিস্ট্রেটর — সকল স্টেশন',
+    moduleId: 'multi_station',
+  },
+];
+
 export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
   const [currentStaff, setCurrentStaff] = useState<StaffAccount | null>(null);
 
   // Login form state - dev bypass enabled only in local development
   const isDevMode = isDevTestBypassAllowed();
+  const [staffTypeInput, setStaffTypeInput] = useState<EventStaffRole | 'ALL'>('ALL');
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -191,8 +247,14 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
     setIsLoggingIn(true);
 
     try {
-      const res = await EventStore.authenticateStaff(usernameInput, passwordInput);
+      const res = await EventStore.authenticateStaff(usernameInput, passwordInput, staffTypeInput);
       if (res.success && res.staff) {
+        if (res.staff.role === 'SUPER_ADMIN' && staffTypeInput !== 'ALL') {
+          const matchedOption = STAFF_TYPE_OPTIONS.find((opt) => opt.value === staffTypeInput);
+          if (matchedOption?.moduleId) {
+            handleAdminModuleChange(matchedOption.moduleId);
+          }
+        }
         setCurrentStaff(res.staff);
         setUsernameInput('');
         setPasswordInput('');
@@ -322,10 +384,12 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
               <Shield className="w-8 h-8" />
             </div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-              Staff Portal Authentication
+              {language === 'bn' ? 'সকল স্টাফ পোর্টাল লগইন' : 'All Staff Portal Authentication'}
             </h1>
             <p className="text-xs text-slate-600">
-              Authorized Operational Personnel • Police Lines School & College, Faridpur
+              {language === 'bn'
+                ? 'সকল স্টাফ ও অপারেশনাল কর্মী • পুলিশ লাইন্স স্কুল অ্যান্ড কলেজ, ফরিদপুর'
+                : 'All Authorized Operational Staff • Police Lines School & College, Faridpur'}
             </p>
           </div>
 
@@ -348,6 +412,7 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
               <button
                 type="button"
                 onClick={() => {
+                  setStaffTypeInput('SUPER_ADMIN');
                   setUsernameInput('admin@gmail.com');
                   setPasswordInput('admin@123');
                 }}
@@ -361,13 +426,30 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Staff Username or Email *
+                {language === 'bn' ? '১. স্টাফের ধরন (Staff Type) *' : '1. Staff Type *'}
+              </label>
+              <select
+                value={staffTypeInput}
+                onChange={(e) => setStaffTypeInput(e.target.value as EventStaffRole | 'ALL')}
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-semibold text-slate-800 focus:border-slate-900 focus:outline-hidden cursor-pointer"
+              >
+                {STAFF_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {language === 'bn' ? opt.labelBn : opt.labelEn}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                {language === 'bn' ? '২. স্টাফ ইউজারনেম বা ইমেইল *' : '2. Staff Username or Email *'}
               </label>
               <input
                 type="text"
                 value={usernameInput}
                 onChange={(e) => setUsernameInput(e.target.value)}
-                placeholder="staff@example.com"
+                placeholder="puja@plscf.edu.bd or @puja"
                 required
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:border-slate-900 focus:outline-hidden"
               />
@@ -375,7 +457,7 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Staff Password / PIN *
+                {language === 'bn' ? '৩. স্টাফ পাসওয়ার্ড / পিন *' : '3. Staff Password / PIN *'}
               </label>
               <input
                 type="password"
@@ -414,42 +496,49 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
                   {
                     title: 'Gate Entry Staff',
                     id: 'gate@gmail.com',
+                    staffType: 'GATE_STAFF' as EventStaffRole,
                     role: 'Gate 01 Scanner Desk',
                     color: 'border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100/70 text-emerald-950',
                   },
                   {
                     title: 'Lunch Pavilion Staff',
                     id: 'food@gmail.com',
+                    staffType: 'LUNCH_STAFF' as EventStaffRole,
                     role: 'Lunch Buffet Pavilion A',
                     color: 'border-orange-200 bg-orange-50/50 hover:bg-orange-100/70 text-orange-950',
                   },
                   {
                     title: 'Breakfast Counter Staff',
                     id: 'breakfast@gmail.com',
+                    staffType: 'BREAKFAST_STAFF' as EventStaffRole,
                     role: 'Food Pavilion B (Morning)',
                     color: 'border-yellow-200 bg-yellow-50/50 hover:bg-yellow-100/70 text-yellow-950',
                   },
                   {
                     title: 'Dinner Banquet Staff',
                     id: 'dinner@gmail.com',
+                    staffType: 'DINNER_STAFF' as EventStaffRole,
                     role: 'Gala Dinner Banquet Counter',
                     color: 'border-purple-200 bg-purple-50/50 hover:bg-purple-100/70 text-purple-950',
                   },
                   {
                     title: 'T-Shirt & Kit Incharge',
                     id: 'dress@gmail.com',
+                    staffType: 'DRESS_STAFF' as EventStaffRole,
                     role: 'Distribution Booth 03',
                     color: 'border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100/70 text-indigo-950',
                   },
                   {
                     title: 'Treasury & Finance',
                     id: 'finance@gmail.com',
+                    staffType: 'FINANCE_STAFF' as EventStaffRole,
                     role: 'Central Accounts Office',
                     color: 'border-cyan-200 bg-cyan-50/50 hover:bg-cyan-100/70 text-cyan-950',
                   },
                   {
                     title: 'Super Administrator',
                     id: 'admin@gmail.com',
+                    staffType: 'SUPER_ADMIN' as EventStaffRole,
                     role: 'Multi-Station Master Desk',
                     color: 'border-amber-200 bg-amber-50/50 hover:bg-amber-100/70 text-amber-950',
                   },
@@ -458,6 +547,7 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
                     key={staff.id}
                     type="button"
                     onClick={() => {
+                      setStaffTypeInput(staff.staffType);
                       setUsernameInput(staff.id);
                       setPasswordInput('admin@123');
                     }}

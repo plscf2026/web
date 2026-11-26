@@ -177,10 +177,16 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate, feeSetting
                 <button
                   type="button"
                   onClick={() => handleDirectPortalNav('scanner')}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-sky-400 w-full transition-colors cursor-pointer"
+                  className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-sky-400 w-full transition-colors cursor-pointer"
+                  title="All Staff Login (Gate, Food, Kit, Finance & Admin)"
                 >
-                  <QrCode className="w-4 h-4 text-sky-500" />
-                  <span>{t.navScannerPortal}</span>
+                  <div className="flex items-center gap-2">
+                    <QrCode className="w-4 h-4 text-sky-500" />
+                    <span className="font-semibold">{t.navScannerPortal}</span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-600 text-white font-mono font-bold">
+                    All Staff
+                  </span>
                 </button>
               </li>
               <li>

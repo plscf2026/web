@@ -8,6 +8,7 @@ import {
   getPortalConfigBySlug,
 } from '../types';
 import { SupabaseService } from '../services/supabase';
+import { EventStore } from '../services/eventStore';
 import { getUrlForView } from './navigation';
 
 // ==========================================
@@ -154,4 +155,33 @@ test('6. Role Module Permission Isolation (Allowed Tabs)', () => {
   assert.ok(modTabs.includes('allBookings'));
   assert.equal(modTabs.includes('manualApproval'), false);
   assert.equal(modTabs.includes('budgetManagement'), false);
+});
+
+test('7. Staff Portal Type Filtering Validates Matching vs Mismatched Staff Types and Allows All-Staff Auto-Detect', async () => {
+  const prevFlag = process.env.VITE_ENABLE_TEST_BYPASS;
+  const prevUrl = process.env.VITE_SUPABASE_URL;
+  process.env.VITE_ENABLE_TEST_BYPASS = 'true';
+  process.env.VITE_SUPABASE_URL = 'http://localhost:54321';
+  try {
+    const autoGate = await EventStore.authenticateStaff('gate@gmail.com', 'admin@123', 'ALL');
+    assert.equal(autoGate.success, true);
+    assert.equal(autoGate.staff?.role, 'GATE_STAFF');
+
+    const exactGate = await EventStore.authenticateStaff('gate@gmail.com', 'admin@123', 'GATE_STAFF');
+    assert.equal(exactGate.success, true);
+    assert.equal(exactGate.staff?.role, 'GATE_STAFF');
+
+    const wrongType = await EventStore.authenticateStaff('gate@gmail.com', 'admin@123', 'DINNER_STAFF');
+    assert.equal(wrongType.success, false);
+    assert.ok(wrongType.error?.includes('Role mismatch'));
+
+    const superOverride = await EventStore.authenticateStaff('admin@gmail.com', 'admin@123', 'GATE_STAFF');
+    assert.equal(superOverride.success, true);
+    assert.equal(superOverride.staff?.role, 'SUPER_ADMIN');
+  } finally {
+    if (prevFlag === undefined) delete process.env.VITE_ENABLE_TEST_BYPASS;
+    else process.env.VITE_ENABLE_TEST_BYPASS = prevFlag;
+    if (prevUrl === undefined) delete process.env.VITE_SUPABASE_URL;
+    else process.env.VITE_SUPABASE_URL = prevUrl;
+  }
 });
