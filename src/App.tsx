@@ -32,6 +32,9 @@ const DonationPage = lazy(() => import('./components/DonationPage').then((m) => 
 const NoticeBoardPage = lazy(() => import('./components/NoticeBoardPage').then((m) => ({ default: m.NoticeBoardPage })));
 const GalleryPage = lazy(() => import('./components/GalleryPage').then((m) => ({ default: m.GalleryPage })));
 const AboutContactPage = lazy(() => import('./components/AboutContactPage').then((m) => ({ default: m.AboutContactPage })));
+const InternationalPaymentPage = lazy(() =>
+  import('./components/InternationalPaymentPage').then((m) => ({ default: m.InternationalPaymentPage }))
+);
 const ScannerPortal = lazy(() => import('./components/ScannerPortal').then((m) => ({ default: m.ScannerPortal })));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard').then((m) => ({ default: m.AdminDashboard })));
 const NotFoundPage = lazy(() => import('./components/common/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
@@ -459,7 +462,13 @@ export default function App() {
               )
             )}
 
-            {activeView === 'donate' && <DonationPage language={language} />}
+            {activeView === 'donate' && (
+              <DonationPage language={language} onNavigate={handleNavigate} />
+            )}
+
+            {activeView === 'international-payment' && (
+              <InternationalPaymentPage language={language} onNavigate={handleNavigate} />
+            )}
 
             {activeView === 'notices' && <NoticeBoardPage language={language} />}
 

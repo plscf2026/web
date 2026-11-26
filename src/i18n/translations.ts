@@ -209,14 +209,14 @@ export const translations = {
 
     // About & Contact
     aboutHeading: 'About Police Lines School and College, Faridpur',
-    historyTitle: '64 Years of Knowledge & Discipline (Est. 1962)',
+    historyTitle: '65 Years of Knowledge & Discipline (Est. 1962)',
     historyContent:
       'Established in 1962 under the patronage of the Faridpur District Police Administration, Police Lines School and College has stood as a bastion of academic excellence, physical discipline, and moral character in the Padma-Ganges basin. For over six decades, our alumni have served Bangladesh with distinction across civil service, armed forces, medicine, engineering, arts, and enterprise.',
     committeeHeading: 'Reunion 2026 Organizing Committee',
     helpdeskTitle: 'Reunion Secretariat & Helpdesk',
-    addressText: 'Police Lines Road, Joyrampur, Faridpur - 7800, Dhaka Division, Bangladesh',
-    helplinePhone: '+880 1712-345678 / +880 1911-876543',
-    helplineEmail: 'reunion2026@plscf.edu.bd',
+    addressText: 'Police Lines area in Kamlapur, Faridpur Sadar, Faridpur-7800',
+    helplinePhone: '+880 1637-85 7040 / +880 1309-026240',
+    helplineEmail: 'sagarsaha3371@gmail.com',
 
     // Scanner Portal
     scannerTitle: 'Gate QR Scanner & Identity Verification Portal',
@@ -471,14 +471,14 @@ export const translations = {
 
     // About & Contact
     aboutHeading: 'পুলিশ লাইন্স স্কুল অ্যান্ড কলেজ, ফরিদপুর পরিচিতি',
-    historyTitle: 'শিক্ষা ও শৃঙ্খলার ৬৪ বছর (স্থাপিত ১৯৬২)',
+    historyTitle: 'শিক্ষা ও শৃঙ্খলার ৬৫ বছর (স্থাপিত ১৯৬২)',
     historyContent:
       '১৯৬২ সালে ফরিদপুর জেলা পুলিশ প্রশাসনের উদ্যোগে পদ্মা-কুমার অববাহিকায় প্রতিষ্ঠিত পুলিশ লাইন্স স্কুল অ্যান্ড কলেজ দেশের অন্যতম ঐতিহ্যবাহী শিক্ষা প্রতিষ্ঠান। ছয় দশকেরও বেশি সময় ধরে শৃঙ্খলা, নীতি ও আদর্শ শিক্ষার মাধ্যমে প্রতিষ্ঠানটি তৈরি করেছে দেশসেরা গবেষক, চিকিৎসক, প্রকৌশলী, প্রতিরক্ষা কর্মকর্তা ও প্রাজ্ঞ ব্যক্তিবর্গ।',
     committeeHeading: 'পুনর্মিলনী ২০২৬ পরিচালনা পরিষদ',
     helpdeskTitle: 'পুনর্মিলনী সচিবালয় ও হেল্পডেস্ক',
-    addressText: 'পুলিশ লাইন্স রোড, জয়রামপুর, ফরিদপুর - ৭৮০০, ঢাকা বিভাগ, বাংলাদেশ',
-    helplinePhone: '+৮৮০ ১৭১২-৩৪৫৬৭৮ / +৮৮০ ১৯১১-৮৭৬৫৪৩',
-    helplineEmail: 'reunion2026@plscf.edu.bd',
+    addressText: 'পুলিশ লাইনস এলাকা, কমলাপুর, ফরিদপুর সদর, ফরিদপুর-৭৮০০',
+    helplinePhone: '+৮৮০ ১৬৩৭-৮৫ ৭০৪০ / +৮৮০ ১৩০৯-০২৬২৪০',
+    helplineEmail: 'sagarsaha3371@gmail.com',
 
     // Scanner Portal
     scannerTitle: 'গেট কিউআর স্ক্যানার ও পরিচয় যাচাইকরণ পোর্টাল',

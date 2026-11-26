@@ -394,6 +394,7 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
       'galleryManagement',
       'committeeManagement',
       'aboutContactManagement',
+      'internationalPaymentManagement',
       'reports',
     ],
     demoCredentials: {

@@ -15,23 +15,26 @@ import {
   Loader2,
   ExternalLink,
   RefreshCw,
+  Globe,
 } from 'lucide-react';
 import { Language, DonationRecord, FeeSettings } from '../types';
 import { translations } from '../i18n/translations';
 import { AppStore } from '../services/store';
 import { SupabaseService } from '../services/supabase';
 import { PayStationService } from '../services/paystation';
+import { InternationalPaymentInfo, InternationalPaymentService } from '../services/internationalPaymentService';
 import { isValidBangladeshiMobile, normalizeBangladeshiMobileNumber, isDonationOpen, getDonationClosedMessage, calculateGatewayCharge } from '../utils/rules';
 import { sanitizeInput } from '../utils/security';
 import { ThankYouCardBadge } from './ThankYouCardBadge';
 
 interface DonationPageProps {
   language: Language;
+  onNavigate?: (view: string) => void;
 }
 
 const PRESET_AMOUNTS = [500, 1000, 2500, 5000, 10000, 25000];
 
-export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
+export const DonationPage: React.FC<DonationPageProps> = ({ language, onNavigate }) => {
   const t = translations[language];
   const isBangla = language === 'bn';
 
@@ -75,11 +78,15 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
   // Live community donations list & fee settings
   const [donationsList, setDonationsList] = useState<DonationRecord[]>([]);
   const [feeSettings, setFeeSettings] = useState<FeeSettings>(() => AppStore.getFeeSettings());
+  const [intlPaymentInfo, setIntlPaymentInfo] = useState<InternationalPaymentInfo>(() =>
+    InternationalPaymentService.getInfo()
+  );
 
   useEffect(() => {
     // 1. Initial read from local cache
     setDonationsList(AppStore.getDonations());
     setFeeSettings(AppStore.getFeeSettings());
+    InternationalPaymentService.fetchFromSupabase().catch(() => {});
 
     // 2. Fetch live from Supabase canonical public.donations
     SupabaseService.fetchDonations().then((res) => {
@@ -93,7 +100,13 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
       if (e.detail) setFeeSettings(e.detail);
     };
     window.addEventListener('plscf_fee_settings_updated', handleSync);
-    return () => window.removeEventListener('plscf_fee_settings_updated', handleSync);
+    const unsubIntl = InternationalPaymentService.subscribe((updated) => {
+      setIntlPaymentInfo(updated);
+    });
+    return () => {
+      window.removeEventListener('plscf_fee_settings_updated', handleSync);
+      unsubIntl();
+    };
   }, [completedDonation]);
 
   // 3. Auto-handle return from PayStation gateway callback
@@ -824,6 +837,34 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
                 </span>
               </div>
             </form>
+
+            {/* Big International Payment Button */}
+            {intlPaymentInfo.isEnabled && onNavigate && (
+              <div className="pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => onNavigate('international-payment')}
+                  className="w-full py-4 px-5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white shadow-lg hover:shadow-xl border border-slate-700 transition-all cursor-pointer flex items-center justify-between gap-3 group"
+                >
+                  <div className="flex items-center gap-3 text-left min-w-0">
+                    <div className="w-11 h-11 rounded-xl bg-sky-500/20 text-sky-300 border border-sky-400/30 flex items-center justify-center shrink-0">
+                      <Globe className="w-6 h-6" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-sm sm:text-base font-black block tracking-tight">
+                        {isBangla ? 'আন্তর্জাতিক পেমেন্ট (প্রবাসী / বিদেশ থেকে)' : 'International Payment'}
+                      </span>
+                      <span className="text-[11px] text-sky-200/90 block truncate">
+                        {isBangla
+                          ? 'আন্তর্জাতিক ব্যাংক ট্রান্সফার, রাউটিং, সুইফট ও নির্দেশনা দেখুন'
+                          : 'Overseas Bank Transfer, SWIFT, Routing & Transfer Details'}
+                      </span>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-sky-300 shrink-0 group-hover:translate-x-1 transition-transform" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Right: Verified Donors Roll (Donors Hall of Fame - Top 10) */}

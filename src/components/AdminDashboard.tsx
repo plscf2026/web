@@ -45,6 +45,7 @@ import {
   Heart,
   Crown,
   FileEdit,
+  Globe,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -124,6 +125,11 @@ const StaffCardManagementTab = lazy(() =>
 );
 const AboutContactManagementTab = lazy(() =>
   import('./admin/AboutContactManagementTab').then((m) => ({ default: m.AboutContactManagementTab }))
+);
+const InternationalPaymentManagementTab = lazy(() =>
+  import('./admin/InternationalPaymentManagementTab').then((m) => ({
+    default: m.InternationalPaymentManagementTab,
+  }))
 );
 
 const AdminTabFallback = () => (
@@ -346,6 +352,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'galleryManagement'
     | 'committeeManagement'
     | 'aboutContactManagement'
+    | 'internationalPaymentManagement'
     | 'reports';
 
   const isSuperAdmin = adminSession?.role === 'super_admin';
@@ -1684,6 +1691,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             highlight: true,
             badge: 'Edit',
             badgeColor: 'emerald' as const,
+          },
+        ]
+      : []),
+    ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('internationalPaymentManagement' as any)
+      ? [
+          {
+            id: 'internationalPaymentManagement' as const,
+            label: language === 'bn' ? 'আন্তর্জাতিক পেমেন্ট এডিট' : 'International Payment Page',
+            icon: Globe,
+            category: 'media' as const,
+            highlight: true,
+            badge: 'Global',
+            badgeColor: 'blue' as const,
           },
         ]
       : []),
@@ -4646,6 +4666,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {activeTab === 'aboutContactManagement' && isSuperAdminAccount && (
         <Suspense fallback={<AdminTabFallback />}>
           <AboutContactManagementTab language={language} adminName={effectiveAdmin.fullName} />
+        </Suspense>
+      )}
+
+      {/* TAB 15: INTERNATIONAL PAYMENT PAGE EDITOR (SUPER ADMIN ONLY) */}
+      {activeTab === 'internationalPaymentManagement' && isSuperAdminAccount && (
+        <Suspense fallback={<AdminTabFallback />}>
+          <InternationalPaymentManagementTab
+            language={language}
+            adminName={effectiveAdmin.fullName}
+          />
         </Suspense>
       )}
 

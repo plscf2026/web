@@ -68,8 +68,8 @@ export const DEFAULT_ABOUT_CONTACT_CONTENT: AboutContactContent = {
   taglineEn: 'Connecting Generations, Celebrating 65 Years of Excellence',
   taglineBn: 'প্রজন্মের মেলবন্ধন, গৌরবের ৬৫ বছর উদ্‌যাপন',
 
-  historyTitleEn: '64 Years of Knowledge & Discipline (Est. 1962)',
-  historyTitleBn: 'শিক্ষা ও শৃঙ্খলার ৬৪ বছর (স্থাপিত ১৯৬২)',
+  historyTitleEn: '65 Years of Knowledge & Discipline (Est. 1962)',
+  historyTitleBn: 'শিক্ষা ও শৃঙ্খলার ৬৫ বছর (স্থাপিত ১৯৬২)',
   historyContentEn:
     'Established in 1962 under the patronage of the Faridpur District Police Administration, Police Lines School and College has stood as a bastion of academic excellence, physical discipline, and moral character in the Padma-Ganges basin. For over six decades, our alumni have served Bangladesh with distinction across civil service, armed forces, medicine, engineering, arts, and enterprise.',
   historyContentBn:
@@ -77,8 +77,8 @@ export const DEFAULT_ABOUT_CONTACT_CONTENT: AboutContactContent = {
 
   locationLabelEn: 'Location',
   locationLabelBn: 'অবস্থান',
-  locationValueEn: 'Joyrampur, Faridpur Sadar, Dhaka Division',
-  locationValueBn: 'জয়রামপুর, ফরিদপুর সদর, ঢাকা বিভাগ',
+  locationValueEn: 'Police Lines area in Kamlapur, Faridpur Sadar, Faridpur-7800',
+  locationValueBn: 'পুলিশ লাইনস এলাকা, কমলাপুর, ফরিদপুর সদর, ফরিদপুর-৭৮০০',
   affiliationLabelEn: 'Affiliation',
   affiliationLabelBn: 'অধিভুক্তি',
   affiliationValueEn: 'Board of Intermediate & Secondary Education, Dhaka',
@@ -130,11 +130,11 @@ export const DEFAULT_ABOUT_CONTACT_CONTENT: AboutContactContent = {
     'Reach out to the Reunion secretariat team for queries, gate passes or batch coordination.',
   helpdeskSubtitleBn:
     'যেকোনো জিজ্ঞাসা, টিকিট সংক্রান্ত সমস্যা বা সহায়তার জন্য যোগাযোগ করুন।',
-  addressEn: 'Police Lines Road, Joyrampur, Faridpur - 7800, Dhaka Division, Bangladesh',
-  addressBn: 'পুলিশ লাইন্স রোড, জয়রামপুর, ফরিদপুর - ৭৮০০, ঢাকা বিভাগ, বাংলাদেশ',
-  helplinePhoneEn: '+880 1712-345678 / +880 1911-876543',
-  helplinePhoneBn: '+৮৮০ ১৭১২-৩৪৫৬৭৮ / +৮৮০ ১৯১১-৮৭৬৫৪৩',
-  helplineEmail: 'reunion2026@plscf.edu.bd',
+  addressEn: 'Police Lines area in Kamlapur, Faridpur Sadar, Faridpur-7800',
+  addressBn: 'পুলিশ লাইনস এলাকা, কমলাপুর, ফরিদপুর সদর, ফরিদপুর-৭৮০০',
+  helplinePhoneEn: '+880 1637-85 7040 / +880 1309-026240',
+  helplinePhoneBn: '+৮৮০ ১৬৩৭-৮৫ ৭০৪০ / +৮৮০ ১৩০৯-০২৬২৪০',
+  helplineEmail: 'sagarsaha3371@gmail.com',
   showInquiryForm: true,
   updatedBy: 'System Default',
   updatedAt: '2026-01-01T00:00:00.000Z',

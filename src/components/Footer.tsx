@@ -90,7 +90,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate, feeSetting
 
             <p className="text-xs leading-relaxed text-slate-400">
               {language === 'bn'
-                ? 'ফরিদপুরের ঐতিহ্যবাহী পুলিশ লাইন্স স্কুল অ্যান্ড কলেজের ৬৪ বছর পূর্তি উপলক্ষে আয়োজিত গ্র্যান্ড পুনর্মিলনী ২০২৭। প্রাক্তন ও বর্তমান শিক্ষার্থীদের এক মিলনমেলা।'
+                ? 'ফরিদপুরের ঐতিহ্যবাহী পুলিশ লাইন্স স্কুল অ্যান্ড কলেজের ৬৫ বছর পূর্তি উপলক্ষে আয়োজিত গ্র্যান্ড পুনর্মিলনী ২০২৭। প্রাক্তন ও বর্তমান শিক্ষার্থীদের এক মিলনমেলা।'
                 : 'Police Lines School and College, Faridpur celebrates 65 glorious years of academic excellence and character building with Grand Reunion 2027.'}
             </p>
 
@@ -249,7 +249,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate, feeSetting
           </div>
 
           <div className="flex items-center gap-1 text-slate-400">
-            <span>{language === 'bn' ? 'ঐতিহ্যের ৬৪ বছর উদ্‌যাপনে' : 'Celebrating 64 Years with'}</span>
+            <span>{language === 'bn' ? 'ঐতিহ্যের ৬৫ বছর উদ্‌যাপনে' : 'Celebrating 65 Years with'}</span>
             <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500 inline" />
             <span>{language === 'bn' ? 'সকল শিক্ষক ও শিক্ষার্থী' : 'Alumni & Students'}</span>
           </div>
