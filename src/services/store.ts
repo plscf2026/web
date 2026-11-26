@@ -5,6 +5,8 @@ import {
   ExpenseRecord,
   StaffUser,
   FeeSettings,
+  ClosureNoticeContent,
+  GovernanceClosureNotices,
   ScanLog,
   DEFAULT_HOME_PAGE_SECTIONS,
   reconcileHomePageSections,
@@ -115,9 +117,71 @@ export const INITIAL_STAFF_USERS: StaffUser[] = [
   },
 ];
 
+export const DEFAULT_CLOSURE_NOTICES: GovernanceClosureNotices = {
+  alumni: {
+    titleEn: 'Alumni Registration Is Temporarily Closed',
+    titleBn: 'প্রাক্তন শিক্ষার্থী নিবন্ধন সাময়িকভাবে বন্ধ রয়েছে',
+    messageEn:
+      'Alumni (Former Student) online registration is currently closed by the Reunion Secretariat. Please check back later or contact us for assistance.',
+    messageBn:
+      'প্রাক্তন শিক্ষার্থীদের অনলাইন নিবন্ধন কার্যক্রম বর্তমানে পুনর্মিলনী সচিবালয়ের নির্দেশে বন্ধ রয়েছে। প্রয়োজন হলে অনুগ্রহ করে নিচের নম্বরে বা ইমেইলে যোগাযোগ করুন।',
+    reopenAt: '',
+    contactInfo: '',
+    instructionsEn: '',
+    instructionsBn: '',
+  },
+  currentStudent: {
+    titleEn: 'Current Student Registration Is Temporarily Closed',
+    titleBn: 'বর্তমান শিক্ষার্থী নিবন্ধন সাময়িকভাবে বন্ধ রয়েছে',
+    messageEn:
+      'Current student online registration is currently paused by the Reunion Secretariat. Please check back soon or reach out to the helpdesk.',
+    messageBn:
+      'বর্তমান শিক্ষার্থীদের অনলাইন নিবন্ধন কার্যক্রম বর্তমানে সাময়িকভাবে স্থগিত রয়েছে। বিস্তারিত জানতে অনুগ্রহ করে সচিবালয়ে যোগাযোগ করুন।',
+    reopenAt: '',
+    contactInfo: '',
+    instructionsEn: '',
+    instructionsBn: '',
+  },
+  donation: {
+    titleEn: 'Online Donations Are Temporarily Closed',
+    titleBn: 'অনলাইন অনুদান কার্যক্রম সাময়িকভাবে বন্ধ রয়েছে',
+    messageEn:
+      'Online donations are currently paused by the Reunion Secretariat. Thank you for your continued generosity and support.',
+    messageBn:
+      'অনলাইন অনুদান কার্যক্রম বর্তমানে সাময়িকভাবে বন্ধ রয়েছে। পুনর্মিলনী তহবিলে আপনার আন্তরিক আগ্রহ ও সহযোগিতার জন্য ধন্যবাদ।',
+    reopenAt: '',
+    contactInfo: '',
+    instructionsEn: '',
+    instructionsBn: '',
+  },
+};
+
+export function normalizeClosureNoticeContent(
+  raw: Partial<ClosureNoticeContent> | null | undefined,
+  fallback: ClosureNoticeContent
+): ClosureNoticeContent {
+  if (!raw || typeof raw !== 'object') {
+    return { ...fallback };
+  }
+  return {
+    titleEn: typeof raw.titleEn === 'string' ? raw.titleEn : fallback.titleEn,
+    titleBn: typeof raw.titleBn === 'string' ? raw.titleBn : fallback.titleBn,
+    messageEn: typeof raw.messageEn === 'string' ? raw.messageEn : fallback.messageEn,
+    messageBn: typeof raw.messageBn === 'string' ? raw.messageBn : fallback.messageBn,
+    reopenAt: typeof raw.reopenAt === 'string' ? raw.reopenAt : (fallback.reopenAt ?? ''),
+    contactInfo: typeof raw.contactInfo === 'string' ? raw.contactInfo : (fallback.contactInfo ?? ''),
+    instructionsEn: typeof raw.instructionsEn === 'string' ? raw.instructionsEn : (fallback.instructionsEn ?? ''),
+    instructionsBn: typeof raw.instructionsBn === 'string' ? raw.instructionsBn : (fallback.instructionsBn ?? ''),
+  };
+}
+
 export const INITIAL_FEE_SETTINGS: FeeSettings = {
   formerStudentFee: 1500,
   currentStudentFee: 500,
+  parentFee: 500,
+  minDonation: 100,
+  maxDonation: 50000,
+  gatewayChargePercent: 1.8,
   registrationOpen: true,
   alumniRegistrationOpen: true,
   currentStudentRegistrationOpen: true,
@@ -130,11 +194,65 @@ export const INITIAL_FEE_SETTINGS: FeeSettings = {
   closedMessageBn: 'অনলাইন রেজিস্ট্রেশন কার্যক্রম বর্তমানে বন্ধ রয়েছে। জরুরি প্রয়োজনে অনুগ্রহ করে পুনর্মিলনী সচিবালয়ে যোগাযোগ করুন।',
   donationClosedMessageEn: 'Online donations are currently paused by the Reunion Secretariat. Thank you for your continued support.',
   donationClosedMessageBn: 'অনলাইন অনুদান কার্যক্রম বর্তমানে সাময়িকভাবে বন্ধ রয়েছে। পুনর্মিলনী তহবিলে সহযোগিতার জন্য আন্তরিক ধন্যবাদ।',
+  closureNotices: DEFAULT_CLOSURE_NOTICES,
   eventTargetDate: '2027-01-29T09:00:00',
   simulateEventCompleted: false,
   hideDonationAmounts: false,
   homePageSections: DEFAULT_HOME_PAGE_SECTIONS,
 };
+
+export function normalizeFeeSettings(raw: Partial<FeeSettings> | Record<string, any> | null | undefined): FeeSettings {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const rawNotices = (src.closureNotices && typeof src.closureNotices === 'object' ? src.closureNotices : {}) as Record<string, any>;
+  const donationFallback: ClosureNoticeContent = {
+    ...DEFAULT_CLOSURE_NOTICES.donation,
+    messageEn:
+      typeof src.donationClosedMessageEn === 'string' && src.donationClosedMessageEn.trim()
+        ? src.donationClosedMessageEn
+        : DEFAULT_CLOSURE_NOTICES.donation.messageEn,
+    messageBn:
+      typeof src.donationClosedMessageBn === 'string' && src.donationClosedMessageBn.trim()
+        ? src.donationClosedMessageBn
+        : DEFAULT_CLOSURE_NOTICES.donation.messageBn,
+  };
+  const closureNotices: GovernanceClosureNotices = {
+    alumni: normalizeClosureNoticeContent(rawNotices.alumni, DEFAULT_CLOSURE_NOTICES.alumni),
+    currentStudent: normalizeClosureNoticeContent(rawNotices.currentStudent, DEFAULT_CLOSURE_NOTICES.currentStudent),
+    donation: normalizeClosureNoticeContent(rawNotices.donation, donationFallback),
+  };
+
+  return {
+    ...INITIAL_FEE_SETTINGS,
+    ...src,
+    formerStudentFee: Number.isFinite(Number(src.formerStudentFee)) && Number(src.formerStudentFee) > 0
+      ? Number(src.formerStudentFee)
+      : INITIAL_FEE_SETTINGS.formerStudentFee,
+    currentStudentFee: Number.isFinite(Number(src.currentStudentFee)) && Number(src.currentStudentFee) > 0
+      ? Number(src.currentStudentFee)
+      : INITIAL_FEE_SETTINGS.currentStudentFee,
+    parentFee: Number.isFinite(Number(src.parentFee)) ? Number(src.parentFee) : INITIAL_FEE_SETTINGS.parentFee,
+    minDonation: Number.isFinite(Number(src.minDonation)) ? Number(src.minDonation) : INITIAL_FEE_SETTINGS.minDonation,
+    maxDonation: Number.isFinite(Number(src.maxDonation)) ? Number(src.maxDonation) : INITIAL_FEE_SETTINGS.maxDonation,
+    gatewayChargePercent: Number.isFinite(Number(src.gatewayChargePercent))
+      ? Number(src.gatewayChargePercent)
+      : INITIAL_FEE_SETTINGS.gatewayChargePercent,
+    registrationOpen: typeof src.registrationOpen === 'boolean' ? src.registrationOpen : true,
+    alumniRegistrationOpen: typeof src.alumniRegistrationOpen === 'boolean' ? src.alumniRegistrationOpen : true,
+    currentStudentRegistrationOpen:
+      typeof src.currentStudentRegistrationOpen === 'boolean' ? src.currentStudentRegistrationOpen : true,
+    donationOpen: typeof src.donationOpen === 'boolean' ? src.donationOpen : true,
+    closedMessageEn:
+      typeof src.closedMessageEn === 'string' ? src.closedMessageEn : INITIAL_FEE_SETTINGS.closedMessageEn,
+    closedMessageBn:
+      typeof src.closedMessageBn === 'string' ? src.closedMessageBn : INITIAL_FEE_SETTINGS.closedMessageBn,
+    donationClosedMessageEn: closureNotices.donation.messageEn,
+    donationClosedMessageBn: closureNotices.donation.messageBn,
+    closureNotices,
+    simulateEventCompleted: Boolean(src.simulateEventCompleted),
+    hideDonationAmounts: Boolean(src.hideDonationAmounts),
+    homePageSections: reconcileHomePageSections(src.homePageSections),
+  };
+}
 
 export const INITIAL_REGISTRATIONS: RegistrationRecord[] = [];
 
@@ -724,14 +842,7 @@ export class AppStore {
 
   static getFeeSettings(): FeeSettings {
     const settings = getStored<FeeSettings>(STORAGE_KEY_SETTINGS, INITIAL_FEE_SETTINGS);
-    return {
-      ...settings,
-      registrationOpen: typeof settings.registrationOpen === 'boolean' ? settings.registrationOpen : true,
-      alumniRegistrationOpen: typeof settings.alumniRegistrationOpen === 'boolean' ? settings.alumniRegistrationOpen : true,
-      currentStudentRegistrationOpen: typeof settings.currentStudentRegistrationOpen === 'boolean' ? settings.currentStudentRegistrationOpen : true,
-      donationOpen: typeof settings.donationOpen === 'boolean' ? settings.donationOpen : true,
-      homePageSections: reconcileHomePageSections(settings.homePageSections),
-    };
+    return normalizeFeeSettings(settings);
   }
 
   static getActiveEventYear(): number {
@@ -746,13 +857,13 @@ export class AppStore {
   }
 
   static saveFeeSettings(settings: FeeSettings): void {
-    const normalized: FeeSettings = {
+    const normalized = normalizeFeeSettings({
       ...settings,
       registrationOpen: Boolean(settings.registrationOpen),
       alumniRegistrationOpen: settings.alumniRegistrationOpen !== false,
       currentStudentRegistrationOpen: settings.currentStudentRegistrationOpen !== false,
       donationOpen: settings.donationOpen !== false,
-    };
+    });
     setStored(STORAGE_KEY_SETTINGS, normalized);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('plscf_fee_settings_updated', { detail: normalized }));

@@ -9,21 +9,27 @@ import {
   Lock,
   QrCode,
 } from 'lucide-react';
-import { Language, FeeSettings } from '../types';
+import { Language, FeeSettings, GovernanceLoadStatus } from '../types';
 import { AboutContactContent } from '../types/aboutContact';
 import { AboutContactService } from '../services/aboutContactService';
 import { translations } from '../i18n/translations';
 import { SupabaseService } from '../services/supabase';
 import { AppStore } from '../services/store';
-import { isGlobalRegistrationOpen, isDonationOpen } from '../utils/rules';
+import { isGlobalRegistrationOpen } from '../utils/rules';
 
 interface FooterProps {
   language: Language;
   onNavigate: (view: string, replace?: boolean, extraParams?: Record<string, string>) => void;
   feeSettings?: FeeSettings;
+  governanceStatus?: GovernanceLoadStatus;
 }
 
-export const Footer: React.FC<FooterProps> = ({ language, onNavigate, feeSettings: initialFeeSettings }) => {
+export const Footer: React.FC<FooterProps> = ({
+  language,
+  onNavigate,
+  feeSettings: initialFeeSettings,
+  governanceStatus = 'ready',
+}) => {
   const [feeSettings, setFeeSettings] = useState<FeeSettings>(
     () => initialFeeSettings || AppStore.getFeeSettings()
   );
@@ -110,7 +116,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate, feeSetting
               {language === 'bn' ? 'প্রয়োজনীয় লিংক' : 'Quick Links'}
             </h4>
             <ul className="space-y-2 text-xs">
-              {isGlobalRegistrationOpen(feeSettings) && (
+              {governanceStatus === 'ready' && isGlobalRegistrationOpen(feeSettings) && (
                 <li>
                   <button
                     type="button"
@@ -132,7 +138,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate, feeSetting
                   <span>{t.navFindTicket}</span>
                 </button>
               </li>
-              {isDonationOpen(feeSettings) && (
+              {governanceStatus === 'ready' && (
                 <li>
                   <button
                     type="button"

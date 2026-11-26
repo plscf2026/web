@@ -7,11 +7,12 @@ import {
   Language,
   RegistrationRecord,
   FeeSettings,
+  StudentCategory,
   PortalRole,
   PORTAL_ROLE_CONFIGS,
   getPortalRoleFromSlug,
 } from './types';
-import { AppStore } from './services/store';
+import { AppStore, INITIAL_FEE_SETTINGS } from './services/store';
 import { RegistrationFormData } from './utils/rules';
 import { StudentIdService } from './services/studentIdStore';
 import { findRegistrationByTokenOrId } from './utils/tokenGenerator';
@@ -19,10 +20,18 @@ import { PayStationService } from './services/paystation';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
 import type { ModalStep } from './components/PaymentModal';
-import { resolveRouteFromLocation, syncRouteHistory } from './utils/navigation';
+import {
+  resolveRouteFromLocation,
+  syncRouteHistory,
+  parseRegistrationCategory,
+} from './utils/navigation';
 import { SupabaseService } from './services/supabase';
 import { subscribeToAuthSync } from './services/authSync';
 import { AboutContactService } from './services/aboutContactService';
+import {
+  GovernanceSettingsService,
+  GovernanceSettingsSnapshot,
+} from './services/governanceSettingsService';
 
 // Route-level code-splitting: heavy pages and portals are loaded on-demand
 const RegistrationPage = lazy(() => import('./components/RegistrationPage').then((m) => ({ default: m.RegistrationPage })));
@@ -79,6 +88,10 @@ export default function App() {
     return resolveRouteFromLocation().notFoundPath || '';
   });
 
+  const [initialRegistrationCategory, setInitialRegistrationCategory] = useState<StudentCategory | undefined>(() => {
+    return resolveRouteFromLocation().category;
+  });
+
   // Unified router navigation handler: updates state, syncs HTML5 history and persists session
   const handleNavigate = (view: string, replace = false, extraParams?: Record<string, string>) => {
     if (view === 'register' && activeView === 'ticket') {
@@ -96,6 +109,10 @@ export default function App() {
       setCurrentPortalRole(parsedRole || undefined);
     } else if (view !== 'dashboard' && view !== 'admin') {
       setCurrentPortalRole(undefined);
+    }
+
+    if (view === 'register') {
+      setInitialRegistrationCategory(parseRegistrationCategory(extraParams?.category));
     }
     setActiveView(view);
     syncRouteHistory(view, replace, extraParams);
@@ -127,6 +144,7 @@ export default function App() {
       }
       setActiveView(resolved.view);
       setCurrentPortalRole(resolved.portalRole);
+      setInitialRegistrationCategory(resolved.category);
       if (resolved.notFoundPath) {
         setNotFoundPath(resolved.notFoundPath);
       }
@@ -144,18 +162,11 @@ export default function App() {
   // Active Ticket to display
   const [activeTicket, setActiveTicket] = useState<RegistrationRecord | null>(null);
 
-  // Fee settings
-  const [feeSettings, setFeeSettings] = useState<FeeSettings>(() => AppStore.getFeeSettings());
-
-  useEffect(() => {
-    const handleSettingsSync = (e: any) => {
-      if (e.detail) {
-        setFeeSettings(e.detail);
-      }
-    };
-    window.addEventListener('plscf_fee_settings_updated', handleSettingsSync);
-    return () => window.removeEventListener('plscf_fee_settings_updated', handleSettingsSync);
-  }, []);
+  // Authoritative Supabase Governance & Fee settings (fails closed while loading / on initial error)
+  const [governanceSnapshot, setGovernanceSnapshot] = useState<GovernanceSettingsSnapshot>(() =>
+    GovernanceSettingsService.getSnapshot()
+  );
+  const feeSettings: FeeSettings = governanceSnapshot.settings || INITIAL_FEE_SETTINGS;
 
   // Payment Modal State
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -183,17 +194,18 @@ export default function App() {
     totalPayable: 1500,
   });
 
-  // Keep fee settings updated
-  useEffect(() => {
-    setFeeSettings(AppStore.getFeeSettings());
-  }, [activeView]);
-
-  // Synchronize registrations and About & Contact CMS bidirectionally with Supabase on startup
+  // Synchronize registrations, governance settings, and About & Contact CMS bidirectionally with Supabase on startup
   useEffect(() => {
     AppStore.syncWithSupabase(2027).catch(() => { });
     const cleanupAboutSync = AboutContactService.initRealtimeSync();
+    const unsubGovernance = GovernanceSettingsService.subscribe((snap) => {
+      setGovernanceSnapshot(snap);
+    });
+    const cleanupGovernanceSync = GovernanceSettingsService.initRealtimeSync();
     return () => {
       cleanupAboutSync();
+      unsubGovernance();
+      cleanupGovernanceSync();
     };
   }, []);
 
@@ -225,7 +237,7 @@ export default function App() {
         const pendingSession = PayStationService.getPendingSession();
 
         if (pendingSession && pendingSession.type === 'registration' && pendingSession.formData) {
-          handleNavigate('register', true);
+          handleNavigate('register', true, { category: pendingSession.formData.category });
           setPendingRegistrationData(pendingSession.formData);
           setPreservedRegistrationData(pendingSession.formData);
 
@@ -314,7 +326,14 @@ export default function App() {
         setNotFoundPath(resolved.notFoundPath || (typeof window !== 'undefined' ? window.location.pathname : ''));
         setActiveView('404');
       } else {
-        syncRouteHistory(resolved.view, true, resolved.tab ? { tab: resolved.tab } : undefined);
+        const nextParams: Record<string, string> = {};
+        if (resolved.tab) nextParams.tab = resolved.tab;
+        if (resolved.category) nextParams.category = resolved.category;
+        syncRouteHistory(
+          resolved.view,
+          true,
+          Object.keys(nextParams).length > 0 ? nextParams : undefined
+        );
       }
     } catch (e) {
       console.warn('URL deep-link parsing notice:', e);
@@ -382,6 +401,7 @@ export default function App() {
           activeView={activeView}
           onNavigate={handleNavigate}
           feeSettings={feeSettings}
+          governanceStatus={governanceSnapshot.status}
         />
       </div>
 
@@ -402,6 +422,11 @@ export default function App() {
               <HomePage
                 language={language}
                 feeSettings={feeSettings}
+                governanceStatus={governanceSnapshot.status}
+                governanceError={governanceSnapshot.error}
+                onRetryGovernance={() => {
+                  GovernanceSettingsService.fetchFromSupabase().catch(() => { });
+                }}
                 onNavigate={handleNavigate}
                 onSelectTicket={(reg) => {
                   setActiveTicket(reg);
@@ -415,6 +440,12 @@ export default function App() {
                 key={`registration-form-${registrationFormKey}`}
                 language={language}
                 feeSettings={feeSettings}
+                governanceStatus={governanceSnapshot.status}
+                governanceError={governanceSnapshot.error}
+                onRetryGovernance={() => {
+                  GovernanceSettingsService.fetchFromSupabase().catch(() => { });
+                }}
+                initialCategory={initialRegistrationCategory}
                 initialData={preservedRegistrationData}
                 isProcessingPayment={isPaymentModalOpen}
                 onInitiatePayment={handleInitiatePayment}
@@ -463,7 +494,16 @@ export default function App() {
             )}
 
             {activeView === 'donate' && (
-              <DonationPage language={language} onNavigate={handleNavigate} />
+              <DonationPage
+                language={language}
+                onNavigate={handleNavigate}
+                feeSettings={feeSettings}
+                governanceStatus={governanceSnapshot.status}
+                governanceError={governanceSnapshot.error}
+                onRetryGovernance={() => {
+                  GovernanceSettingsService.fetchFromSupabase().catch(() => { });
+                }}
+              />
             )}
 
             {activeView === 'international-payment' && (
@@ -516,6 +556,7 @@ export default function App() {
           language={language}
           onNavigate={handleNavigate}
           feeSettings={feeSettings}
+          governanceStatus={governanceSnapshot.status}
         />
       </div>
 
@@ -526,6 +567,7 @@ export default function App() {
           activeView={activeView}
           onNavigate={handleNavigate}
           feeSettings={feeSettings}
+          governanceStatus={governanceSnapshot.status}
         />
       </div>
 

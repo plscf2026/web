@@ -17,7 +17,6 @@ import {
   AlertTriangle,
   QrCode,
   FileText,
-  Lock,
   Play,
   PenLine,
   Users,
@@ -28,10 +27,12 @@ import {
   Handshake,
   Trophy,
   X,
+  RefreshCw,
 } from 'lucide-react';
 import {
   Language,
   FeeSettings,
+  GovernanceLoadStatus,
   RegistrationRecord,
   DonationRecord,
   HomePageSectionId,
@@ -43,18 +44,23 @@ import { AppStore } from '../services/store';
 import { SupabaseService } from '../services/supabase';
 import { FinancialTransparencyDashboard } from './financials/FinancialTransparencyDashboard';
 import { ThankYouCardModal } from './ThankYouCardModal';
+import { GovernanceClosureNoticeCard } from './common/GovernanceClosureNoticeCard';
 import {
   isGlobalRegistrationOpen,
   isAlumniRegistrationOpen,
   isCurrentStudentRegistrationOpen,
   isDonationOpen,
+  getStructuredClosureNotice,
 } from '../utils/rules';
 
 interface HomePageProps {
   language: Language;
   feeSettings: FeeSettings;
-  onNavigate: (view: string) => void;
+  onNavigate: (view: string, replace?: boolean, extraParams?: Record<string, string>) => void;
   onSelectTicket?: (reg: RegistrationRecord) => void;
+  governanceStatus?: GovernanceLoadStatus;
+  governanceError?: string | null;
+  onRetryGovernance?: () => void;
 }
 
 interface TimeLeft {
@@ -70,7 +76,11 @@ export const HomePage: React.FC<HomePageProps> = ({
   feeSettings,
   onNavigate,
   onSelectTicket,
+  governanceStatus = 'ready',
+  governanceError = null,
+  onRetryGovernance,
 }) => {
+  const isGovernanceReady = governanceStatus === 'ready';
   const t = translations[language];
   const registrations = AppStore.getRegistrations();
   const notices = AppStore.getNotices();
@@ -192,10 +202,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   };
 
   // Registration closed notice text
-  const closedNotice =
-    language === 'bn'
-      ? feeSettings.closedMessageBn || t.regClosedNoticeDefault
-      : feeSettings.closedMessageEn || t.regClosedNoticeDefault;
+  const globalClosedNotice = getStructuredClosureNotice(feeSettings, 'global', language);
+  const closedNotice = globalClosedNotice.message;
 
   return (
     <div className="flex flex-col gap-16 pb-16">
@@ -270,11 +278,11 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
 
             {/* Registration Closed Banner if applicable */}
-            {!feeSettings.registrationOpen && (
+            {isGovernanceReady && !isGlobalRegistrationOpen(feeSettings) && (
               <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs sm:text-sm shadow-xs">
                 <div className="flex items-center gap-2 font-bold mb-1 text-amber-800">
                   <AlertTriangle className="w-4 h-4" />
-                  <span>{language === 'bn' ? 'জরুরি প্রশাসনিক বিজ্ঞপ্তি' : 'Official Notice'}</span>
+                  <span>{globalClosedNotice.title}</span>
                 </div>
                 <p>{closedNotice}</p>
               </div>
@@ -282,7 +290,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
             {/* Action Buttons */}
             <div className="flex flex-wrap items-center gap-3 pt-2">
-              {isGlobalRegistrationOpen(feeSettings) && (
+              {isGovernanceReady && isGlobalRegistrationOpen(feeSettings) && (
                 <button
                   onClick={() => onNavigate('register')}
                   className="px-7 py-3.5 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-black text-sm sm:text-base shadow-lg shadow-sky-600/30 hover:shadow-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center gap-2 group"
@@ -293,13 +301,18 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </button>
               )}
 
-              {isDonationOpen(feeSettings) && (
+              {isGovernanceReady && (
                 <button
                   onClick={() => onNavigate('donate')}
                   className="px-6 py-3.5 rounded-full bg-[#E2EEF8] hover:bg-white text-[#0F172A] border border-[#0284C7]/30 font-bold text-sm sm:text-base shadow-xs hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer flex items-center gap-2"
                 >
                   <HeartHandshake className="w-4 h-4 text-[#0284C7]" />
                   <span>{language === 'bn' ? 'অনুদান / সহায়তা' : 'Contribute / Donate'}</span>
+                  {!isDonationOpen(feeSettings) && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-black uppercase">
+                      {language === 'bn' ? 'বন্ধ' : 'Closed'}
+                    </span>
+                  )}
                 </button>
               )}
             </div>
@@ -584,7 +597,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
 
             {/* Action CTA Button */}
-            {isGlobalRegistrationOpen(feeSettings) && (
+            {isGovernanceReady && isGlobalRegistrationOpen(feeSettings) && (
               <button
                 onClick={() => onNavigate('register')}
                 className="px-6 py-3.5 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-black text-xs sm:text-sm shadow-lg shadow-sky-600/30 transition-all transform hover:scale-105 active:scale-100 cursor-pointer flex items-center gap-2 shrink-0"
@@ -951,14 +964,16 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <p className="text-xs text-rose-700">
                   {statusLookupError || t.statusNotFoundDesc}
                 </p>
-                <div className="pt-2">
-                  <button
-                    onClick={() => onNavigate('register')}
-                    className="text-xs font-bold text-rose-800 underline hover:text-rose-950 cursor-pointer"
-                  >
-                    {language === 'bn' ? 'নতুন শিক্ষার্থী নিবন্ধন করুন →' : 'Register as New Attendee →'}
-                  </button>
-                </div>
+                {isGovernanceReady && isGlobalRegistrationOpen(feeSettings) && (
+                  <div className="pt-2">
+                    <button
+                      onClick={() => onNavigate('register')}
+                      className="text-xs font-bold text-rose-800 underline hover:text-rose-950 cursor-pointer"
+                    >
+                      {language === 'bn' ? 'নতুন শিক্ষার্থী নিবন্ধন করুন →' : 'Register as New Attendee →'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -981,131 +996,207 @@ export const HomePage: React.FC<HomePageProps> = ({
           </p>
         </div>
 
-        {!isGlobalRegistrationOpen(feeSettings) ? (
+        {governanceStatus === 'loading' ? (
           <div className="max-w-2xl mx-auto p-8 bg-white rounded-3xl border border-slate-200 text-center space-y-3 shadow-xs">
+            <RefreshCw className="w-7 h-7 text-[#0284C7] animate-spin mx-auto" />
+            <h3 className="text-sm font-bold text-slate-900">
+              {language === 'bn' ? 'নিবন্ধনের সর্বশেষ অবস্থা যাচাই করা হচ্ছে...' : 'Checking live registration availability...'}
+            </h3>
+            <p className="text-xs text-slate-500">
+              {language === 'bn'
+                ? 'অনুগ্রহ করে এক মুহূর্ত অপেক্ষা করুন।'
+                : 'Please wait a moment while we load live governance settings.'}
+            </p>
+          </div>
+        ) : governanceStatus === 'error' ? (
+          <div className="max-w-2xl mx-auto p-8 bg-white rounded-3xl border border-rose-200 text-center space-y-4 shadow-xs">
             <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-              <Lock className="w-6 h-6" />
+              <AlertTriangle className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-bold text-slate-900">
-              {language === 'bn' ? 'অনলাইন রেজিস্ট্রেশন কার্যক্রম বর্তমানে বন্ধ রয়েছে' : 'Online Registration is Currently Closed'}
-            </h3>
-            <p className="text-xs text-slate-600 max-w-md mx-auto">
-              {closedNotice}
-            </p>
-          </div>
-        ) : !isAlumniRegistrationOpen(feeSettings) && !isCurrentStudentRegistrationOpen(feeSettings) ? (
-          <div className="max-w-2xl mx-auto p-8 bg-white rounded-3xl border border-slate-200 text-center space-y-3 shadow-xs">
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
-              <Lock className="w-6 h-6" />
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-slate-900">
+                {language === 'bn'
+                  ? 'নিবন্ধন সেটিংস লোড করা সম্ভব হয়নি'
+                  : 'Unable to Load Registration Status'}
+              </h3>
+              <p className="text-xs text-slate-600 max-w-md mx-auto">
+                {governanceError ||
+                  (language === 'bn'
+                    ? 'সার্ভারের সাথে সংযোগ স্থাপন করা যায়নি। অনুগ্রহ করে পুনরায় চেষ্টা করুন।'
+                    : 'Could not reach the portal settings server. Please retry.')}
+              </p>
             </div>
-            <h3 className="text-base font-bold text-slate-900">
-              {language === 'bn' ? 'সকল ক্যাটাগরির রেজিস্ট্রেশন সাময়িকভাবে বন্ধ' : 'Registration for All Categories is Currently Paused'}
-            </h3>
-            <p className="text-xs text-slate-600 max-w-md mx-auto">
-              {closedNotice}
-            </p>
+            {onRetryGovernance && (
+              <button
+                type="button"
+                onClick={onRetryGovernance}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>{language === 'bn' ? 'পুনরায় চেষ্টা করুন' : 'Retry'}</span>
+              </button>
+            )}
           </div>
+        ) : !isGlobalRegistrationOpen(feeSettings) ? (
+          <GovernanceClosureNoticeCard
+            notice={globalClosedNotice}
+            language={language}
+            badgeText={language === 'bn' ? 'নিবন্ধন বন্ধ' : 'Registration Closed'}
+            onFindTicket={() => onNavigate('find-ticket')}
+          />
         ) : (
-          <div className={`grid gap-8 max-w-4xl mx-auto ${
-            isAlumniRegistrationOpen(feeSettings) && isCurrentStudentRegistrationOpen(feeSettings)
-              ? 'grid-cols-1 md:grid-cols-2'
-              : 'grid-cols-1 max-w-md'
-          }`}>
-            {/* Former Student Card */}
-            {isAlumniRegistrationOpen(feeSettings) && (
-              <div className="bg-white rounded-3xl p-8 border-2 border-[#0284C7] shadow-xl relative overflow-hidden flex flex-col justify-between">
-                <div className="absolute top-0 right-0 bg-[#0284C7] text-white text-[10px] font-black uppercase px-4 py-1 rounded-bl-xl tracking-wider">
-                  {language === 'bn' ? 'অ্যালামনাই ক্যাটাগরি' : 'Alumni'}
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <span className="text-xs font-bold text-[#0284C7] uppercase tracking-wider block">
-                      {t.feeFormerTitle}
-                    </span>
-                    <h3 className="text-3xl font-black text-slate-900 mt-1">
-                      ৳ {feeSettings.formerStudentFee} BDT
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-1">{t.feeFormerSubtitle}</p>
-                  </div>
-
-                  <div className="space-y-2.5 text-xs text-slate-700 pt-4 border-t border-slate-100">
-                    <div className="flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-[#0284C7] shrink-0 mt-0.5" />
-                      <span>{t.feeFormerIncludes}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Shirt className="w-4 h-4 text-[#0284C7] shrink-0" />
-                      <span>
-                        {language === 'bn' ? 'কাস্টম সাইজ টি-শার্ট অন্তর্ভুক্ত' : 'T-shirt Included (S-XXXL)'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Award className="w-4 h-4 text-[#0284C7] shrink-0" />
-                      <span>
-                        {language === 'bn' ? '৬৪ বছর পূর্তি স্মারক স্মরণিকা' : 'Anniversary Souvenir Magazine'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-8">
-                  <button
-                    onClick={() => onNavigate('register')}
-                    className="w-full py-3.5 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold text-sm shadow-lg shadow-sky-600/30 transition-all cursor-pointer flex items-center justify-center gap-2"
+          <div className="grid gap-8 max-w-4xl mx-auto grid-cols-1 md:grid-cols-2">
+            {/* Former Student Card (always visible & clickable when Global is ON) */}
+            {(() => {
+              const alumniOpen = isAlumniRegistrationOpen(feeSettings);
+              return (
+                <div
+                  className={`bg-white rounded-3xl p-8 shadow-xl relative overflow-hidden flex flex-col justify-between ${
+                    alumniOpen ? 'border-2 border-[#0284C7]' : 'border-2 border-amber-300'
+                  }`}
+                >
+                  <div
+                    className={`absolute top-0 right-0 text-white text-[10px] font-black uppercase px-4 py-1 rounded-bl-xl tracking-wider ${
+                      alumniOpen ? 'bg-[#0284C7]' : 'bg-amber-600'
+                    }`}
                   >
-                    <span>{language === 'bn' ? 'প্রাক্তন শিক্ষার্থী নিবন্ধন' : 'Register as Alumni'}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Current Student Card */}
-            {isCurrentStudentRegistrationOpen(feeSettings) && (
-              <div className="bg-white rounded-3xl p-8 border border-[#E2EEF8] shadow-lg relative overflow-hidden flex flex-col justify-between">
-                <div className="space-y-4">
-                  <div>
-                    <span className="text-xs font-bold text-[#0EA5E9] uppercase tracking-wider block">
-                      {t.feeCurrentTitle}
-                    </span>
-                    <h3 className="text-3xl font-black text-slate-900 mt-1">
-                      ৳ {feeSettings.currentStudentFee} BDT
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-1">{t.feeCurrentSubtitle}</p>
+                    {alumniOpen
+                      ? language === 'bn'
+                        ? 'অ্যালামনাই ক্যাটাগরি'
+                        : 'Alumni'
+                      : language === 'bn'
+                        ? 'সাময়িকভাবে বন্ধ'
+                        : 'Temporarily Closed'}
                   </div>
 
-                  <div className="space-y-2.5 text-xs text-slate-700 pt-4 border-t border-slate-100">
-                    <div className="flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-[#0EA5E9] shrink-0 mt-0.5" />
-                      <span>{t.feeCurrentIncludes}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Shirt className="w-4 h-4 text-[#0EA5E9] shrink-0" />
-                      <span>
-                        {language === 'bn' ? 'পুনর্মিলনী টি-শার্ট অন্তর্ভুক্ত' : 'Reunion T-shirt Included'}
+                  <div className="space-y-4">
+                    <div>
+                      <span className="text-xs font-bold text-[#0284C7] uppercase tracking-wider block">
+                        {t.feeFormerTitle}
                       </span>
+                      <h3 className="text-3xl font-black text-slate-900 mt-1">
+                        ৳ {feeSettings.formerStudentFee} BDT
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1">{t.feeFormerSubtitle}</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-[#0EA5E9] shrink-0" />
-                      <span>
-                        {language === 'bn' ? 'বিশেষ ছাত্র মধ্যাহ্নভোজ ও কনসার্ট' : 'Student Banquet & Live Concert'}
-                      </span>
+
+                    <div className="space-y-2.5 text-xs text-slate-700 pt-4 border-t border-slate-100">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-[#0284C7] shrink-0 mt-0.5" />
+                        <span>{t.feeFormerIncludes}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Shirt className="w-4 h-4 text-[#0284C7] shrink-0" />
+                        <span>
+                          {language === 'bn' ? 'কাস্টম সাইজ টি-শার্ট অন্তর্ভুক্ত' : 'T-shirt Included (S-XXXL)'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Award className="w-4 h-4 text-[#0284C7] shrink-0" />
+                        <span>
+                          {language === 'bn' ? '৬৪ বছর পূর্তি স্মারক স্মরণিকা' : 'Anniversary Souvenir Magazine'}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="pt-8">
-                  <button
-                    onClick={() => onNavigate('register')}
-                    className="w-full py-3.5 rounded-full bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <span>{language === 'bn' ? 'বর্তমান শিক্ষার্থী নিবন্ধন' : 'Register as Current Student'}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                  <div className="pt-8">
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('register', false, { category: 'former' })}
+                      className={`w-full py-3.5 rounded-full font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                        alumniOpen
+                          ? 'bg-[#0284C7] hover:bg-[#0EA5E9] text-white shadow-lg shadow-sky-600/30'
+                          : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 shadow-xs'
+                      }`}
+                    >
+                      <span>
+                        {alumniOpen
+                          ? language === 'bn'
+                            ? 'প্রাক্তন শিক্ষার্থী নিবন্ধন'
+                            : 'Register as Alumni'
+                          : language === 'bn'
+                            ? 'প্রাক্তন শিক্ষার্থী (বিজ্ঞপ্তি দেখুন)'
+                            : 'Alumni Notice & Details'}
+                      </span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
+
+            {/* Current Student Card (always visible & clickable when Global is ON) */}
+            {(() => {
+              const currentOpen = isCurrentStudentRegistrationOpen(feeSettings);
+              return (
+                <div
+                  className={`bg-white rounded-3xl p-8 shadow-lg relative overflow-hidden flex flex-col justify-between ${
+                    currentOpen ? 'border border-[#E2EEF8]' : 'border-2 border-amber-300'
+                  }`}
+                >
+                  {!currentOpen && (
+                    <div className="absolute top-0 right-0 bg-amber-600 text-white text-[10px] font-black uppercase px-4 py-1 rounded-bl-xl tracking-wider">
+                      {language === 'bn' ? 'সাময়িকভাবে বন্ধ' : 'Temporarily Closed'}
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    <div>
+                      <span className="text-xs font-bold text-[#0EA5E9] uppercase tracking-wider block">
+                        {t.feeCurrentTitle}
+                      </span>
+                      <h3 className="text-3xl font-black text-slate-900 mt-1">
+                        ৳ {feeSettings.currentStudentFee} BDT
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1">{t.feeCurrentSubtitle}</p>
+                    </div>
+
+                    <div className="space-y-2.5 text-xs text-slate-700 pt-4 border-t border-slate-100">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-[#0EA5E9] shrink-0 mt-0.5" />
+                        <span>{t.feeCurrentIncludes}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Shirt className="w-4 h-4 text-[#0EA5E9] shrink-0" />
+                        <span>
+                          {language === 'bn' ? 'পুনর্মিলনী টি-শার্ট অন্তর্ভুক্ত' : 'Reunion T-shirt Included'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-[#0EA5E9] shrink-0" />
+                        <span>
+                          {language === 'bn' ? 'বিশেষ ছাত্র মধ্যাহ্নভোজ ও কনসার্ট' : 'Student Banquet & Live Concert'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-8">
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('register', false, { category: 'current' })}
+                      className={`w-full py-3.5 rounded-full font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                        currentOpen
+                          ? 'bg-[#0F172A] hover:bg-slate-800 text-white shadow-md'
+                          : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 shadow-xs'
+                      }`}
+                    >
+                      <span>
+                        {currentOpen
+                          ? language === 'bn'
+                            ? 'বর্তমান শিক্ষার্থী নিবন্ধন'
+                            : 'Register as Current Student'
+                          : language === 'bn'
+                            ? 'বর্তমান শিক্ষার্থী (বিজ্ঞপ্তি দেখুন)'
+                            : 'Current Student Notice & Details'}
+                      </span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
       </section>
@@ -1115,6 +1206,8 @@ export const HomePage: React.FC<HomePageProps> = ({
         <FinancialTransparencyDashboard
           language={language}
           onNavigateDonate={() => onNavigate('donate')}
+          feeSettings={feeSettings}
+          governanceStatus={governanceStatus}
         />
       </div>
 

@@ -11,7 +11,7 @@ import {
   Image as ImageIcon,
   Info,
 } from 'lucide-react';
-import { Language, FeeSettings } from '../types';
+import { Language, FeeSettings, GovernanceLoadStatus } from '../types';
 import { translations } from '../i18n/translations';
 import { AppStore } from '../services/store';
 import { isGlobalRegistrationOpen, isDonationOpen } from '../utils/rules';
@@ -22,6 +22,7 @@ interface HeaderProps {
   activeView: string;
   onNavigate: (view: string) => void;
   feeSettings?: FeeSettings;
+  governanceStatus?: GovernanceLoadStatus;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -30,6 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeView,
   onNavigate,
   feeSettings: initialFeeSettings,
+  governanceStatus = 'ready',
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [feeSettings, setFeeSettings] = useState<FeeSettings>(
@@ -67,13 +69,25 @@ export const Header: React.FC<HeaderProps> = ({
     highlight?: boolean;
   }
 
+  const isGovernanceReady = governanceStatus === 'ready';
+
   const rawNavItems: NavItem[] = [
     { id: 'home', label: t.navHome, icon: Home },
-    ...(isGlobalRegistrationOpen(feeSettings)
+    ...(isGovernanceReady && isGlobalRegistrationOpen(feeSettings)
       ? [{ id: 'register', label: t.navRegister, icon: UserPlus, highlight: true }]
       : []),
-    ...(isDonationOpen(feeSettings)
-      ? [{ id: 'donate', label: t.navDonate, icon: HeartHandshake }]
+    ...(isGovernanceReady
+      ? [
+          {
+            id: 'donate',
+            label: isDonationOpen(feeSettings)
+              ? t.navDonate
+              : language === 'bn'
+                ? `${t.navDonate} (বন্ধ)`
+                : `${t.navDonate} (Closed)`,
+            icon: HeartHandshake,
+          },
+        ]
       : []),
     { id: 'find-ticket', label: t.navFindTicket, icon: Search },
     { id: 'notices', label: t.navNotices, icon: Bell },

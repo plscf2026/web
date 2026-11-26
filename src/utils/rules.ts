@@ -545,14 +545,79 @@ export function getDonationClosedMessage(
   settings: FeeSettings | null | undefined,
   lang: 'en' | 'bn' = 'en'
 ): string {
-  if (lang === 'bn') {
-    return (
-      settings?.donationClosedMessageBn ||
-      'অনলাইন অনুদান কার্যক্রম বর্তমানে সাময়িকভাবে বন্ধ রয়েছে। পুনর্মিলনী তহবিলে সহযোগিতার জন্য আন্তরিক ধন্যবাদ।'
-    );
+  const custom =
+    lang === 'bn'
+      ? settings?.closureNotices?.donation?.messageBn || settings?.donationClosedMessageBn
+      : settings?.closureNotices?.donation?.messageEn || settings?.donationClosedMessageEn;
+  if (custom && custom.trim()) {
+    return custom.trim();
   }
-  return (
-    settings?.donationClosedMessageEn ||
-    'Online donations are currently paused by the Reunion Secretariat. Thank you for your continued support.'
-  );
+  if (lang === 'bn') {
+    return 'অনলাইন অনুদান কার্যক্রম বর্তমানে সাময়িকভাবে বন্ধ রয়েছে। পুনর্মিলনী তহবিলে সহযোগিতার জন্য আন্তরিক ধন্যবাদ।';
+  }
+  return 'Online donations are currently paused by the Reunion Secretariat. Thank you for your continued support.';
+}
+
+export interface ResolvedClosureNotice {
+  target: 'global' | 'alumni' | 'currentStudent' | 'donation';
+  title: string;
+  message: string;
+  reopenAt?: string;
+  contactInfo?: string;
+  instructions?: string;
+}
+
+/**
+ * Resolves safe plain-text closure notice content for UI rendering, omitting any blank optional fields.
+ */
+export function getStructuredClosureNotice(
+  settings: FeeSettings | null | undefined,
+  target: 'global' | 'alumni' | 'currentStudent' | 'donation',
+  lang: 'en' | 'bn' = 'en'
+): ResolvedClosureNotice {
+  const isBn = lang === 'bn';
+
+  if (target === 'global') {
+    return {
+      target: 'global',
+      title: isBn
+        ? 'অনলাইন রেজিস্ট্রেশন কার্যক্রম সাময়িকভাবে বন্ধ রয়েছে'
+        : 'Online Registration Is Currently Closed',
+      message: getRegistrationClosedMessage(settings, 'global', lang),
+    };
+  }
+
+  const slot = settings?.closureNotices?.[target];
+  const fallbackTitle =
+    target === 'alumni'
+      ? isBn
+        ? 'প্রাক্তন শিক্ষার্থী নিবন্ধন সাময়িকভাবে বন্ধ রয়েছে'
+        : 'Alumni Registration Is Temporarily Closed'
+      : target === 'currentStudent'
+      ? isBn
+        ? 'বর্তমান শিক্ষার্থী নিবন্ধন সাময়িকভাবে বন্ধ রয়েছে'
+        : 'Current Student Registration Is Temporarily Closed'
+      : isBn
+      ? 'অনলাইন অনুদান কার্যক্রম সাময়িকভাবে বন্ধ রয়েছে'
+      : 'Online Donations Are Temporarily Closed';
+
+  const fallbackMessage =
+    target === 'donation'
+      ? getDonationClosedMessage(settings, lang)
+      : getRegistrationClosedMessage(settings, target === 'alumni' ? 'former' : 'current', lang);
+
+  const title = (isBn ? slot?.titleBn : slot?.titleEn)?.trim() || fallbackTitle;
+  const message = (isBn ? slot?.messageBn : slot?.messageEn)?.trim() || fallbackMessage;
+  const reopenAt = slot?.reopenAt?.trim() || undefined;
+  const contactInfo = slot?.contactInfo?.trim() || undefined;
+  const instructions = (isBn ? slot?.instructionsBn : slot?.instructionsEn)?.trim() || undefined;
+
+  return {
+    target,
+    title,
+    message,
+    reopenAt,
+    contactInfo,
+    instructions,
+  };
 }

@@ -3,7 +3,7 @@
  * Preserves active views, handles nested routes, and provides reliable in-place page refreshes across the entire application.
  */
 
-import { PortalRole, getPortalRoleFromSlug } from '../types';
+import { PortalRole, StudentCategory, getPortalRoleFromSlug } from '../types';
 
 export const VALID_VIEWS = [
   'home',
@@ -29,9 +29,18 @@ export interface ResolvedRoute {
   view: AppView;
   portalRole?: PortalRole;
   tab?: string;
+  category?: StudentCategory;
   ticketQuery?: string;
   isPaymentReturn?: boolean;
   notFoundPath?: string;
+}
+
+export function parseRegistrationCategory(raw: string | null | undefined): StudentCategory | undefined {
+  if (!raw) return undefined;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === 'former' || normalized === 'alumni') return 'former';
+  if (normalized === 'current' || normalized === 'student' || normalized === 'current-student') return 'current';
+  return undefined;
 }
 
 export const STORAGE_KEY_CURRENT_VIEW = 'plscf_current_view';
@@ -90,6 +99,8 @@ export function resolveRouteFromLocation(): ResolvedRoute {
       };
     }
 
+    const categoryParam = parseRegistrationCategory(searchParams.get('category'));
+
     // 3. Root URL access
     if (!rawPath || rawPath === '' || rawPath === '/') {
       // Check query param fallbacks (?admin=true, ?view=scanner, etc.)
@@ -98,6 +109,7 @@ export function resolveRouteFromLocation(): ResolvedRoute {
         return {
           view: viewParam as AppView,
           tab: searchParams.get('tab') || undefined,
+          category: viewParam === 'register' ? categoryParam : undefined,
         };
       }
 
@@ -106,6 +118,7 @@ export function resolveRouteFromLocation(): ResolvedRoute {
           return {
             view: v,
             tab: searchParams.get('tab') || undefined,
+            category: v === 'register' ? categoryParam : undefined,
           };
         }
       }
@@ -115,6 +128,7 @@ export function resolveRouteFromLocation(): ResolvedRoute {
       if (cleanHash && (VALID_VIEWS as readonly string[]).includes(cleanHash)) {
         return {
           view: cleanHash as AppView,
+          category: cleanHash === 'register' ? categoryParam : undefined,
         };
       }
 
@@ -123,6 +137,7 @@ export function resolveRouteFromLocation(): ResolvedRoute {
       if (savedRoute && savedRoute !== '404' && (VALID_VIEWS as readonly string[]).includes(savedRoute)) {
         return {
           view: savedRoute as AppView,
+          category: savedRoute === 'register' ? categoryParam : undefined,
         };
       }
 
@@ -135,6 +150,16 @@ export function resolveRouteFromLocation(): ResolvedRoute {
     const primarySegment = segments[0]?.toLowerCase() || '';
     const subSegment = segments[1] || '';
     const cleanPathLower = cleanPath.toLowerCase();
+
+    // Direct or category-scoped registration URL: /register, /register/alumni, /register/current
+    if (primarySegment === 'register' || primarySegment === 'registration') {
+      const subCategory = parseRegistrationCategory(subSegment);
+      return {
+        view: 'register',
+        tab: searchParams.get('tab') || undefined,
+        category: subCategory || categoryParam,
+      };
+    }
 
     // Nested dashboard role route: /dashboard/:role (e.g. /dashboard/super-admin, /dashboard/finance)
     if (primarySegment === 'dashboard') {
@@ -214,16 +239,20 @@ export function resolveRouteFromLocation(): ResolvedRoute {
 
     // Route alias match (e.g. /contact -> about, /registration -> register)
     if (ROUTE_ALIASES[cleanPathLower]) {
+      const targetView = ROUTE_ALIASES[cleanPathLower];
       return {
-        view: ROUTE_ALIASES[cleanPathLower],
+        view: targetView,
         tab: searchParams.get('tab') || undefined,
+        category: targetView === 'register' ? categoryParam : undefined,
       };
     }
 
     if (ROUTE_ALIASES[primarySegment]) {
+      const targetView = ROUTE_ALIASES[primarySegment];
       return {
-        view: ROUTE_ALIASES[primarySegment],
+        view: targetView,
         tab: subSegment || searchParams.get('tab') || undefined,
+        category: targetView === 'register' ? categoryParam : undefined,
       };
     }
 
@@ -233,6 +262,7 @@ export function resolveRouteFromLocation(): ResolvedRoute {
       return {
         view: viewParam as AppView,
         tab: searchParams.get('tab') || undefined,
+        category: viewParam === 'register' ? categoryParam : undefined,
       };
     }
 

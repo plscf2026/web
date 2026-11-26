@@ -18,7 +18,7 @@ import {
   Calendar,
   RefreshCw,
   Lock,
-  Unlock,
+  AlertTriangle,
   Sparkles,
   Database,
   LogOut,
@@ -92,6 +92,7 @@ import { AuditHistoryTab } from './admin/AuditHistoryTab';
 import { StudentIdManagementTab } from './admin/StudentIdManagementTab';
 import { MealTimeScannerControlPanel } from './admin/MealTimeScannerControlPanel';
 import { RegistrationDonationControlPanel } from './admin/RegistrationDonationControlPanel';
+import { GovernanceSettingsService } from '../services/governanceSettingsService';
 import { StudentIdService } from '../services/studentIdStore';
 import { EventStore } from '../services/eventStore';
 import { IdCardStore } from '../services/idCardStore';
@@ -536,18 +537,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [noticeContentEn, setNoticeContentEn] = useState('');
   const [noticeContentBn, setNoticeContentBn] = useState('');
 
-  // Fee settings form
+  // Fee settings form (non-governance event/fee/layout fields only)
   const [formerFeeInput, setFormerFeeInput] = useState(feeSettings.formerStudentFee);
   const [currentFeeInput, setCurrentFeeInput] = useState(feeSettings.currentStudentFee);
-  const [registrationOpenInput, setRegistrationOpenInput] = useState(feeSettings.registrationOpen);
-  const [closedMessageEnInput, setClosedMessageEnInput] = useState(
-    feeSettings.closedMessageEn ||
-      'Online registration is currently closed. If you need special authorization, please contact the Reunion Secretariat.'
-  );
-  const [closedMessageBnInput, setClosedMessageBnInput] = useState(
-    feeSettings.closedMessageBn ||
-      'অনলাইন রেজিস্ট্রেশন কার্যক্রম বর্তমানে বন্ধ রয়েছে। জরুরি প্রয়োজনে অনুগ্রহ করে পুনর্মিলনী সচিবালয়ে যোগাযোগ করুন।'
-  );
   const [eventTargetDateInput, setEventTargetDateInput] = useState(
     feeSettings.eventTargetDate || '2027-01-29T09:00:00'
   );
@@ -563,16 +555,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   );
   const [selectedCardDonation, setSelectedCardDonation] = useState<DonationRecord | null>(null);
   const [settingsSuccessNotice, setSettingsSuccessNotice] = useState(false);
+  const [settingsErrorNotice, setSettingsErrorNotice] = useState<string | null>(null);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
-  // Super Admin direct privacy toggle for Donors Hall of Fame
-  const handleToggleHideDonationAmounts = () => {
-    const updated: FeeSettings = {
-      ...feeSettings,
-      hideDonationAmounts: !feeSettings.hideDonationAmounts,
-    };
-    AppStore.saveFeeSettings(updated);
-    setFeeSettings(updated);
-    setHideDonationAmountsInput(Boolean(updated.hideDonationAmounts));
+  // Super Admin direct privacy toggle for Donors Hall of Fame (atomic Supabase patch)
+  const handleToggleHideDonationAmounts = async () => {
+    const prevValue = Boolean(feeSettings.hideDonationAmounts);
+    const nextValue = !prevValue;
+    setHideDonationAmountsInput(nextValue);
+    setSettingsErrorNotice(null);
+
+    const res = await GovernanceSettingsService.patchSettings(
+      { hideDonationAmounts: nextValue },
+      effectiveAdmin.fullName || 'Super Admin',
+      language
+    );
+
+    if (res.success && res.settings) {
+      setFeeSettings(res.settings);
+      setHideDonationAmountsInput(Boolean(res.settings.hideDonationAmounts));
+    } else {
+      setHideDonationAmountsInput(prevValue);
+      setSettingsErrorNotice(
+        res.error ||
+          (language === 'bn'
+            ? 'গোপনীয়তা সেটিংস সংরক্ষণ করা যায়নি।'
+            : 'Failed to update privacy setting in Supabase.')
+      );
+    }
   };
 
   // Fetch registrations from Supabase for selected year
@@ -665,7 +675,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const freshRegs = AppStore.getRegistrations();
     const freshDonations = AppStore.getDonations();
     const freshExpenses = AppStore.getExpenses();
-    const freshSettings = AppStore.getFeeSettings();
+    const freshSettings = GovernanceSettingsService.getConfirmedSettings() || AppStore.getFeeSettings();
     const freshNotices = AppStore.getNotices();
     const freshScanLogs = AppStore.getScanLogs();
     const freshDress = EventStore.getDressDistributions();
@@ -684,14 +694,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     setFormerFeeInput(freshSettings.formerStudentFee);
     setCurrentFeeInput(freshSettings.currentStudentFee);
-    setRegistrationOpenInput(freshSettings.registrationOpen);
-    setClosedMessageEnInput(freshSettings.closedMessageEn || '');
-    setClosedMessageBnInput(freshSettings.closedMessageBn || '');
     setEventTargetDateInput(freshSettings.eventTargetDate || '2027-01-29T09:00:00');
     setSimulateEventCompletedInput(Boolean(freshSettings.simulateEventCompleted));
     setHomePageSectionsInput(reconcileHomePageSections(freshSettings.homePageSections));
     setEndDateInput(freshSettings.endDate || '2026-12-15');
+    setHideDonationAmountsInput(Boolean(freshSettings.hideDonationAmounts));
   };
+
+  useEffect(() => {
+    return GovernanceSettingsService.subscribe((snap) => {
+      if (snap.status === 'ready' && snap.settings) {
+        const s = snap.settings;
+        setFeeSettings(s);
+        setFormerFeeInput(s.formerStudentFee);
+        setCurrentFeeInput(s.currentStudentFee);
+        setEventTargetDateInput(s.eventTargetDate || '2027-01-29T09:00:00');
+        setSimulateEventCompletedInput(Boolean(s.simulateEventCompleted));
+        setHomePageSectionsInput(reconcileHomePageSections(s.homePageSections));
+        setEndDateInput(s.endDate || '2026-12-15');
+        setHideDonationAmountsInput(Boolean(s.hideDonationAmounts));
+      }
+    });
+  }, []);
 
   // Explicit refresh from Supabase cloud database (e.g. when user clicks Refresh button)
   const refreshAll = async () => {
@@ -926,33 +950,51 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const tshirtCollectedCount = registrationsForYear.filter((r) => r.isTShirtCollected).length;
 
-  // Handlers
-  const handleSaveFeeSettings = (e: React.SyntheticEvent) => {
+  // Handlers (atomic partial update: never touches governance switches or closure notices)
+  const handleSaveFeeSettings = async (e: React.SyntheticEvent) => {
     e.preventDefault();
-    const currentLatest = AppStore.getFeeSettings();
-    const updated: FeeSettings = {
-      ...currentLatest,
-      ...feeSettings,
-      formerStudentFee: Number(formerFeeInput),
-      currentStudentFee: Number(currentFeeInput),
-      registrationOpen: Boolean(registrationOpenInput),
-      alumniRegistrationOpen: currentLatest.alumniRegistrationOpen !== false,
-      currentStudentRegistrationOpen: currentLatest.currentStudentRegistrationOpen !== false,
-      donationOpen: currentLatest.donationOpen !== false,
-      closedMessageEn: closedMessageEnInput,
-      closedMessageBn: closedMessageBnInput,
-      donationClosedMessageEn: currentLatest.donationClosedMessageEn,
-      donationClosedMessageBn: currentLatest.donationClosedMessageBn,
-      eventTargetDate: eventTargetDateInput,
-      simulateEventCompleted: Boolean(simulateEventCompletedInput),
-      homePageSections: homePageSectionsInput,
-      endDate: endDateInput,
-      hideDonationAmounts: Boolean(hideDonationAmountsInput),
-    };
-    AppStore.saveFeeSettings(updated);
-    setFeeSettings(updated);
-    setSettingsSuccessNotice(true);
-    setTimeout(() => setSettingsSuccessNotice(false), 3000);
+    setSettingsErrorNotice(null);
+    setSettingsSuccessNotice(false);
+    setIsSavingSettings(true);
+
+    try {
+      const res = await GovernanceSettingsService.patchSettings(
+        {
+          formerStudentFee: Number(formerFeeInput),
+          currentStudentFee: Number(currentFeeInput),
+          eventTargetDate: eventTargetDateInput,
+          simulateEventCompleted: Boolean(simulateEventCompletedInput),
+          homePageSections: homePageSectionsInput,
+          endDate: endDateInput,
+          hideDonationAmounts: Boolean(hideDonationAmountsInput),
+        },
+        effectiveAdmin.fullName || 'Super Admin',
+        language
+      );
+
+      if (res.success && res.settings) {
+        setFeeSettings(res.settings);
+        setSettingsSuccessNotice(true);
+        setTimeout(() => setSettingsSuccessNotice(false), 3000);
+      } else {
+        const confirmed = res.settings || GovernanceSettingsService.getConfirmedSettings() || feeSettings;
+        setFormerFeeInput(confirmed.formerStudentFee);
+        setCurrentFeeInput(confirmed.currentStudentFee);
+        setEventTargetDateInput(confirmed.eventTargetDate || '2027-01-29T09:00:00');
+        setSimulateEventCompletedInput(Boolean(confirmed.simulateEventCompleted));
+        setHomePageSectionsInput(reconcileHomePageSections(confirmed.homePageSections));
+        setEndDateInput(confirmed.endDate || '2026-12-15');
+        setHideDonationAmountsInput(Boolean(confirmed.hideDonationAmounts));
+        setSettingsErrorNotice(
+          res.error ||
+            (language === 'bn'
+              ? 'সুপাবেজ ডাটাবেজে ইভেন্ট সেটিংস সংরক্ষণ করা যায়নি। পূর্বের নিশ্চিতকৃত মান বহাল রাখা হয়েছে।'
+              : 'Failed to save event settings to Supabase. Previous confirmed values have been restored.')
+        );
+      }
+    } finally {
+      setIsSavingSettings(false);
+    }
   };
 
   const moveHomePageSection = (sectionId: HomePageSectionId, offset: -1 | 1) => {
@@ -3392,9 +3434,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <RegistrationDonationControlPanel
             language={language}
             adminName={effectiveAdmin.fullName || 'Super Admin'}
+            isSuperAdmin={isSuperAdmin}
             onSettingsChanged={(updated) => {
               setFeeSettings(updated);
-              setRegistrationOpenInput(updated.registrationOpen);
             }}
           />
 
@@ -3407,12 +3449,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
           <div>
             <h2 className="text-lg font-bold text-slate-900">
-              {language === 'bn' ? 'রেজিস্ট্রেশন স্ট্যাটাস ও ফি কনফিগারেশন' : 'Registration Status & Event Settings'}
+              {language === 'bn' ? 'রেজিস্ট্রেশন ফি, সময়সূচি ও হোমপেজ কনফিগারেশন' : 'Registration Fees, Schedule & Homepage Settings'}
             </h2>
             <p className="text-xs text-slate-500">
               {language === 'bn'
-                ? 'রেজিস্ট্রেশন চালু/বন্ধ, ফি নির্ধারণ, ইভেন্ট সময়সূচি এবং ওয়েবসাইট কাউন্টডাউন নিয়ন্ত্রণ করুন।'
-                : 'Manage open/close status, category fees, target event countdown, and post-event simulation.'}
+                ? 'ক্যাটাগরি ফি, ইভেন্ট সময়সূচি, ওয়েবসাইট কাউন্টডাউন এবং হোমপেজ সেকশন ক্রম নিয়ন্ত্রণ করুন (উপরের সুইচ ও বন্ধের নোটিশ অপরিবর্তিত থাকবে)।'
+                : 'Manage category fees, target event countdown, homepage layout, and privacy without altering live governance switches or closure notices.'}
             </p>
           </div>
 
@@ -3421,97 +3463,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <Check className="w-4 h-4 text-emerald-600" />
               <span>
                 {language === 'bn'
-                  ? 'সেটিংস সফলভাবে সংরক্ষিত হয়েছে এবং ওয়েবসাইটে তাৎক্ষণিক প্রযোজ্য হয়েছে!'
-                  : 'Settings saved successfully and updated live on the website!'}
+                  ? 'ইভেন্ট ও ফি সেটিংস সুপাবেজ ডাটাবেজে সফলভাবে সংরক্ষিত হয়েছে!'
+                  : 'Event & fee settings confirmed in Supabase and updated across visitors!'}
               </span>
             </div>
           )}
 
+          {settingsErrorNotice && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{settingsErrorNotice}</span>
+            </div>
+          )}
+
           <form onSubmit={handleSaveFeeSettings} className="space-y-6">
-            {/* 1. REGISTRATION STATUS TOGGLE */}
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                    {language === 'bn' ? 'অনলাইন রেজিস্ট্রেশন স্ট্যাটাস' : 'Online Registration Status'}
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    {language === 'bn'
-                      ? 'রেজিস্ট্রেশন বন্ধ করলে ওয়েবসাইটে বন্ধের নোটিশ প্রদর্শিত হবে এবং নতুন আবেদন নিষ্ক্রিয় থাকবে।'
-                      : 'Closing registration displays the advisory banner and disables new registration forms.'}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setRegistrationOpenInput(!registrationOpenInput)}
-                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 shadow-xs ${
-                    registrationOpenInput
-                      ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                      : 'bg-rose-600 text-white hover:bg-rose-700'
-                  }`}
-                >
-                  {registrationOpenInput ? (
-                    <>
-                      <Unlock className="w-3.5 h-3.5" />
-                      <span>{language === 'bn' ? 'রেজিস্ট্রেশন চালু (OPEN)' : 'REGISTRATION OPEN'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="w-3.5 h-3.5" />
-                      <span>{language === 'bn' ? 'রেজিস্ট্রেশন বন্ধ (CLOSED)' : 'REGISTRATION CLOSED'}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Status preview banner */}
-              <div className="pt-2 border-t border-slate-200">
-                <span className="text-[11px] text-slate-400 mr-2">Website Badge Preview:</span>
-                {registrationOpenInput ? (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    {t.regStatusOpenBadge} (Deadline: {endDateInput})
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800">
-                    <Lock className="w-3 h-3 text-rose-600" />
-                    {t.regStatusClosedBadge}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* 2. REGISTRATION CLOSED ADVISORY MESSAGES */}
-            <div className="space-y-3">
-              <label className="block text-xs font-bold text-slate-800">
-                {language === 'bn'
-                  ? 'রেজিস্ট্রেশন বন্ধ থাকলে প্রদর্শিত বার্তা (Notice when Registration is Closed)'
-                  : 'Closed Advisory Notices (Displayed when registration is closed)'}
-              </label>
-
-              <div>
-                <span className="text-[11px] text-slate-500 block mb-1">English Advisory Notice:</span>
-                <textarea
-                  rows={2}
-                  value={closedMessageEnInput}
-                  onChange={(e) => setClosedMessageEnInput(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs text-slate-800 focus:border-emerald-500 focus:outline-hidden"
-                  placeholder="Enter notice in English..."
-                />
-              </div>
-
-              <div>
-                <span className="text-[11px] text-slate-500 block mb-1">বাংলা নোটিশ (Bengali Notice):</span>
-                <textarea
-                  rows={2}
-                  value={closedMessageBnInput}
-                  onChange={(e) => setClosedMessageBnInput(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs text-slate-800 focus:border-emerald-500 focus:outline-hidden"
-                  placeholder="বাংলায় নোটিশ লিখুন..."
-                />
-              </div>
-            </div>
 
             {/* 3. REGISTRATION FEES */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -3730,11 +3695,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="pt-2">
               <button
                 type="submit"
-                className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-md transition-colors cursor-pointer flex items-center gap-2"
+                disabled={isSavingSettings}
+                className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-black text-xs shadow-md transition-colors cursor-pointer flex items-center gap-2"
               >
                 <Check className="w-4 h-4" />
                 <span>
-                  {language === 'bn' ? 'সকল কনফিগারেশন সংরক্ষণ করুন' : 'Save All Settings & Apply Live'}
+                  {isSavingSettings
+                    ? language === 'bn'
+                      ? 'সংরক্ষণ হচ্ছে...'
+                      : 'Saving...'
+                    : language === 'bn'
+                      ? 'ইভেন্ট ও ফি সেটিংস সংরক্ষণ করুন'
+                      : 'Save Event & Fee Settings'}
                 </span>
               </button>
             </div>

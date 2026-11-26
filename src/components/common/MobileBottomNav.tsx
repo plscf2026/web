@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Home, UserPlus, HeartHandshake, Ticket, QrCode, Shield } from 'lucide-react';
-import { Language, FeeSettings } from '../../types';
+import { Language, FeeSettings, GovernanceLoadStatus } from '../../types';
 import { AppStore } from '../../services/store';
-import { isGlobalRegistrationOpen, isDonationOpen } from '../../utils/rules';
+import { isGlobalRegistrationOpen } from '../../utils/rules';
 
 interface MobileBottomNavProps {
   language: Language;
   activeView: string;
   onNavigate: (view: string) => void;
   feeSettings?: FeeSettings;
+  governanceStatus?: GovernanceLoadStatus;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
@@ -16,6 +17,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   activeView,
   onNavigate,
   feeSettings: initialFeeSettings,
+  governanceStatus = 'ready',
 }) => {
   const [feeSettings, setFeeSettings] = useState<FeeSettings>(
     () => initialFeeSettings || AppStore.getFeeSettings()
@@ -37,13 +39,15 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     return () => window.removeEventListener('plscf_fee_settings_updated', handleSync);
   }, []);
 
+  const isGovernanceReady = governanceStatus === 'ready';
+
   const navItems = [
     {
       id: 'home',
       label: language === 'bn' ? 'হোম' : 'Home',
       icon: Home,
     },
-    ...(isGlobalRegistrationOpen(feeSettings)
+    ...(isGovernanceReady && isGlobalRegistrationOpen(feeSettings)
       ? [
           {
             id: 'register',
@@ -53,7 +57,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           },
         ]
       : []),
-    ...(isDonationOpen(feeSettings)
+    ...(isGovernanceReady
       ? [
           {
             id: 'donate',

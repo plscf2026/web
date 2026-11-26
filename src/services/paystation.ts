@@ -22,6 +22,7 @@ import {
 import { sanitizeInput } from '../utils/security';
 import { generateUniqueSixCharToken } from '../utils/tokenGenerator';
 import { AppStore } from './store';
+import { GovernanceSettingsService } from './governanceSettingsService';
 import { SupabaseService, supabase } from './supabase';
 import { EventStore } from './eventStore';
 import { StudentIdService } from './studentIdStore';
@@ -242,8 +243,18 @@ export class PayStationService {
     invoiceNumber?: string;
     error?: string;
   }> {
-    // 0. Super Admin Governance Enforcement (Security Validation)
-    const settings = AppStore.getFeeSettings();
+    // 0. Super Admin Governance Enforcement (Authoritative Supabase state when initialized)
+    let settings = AppStore.getFeeSettings();
+    if (GovernanceSettingsService.hasAttemptedLoad()) {
+      const snap = GovernanceSettingsService.getSnapshot();
+      if (snap.status !== 'ready' || !snap.settings) {
+        return {
+          success: false,
+          error: 'Unable to verify registration and donation availability from Supabase. Please refresh and try again.',
+        };
+      }
+      settings = snap.settings;
+    }
     if ((settings as any)?.paymentEnabled === false) {
       return {
         success: false,
@@ -1085,11 +1096,8 @@ export class PayStationService {
     },
     payment: PayStationPaymentResult
   ): Promise<DonationRecord> {
-    const settings = AppStore.getFeeSettings();
-    if (!isDonationOpen(settings)) {
-      throw new Error('Online donations are currently disabled by Super Admin.');
-    }
-
+    // Do NOT block finalizing an already-paid PayStation donation if Super Admin later turned Donations OFF.
+    // Initiation is strictly gated in createPayment() and server-side executeInitiatePayment().
     const year = AppStore.getActiveEventYear() || 2027;
     const nowIso = new Date().toISOString();
     const donationId = `DON-${year}-${Math.floor(1000 + Math.random() * 9000)}`;

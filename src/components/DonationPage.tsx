@@ -17,24 +17,44 @@ import {
   RefreshCw,
   Globe,
 } from 'lucide-react';
-import { Language, DonationRecord, FeeSettings } from '../types';
+import { Language, DonationRecord, FeeSettings, GovernanceLoadStatus } from '../types';
 import { translations } from '../i18n/translations';
 import { AppStore } from '../services/store';
 import { SupabaseService } from '../services/supabase';
 import { PayStationService } from '../services/paystation';
 import { InternationalPaymentInfo, InternationalPaymentService } from '../services/internationalPaymentService';
-import { isValidBangladeshiMobile, normalizeBangladeshiMobileNumber, isDonationOpen, getDonationClosedMessage, calculateGatewayCharge } from '../utils/rules';
+import { GovernanceSettingsService } from '../services/governanceSettingsService';
+import {
+  isValidBangladeshiMobile,
+  normalizeBangladeshiMobileNumber,
+  isDonationOpen,
+  getDonationClosedMessage,
+  getStructuredClosureNotice,
+  calculateGatewayCharge,
+} from '../utils/rules';
 import { sanitizeInput } from '../utils/security';
 import { ThankYouCardBadge } from './ThankYouCardBadge';
+import { GovernanceClosureNoticeCard } from './common/GovernanceClosureNoticeCard';
 
 interface DonationPageProps {
   language: Language;
   onNavigate?: (view: string) => void;
+  feeSettings?: FeeSettings;
+  governanceStatus?: GovernanceLoadStatus;
+  governanceError?: string | null;
+  onRetryGovernance?: () => void;
 }
 
 const PRESET_AMOUNTS = [500, 1000, 2500, 5000, 10000, 25000];
 
-export const DonationPage: React.FC<DonationPageProps> = ({ language, onNavigate }) => {
+export const DonationPage: React.FC<DonationPageProps> = ({
+  language,
+  onNavigate,
+  feeSettings: initialFeeSettings,
+  governanceStatus = 'ready',
+  governanceError = null,
+  onRetryGovernance,
+}) => {
   const t = translations[language];
   const isBangla = language === 'bn';
 
@@ -77,15 +97,23 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language, onNavigate
 
   // Live community donations list & fee settings
   const [donationsList, setDonationsList] = useState<DonationRecord[]>([]);
-  const [feeSettings, setFeeSettings] = useState<FeeSettings>(() => AppStore.getFeeSettings());
+  const [feeSettings, setFeeSettings] = useState<FeeSettings>(
+    () => initialFeeSettings || GovernanceSettingsService.getConfirmedSettings() || AppStore.getFeeSettings()
+  );
   const [intlPaymentInfo, setIntlPaymentInfo] = useState<InternationalPaymentInfo>(() =>
     InternationalPaymentService.getInfo()
   );
 
   useEffect(() => {
+    if (initialFeeSettings) {
+      setFeeSettings(initialFeeSettings);
+    }
+  }, [initialFeeSettings]);
+
+  useEffect(() => {
     // 1. Initial read from local cache
     setDonationsList(AppStore.getDonations());
-    setFeeSettings(AppStore.getFeeSettings());
+    setFeeSettings(initialFeeSettings || GovernanceSettingsService.getConfirmedSettings() || AppStore.getFeeSettings());
     InternationalPaymentService.fetchFromSupabase().catch(() => {});
 
     // 2. Fetch live from Supabase canonical public.donations
@@ -100,14 +128,20 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language, onNavigate
       if (e.detail) setFeeSettings(e.detail);
     };
     window.addEventListener('plscf_fee_settings_updated', handleSync);
+    const unsubGov = GovernanceSettingsService.subscribe((snap) => {
+      if (snap.status === 'ready' && snap.settings) {
+        setFeeSettings(snap.settings);
+      }
+    });
     const unsubIntl = InternationalPaymentService.subscribe((updated) => {
       setIntlPaymentInfo(updated);
     });
     return () => {
       window.removeEventListener('plscf_fee_settings_updated', handleSync);
+      unsubGov();
       unsubIntl();
     };
-  }, [completedDonation]);
+  }, [completedDonation, initialFeeSettings]);
 
   // 3. Auto-handle return from PayStation gateway callback
   useEffect(() => {
@@ -268,6 +302,15 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language, onNavigate
   const handleInitiateDonation = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setErrorMessage('');
+
+    if (governanceStatus !== 'ready') {
+      setErrorMessage(
+        isBangla
+          ? 'অনুদান সেটিংস এখনও লোড হচ্ছে। অনুগ্রহ করে অপেক্ষা করুন।'
+          : 'Donation status is still loading. Please wait.'
+      );
+      return;
+    }
 
     if (!isDonationOpen(feeSettings)) {
       setErrorMessage(getDonationClosedMessage(feeSettings, language));
@@ -557,9 +600,58 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language, onNavigate
           </div>
         </section>
       ) : (
-        /* 3. Main Donation Form */
+        /* 3. Main Donation Area */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left: International Payment First + Normal Donation Form Second */}
+          {/* Left: Loading / Error / Closure Notice / Active Donation Checkout */}
+          {governanceStatus === 'loading' ? (
+            <div className="lg:col-span-8 bg-white rounded-3xl p-10 border border-slate-200 text-center space-y-3 shadow-sm">
+              <RefreshCw className="w-8 h-8 text-[#0284C7] animate-spin mx-auto" />
+              <h2 className="text-base font-bold text-slate-900">
+                {isBangla ? 'অনুদান পোর্টালের অবস্থা যাচাই করা হচ্ছে...' : 'Checking Donation Portal Status...'}
+              </h2>
+              <p className="text-xs text-slate-500">
+                {isBangla
+                  ? 'অনুগ্রহ করে এক মুহূর্ত অপেক্ষা করুন।'
+                  : 'Please wait while authoritative donation governance settings load.'}
+              </p>
+            </div>
+          ) : governanceStatus === 'error' ? (
+            <div className="lg:col-span-8 bg-white rounded-3xl p-8 border border-rose-200 text-center space-y-4 shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-lg font-bold text-slate-900">
+                  {isBangla ? 'অনুদান সেটিংস লোড করা সম্ভব হয়নি' : 'Unable to Load Donation Portal Status'}
+                </h2>
+                <p className="text-xs text-slate-600 max-w-md mx-auto">
+                  {governanceError ||
+                    (isBangla
+                      ? 'সার্ভারের সাথে সংযোগ স্থাপন করা যায়নি। অনুগ্রহ করে পুনরায় চেষ্টা করুন।'
+                      : 'Could not reach the portal settings server. Please retry.')}
+                </p>
+              </div>
+              {onRetryGovernance && (
+                <button
+                  type="button"
+                  onClick={onRetryGovernance}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>{isBangla ? 'পুনরায় চেষ্টা করুন' : 'Retry Loading'}</span>
+                </button>
+              )}
+            </div>
+          ) : !isDonationOpen(feeSettings) ? (
+            <div className="lg:col-span-8">
+              <GovernanceClosureNoticeCard
+                notice={getStructuredClosureNotice(feeSettings, 'donation', language)}
+                language={language}
+                badgeText={isBangla ? 'অনুদান বন্ধ' : 'Donations Closed'}
+                onBackHome={onNavigate ? () => onNavigate('home') : undefined}
+              />
+            </div>
+          ) : (
           <div className="lg:col-span-8 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
             {/* 1. Big International Payment Button */}
             {intlPaymentInfo.isEnabled && onNavigate && (
@@ -591,19 +683,6 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language, onNavigate
 
             {/* 2. Normal Domestic Payment Form */}
             <form onSubmit={handleInitiateDonation} className="space-y-6">
-              {!isDonationOpen(feeSettings) && (
-                <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-900 flex items-start gap-3">
-                  <Lock className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-amber-800">
-                      {isBangla ? 'অনলাইন অনুদান কার্যক্রম সাময়িকভাবে স্থগিত' : 'Online Donations Temporarily Paused'}
-                    </h4>
-                    <p className="text-xs text-amber-800 mt-1">
-                      {getDonationClosedMessage(feeSettings, language)}
-                    </p>
-                  </div>
-                </div>
-              )}
 
               {/* Step 1: Amount Selector */}
               <div>
@@ -867,6 +946,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language, onNavigate
               </div>
             </form>
           </div>
+          )}
 
           {/* Right: Verified Donors Roll (Donors Hall of Fame - Top 10) */}
           <div className="lg:col-span-4 space-y-6">

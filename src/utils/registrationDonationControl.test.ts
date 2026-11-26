@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FeeSettings } from '../types';
-import { AppStore } from '../services/store';
+import { AppStore, INITIAL_FEE_SETTINGS, normalizeFeeSettings } from '../services/store';
 import { PayStationService } from '../services/paystation';
+import { GovernanceSettingsService } from '../services/governanceSettingsService';
+import { resolveRouteFromLocation, parseRegistrationCategory } from './navigation';
 import {
   isGlobalRegistrationOpen,
   isAlumniRegistrationOpen,
@@ -11,6 +13,7 @@ import {
   isDonationOpen,
   getRegistrationClosedMessage,
   getDonationClosedMessage,
+  getStructuredClosureNotice,
 } from './rules';
 
 // Polyfill in-memory localStorage for Node test runner
@@ -272,4 +275,154 @@ test('Registration & Donation Governance: 5. AppStore Default Fallback Safety fo
   assert.equal(restored.alumniRegistrationOpen, true);
   assert.equal(restored.currentStudentRegistrationOpen, true);
   assert.equal(restored.donationOpen, true);
+});
+
+test('Registration & Donation Governance: 6. Structured Closure Notices Omit Blank Optional Fields', () => {
+  const customSettings = normalizeFeeSettings({
+    ...INITIAL_FEE_SETTINGS,
+    registrationOpen: true,
+    alumniRegistrationOpen: false,
+    currentStudentRegistrationOpen: true,
+    donationOpen: false,
+    closureNotices: {
+      alumni: {
+        titleEn: 'Alumni Registration Temporarily Paused',
+        titleBn: 'অ্যালামনাই নিবন্ধন সাময়িকভাবে স্থগিত',
+        messageEn: 'Batch verification is underway before reopening.',
+        messageBn: 'ব্যাচ যাচাইকরণ কার্যক্রম চলছে।',
+        reopenAt: '  2027-01-10 10:00 AM  ',
+        contactInfo: '', // blank optional field -> omitted
+        instructionsEn: 'Keep your SSC certificate ready.',
+        instructionsBn: 'আপনার এসএসসি সনদ প্রস্তুত রাখুন।',
+      },
+      donation: {
+        titleEn: 'Donation Window Under Audit',
+        titleBn: 'অনুদান পোর্টাল অডিটের জন্য বন্ধ',
+        messageEn: 'Audit reconciliation is in progress.',
+        messageBn: 'আর্থিক অডিট চলছে।',
+        reopenAt: '   ', // whitespace only -> omitted
+        contactInfo: '+880 1637-857040',
+        instructionsEn: '',
+        instructionsBn: '',
+      },
+    },
+  });
+
+  const alumniNoticeEn = getStructuredClosureNotice(customSettings, 'alumni', 'en');
+  assert.equal(alumniNoticeEn.title, 'Alumni Registration Temporarily Paused');
+  assert.equal(alumniNoticeEn.message, 'Batch verification is underway before reopening.');
+  assert.equal(alumniNoticeEn.reopenAt, '2027-01-10 10:00 AM');
+  assert.equal(alumniNoticeEn.contactInfo, undefined);
+  assert.equal(alumniNoticeEn.instructions, 'Keep your SSC certificate ready.');
+
+  const alumniNoticeBn = getStructuredClosureNotice(customSettings, 'alumni', 'bn');
+  assert.equal(alumniNoticeBn.title, 'অ্যালামনাই নিবন্ধন সাময়িকভাবে স্থগিত');
+  assert.equal(alumniNoticeBn.instructions, 'আপনার এসএসসি সনদ প্রস্তুত রাখুন।');
+
+  const donationNoticeEn = getStructuredClosureNotice(customSettings, 'donation', 'en');
+  assert.equal(donationNoticeEn.title, 'Donation Window Under Audit');
+  assert.equal(donationNoticeEn.reopenAt, undefined);
+  assert.equal(donationNoticeEn.contactInfo, '+880 1637-857040');
+  assert.equal(donationNoticeEn.instructions, undefined);
+});
+
+test('Registration & Donation Governance: 7. Direct Category & Donation Routes Resolve Correctly', () => {
+  assert.equal(parseRegistrationCategory('alumni'), 'former');
+  assert.equal(parseRegistrationCategory('former'), 'former');
+  assert.equal(parseRegistrationCategory('current'), 'current');
+  assert.equal(parseRegistrationCategory('current-student'), 'current');
+  assert.equal(parseRegistrationCategory('unknown'), undefined);
+
+  const originalWindow = (globalThis as any).window;
+  const mockRoute = (pathname: string, search = '') => {
+    (globalThis as any).window = {
+      location: { pathname, search, hash: '', origin: 'http://localhost:3000' },
+    };
+    (globalThis as any).sessionStorage = {
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {},
+    };
+    return resolveRouteFromLocation();
+  };
+
+  try {
+    const rAlumni = mockRoute('/register/alumni');
+    assert.equal(rAlumni.view, 'register');
+    assert.equal(rAlumni.category, 'former');
+
+    const rCurrent = mockRoute('/register/current');
+    assert.equal(rCurrent.view, 'register');
+    assert.equal(rCurrent.category, 'current');
+
+    const rQuery = mockRoute('/register', '?category=former');
+    assert.equal(rQuery.view, 'register');
+    assert.equal(rQuery.category, 'former');
+
+    const rDonate = mockRoute('/donate');
+    assert.equal(rDonate.view, 'donate');
+  } finally {
+    (globalThis as any).window = originalWindow;
+  }
+});
+
+test('Registration & Donation Governance: 8. Fail-Closed Before Authoritative Governance Load', async () => {
+  // Simulate GovernanceSettingsService having attempted a load that failed with no prior confirmed settings
+  (GovernanceSettingsService as any).attemptedLoad = true;
+  (GovernanceSettingsService as any).snapshot = {
+    status: 'error',
+    settings: null,
+    error: 'Network error',
+    lastSyncedAt: null,
+  };
+
+  const blocked = await PayStationService.createPayment({
+    invoice_number: `INV-FAILCLOSED-${Date.now()}`,
+    payment_amount: 1500,
+    cust_name: 'Visitor',
+    cust_phone: '01711111111',
+    callback_url: 'https://example.com/callback',
+    opt_a: 'REGISTRATION',
+    opt_b: 'former',
+  });
+  assert.equal(blocked.success, false);
+  assert.ok(blocked.error?.includes('Unable to verify'));
+
+  // Reset state cleanly for subsequent tests
+  (GovernanceSettingsService as any).attemptedLoad = false;
+  (GovernanceSettingsService as any).snapshot = {
+    status: 'loading',
+    settings: null,
+    error: null,
+    lastSyncedAt: null,
+  };
+});
+
+test('Registration & Donation Governance: 9. Paid Donation Completion Preserved Even If Switch Closed Mid-Payment', async () => {
+  AppStore.saveFeeSettings({
+    ...INITIAL_FEE_SETTINGS,
+    donationOpen: false, // Closed after payment was already paid at gateway
+  });
+
+  const completed = await PayStationService.completeDonationAfterPayment(
+    {
+      donorName: 'Paid Donor',
+      mobileNumber: '01712345678',
+      amount: 1000,
+      purpose: 'Reunion Fund',
+    },
+    {
+      invoiceNumber: 'INV-MIDFLOW-001',
+      trxId: 'TRX-MIDFLOW-001',
+      status: 'Success',
+      amount: 1000,
+      method: 'bkash',
+    }
+  );
+
+  assert.equal(completed.donorName, 'Paid Donor');
+  assert.equal(completed.amount, 1000);
+  assert.equal(completed.transactionId, 'TRX-MIDFLOW-001');
+
+  AppStore.saveFeeSettings({ ...INITIAL_FEE_SETTINGS });
 });

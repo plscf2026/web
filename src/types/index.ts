@@ -233,9 +233,34 @@ export interface CommitteeSettings {
   sectionSubtitleBn: string;
 }
 
+export type ClosureNoticeTarget = 'alumni' | 'currentStudent' | 'donation';
+
+export type GovernanceLoadStatus = 'loading' | 'ready' | 'error';
+
+export interface ClosureNoticeContent {
+  titleEn: string;
+  titleBn: string;
+  messageEn: string;
+  messageBn: string;
+  reopenAt?: string;
+  contactInfo?: string;
+  instructionsEn?: string;
+  instructionsBn?: string;
+}
+
+export interface GovernanceClosureNotices {
+  alumni: ClosureNoticeContent;
+  currentStudent: ClosureNoticeContent;
+  donation: ClosureNoticeContent;
+}
+
 export interface FeeSettings {
   formerStudentFee: number;
   currentStudentFee: number;
+  parentFee?: number;
+  minDonation?: number;
+  maxDonation?: number;
+  gatewayChargePercent?: number;
   registrationOpen: boolean;
   alumniRegistrationOpen?: boolean;
   currentStudentRegistrationOpen?: boolean;
@@ -248,10 +273,13 @@ export interface FeeSettings {
   closedMessageBn?: string;
   donationClosedMessageEn?: string;
   donationClosedMessageBn?: string;
+  closureNotices?: GovernanceClosureNotices;
   eventTargetDate?: string;
   simulateEventCompleted?: boolean;
   homePageSections?: HomePageSectionSetting[];
   hideDonationAmounts?: boolean;
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 export type HomePageSectionId =

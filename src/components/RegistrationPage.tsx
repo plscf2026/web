@@ -27,6 +27,7 @@ import {
   TShirtSize,
   Language,
   FeeSettings,
+  GovernanceLoadStatus,
   StudentIdVerificationResult,
 } from '../types';
 import { translations } from '../i18n/translations';
@@ -41,7 +42,9 @@ import {
   isAlumniRegistrationOpen,
   isCurrentStudentRegistrationOpen,
   isCategoryRegistrationOpen,
+  isDonationOpen,
   getRegistrationClosedMessage,
+  getStructuredClosureNotice,
 } from '../utils/rules';
 import { StudentIdService } from '../services/studentIdStore';
 import { readValidatedImage } from '../utils/fileValidation';
@@ -51,10 +54,15 @@ import { PayStationService } from '../services/paystation';
 import { StudentPhotoStorageService, extractStoragePathFromPublicUrl } from '../services/studentPhotoStorageService';
 import { StudentIdCardRecord } from '../types/idcard';
 import { SynchronizedCameraCardModal } from './idcard/SynchronizedCameraCardModal';
+import { GovernanceClosureNoticeCard } from './common/GovernanceClosureNoticeCard';
 
 interface RegistrationPageProps {
   language: Language;
   feeSettings: FeeSettings;
+  governanceStatus?: GovernanceLoadStatus;
+  governanceError?: string | null;
+  onRetryGovernance?: () => void;
+  initialCategory?: StudentCategory;
   initialData?: RegistrationFormData | null;
   onInitiatePayment: (formData: RegistrationFormData, fees: { registrationFee: number; donationAmount: number; totalPayable: number }) => void;
   onNavigate: (view: string) => void;
@@ -69,6 +77,10 @@ interface RegistrationPageProps {
 export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   language,
   feeSettings,
+  governanceStatus = 'ready',
+  governanceError = null,
+  onRetryGovernance,
+  initialCategory,
   initialData,
   onInitiatePayment,
   onNavigate: _onNavigate,
@@ -102,7 +114,9 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   const [mobileNumber, setMobileNumber] = useState(() => draft?.mobileNumber || '');
   const [email, setEmail] = useState(() => draft?.email || ''); // OPTIONAL
   const [address, setAddress] = useState(() => draft?.address || '');
-  const [category, setCategory] = useState<StudentCategory>(() => draft?.category || 'former');
+  const [category, setCategory] = useState<StudentCategory>(
+    () => initialCategory || draft?.category || 'former'
+  );
   const [gender, setGender] = useState<'male' | 'female'>(() => draft?.gender || 'male');
   const [bloodGroup, setBloodGroup] = useState(() => draft?.bloodGroup || '');
 
@@ -159,14 +173,15 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     StudentIdService.syncWithSupabase().catch(() => {});
   }, []);
 
-  // Auto-switch category if the current selected category is disabled
+  // Respect explicit route/card category selection so closed category notices display as intended
   useEffect(() => {
-    if (category === 'former' && !isAlumniRegistrationOpen(feeSettings) && isCurrentStudentRegistrationOpen(feeSettings)) {
-      setCategory('current');
-    } else if (category === 'current' && !isCurrentStudentRegistrationOpen(feeSettings) && isAlumniRegistrationOpen(feeSettings)) {
-      setCategory('former');
+    if (initialCategory) {
+      setCategory(initialCategory);
+      if (initialCategory === 'former') {
+        setIdVerificationResult(null);
+      }
     }
-  }, [feeSettings, category]);
+  }, [initialCategory]);
 
   // Comprehensive form reset — clears all input fields, previews, file input, and state
   const resetForm = () => {
@@ -175,7 +190,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     setMobileNumber('');
     setEmail('');
     setAddress('');
-    setCategory('former');
+    setCategory(initialCategory || 'former');
     setGender('male');
     setBloodGroup('');
     setHasParent(false);
@@ -290,10 +305,15 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     termsAccepted,
   ]);
 
-  // Synchronize form fields whenever initialData changes (or reset if null)
+  // Synchronize form fields whenever initialData changes (only reset on non-null -> null transition)
+  const prevInitialDataRef = useRef<RegistrationFormData | null | undefined>(initialData);
   useEffect(() => {
+    const prev = prevInitialDataRef.current;
+    prevInitialDataRef.current = initialData;
     if (initialData === null) {
-      resetForm();
+      if (prev !== null && prev !== undefined) {
+        resetForm();
+      }
       return;
     }
     if (!initialData) return;
@@ -354,7 +374,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   const isParentEligible = gender === 'female' || isBelowClass6;
   const effectiveHasParent = isParentEligible && hasParent;
 
-  const donationAmount = typeof donationInput === 'number' ? donationInput : 0;
+  const isOptionalDonationOpen = isDonationOpen(feeSettings);
+  const donationAmount = isOptionalDonationOpen && typeof donationInput === 'number' ? donationInput : 0;
   const fees = calculateTotalFee(category, feeSettings, donationAmount, effectiveHasParent);
   const gatewayCharge = calculateGatewayCharge(fees.totalPayable);
   const totalPayableWithCharge = Math.round((fees.totalPayable + gatewayCharge) * 100) / 100;
@@ -631,6 +652,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   const handleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (isSubmitting) return; // Prevent duplicate submissions (Requirement 10)
+    if (governanceStatus !== 'ready') return;
     if (!isGlobalRegistrationOpen(feeSettings)) {
       const msg = getRegistrationClosedMessage(feeSettings, 'global', language);
       setValidationErrors((current) => ({
@@ -751,6 +773,10 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
   const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
+  const selectedCategoryOpen = isCategoryRegistrationOpen(category, feeSettings);
+  const otherCategory: StudentCategory = category === 'former' ? 'current' : 'former';
+  const otherCategoryOpen = isCategoryRegistrationOpen(otherCategory, feeSettings);
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* ── Post-payment success banner — appears after a confirmed registration ── */}
@@ -807,32 +833,58 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
         <p className="text-xs sm:text-sm text-slate-600 mt-2 max-w-2xl mx-auto">
           {t.regPageSubtitle}
         </p>
-
-        {!isGlobalRegistrationOpen(feeSettings) ? (
-          <div className="mt-4 p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-900 max-w-2xl mx-auto text-left shadow-sm">
-            <div className="flex items-center gap-2 font-bold text-rose-800 mb-1">
-              <Lock className="w-4 h-4 text-rose-600" />
-              <span>{t.regStatusClosedBadge}</span>
-            </div>
-            <p className="text-xs text-rose-700 leading-relaxed">
-              {getRegistrationClosedMessage(feeSettings, 'global', language)}
-            </p>
-          </div>
-        ) : !isAlumniRegistrationOpen(feeSettings) && !isCurrentStudentRegistrationOpen(feeSettings) ? (
-          <div className="mt-4 p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-900 max-w-2xl mx-auto text-left shadow-sm">
-            <div className="flex items-center gap-2 font-bold text-amber-800 mb-1">
-              <Lock className="w-4 h-4 text-amber-600" />
-              <span>{t.regStatusClosedBadge}</span>
-            </div>
-            <p className="text-xs text-amber-800 leading-relaxed">
-              {getRegistrationClosedMessage(feeSettings, 'global', language)}
-            </p>
-          </div>
-        ) : null}
       </div>
 
+      {governanceStatus === 'loading' ? (
+        <div className="bg-white rounded-3xl p-10 border border-slate-200 text-center space-y-3 shadow-sm max-w-2xl mx-auto">
+          <RefreshCw className="w-8 h-8 text-[#0284C7] animate-spin mx-auto" />
+          <h2 className="text-base font-bold text-slate-900">
+            {language === 'bn' ? 'নিবন্ধনের সর্বশেষ অবস্থা যাচাই করা হচ্ছে...' : 'Checking Registration Status...'}
+          </h2>
+          <p className="text-xs text-slate-500">
+            {language === 'bn'
+              ? 'অনুগ্রহ করে অপেক্ষা করুন, সার্ভার থেকে অনুমোদিত সেটিংস লোড হচ্ছে।'
+              : 'Please wait while authoritative governance settings load from Supabase.'}
+          </p>
+        </div>
+      ) : governanceStatus === 'error' ? (
+        <div className="bg-white rounded-3xl p-8 border border-rose-200 text-center space-y-4 shadow-sm max-w-2xl mx-auto">
+          <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-slate-900">
+              {language === 'bn' ? 'নিবন্ধন সেটিংস লোড করা সম্ভব হয়নি' : 'Unable to Load Registration Status'}
+            </h2>
+            <p className="text-xs text-slate-600 max-w-md mx-auto">
+              {governanceError ||
+                (language === 'bn'
+                  ? 'সার্ভারের সাথে সংযোগ বিচ্ছিন্ন রয়েছে। অনুগ্রহ করে পুনরায় চেষ্টা করুন।'
+                  : 'Could not load portal settings from Supabase. Please try again.')}
+            </p>
+          </div>
+          {onRetryGovernance && (
+            <button
+              type="button"
+              onClick={onRetryGovernance}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>{language === 'bn' ? 'পুনরায় চেষ্টা করুন' : 'Retry Loading'}</span>
+            </button>
+          )}
+        </div>
+      ) : !isGlobalRegistrationOpen(feeSettings) ? (
+        <GovernanceClosureNoticeCard
+          notice={getStructuredClosureNotice(feeSettings, 'global', language)}
+          language={language}
+          badgeText={t.regStatusClosedBadge}
+          onBackHome={() => _onNavigate('home')}
+          onFindTicket={() => _onNavigate('find-ticket')}
+        />
+      ) : (
       <form onSubmit={handleSubmit} className="space-y-8" noValidate>
-        {/* Category Selector Card - RAW FORM tokens */}
+        {/* Category Selector Card - always visible & clickable when Global Registration is ON */}
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#E2EEF8]">
           <label className="block text-sm font-bold text-[#0F172A] mb-3">
             {t.categoryLabel} *
@@ -841,9 +893,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             {/* Alumni Button */}
             <button
               type="button"
-              disabled={!isAlumniRegistrationOpen(feeSettings)}
               onClick={() => {
-                if (!isAlumniRegistrationOpen(feeSettings)) return;
                 setCategory('former');
                 setIdVerificationResult(null);
                 if (validationErrors.passingYear || validationErrors.studentId) {
@@ -853,24 +903,26 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   setValidationErrors(next);
                 }
               }}
-              className={`p-4 rounded-2xl border-2 text-left transition-all ${
+              className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
                 !isAlumniRegistrationOpen(feeSettings)
-                  ? 'border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed'
+                  ? category === 'former'
+                    ? 'border-amber-500 bg-amber-50/70 shadow-xs'
+                    : 'border-amber-200 bg-amber-50/30 hover:border-amber-300'
                   : category === 'former'
-                  ? 'border-[#0284C7] bg-[#E2EEF8]/40 shadow-xs cursor-pointer'
-                  : 'border-[#E2EEF8] hover:border-slate-300 bg-white cursor-pointer'
+                  ? 'border-[#0284C7] bg-[#E2EEF8]/40 shadow-xs'
+                  : 'border-[#E2EEF8] hover:border-slate-300 bg-white'
               }`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="font-bold text-[#0F172A] text-base">
                   {t.categoryFormer}
                 </span>
                 {isAlumniRegistrationOpen(feeSettings) ? (
-                  <span className="px-3 py-1 rounded-full bg-[#0284C7] text-white font-extrabold text-xs">
+                  <span className="px-3 py-1 rounded-full bg-[#0284C7] text-white font-extrabold text-xs shrink-0">
                     ৳ {feeSettings.formerStudentFee}
                   </span>
                 ) : (
-                  <span className="px-3 py-1 rounded-full bg-slate-300 text-slate-700 font-bold text-xs flex items-center gap-1">
+                  <span className="px-3 py-1 rounded-full bg-amber-200 text-amber-900 font-bold text-xs flex items-center gap-1 shrink-0">
                     <Lock className="w-3 h-3" />
                     <span>{language === 'bn' ? 'বন্ধ (Closed)' : 'Closed'}</span>
                   </span>
@@ -886,9 +938,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             {/* Current Student Button */}
             <button
               type="button"
-              disabled={!isCurrentStudentRegistrationOpen(feeSettings)}
               onClick={() => {
-                if (!isCurrentStudentRegistrationOpen(feeSettings)) return;
                 setCategory('current');
                 if (validationErrors.currentClass) {
                   const next = { ...validationErrors };
@@ -896,24 +946,26 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   setValidationErrors(next);
                 }
               }}
-              className={`p-4 rounded-2xl border-2 text-left transition-all ${
+              className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
                 !isCurrentStudentRegistrationOpen(feeSettings)
-                  ? 'border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed'
+                  ? category === 'current'
+                    ? 'border-amber-500 bg-amber-50/70 shadow-xs'
+                    : 'border-amber-200 bg-amber-50/30 hover:border-amber-300'
                   : category === 'current'
-                  ? 'border-[#0EA5E9] bg-[#E2EEF8]/40 shadow-xs cursor-pointer'
-                  : 'border-[#E2EEF8] hover:border-slate-300 bg-white cursor-pointer'
+                  ? 'border-[#0EA5E9] bg-[#E2EEF8]/40 shadow-xs'
+                  : 'border-[#E2EEF8] hover:border-slate-300 bg-white'
               }`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="font-bold text-[#0F172A] text-base">
                   {t.categoryCurrent}
                 </span>
                 {isCurrentStudentRegistrationOpen(feeSettings) ? (
-                  <span className="px-3 py-1 rounded-full bg-[#0EA5E9] text-white font-extrabold text-xs">
+                  <span className="px-3 py-1 rounded-full bg-[#0EA5E9] text-white font-extrabold text-xs shrink-0">
                     ৳ {feeSettings.currentStudentFee}
                   </span>
                 ) : (
-                  <span className="px-3 py-1 rounded-full bg-slate-300 text-slate-700 font-bold text-xs flex items-center gap-1">
+                  <span className="px-3 py-1 rounded-full bg-amber-200 text-amber-900 font-bold text-xs flex items-center gap-1 shrink-0">
                     <Lock className="w-3 h-3" />
                     <span>{language === 'bn' ? 'বন্ধ (Closed)' : 'Closed'}</span>
                   </span>
@@ -928,8 +980,43 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           </div>
         </div>
 
+        {/* Category-specific closure notice replaces application form when selected category is OFF */}
+        {!selectedCategoryOpen && (
+          <GovernanceClosureNoticeCard
+            notice={getStructuredClosureNotice(
+              feeSettings,
+              category === 'former' ? 'alumni' : 'currentStudent',
+              language
+            )}
+            language={language}
+            badgeText={language === 'bn' ? 'সাময়িকভাবে বন্ধ' : 'Temporarily Closed'}
+            onBackHome={() => _onNavigate('home')}
+            onFindTicket={() => _onNavigate('find-ticket')}
+            alternateAction={
+              otherCategoryOpen
+                ? {
+                    label:
+                      otherCategory === 'current'
+                        ? language === 'bn'
+                          ? 'বর্তমান শিক্ষার্থী নিবন্ধনে যান'
+                          : 'Switch to Current Student Registration'
+                        : language === 'bn'
+                          ? 'প্রাক্তন শিক্ষার্থী নিবন্ধনে যান'
+                          : 'Switch to Alumni Registration',
+                    onClick: () => {
+                      setCategory(otherCategory);
+                      if (otherCategory === 'former') {
+                        setIdVerificationResult(null);
+                      }
+                    },
+                  }
+                : undefined
+            }
+          />
+        )}
+
         {/* CURRENT STUDENT SPECIFIC: 1. ACADEMIC INFORMATION & INSTITUTIONAL VERIFICATION (FIRST STEP) */}
-        {category === 'current' && (
+        {selectedCategoryOpen && category === 'current' && (
           <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
@@ -1163,7 +1250,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
         )}
 
         {/* Gated Callout for Current Students if not yet verified */}
-        {category === 'current' && !idVerificationResult?.success && (
+        {selectedCategoryOpen && category === 'current' && !idVerificationResult?.success && (
           <div className="bg-white rounded-2xl p-8 shadow-sm border border-dashed border-slate-300 text-center space-y-3">
             <div className="w-12 h-12 rounded-full bg-sky-50 text-[#0284C7] flex items-center justify-center mx-auto">
               <ShieldCheck className="w-6 h-6" />
@@ -1180,7 +1267,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
         )}
 
         {/* Section 1 / Next Steps: Rendered for Alumni, or for Current Student once verified */}
-        {(category === 'former' || (category === 'current' && idVerificationResult?.success)) && (
+        {selectedCategoryOpen && (category === 'former' || (category === 'current' && idVerificationResult?.success)) && (
           <>
           <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
@@ -2028,7 +2115,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           )}
         </div>
 
-        {/* Section 4: Optional Donation */}
+        {/* Section 4: Optional Donation (omitted cleanly if Donation is OFF) */}
+        {isOptionalDonationOpen && (
         <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-4">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <Heart className="w-5 h-5 text-rose-600" />
@@ -2076,6 +2164,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             />
           </div>
         </div>
+        )}
 
         {/* Section 5: Order Summary & Terms */}
         <div className="bg-[#0F172A] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-800 space-y-6">
@@ -2149,6 +2238,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           </>
         )}
       </form>
+      )}
 
       {/* Size Chart Modal */}
       {showSizeModal && (

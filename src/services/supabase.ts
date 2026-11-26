@@ -66,7 +66,9 @@ if (typeof window !== 'undefined') {
 // Initialize Supabase Client (Only with publishable anon key)
 export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    persistSession: false,
+    persistSession: true,
+    storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
+    storageKey: 'plscf_supabase_auth',
     autoRefreshToken: true,
   },
 });
