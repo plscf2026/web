@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Home, UserPlus, Ticket, QrCode, Shield } from 'lucide-react';
+import { Home, UserPlus, HeartHandshake, Ticket, QrCode, Shield } from 'lucide-react';
 import { Language, FeeSettings } from '../../types';
 import { AppStore } from '../../services/store';
-import { isGlobalRegistrationOpen } from '../../utils/rules';
+import { isGlobalRegistrationOpen, isDonationOpen } from '../../utils/rules';
 
 interface MobileBottomNavProps {
   language: Language;
@@ -53,6 +53,15 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           },
         ]
       : []),
+    ...(isDonationOpen(feeSettings)
+      ? [
+          {
+            id: 'donate',
+            label: language === 'bn' ? 'অনুদান' : 'Donate',
+            icon: HeartHandshake,
+          },
+        ]
+      : []),
     {
       id: 'find-ticket',
       label: language === 'bn' ? 'টিকিট' : 'Ticket',
@@ -75,7 +84,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       aria-label="Mobile Quick Navigation"
       className="sm:hidden fixed-bottom-navigation"
     >
-      <div className="max-w-md mx-auto px-3 flex items-center justify-around">
+      <div className="max-w-md mx-auto px-1.5 flex items-center justify-between gap-0.5">
         {navItems.map((item) => {
           const isActive =
             activeView === item.id ||
@@ -87,7 +96,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               key={item.id}
               type="button"
               onClick={() => onNavigate(item.id)}
-              className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] py-1 px-2 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+              className={`flex-1 min-w-0 flex flex-col items-center justify-center min-h-[44px] py-1 px-1 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
                 isActive
                   ? 'text-[#38BDF8] bg-sky-950/60 font-bold shadow-inner'
                   : item.highlight
