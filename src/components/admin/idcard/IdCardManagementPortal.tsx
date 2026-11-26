@@ -44,7 +44,10 @@ import {
   IdCardDownloadLog,
   IdCardSystemSettings,
 } from '../../../types/idcard';
+import { RegistrationRecord } from '../../../types';
 import { IdCardStore } from '../../../services/idCardStore';
+import { AppStore } from '../../../services/store';
+import { SupabaseService } from '../../../services/supabase';
 import { GlobalPagination } from '../../common/GlobalPagination';
 import { paginate } from '../../../utils/pagination';
 
@@ -56,12 +59,14 @@ interface IdCardManagementPortalProps {
   currentUserEmail?: string;
   currentUserRole?: string;
   isSuperAdmin?: boolean;
+  registrations?: RegistrationRecord[];
 }
 
 export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
-  currentUserEmail = 'admin@gmail.com',
+  currentUserEmail = '',
   currentUserRole = 'SUPER_ADMIN',
   isSuperAdmin = true,
+  registrations,
 }) => {
   // Navigation Tabs
   const [activeTab, setActiveTab] = useState<
@@ -109,11 +114,11 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
     setStudentPage(1);
   }, [searchQuery, selectedBatchFilter, statusFilter]);
 
-  // Synchronize with Supabase ID card & download job tables on mount
+  // Synchronize with Supabase ID card & download job tables on mount and when registrations update
   useEffect(() => {
     let mounted = true;
     const reloadAllCards = () => {
-      IdCardStore.syncWithRegistrations();
+      IdCardStore.syncWithRegistrations(registrations);
       if (mounted) {
         setCards(IdCardStore.getIdCards());
         setBatches(IdCardStore.getBatchCollections());
@@ -124,6 +129,7 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
     reloadAllCards();
     if (typeof window !== 'undefined') {
       window.addEventListener('plscf_registration_updated', reloadAllCards);
+      window.addEventListener('plscf_idcard_store_updated', reloadAllCards);
     }
 
     IdCardStore.syncWithSupabase()
@@ -137,9 +143,10 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
       mounted = false;
       if (typeof window !== 'undefined') {
         window.removeEventListener('plscf_registration_updated', reloadAllCards);
+        window.removeEventListener('plscf_idcard_store_updated', reloadAllCards);
       }
     };
-  }, []);
+  }, [registrations]);
 
   // Modals & Preview States
   const [previewStudent, setPreviewStudent] = useState<StudentIdCardRecord | null>(null);
@@ -181,19 +188,36 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Load Data
-  const refreshData = () => {
-    const updatedCards = IdCardStore.syncWithRegistrations();
-    setCards(updatedCards);
+  // Load Data (pulls fresh registrations & ID card states from Supabase)
+  const refreshData = async (notify = false) => {
+    let sourceRegs = registrations;
+    try {
+      const cloudRes = await SupabaseService.fetchRegistrations(2027, { forceRefresh: true });
+      if (cloudRes.data && cloudRes.data.length > 0) {
+        const deletedIds = AppStore.getDeletedRegistrationIds();
+        sourceRegs = cloudRes.data.filter((r) => !deletedIds.has(r.id));
+        AppStore.saveRegistrations(sourceRegs);
+      }
+    } catch (_) {}
+
+    const updatedCards = IdCardStore.syncWithRegistrations(sourceRegs);
+    try {
+      await IdCardStore.syncWithSupabase();
+    } catch (_) {}
+
+    setCards(IdCardStore.getIdCards().length > 0 ? IdCardStore.getIdCards() : updatedCards);
     setBatches(IdCardStore.getBatchCollections());
     setStaffList(IdCardStore.getStaffAccounts());
     setDownloadLogs(IdCardStore.getDownloadLogs());
+    if (notify) {
+      showToast('success', `Synced ${IdCardStore.getIdCards().length} ID card records from database.`);
+    }
   };
 
   useEffect(() => {
     // Non-blocking initialization: lets the mobile browser complete initial render/paint first
     const timer = setTimeout(() => {
-      refreshData();
+      void refreshData(false);
     }, 20);
     return () => clearTimeout(timer);
   }, []);
@@ -678,8 +702,8 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-3">
           <button
-            onClick={refreshData}
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs flex items-center gap-1.5 transition"
+            onClick={() => void refreshData(true)}
+            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer"
           >
             <RefreshCw className="w-4 h-4" />
             Sync Database

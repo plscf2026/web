@@ -212,7 +212,8 @@ const memoryStorage = new Map<string, string>();
 function safeGetItem(key: string): string | null {
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
-      return window.localStorage.getItem(key);
+      const lsVal = window.localStorage.getItem(key);
+      if (lsVal !== null) return lsVal;
     }
   } catch {}
   return memoryStorage.get(key) || null;
@@ -456,8 +457,11 @@ export class IdCardStore {
     };
   }
 
-  static syncWithRegistrations(): StudentIdCardRecord[] {
-    const registrations = AppStore.getRegistrations();
+  static syncWithRegistrations(sourceRegistrations?: RegistrationRecord[]): StudentIdCardRecord[] {
+    const registrations =
+      Array.isArray(sourceRegistrations) && sourceRegistrations.length > 0
+        ? sourceRegistrations
+        : AppStore.getRegistrations();
     const paidRegistrations = registrations.filter(
       (r) =>
         r.paymentStatus === 'paid' &&

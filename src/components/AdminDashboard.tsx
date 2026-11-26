@@ -581,7 +581,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const validCloudData = res.data.filter((r) => !deletedIds.has(r.id));
         setRegistrations(validCloudData);
         AppStore.saveRegistrations(validCloudData);
-        IdCardStore.syncWithRegistrations();
+        IdCardStore.syncWithRegistrations(validCloudData);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('plscf_idcard_store_updated'));
+        }
         // Circular event dispatch removed here: network fetch completion must NEVER re-trigger event listeners
       }
     } catch (err) {
@@ -592,21 +595,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   useEffect(() => {
-    fetchSupabaseRegistrationsForYear(selectedYear);
+    if (!adminSession?.id) return;
+
+    SupabaseService.clearRegistrationCache(selectedYear);
+    fetchSupabaseRegistrationsForYear(selectedYear, true);
     SupabaseService.fetchDonations(selectedYear).then((res) => {
       if (res.data && res.data.length > 0) {
         setDonations(res.data);
         AppStore.saveDonations(res.data);
       }
     }).catch((err) => console.warn('Error fetching donations from Supabase on mount:', err));
-  }, [selectedYear]);
+
+    EventStore.initRealtimeSync();
+    Promise.allSettled([
+      EventStore.syncDistributionsWithSupabase(),
+      EventStore.syncFinanceWithSupabase(),
+    ]).then(() => {
+      syncLocalState();
+    });
+  }, [selectedYear, adminSession?.id]);
 
   // Real-time bidirectional synchronization for staff stations & finance ledger
   useEffect(() => {
-    EventStore.initRealtimeSync();
-    EventStore.syncDistributionsWithSupabase();
-    EventStore.syncFinanceWithSupabase();
-
     const handleSync = () => {
       syncLocalState();
     };
@@ -2108,9 +2118,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <ErrorBoundary>
           <Suspense fallback={<AdminTabFallback />}>
             <IdCardManagementPortal
-              currentUserEmail={adminSession?.email || 'admin@gmail.com'}
+              currentUserEmail={adminSession?.email || ''}
               currentUserRole={adminSession?.role || 'super_admin'}
-              isSuperAdmin={adminSession?.role === 'super_admin' || !adminSession}
+              isSuperAdmin={adminSession?.role === 'super_admin'}
+              registrations={registrations}
             />
           </Suspense>
         </ErrorBoundary>

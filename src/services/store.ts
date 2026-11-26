@@ -235,13 +235,16 @@ function getStored<T>(key: string, defaultValue: T): T {
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
       const item = window.localStorage.getItem(key);
-      if (!item) return defaultValue;
-      return JSON.parse(item);
+      if (item !== null) return JSON.parse(item);
     }
-    const item = memoryStore[key];
-    if (!item) return defaultValue;
-    return JSON.parse(item);
+    const memItem = memoryStore[key];
+    if (memItem !== undefined) return JSON.parse(memItem);
+    return defaultValue;
   } catch {
+    try {
+      const memItem = memoryStore[key];
+      if (memItem !== undefined) return JSON.parse(memItem);
+    } catch (_) { }
     return defaultValue;
   }
 }
