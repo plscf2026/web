@@ -417,9 +417,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
       const createRes = await PayStationService.createPayment({
         invoice_number: invoiceRef.current,
+        order_type: 'registration',
+        category: registrationData.category,
+        has_parent: Boolean(registrationData.hasParent),
+        donation_amount: donationAmount,
+        payment_method: selectedMethod,
+        student_id: registrationData.studentId || null,
+        return_origin: typeof window !== 'undefined' ? window.location.origin : undefined,
         currency: 'BDT',
         payment_amount: chargeAmount,
-        pay_with_charge: 0,   // Merchant absorbs gateway charge
+        pay_with_charge: currentCharge > 0 ? 1 : 0,
         reference: registrationData.category === 'current'
           ? (registrationData.studentId || 'CURRENT')
           : 'ALUMNI-REUNION',

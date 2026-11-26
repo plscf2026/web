@@ -63,9 +63,12 @@ BEGIN
   END IF;
 END $$;
 
--- 9. Restore current_student_ids anon write access
+-- 9. Restore current_student_ids anon read/write access
 DROP POLICY IF EXISTS "current_student_ids_anon_select" ON public.current_student_ids;
+DROP POLICY IF EXISTS "current_student_ids_admin_read" ON public.current_student_ids;
 DROP POLICY IF EXISTS "Service role full access on current_student_ids" ON public.current_student_ids;
+CREATE POLICY "Public can view current student ids" ON public.current_student_ids
+  FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "Public can insert current student ids" ON public.current_student_ids
   FOR INSERT TO public WITH CHECK (true);
 CREATE POLICY "Public can update current student ids" ON public.current_student_ids
@@ -74,12 +77,19 @@ CREATE POLICY "Public can delete current student ids" ON public.current_student_
   FOR DELETE TO public USING (true);
 GRANT ALL ON public.current_student_ids TO anon, authenticated;
 
--- 10. Restore registrations_2027 anon INSERT/UPDATE/DELETE (from 20270124)
-GRANT INSERT, UPDATE, DELETE ON public.registrations_2027 TO anon;
+-- 10. Restore registrations_2027 anon policies & grants
+DROP POLICY IF EXISTS "registrations_2027_service_all" ON public.registrations_2027;
+DROP POLICY IF EXISTS "registrations_2027_admin_staff_read" ON public.registrations_2027;
+DROP POLICY IF EXISTS "registrations_2027_admin_write" ON public.registrations_2027;
+CREATE POLICY "allow_read_registrations_2027" ON public.registrations_2027
+  FOR SELECT TO anon, authenticated USING (true);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.registrations_2027 TO anon, authenticated, service_role;
 
--- 11. Drop reservation RPCs
+-- 11. Drop P0-3 RPCs added by 20270310 / 20270311
 DROP FUNCTION IF EXISTS public.rpc_reserve_student_id(TEXT, INT);
 DROP FUNCTION IF EXISTS public.rpc_release_student_id_reservation(TEXT);
+DROP FUNCTION IF EXISTS public.rpc_verify_student_id(TEXT);
+DROP FUNCTION IF EXISTS public.rpc_compute_expected_order_amount(TEXT, TEXT, BOOLEAN, NUMERIC, TEXT, INT);
 
 -- 12. Drop system_settings table (only if no manual admin changes were made)
 -- WARNING: This drops the portal_fee_settings. Only run if you are sure.

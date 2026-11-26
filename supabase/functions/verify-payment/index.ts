@@ -19,6 +19,8 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { computeAuthoritativeOrderAmount } from './feeValidation.ts';
+import { parseAllowlistedOrigins, resolveServerCallbackUrl } from './callbackUrl.ts';
 
 // ── Required env secrets (fail closed if missing) ───────────────────────────
 const PAYSTATION_MERCHANT_ID = Deno.env.get('PAYSTATION_MERCHANT_ID');
@@ -30,10 +32,8 @@ const PAYMENT_SIGNING_SECRET = Deno.env.get('PAYMENT_SIGNING_SECRET');
 // Edge Function will only call payment-confirming RPCs when this is 'true'.
 const ALLOW_PAYMENT_FINALIZATION = Deno.env.get('PAYSTATION_ALLOW_PAYMENT_FINALIZATION') === 'true';
 
-const allowedOrigins = (Deno.env.get('APP_ALLOWED_ORIGINS') ?? '')
-  .split(',')
-  .map((o) => o.trim())
-  .filter(Boolean);
+const ALLOWED_ORIGINS_RAW = Deno.env.get('APP_ALLOWED_ORIGINS') ?? '';
+const allowedOrigins = parseAllowlistedOrigins(ALLOWED_ORIGINS_RAW, PAYSTATION_ENV);
 
 const PAYSTATION_BASE_URL = PAYSTATION_ENV === 'production'
   ? 'https://api.paystation.com.bd'
@@ -134,31 +134,136 @@ serve(async (req) => {
     const action = body.action || (isDirectIpn ? 'ipn' : (body.order ? 'initiate-payment' : 'verify-payment'));
 
     // ────────────────────────────────────────────────────────────────────────
-    // 1. ACTION: initiate-payment
+    // 1. ACTION: initiate-payment / create-payment
+    // Loads authoritative fees from system_settings, computes expected total
+    // server-side, validates callback URL against APP_ALLOWED_ORIGINS, and
+    // persists pending_orders via service_role.
     // ────────────────────────────────────────────────────────────────────────
     if (action === 'initiate-payment' || action === 'create-payment') {
       const order = body.order || body;
-      if (!order?.invoice_number || !order?.payment_amount) {
-        return jsonResponse({ success: false, error: 'Missing required order details.' }, 400, corsHeaders);
+      if (!order?.invoice_number) {
+        return jsonResponse({ success: false, error: 'INVALID_INVOICE_NUMBER', message: 'invoice_number is required.' }, 400, corsHeaders);
+      }
+      if (order.currency !== undefined && order.currency !== null && String(order.currency).toUpperCase() !== 'BDT') {
+        return jsonResponse({ success: false, error: 'CURRENCY_MISMATCH', message: 'Only BDT currency is supported.' }, 400, corsHeaders);
+      }
+
+      const supabaseUrl        = Deno.env.get('SUPABASE_URL');
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      if (!supabaseUrl || !supabaseServiceKey) {
+        return jsonResponse({ success: false, error: 'DB_CONFIG_MISSING', message: 'Database service credentials missing.' }, 503, corsHeaders);
+      }
+
+      const sbAdmin = createClient(supabaseUrl, supabaseServiceKey);
+      const { data: settingsRow, error: settingsErr } = await sbAdmin
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'portal_fee_settings')
+        .maybeSingle();
+
+      if (settingsErr || !settingsRow?.value) {
+        console.error('[initiate-payment] Missing portal_fee_settings in system_settings:', settingsErr?.message);
+        return jsonResponse({
+          success: false,
+          error: 'FEE_SETTINGS_MISSING',
+          message: 'Authoritative fee configuration is unavailable.',
+        }, 503, corsHeaders);
+      }
+
+      const rawSettings = settingsRow.value as Record<string, unknown>;
+      const feeEval = computeAuthoritativeOrderAmount(rawSettings, {
+        orderType: order.order_type,
+        category: order.category,
+        hasParent: order.has_parent ?? order.hasParent,
+        donationAmount: order.donation_amount ?? order.donationAmount ?? 0,
+        paymentMethod: order.payment_method ?? 'bkash',
+        payWithCharge: order.pay_with_charge ?? 0,
+        clientPaymentAmount: order.payment_amount,
+        clientRegistrationFee: order.registration_fee ?? order.registrationFee,
+        clientParentFee: order.parent_fee ?? order.parentFee,
+        clientGatewayCharge: order.gateway_charge ?? order.gatewayCharge,
+      });
+
+      if (!feeEval.valid) {
+        const status = feeEval.error === 'FEE_SETTINGS_MISSING' || feeEval.error === 'INVALID_FEE_SETTINGS' ? 503 : 400;
+        return jsonResponse({ success: false, error: feeEval.error, message: feeEval.message }, status, corsHeaders);
+      }
+
+      if (feeEval.orderType === 'registration' && rawSettings.registrationOpen !== true && PAYSTATION_ENV === 'production') {
+        return jsonResponse({ success: false, error: 'REGISTRATION_CLOSED', message: 'Registration is closed.' }, 403, corsHeaders);
+      }
+      if (feeEval.orderType === 'donation' && rawSettings.donationOpen !== true && PAYSTATION_ENV === 'production') {
+        return jsonResponse({ success: false, error: 'DONATION_CLOSED', message: 'Donations are closed.' }, 403, corsHeaders);
+      }
+
+      const cbEval = resolveServerCallbackUrl({
+        allowedOriginsRaw: ALLOWED_ORIGINS_RAW,
+        paystationEnv: PAYSTATION_ENV,
+        requestedCallbackUrl: order.callback_url,
+        requestedOrigin: order.return_origin,
+        orderType: feeEval.orderType!,
+        invoiceNumber: String(order.invoice_number),
+      });
+
+      if (!cbEval.valid) {
+        const status = cbEval.error === 'CALLBACK_ORIGIN_NOT_CONFIGURED' ? 503 : 400;
+        return jsonResponse({ success: false, error: cbEval.error, message: cbEval.message }, status, corsHeaders);
+      }
+
+      // Persist authoritative server-calculated pending_order before invoking gateway
+      const { error: orderUpsertErr } = await sbAdmin
+        .from('pending_orders')
+        .upsert({
+          id: `ORD-${String(order.invoice_number).trim()}`,
+          invoice_number: String(order.invoice_number).trim(),
+          order_type: feeEval.orderType!,
+          amount: feeEval.expectedTotal!,
+          currency: 'BDT',
+          status: 'pending',
+          customer_name: String(order.cust_name || 'Customer').slice(0, 120),
+          customer_phone: String(order.cust_phone || '01700000000').slice(0, 32),
+          customer_email: order.cust_email ? String(order.cust_email).slice(0, 160) : null,
+          form_data: {
+            category: feeEval.category ?? null,
+            hasParent: Boolean(feeEval.hasParent),
+            studentId: order.student_id ?? null,
+            fullName: order.cust_name || 'Customer',
+            mobileNumber: order.cust_phone || '01700000000',
+            email: order.cust_email || null,
+          },
+          fees: {
+            registrationFee: feeEval.registrationFee!,
+            parentFee: feeEval.parentFee!,
+            donationAmount: feeEval.donationAmount!,
+            gatewayCharge: feeEval.gatewayCharge!,
+            subtotal: feeEval.subtotal!,
+            totalPayable: feeEval.expectedTotal!,
+          },
+          gateway_provider: 'PAYSTATION',
+        }, { onConflict: 'invoice_number' });
+
+      if (orderUpsertErr) {
+        console.error('[initiate-payment] Failed to persist pending_orders:', orderUpsertErr.message);
+        return jsonResponse({ success: false, error: 'PENDING_ORDER_PERSIST_FAILED', message: 'Failed to create authoritative order.' }, 500, corsHeaders);
       }
 
       const formBody = new URLSearchParams();
       formBody.append('merchantId',      PAYSTATION_MERCHANT_ID!);
       formBody.append('password',        PAYSTATION_PASSWORD!);
-      formBody.append('invoice_number',  String(order.invoice_number));
-      formBody.append('currency',        order.currency || 'BDT');
-      formBody.append('payment_amount',  String(order.payment_amount));
-      formBody.append('pay_with_charge', String(order.pay_with_charge ?? 0));
-      if (order.reference)     formBody.append('reference',     order.reference);
-      formBody.append('cust_name',       order.cust_name || 'Customer');
-      formBody.append('cust_phone',      order.cust_phone || '01700000000');
-      if (order.cust_email)    formBody.append('cust_email',    order.cust_email);
-      if (order.cust_address)  formBody.append('cust_address',  order.cust_address);
-      formBody.append('callback_url',    order.callback_url || 'https://plscf.org');
-      if (order.checkout_items) formBody.append('checkout_items', order.checkout_items);
-      if (order.opt_a)         formBody.append('opt_a', order.opt_a);
-      if (order.opt_b)         formBody.append('opt_b', order.opt_b);
-      if (order.opt_c)         formBody.append('opt_c', order.opt_c);
+      formBody.append('invoice_number',  String(order.invoice_number).trim());
+      formBody.append('currency',        'BDT');
+      formBody.append('payment_amount',  String(feeEval.expectedTotal!));
+      formBody.append('pay_with_charge', String(feeEval.payWithCharge!));
+      if (order.reference)     formBody.append('reference',     String(order.reference));
+      formBody.append('cust_name',       String(order.cust_name || 'Customer'));
+      formBody.append('cust_phone',      String(order.cust_phone || '01700000000'));
+      if (order.cust_email)    formBody.append('cust_email',    String(order.cust_email));
+      if (order.cust_address)  formBody.append('cust_address',  String(order.cust_address));
+      formBody.append('callback_url',    cbEval.callbackUrl!);
+      if (order.checkout_items) formBody.append('checkout_items', String(order.checkout_items));
+      if (order.opt_a)         formBody.append('opt_a', String(order.opt_a));
+      if (order.opt_b)         formBody.append('opt_b', String(order.opt_b));
+      if (order.opt_c)         formBody.append('opt_c', String(order.opt_c));
 
       try {
         const createRes = await fetch(`${PAYSTATION_BASE_URL}/initiate-payment`, {
@@ -181,7 +286,7 @@ serve(async (req) => {
             status_code:   createData.status_code,
             paymentUrl:    createData.payment_url,
             invoiceNumber: createData.invoice_number || order.invoice_number,
-            payment_amount: createData.payment_amount || String(order.payment_amount),
+            payment_amount: String(feeEval.expectedTotal!),
             message:       createData.message,
           }, 200, corsHeaders);
         }
@@ -192,9 +297,10 @@ serve(async (req) => {
           return jsonResponse({
             success:       true,
             status_code:   '200',
-            paymentUrl:    order.callback_url ? `${order.callback_url}&status=Successful&trx_id=${simTrxId}&simulated=true` : `${PAYSTATION_BASE_URL}/checkout/${order.invoice_number}`,
+            paymentUrl:    `${cbEval.callbackUrl!}&status=Successful&trx_id=${simTrxId}&simulated=true`,
             trxId:         simTrxId,
             invoiceNumber: order.invoice_number,
+            payment_amount: String(feeEval.expectedTotal!),
             message:       'Sandbox simulation payment URL created (finalization disabled).',
           }, 200, corsHeaders);
         }
@@ -206,12 +312,91 @@ serve(async (req) => {
           const simTrxId = `PST-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
           return jsonResponse({
             success: true, status_code: '200',
-            paymentUrl: order.callback_url ? `${order.callback_url}&status=Successful&trx_id=${simTrxId}&simulated=true` : `${PAYSTATION_BASE_URL}/checkout/${order.invoice_number}`,
+            paymentUrl: `${cbEval.callbackUrl!}&status=Successful&trx_id=${simTrxId}&simulated=true`,
             trxId: simTrxId, invoiceNumber: order.invoice_number,
+            payment_amount: String(feeEval.expectedTotal!),
           }, 200, corsHeaders);
         }
         return jsonResponse({ success: false, error: err.message || 'Payment initiation failed' }, 502, corsHeaders);
       }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // 1b. ACTION: record-donation (server-side replacement for anon donation fallback)
+    // Strictly gated behind ALLOW_PAYMENT_FINALIZATION and currency check.
+    // ────────────────────────────────────────────────────────────────────────
+    if (action === 'record-donation') {
+      if (!ALLOW_PAYMENT_FINALIZATION) {
+        return jsonResponse({
+          success: false,
+          error: 'PAYMENT_FINALIZATION_DISABLED',
+          message: 'Live donation payment finalization is disabled.',
+        }, 403, corsHeaders);
+      }
+      const { id, donor_name, mobile_number, email, purpose, payment_method, transaction_id, invoice_number, token, year } = body;
+      if (!id || !transaction_id) {
+        return jsonResponse({ success: false, error: 'INVALID_REQUEST', message: 'id and transaction_id are required.' }, 400, corsHeaders);
+      }
+
+      const queryRes = await fetch(`${PAYSTATION_BASE_URL}/v2/transaction-status`, {
+        method: 'POST',
+        headers: { 'merchantId': PAYSTATION_MERCHANT_ID!, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trxId: transaction_id }),
+      });
+      const gwData = await queryRes.json();
+      if (!(gwData.status_code === '200' && gwData.data && (gwData.data.trx_status || '').toLowerCase().includes('success'))) {
+        return jsonResponse({ success: false, error: 'TRANSACTION_NOT_VERIFIED', message: 'Gateway transaction not confirmed.' }, 402, corsHeaders);
+      }
+      const gwCurrency = gwData.data.currency ?? null;
+      if (gwCurrency === null || gwCurrency === undefined) {
+        return jsonResponse({ success: false, error: 'CURRENCY_MISSING', message: 'PayStation response did not include currency.' }, 402, corsHeaders);
+      }
+      if (gwCurrency !== 'BDT') {
+        return jsonResponse({ success: false, error: 'CURRENCY_MISMATCH', message: `Unexpected currency: ${gwCurrency}` }, 402, corsHeaders);
+      }
+
+      const gwAmount = Number(gwData.data.payment_amount ?? gwData.data.trx_amount);
+      if (!Number.isFinite(gwAmount) || gwAmount <= 0) {
+        return jsonResponse({ success: false, error: 'INVALID_AMOUNT', message: 'Invalid gateway amount.' }, 402, corsHeaders);
+      }
+
+      const supabaseUrl        = Deno.env.get('SUPABASE_URL');
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      if (!supabaseUrl || !supabaseServiceKey) {
+        return jsonResponse({ success: false, error: 'DB_CONFIG_MISSING' }, 503, corsHeaders);
+      }
+      const sbAdmin = createClient(supabaseUrl, supabaseServiceKey);
+      const { data: settingsRow } = await sbAdmin.from('system_settings').select('value').eq('key', 'portal_fee_settings').maybeSingle();
+      if (!settingsRow?.value) {
+        return jsonResponse({ success: false, error: 'FEE_SETTINGS_MISSING' }, 503, corsHeaders);
+      }
+      const donEval = computeAuthoritativeOrderAmount(settingsRow.value, {
+        orderType: 'donation',
+        donationAmount: gwAmount,
+        paymentMethod: gwData.data.payment_method || payment_method || 'bkash',
+        payWithCharge: 0,
+      });
+      if (!donEval.valid) {
+        return jsonResponse({ success: false, error: donEval.error, message: donEval.message }, 402, corsHeaders);
+      }
+
+      const { data: rpcData, error: rpcErr } = await sbAdmin.rpc('rpc_record_donation', {
+        p_id: String(id),
+        p_donor_name: String(donor_name || 'Donor'),
+        p_mobile_number: String(mobile_number || ''),
+        p_email: String(email || ''),
+        p_amount: donEval.expectedTotal!,
+        p_purpose: String(purpose || 'General Reunion Fund'),
+        p_payment_method: String(gwData.data.payment_method || payment_method || 'bkash'),
+        p_transaction_id: String(transaction_id),
+        p_gateway_invoice_number: invoice_number ? String(invoice_number) : null,
+        p_token: token ? String(token) : null,
+        p_year: Number(year || 2027),
+      });
+      if (rpcErr || !rpcData?.success) {
+        return jsonResponse({ success: false, error: rpcErr?.code || 'RECORD_DONATION_FAILED', message: rpcErr?.message || rpcData?.error }, 402, corsHeaders);
+      }
+      return jsonResponse({ success: true, donation: rpcData.donation }, 200, corsHeaders);
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -336,7 +521,7 @@ serve(async (req) => {
     }
 
     let isVerified       = false;
-    let verifiedAmount   = Number(payment_amount || 0);
+    let verifiedAmount   = 0;
     let verifiedMethod   = payment_method || 'bkash';
     let verifiedCurrency: string | null = null;
 
@@ -367,7 +552,7 @@ serve(async (req) => {
           }, 402, corsHeaders);
         }
 
-        const gatewayAmount = Number(data.data.payment_amount ?? data.data.trx_amount ?? verifiedAmount);
+        const gatewayAmount = Number(data.data.payment_amount ?? data.data.trx_amount);
         if (!Number.isFinite(gatewayAmount) || gatewayAmount <= 0) {
           return jsonResponse({
             success: false,

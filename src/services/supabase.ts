@@ -573,10 +573,18 @@ export const SupabaseService = {
   ): Promise<{ success: boolean; table: string; error?: string }> {
     if (reg.paymentStatus === 'pending') {
       if (reg.isManualRegistration || reg.registrationType === 'manual_venue') {
-        // Authoritative: Venue manual registrations MUST be persisted to Supabase so Super Admin can review & approve across all devices
+        // Manual venue writes require an authenticated admin/staff session post-P0-3
         const yearTableName = getRegistrationsTableName(year);
-        const row = toRegistrationDbRow(reg, year);
         try {
+          const { data: authData } = await supabase.auth.getSession();
+          if (!authData?.session?.user) {
+            return {
+              success: false,
+              table: yearTableName,
+              error: 'PERMISSION_DENIED: Authenticated admin session required for manual registration persistence.',
+            };
+          }
+          const row = toRegistrationDbRow(reg, year);
           const { error } = await supabase.from(yearTableName).upsert(row, { onConflict: 'id' });
           if (error) {
             console.error('[SupabaseService] saveRegistration manual venue error:', error);
@@ -593,7 +601,8 @@ export const SupabaseService = {
       return { success: true, table: getRegistrationsTableName(year) };
     }
 
-    // For paid records, finalize authoritatively via rpc_verify_payment
+    // For paid records, finalize authoritatively via Edge Function / server-side verification ONLY.
+    // Direct anon upsert fallback to registrations_2027 is permanently removed.
     const sig =
       reg.serverVerificationSignature ||
       `SIG_VERIFIED_${Date.now().toString(36).toUpperCase()}`;
@@ -612,16 +621,11 @@ export const SupabaseService = {
       return { success: true, table: getRegistrationsTableName(year) };
     }
 
-    // Fallback: Attempt standard upsert
-    const yearTableName = getRegistrationsTableName(year);
-    const row = toRegistrationDbRow(reg, year);
-    try {
-      const { error } = await supabase.from(yearTableName).upsert(row, { onConflict: 'id' });
-      if (!error) return { success: true, table: yearTableName };
-      return { success: false, table: yearTableName, error: error.message || res.error };
-    } catch (e: any) {
-      return { success: false, table: yearTableName, error: e.message || res.error };
-    }
+    return {
+      success: false,
+      table: getRegistrationsTableName(year),
+      error: res.error || 'Payment verification failed. Direct database fallback is disabled.',
+    };
   },
 
   /**
@@ -1044,9 +1048,9 @@ export const SupabaseService = {
   },
 
   /**
-   * Save a donation canonically to Supabase backend in public.donations.
-   * Uses authoritative SECURITY DEFINER rpc_record_donation to bypass RLS safely,
-   * with fallback upsert to public.donations and donations_2027.
+   * Save a donation authoritatively via the `verify-payment` Edge Function (`record-donation`)
+   * or an authenticated admin RPC session.
+   * Direct anon table/RPC fallback writes to `donations` / `donations_2027` are removed post-P0-3.
    */
   async saveDonation(
     donation: DonationRecord,
@@ -1058,11 +1062,55 @@ export const SupabaseService = {
     const cleanEmail = sanitizeInput(donation.email);
     const cleanPurpose = sanitizeInput(donation.purpose) || 'General Reunion Fund';
     const cleanTrx = sanitizeInput(donation.transactionId);
-    const donationDate = donation.date || new Date().toISOString().split('T')[0];
     const token = donation.token || donation.qrToken || undefined;
 
-    // 1. Authoritative: Attempt via SECURITY DEFINER rpc_record_donation
+    // 1. Primary: Authoritative server-side Edge Function (validates PayStation txn + currency via service_role)
+    let edgeErrorMsg: string | undefined;
     try {
+      const { data: edgeData, error: edgeErr } = await supabase.functions.invoke('verify-payment', {
+        body: {
+          action: 'record-donation',
+          id: cleanId,
+          donor_name: cleanDonorName,
+          mobile_number: cleanMobile,
+          email: cleanEmail,
+          purpose: cleanPurpose,
+          payment_method: donation.paymentMethod || 'bkash',
+          transaction_id: cleanTrx,
+          invoice_number: donation.gatewayInvoiceNumber || null,
+          token: token || null,
+          year,
+        },
+      });
+      if (!edgeErr && edgeData?.success && edgeData?.donation) {
+        return { success: true, table: 'donations', donation: fromDonationDbRow(edgeData.donation) };
+      }
+      if (edgeErr) {
+        edgeErrorMsg = edgeErr.message;
+        try {
+          const ctxJson = await (edgeErr as any).context?.json?.();
+          if (ctxJson?.error || ctxJson?.message) {
+            edgeErrorMsg = ctxJson.error || ctxJson.message;
+          }
+        } catch { /* non-JSON error context */ }
+      } else if (edgeData && edgeData.success === false) {
+        return { success: false, table: 'donations', error: edgeData.error || edgeData.message };
+      }
+    } catch (edgeEx: any) {
+      edgeErrorMsg = edgeEx?.message;
+    }
+
+    // 2. Authenticated admin fallback only (never anon direct table/RPC write)
+    try {
+      const { data: authData } = await supabase.auth.getSession();
+      if (!authData?.session?.user) {
+        return {
+          success: false,
+          table: 'donations',
+          error: edgeErrorMsg || 'PERMISSION_DENIED: Server verification failed and direct anon donation writes are disabled.',
+        };
+      }
+
       const { data, error: rpcErr } = await supabase.rpc('rpc_record_donation', {
         p_id: cleanId,
         p_donor_name: cleanDonorName,
@@ -1078,61 +1126,15 @@ export const SupabaseService = {
       });
 
       if (!rpcErr && data?.success && data?.donation) {
-        const saved = fromDonationDbRow(data.donation);
-        return { success: true, table: 'donations', donation: saved };
+        return { success: true, table: 'donations', donation: fromDonationDbRow(data.donation) };
       }
-      if (rpcErr) {
-        console.warn('[SupabaseService] rpc_record_donation notice:', rpcErr.message);
-      }
-    } catch (rpcEx) {
-      console.warn('[SupabaseService] rpc_record_donation exception:', rpcEx);
-    }
-
-    // 2. Direct Supabase write fallback to canonical public.donations
-    const canonicalRow = {
-      id: cleanId,
-      donor_name: cleanDonorName,
-      mobile_number: cleanMobile,
-      email: cleanEmail,
-      amount: donation.amount,
-      purpose: cleanPurpose,
-      payment_method: donation.paymentMethod || 'bkash',
-      transaction_id: cleanTrx,
-      gateway_invoice_number: donation.gatewayInvoiceNumber || null,
-      gateway_provider: donation.gatewayProvider || 'PAYSTATION',
-      registration_id: donation.registrationId || null,
-      date: donationDate,
-      donation_date: donationDate,
-      year: year,
-      payment_status: donation.paymentStatus || 'paid',
-      token: token || null,
-      qr_token: token || null,
-    };
-
-    try {
-      const { error: canonicalErr } = await supabase
-        .from('donations')
-        .upsert(canonicalRow, { onConflict: 'id' });
-
-      // Synchronize to donations_2027 for backward compatibility
-      Promise.resolve(
-        supabase
-          .from('donations_2027')
-          .upsert(canonicalRow, { onConflict: 'id' })
-      ).catch(() => { });
-
-      if (!canonicalErr) {
-        return { success: true, table: 'donations', donation };
-      }
-
-      console.warn('[SupabaseService] Canonical donations write notice:', canonicalErr.message);
       return {
         success: false,
         table: 'donations',
-        error: canonicalErr.message,
+        error: rpcErr?.message || edgeErrorMsg || 'Failed to record donation.',
       };
     } catch (err: any) {
-      return { success: false, table: 'donations', error: err.message };
+      return { success: false, table: 'donations', error: err?.message || edgeErrorMsg };
     }
   },
 
@@ -1201,26 +1203,8 @@ export const SupabaseService = {
       console.warn('[SupabaseService] rpc_lookup_donation fallback notice:', rpcErr);
     }
 
-    // 2. Direct Supabase query fallback on canonical donations table
-    try {
-      let query = supabase.from('donations').select('*');
-      if (cleanId && cleanMobile) {
-        query = query
-          .or(`id.ilike.%${cleanId}%,token.ilike.%${cleanId}%,qr_token.ilike.%${cleanId}%`)
-          .ilike('mobile_number', `%${cleanMobile}%`);
-      } else if (cleanId) {
-        query = query.or(`id.ilike.%${cleanId}%,token.ilike.%${cleanId}%,qr_token.ilike.%${cleanId}%,mobile_number.ilike.%${cleanId}%`);
-      } else if (cleanMobile) {
-        query = query.ilike('mobile_number', `%${cleanMobile}%`);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false }).limit(1);
-      if (!error && data && data.length > 0) {
-        return { donation: fromDonationDbRow(data[0]) };
-      }
-    } catch (err: any) {
-      console.warn('[SupabaseService] Direct donations lookup fallback notice:', err);
-    }
+    // 2. Direct table lookup removed for anon (donations table read is restricted to service_role/admin)
+    // Hardened rpc_lookup_donation / rpc_lookup_ticket handle cloud lookups securely without exposing PII.
 
     // 3. Fallback to local browser storage
     try {
@@ -1580,8 +1564,9 @@ export const SupabaseService = {
       }
     }
 
-    // 3. Fallback table query for authenticated staff
-    const tablesToTry = ['registrations_2027', 'registrations'];
+    // 3. Fallback table query restricted to authenticated staff sessions only (anon table SELECT is revoked)
+    const { data: sessionData } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+    const tablesToTry = sessionData?.session?.user ? ['registrations_2027', 'registrations'] : [];
     for (const table of tablesToTry) {
       try {
         let query = supabase.from(table).select('*');

@@ -544,6 +544,11 @@ export class StudentIdService {
    */
   static async syncWithSupabase(): Promise<CurrentStudentIdRecord[]> {
     try {
+      const { data: sessionData } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+      if (!sessionData?.session?.user) {
+        // Post-P0-3: anon cannot read current_student_ids table directly; use rpc_verify_student_id for individual checks.
+        return loadStoredList();
+      }
       const { data, error } = await supabase
         .from('current_student_ids')
         .select('*')
@@ -644,22 +649,53 @@ export class StudentIdService {
       return verifyStudentIdAgainstRecords(cleanId, list);
     }
 
-    // 2. Direct Supabase Cloud Fallback (Cross-device instant verification)
+    // 2. Scoped Supabase SECURITY DEFINER RPC (zero PII: never queries raw current_student_ids table as anon)
     try {
-      const { data, error } = await supabase
-        .from('current_student_ids')
-        .select('*')
-        .ilike('student_id', cleanId)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc('rpc_verify_student_id', {
+        p_student_id: cleanId,
+      });
 
       if (!error && data) {
-        const cloudRecord = fromStudentIdDbRow(data);
-        const updatedList = [cloudRecord, ...list.filter((r) => r.studentId.trim().toUpperCase() !== cleanId)];
-        persistList(updatedList);
-        return verifyStudentIdAgainstRecords(cleanId, updatedList);
+        if (data.status === 'INACTIVE') {
+          return {
+            success: false,
+            status: 'INACTIVE',
+            messageEn: 'This Student ID Is Currently Inactive. Please contact the Help Desk.',
+            messageBn: 'এই স্টুডেন্ট আইডিটি বর্তমানে নিষ্ক্রিয়। অনুগ্রহ করে হেল্পডেস্কে যোগাযোগ করুন।',
+          };
+        }
+        if (data.status === 'ALREADY_USED') {
+          return {
+            success: false,
+            status: 'ALREADY_USED',
+            messageEn: 'This Student ID Is Already Taken.',
+            messageBn: 'এই স্টুডেন্ট আইডিটি দিয়ে ইতোমধ্যে সফলভাবে নিবন্ধন সম্পন্ন হয়েছে।',
+          };
+        }
+        if (data.status === 'RESERVED') {
+          return {
+            success: false,
+            status: 'RESERVED',
+            messageEn: 'This Student ID Is Currently Reserved for an active registration session.',
+            messageBn: 'এই স্টুডেন্ট আইডিটির জন্য বর্তমানে একটি পেমেন্ট সেশন চলমান রয়েছে। অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন।',
+          };
+        }
+        if (data.success && data.status === 'AVAILABLE') {
+          return {
+            success: true,
+            status: 'AVAILABLE',
+            messageEn: 'Student ID Verified Successfully',
+            messageBn: 'স্টুডেন্ট আইডি সফলভাবে যাচাই সম্পন্ন হয়েছে',
+            record: {
+              studentId: data.student_id || cleanId,
+              className: data.class_name,
+              academicYear: data.academic_year,
+            },
+          };
+        }
       }
     } catch (e) {
-      console.warn('[StudentIdService] Cloud verify notice:', e);
+      console.warn('[StudentIdService] rpc_verify_student_id notice:', e);
     }
 
     return {

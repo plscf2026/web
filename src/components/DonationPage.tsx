@@ -382,6 +382,10 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
       // Create PayStation hosted checkout session
       const createRes = await PayStationService.createPayment({
         invoice_number: invoiceNumber,
+        order_type: 'donation',
+        donation_amount: effectiveAmount,
+        payment_method: paymentMethod,
+        return_origin: typeof window !== 'undefined' ? window.location.origin : undefined,
         currency: 'BDT',
         payment_amount: effectiveAmount,
         pay_with_charge: 0,

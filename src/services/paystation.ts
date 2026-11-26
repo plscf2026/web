@@ -38,6 +38,13 @@ export interface PayStationConfig {
 
 export interface PayStationOrderPayload {
   invoice_number: string;
+  order_type?: 'registration' | 'donation';
+  category?: 'current' | 'former';
+  has_parent?: boolean;
+  donation_amount?: number;
+  payment_method?: PaymentMethod | string;
+  student_id?: string | null;
+  return_origin?: string;
   currency?: string;
   payment_amount: number;
   pay_with_charge?: 0 | 1;  // 1 = customer pays the gateway charge; 0 = merchant pays (default)

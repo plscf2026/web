@@ -174,11 +174,17 @@ export const TicketLookupModal: React.FC<TicketLookupModalProps> = ({
         {matchedRecord && (
           <div className="p-5 rounded-2xl bg-[#E2EEF8]/40 border-2 border-[#0284C7] shadow-md space-y-4 animate-in fade-in">
             <div className="flex items-center gap-4">
-              <img
-                src={matchedRecord.photoUrl}
-                alt={matchedRecord.fullName}
-                className="w-16 h-16 rounded-xl object-cover border-2 border-[#0284C7]"
-              />
+              {matchedRecord.photoUrl ? (
+                <img
+                  src={matchedRecord.photoUrl}
+                  alt={matchedRecord.fullName}
+                  className="w-16 h-16 rounded-xl object-cover border-2 border-[#0284C7]"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-xl bg-[#E2EEF8] text-[#0284C7] border-2 border-[#0284C7] flex items-center justify-center font-black text-xl shrink-0">
+                  {(matchedRecord.fullName || 'S').charAt(0).toUpperCase()}
+                </div>
+              )}
               <div>
                 <span className="text-[10px] font-bold uppercase text-[#0284C7] bg-[#E2EEF8] px-2.5 py-0.5 rounded-full border border-[#0284C7]/30">
                   {matchedRecord.category} Student
