@@ -16,12 +16,12 @@ import {
   ExternalLink,
   RefreshCw,
 } from 'lucide-react';
-import { Language, DonationRecord, PaymentMethod, FeeSettings } from '../types';
+import { Language, DonationRecord, FeeSettings } from '../types';
 import { translations } from '../i18n/translations';
 import { AppStore } from '../services/store';
 import { SupabaseService } from '../services/supabase';
 import { PayStationService } from '../services/paystation';
-import { isValidBangladeshiMobile, normalizeBangladeshiMobileNumber, isDonationOpen, getDonationClosedMessage } from '../utils/rules';
+import { isValidBangladeshiMobile, normalizeBangladeshiMobileNumber, isDonationOpen, getDonationClosedMessage, calculateGatewayCharge } from '../utils/rules';
 import { sanitizeInput } from '../utils/security';
 import { ThankYouCardBadge } from './ThankYouCardBadge';
 
@@ -47,7 +47,6 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
   const [mobileNumber, setMobileNumber] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [isAnonymous, setIsAnonymous] = useState<boolean>(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('bkash');
 
   // Processing & Error states
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -196,6 +195,8 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
   }, [pendingPayment, completedDonation]);
 
   const effectiveAmount = customAmount ? Math.max(10, Number(customAmount) || 0) : selectedAmount;
+  const donationGatewayCharge = calculateGatewayCharge(effectiveAmount);
+  const donationTotalPayable = Math.round((effectiveAmount + donationGatewayCharge) * 100) / 100;
   const totalRaised = donationsList.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
 
   // Top 10 Donors sorted by donation amount descending (Donors Hall of Fame)
@@ -290,22 +291,23 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
 
       const invoiceNumber = `INV-DON-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-      // Build PayStation callback URL — embeds invoice & amount for return verification
+      // Build PayStation callback URL — embeds invoice & total payable for return verification
       const callbackUrl = PayStationService.buildCallbackUrl({
         type: 'donation',
         invoiceNumber,
-        amount: effectiveAmount,
+        amount: donationTotalPayable,
       });
 
       // Store donor info in sessionStorage & localStorage & service session so we can complete the record after return
       const donationSessionPayload = {
         invoiceNumber,
-        amount: effectiveAmount,
+        amount: donationTotalPayable,
+        netDonationAmount: effectiveAmount,
         donorName: finalDonorName,
         mobileNumber: normalizedMobile,
         email: email.trim(),
         purpose: causeTitle,
-        paymentMethod,
+        paymentMethod: 'paystation' as const,
       };
       try {
         sessionStorage.setItem('plscf_pending_donation', JSON.stringify(donationSessionPayload));
@@ -313,21 +315,22 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
         PayStationService.savePendingSession({
           type: 'donation',
           invoiceNumber,
-          amount: effectiveAmount,
+          amount: donationTotalPayable,
           donationData: donationSessionPayload,
           createdAt: new Date().toISOString(),
         });
       } catch { }
 
-      // Create PayStation hosted checkout session
+      // Create PayStation hosted checkout session (total includes flat 1.8% gateway fee; pay_with_charge=0)
       const createRes = await PayStationService.createPayment({
         invoice_number: invoiceNumber,
         order_type: 'donation',
         donation_amount: effectiveAmount,
-        payment_method: paymentMethod,
+        gateway_charge: donationGatewayCharge,
+        payment_method: 'paystation',
         return_origin: typeof window !== 'undefined' ? window.location.origin : undefined,
         currency: 'BDT',
-        payment_amount: effectiveAmount,
+        payment_amount: donationTotalPayable,
         pay_with_charge: 0,
         reference: 'Donation: Reunion Welfare Fund',
         cust_name: sanitizedDonor,
@@ -335,7 +338,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
         cust_email: email.trim() || undefined,
         cust_address: 'Faridpur',
         callback_url: callbackUrl,
-        checkout_items: JSON.stringify({ type: 'donation', cause: 'general_fund' }),
+        checkout_items: JSON.stringify({ type: 'donation', cause: 'general_fund', gatewayCharge: donationGatewayCharge }),
         opt_a: 'donation',
         opt_b: 'general_fund',
       });
@@ -373,7 +376,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
 
       setPendingPayment({
         invoiceNumber,
-        amount: effectiveAmount,
+        amount: donationTotalPayable,
         paymentUrl: checkoutUrl,
         donorName: finalDonorName,
         mobileNumber: normalizedMobile,
@@ -681,35 +684,28 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
                 </div>
               </div>
 
-              {/* Step 3: Payment Method Selection */}
-              <div>
-                <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">3</span>
-                  <span>{isBangla ? 'পেমেন্ট মাধ্যম (PayStation Gateway)' : 'Payment Method (PayStation Gateway)'}</span>
+              {/* Step 3: Uniform 1.8% Gateway Charge Summary (PayStation Hosted Checkout) */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
+                <div className="flex items-center justify-between font-bold text-slate-700 pb-1 border-b border-slate-200">
+                  <span className="flex items-center gap-1.5">
+                    <CreditCard className="w-4 h-4 text-[#0284C7]" />
+                    <span>{isBangla ? 'PayStation চেকআউট সারাংশ' : 'PayStation Checkout Summary'}</span>
+                  </span>
+                  <span className="text-[11px] font-semibold text-emerald-700">
+                    {isBangla ? 'bKash / Nagad / Rocket / কার্ড' : 'bKash / Nagad / Rocket / Cards'}
+                  </span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  {[
-                    { id: 'bkash', label: 'bKash', color: 'border-pink-300 hover:bg-pink-50 text-pink-700' },
-                    { id: 'nagad', label: 'Nagad', color: 'border-orange-300 hover:bg-orange-50 text-orange-700' },
-                    { id: 'rocket', label: 'Rocket', color: 'border-purple-300 hover:bg-purple-50 text-purple-700' },
-                    { id: 'card', label: 'Cards / Visa / MC', color: 'border-blue-300 hover:bg-blue-50 text-blue-700' },
-                  ].map((method) => {
-                    const isSelected = paymentMethod === method.id;
-                    return (
-                      <button
-                        key={method.id}
-                        type="button"
-                        onClick={() => setPaymentMethod(method.id as PaymentMethod)}
-                        className={`p-2.5 rounded-full border text-center transition-all cursor-pointer font-bold text-xs flex items-center justify-center gap-1.5 ${isSelected
-                          ? 'bg-[#0284C7] text-white border-[#0284C7] shadow-sm'
-                          : `bg-slate-50 text-slate-700 ${method.color}`
-                          }`}
-                      >
-                        <CreditCard className="w-3.5 h-3.5" />
-                        <span>{method.label}</span>
-                      </button>
-                    );
-                  })}
+                <div className="flex justify-between text-slate-600">
+                  <span>{isBangla ? 'অনুদানের পরিমাণ' : 'Donation Amount'}:</span>
+                  <span className="font-semibold">৳ {effectiveAmount.toLocaleString('en-US')}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>{isBangla ? 'গেটওয়ে চার্জ (১.৮%)' : 'Gateway Charge (1.8%)'}:</span>
+                  <span className="font-semibold text-indigo-700">+ ৳ {donationGatewayCharge.toLocaleString('en-US')}</span>
+                </div>
+                <div className="flex justify-between text-sm font-black text-slate-900 pt-1.5 border-t border-slate-200">
+                  <span>{isBangla ? 'সর্বমোট প্রদেয়' : 'Total Payable'}:</span>
+                  <span className="text-[#0284C7]">৳ {donationTotalPayable.toLocaleString('en-US')} BDT</span>
                 </div>
               </div>
 
@@ -808,8 +804,8 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
                       <Heart className="w-5 h-5 fill-white" />
                       <span>
                         {isBangla
-                          ? `৳${effectiveAmount.toLocaleString('en-US')} অনুদান প্রদান করুন`
-                          : `Donate ৳${effectiveAmount.toLocaleString('en-US')} BDT via PayStation`}
+                          ? `৳${donationTotalPayable.toLocaleString('en-US')} অনুদান প্রদান করুন`
+                          : `Donate ৳${donationTotalPayable.toLocaleString('en-US')} BDT via PayStation`}
                       </span>
                     </>
                   )}

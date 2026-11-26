@@ -2,7 +2,7 @@ export type StudentCategory = 'former' | 'current';
 
 export type TShirtSize = 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'XXXL' | 'Oversize 50';
 
-export type PaymentMethod = 'bkash' | 'nagad' | 'rocket' | 'card' | 'amex';
+export type PaymentMethod = 'paystation' | 'bkash' | 'nagad' | 'rocket' | 'card' | 'amex';
 
 export type PaymentStatus = 'paid' | 'pending' | 'failed' | 'refunded';
 

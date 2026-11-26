@@ -322,24 +322,18 @@ export function calculateTotalFee(
 }
 
 /**
- * Official Payment Gateway Service Charges:
- * - MFS bKash: 1.85%
- * - Other MFS & Internet Banking (Nagad, Rocket, Upay): 1.50%
- * - Card (VISA, MasterCard): 2.10%
- * - Amex Card: 3.10%
+ * Uniform Payment Gateway Service Charge:
+ * Flat 1.8% added to total payable for every online payment.
  */
-export function getGatewayChargeRate(method: string): number {
-  const m = (method || '').toLowerCase().trim();
-  if (m === 'bkash') return 0.0185;
-  if (m === 'nagad' || m === 'rocket' || m === 'upay' || m.includes('mfs')) return 0.0150;
-  if (m === 'amex') return 0.0310;
-  if (m === 'card' || m === 'visa' || m === 'master' || m === 'mastercard') return 0.0210;
-  return 0.0185;
+export const UNIFORM_GATEWAY_CHARGE_RATE = 0.018;
+
+export function getGatewayChargeRate(_method?: string): number {
+  return UNIFORM_GATEWAY_CHARGE_RATE;
 }
 
-export function calculateGatewayCharge(amount: number, method: string): number {
-  const rate = getGatewayChargeRate(method);
-  return Math.round(amount * rate * 100) / 100;
+export function calculateGatewayCharge(amount: number, _method: string = 'paystation'): number {
+  const validAmount = Math.max(0, Number(amount) || 0);
+  return Math.round(validAmount * UNIFORM_GATEWAY_CHARGE_RATE * 100) / 100;
 }
 
 export interface GateScanValidationResult {

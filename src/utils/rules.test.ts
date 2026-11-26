@@ -373,24 +373,23 @@ test('Accompanying Parent / Guardian validation & fee calculation rules', () => 
   assert.equal(resValidSister.isValid, true);
 });
 
-test('Dynamic Payment Gateway Service Charges: bKash 1.85%, Other MFS 1.50%, Card 2.10%, Amex 3.10%', () => {
-  // 1. Rate lookups
-  assert.equal(getGatewayChargeRate('bkash'), 0.0185);
-  assert.equal(getGatewayChargeRate('nagad'), 0.0150);
-  assert.equal(getGatewayChargeRate('rocket'), 0.0150);
-  assert.equal(getGatewayChargeRate('card'), 0.0210);
-  assert.equal(getGatewayChargeRate('amex'), 0.0310);
+test('Uniform Payment Gateway Service Charge: Flat 1.8% across every payment', () => {
+  // 1. Uniform 1.8% rate lookup across all channels
+  assert.equal(getGatewayChargeRate('bkash'), 0.018);
+  assert.equal(getGatewayChargeRate('nagad'), 0.018);
+  assert.equal(getGatewayChargeRate('rocket'), 0.018);
+  assert.equal(getGatewayChargeRate('card'), 0.018);
+  assert.equal(getGatewayChargeRate('amex'), 0.018);
+  assert.equal(getGatewayChargeRate('paystation'), 0.018);
 
-  // 2. Exact charge calculation on ৳1,500 base amount
-  assert.equal(calculateGatewayCharge(1500, 'bkash'), 27.75); // 1500 * 1.85%
-  assert.equal(calculateGatewayCharge(1500, 'nagad'), 22.5);  // 1500 * 1.50%
-  assert.equal(calculateGatewayCharge(1500, 'rocket'), 22.5); // 1500 * 1.50%
-  assert.equal(calculateGatewayCharge(1500, 'card'), 31.5);   // 1500 * 2.10%
-  assert.equal(calculateGatewayCharge(1500, 'amex'), 46.5);   // 1500 * 3.10%
+  // 2. Exact 1.8% calculation on ৳1,500 base amount
+  assert.equal(calculateGatewayCharge(1500, 'bkash'), 27);      // 1500 * 1.8%
+  assert.equal(calculateGatewayCharge(1500, 'nagad'), 27);
+  assert.equal(calculateGatewayCharge(1500, 'rocket'), 27);
+  assert.equal(calculateGatewayCharge(1500, 'card'), 27);
+  assert.equal(calculateGatewayCharge(1500, 'paystation'), 27);
 
-  // 3. Exact charge calculation on ৳3,000 (Student + Parent: 1500 + 1500)
-  assert.equal(calculateGatewayCharge(3000, 'bkash'), 55.5);
-  assert.equal(calculateGatewayCharge(3000, 'nagad'), 45.0);
-  assert.equal(calculateGatewayCharge(3000, 'card'), 63.0);
-  assert.equal(calculateGatewayCharge(3000, 'amex'), 93.0);
+  // 3. Exact 1.8% calculation on ৳3,000 and ৳2,000
+  assert.equal(calculateGatewayCharge(3000, 'bkash'), 54);
+  assert.equal(calculateGatewayCharge(2000, 'paystation'), 36);
 });

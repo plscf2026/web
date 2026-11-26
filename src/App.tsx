@@ -156,7 +156,7 @@ export default function App() {
 
   // Payment Modal State
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [paymentModalStep, setPaymentModalStep] = useState<ModalStep>('select');
+  const [paymentModalStep, setPaymentModalStep] = useState<ModalStep>('processing');
   const [paymentModalInvoice, setPaymentModalInvoice] = useState<string>('');
   const [pendingRegistrationData, setPendingRegistrationData] = useState<RegistrationFormData | null>(null);
   const [preservedRegistrationData, setPreservedRegistrationData] = useState<RegistrationFormData | null>(() => {
@@ -326,7 +326,7 @@ export default function App() {
     setPendingRegistrationData(formData);
     setPreservedRegistrationData(formData);
     setPendingFees(fees);
-    setPaymentModalStep('select');
+    setPaymentModalStep('processing');
     setPaymentModalInvoice('');
     setPaymentModalError('');
 
@@ -350,7 +350,7 @@ export default function App() {
     setIsPaymentModalOpen(false);
     setPaymentModalError('');
     setPaymentModalInvoice('');
-    setPaymentModalStep('select');
+    setPaymentModalStep('processing');
     handleNavigate('register');
   };
 
@@ -532,7 +532,7 @@ export default function App() {
               setPreservedRegistrationData(null);
               setPaymentModalError('');
               setPaymentModalInvoice('');
-              setPaymentModalStep('select');
+              setPaymentModalStep('processing');
               PayStationService.clearPendingSession();
               try {
                 localStorage.removeItem('plscf_registration_draft');

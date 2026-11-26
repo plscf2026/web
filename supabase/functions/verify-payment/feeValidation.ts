@@ -99,16 +99,20 @@ export function computeAuthoritativeOrderAmount(
     };
   }
 
-  const method = typeof input.paymentMethod === 'string' ? input.paymentMethod.trim().toLowerCase() : '';
-  if (!method || !(method in ratesObj)) {
+  const rawMethod = typeof input.paymentMethod === 'string' ? input.paymentMethod.trim().toLowerCase() : '';
+  const method = rawMethod || 'paystation';
+  let rate: number;
+  if (method in ratesObj) {
+    rate = Number(ratesObj[method]);
+  } else if (method === 'paystation' && s.gatewayChargePercent !== undefined && s.gatewayChargePercent !== null) {
+    rate = Number(s.gatewayChargePercent) / 100;
+  } else {
     return {
       valid: false,
       error: 'INVALID_PAYMENT_METHOD',
       message: `Unsupported or unconfigured payment method: ${String(input.paymentMethod ?? '')}`,
     };
   }
-
-  const rate = Number(ratesObj[method]);
   if (!Number.isFinite(rate) || rate < 0 || rate > 0.25) {
     return {
       valid: false,
@@ -172,7 +176,7 @@ export function computeAuthoritativeOrderAmount(
   }
 
   const subtotal = round2(registrationFee + parentFee + rawDonation);
-  const gatewayCharge = payWithChargeNum === 1 ? round2(subtotal * rate) : 0;
+  const gatewayCharge = round2(subtotal * rate);
   const expectedTotal = round2(subtotal + gatewayCharge);
 
   if (!Number.isFinite(expectedTotal) || expectedTotal <= 0 || expectedTotal > maxTotalPayable) {

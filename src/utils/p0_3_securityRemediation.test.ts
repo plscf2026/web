@@ -16,11 +16,12 @@ const AUTHORITATIVE_FEE_SETTINGS = {
   maxDonation: 50000,
   maxTotalPayable: 100000,
   gatewayChargeRates: {
-    bkash: 0.0185,
-    nagad: 0.015,
-    rocket: 0.015,
-    card: 0.021,
-    amex: 0.031,
+    paystation: 0.018,
+    bkash: 0.018,
+    nagad: 0.018,
+    rocket: 0.018,
+    card: 0.018,
+    amex: 0.018,
   },
   registrationOpen: true,
   donationOpen: true,
@@ -74,8 +75,8 @@ test('Server Fee Validation: computes exact totals & rejects unknown types/categ
   assert.equal(currentWithParentCharge.parentFee, 500);
   assert.equal(currentWithParentCharge.donationAmount, 200);
   assert.equal(currentWithParentCharge.subtotal, 1200);
-  assert.equal(currentWithParentCharge.gatewayCharge, 22.2);
-  assert.equal(currentWithParentCharge.expectedTotal, 1222.2);
+  assert.equal(currentWithParentCharge.gatewayCharge, 21.6);
+  assert.equal(currentWithParentCharge.expectedTotal, 1221.6);
 
   const validDonation = computeAuthoritativeOrderAmount(AUTHORITATIVE_FEE_SETTINGS, {
     orderType: 'donation',
@@ -84,7 +85,8 @@ test('Server Fee Validation: computes exact totals & rejects unknown types/categ
     payWithCharge: 0,
   });
   assert.equal(validDonation.valid, true);
-  assert.equal(validDonation.expectedTotal, 500);
+  assert.equal(validDonation.gatewayCharge, 9);
+  assert.equal(validDonation.expectedTotal, 509);
 });
 
 test('Server Fee Validation: rejects client amount tampering, fee decomposition mismatches & overflows', () => {
@@ -104,7 +106,7 @@ test('Server Fee Validation: rejects client amount tampering, fee decomposition 
     hasParent: true,
     paymentMethod: 'bkash',
     payWithCharge: 0,
-    clientPaymentAmount: 1000,
+    clientPaymentAmount: 1018,
     clientParentFee: 0,
   });
   assert.equal(spoofedParentFee.valid, false);

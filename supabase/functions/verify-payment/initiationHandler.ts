@@ -255,7 +255,8 @@ export async function executeInitiatePayment(
   formBody.append('invoice_number', cleanInvoice);
   formBody.append('currency', 'BDT');
   formBody.append('payment_amount', String(feeEval.expectedTotal!));
-  formBody.append('pay_with_charge', String(feeEval.payWithCharge!));
+  // expectedTotal already includes our platform gateway charge (1.8%); instruct PayStation not to double-charge.
+  formBody.append('pay_with_charge', '0');
   if (order.reference) formBody.append('reference', String(order.reference));
   formBody.append('cust_name', customerName);
   formBody.append('cust_phone', customerPhone);

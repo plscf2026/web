@@ -260,7 +260,7 @@ const BASE_TEST_FEE_SETTINGS = {
   minDonation: 100,
   maxDonation: 50000,
   maxTotalPayable: 100000,
-  gatewayChargeRates: { bkash: 0.0185, nagad: 0.015 },
+  gatewayChargeRates: { paystation: 0.018, bkash: 0.018, nagad: 0.018 },
   registrationOpen: true,
   alumniRegistrationOpen: true,
   currentStudentRegistrationOpen: true,
@@ -463,7 +463,7 @@ test('P0-3 Initiation Gate: succeeds for valid registration & donation when auth
   assert.equal(regRes.status, 200);
   assert.equal(regRes.body.success, true);
   assert.equal(regRes.body.registrationId, 'PLSCF-2027-F7777');
-  assert.equal(regRes.body.payment_amount, '1500');
+  assert.equal(regRes.body.payment_amount, '1527');
   assert.equal(persistedOrders.length, 1);
   assert.equal(persistedOrders[0].order_type, 'registration');
   assert.equal(gatewayUrls.length, 1);
@@ -491,7 +491,7 @@ test('P0-3 Initiation Gate: succeeds for valid registration & donation when auth
 
   assert.equal(donRes.status, 200);
   assert.equal(donRes.body.success, true);
-  assert.equal(donRes.body.payment_amount, '500');
+  assert.equal(donRes.body.payment_amount, '509');
   assert.equal(persistedOrders.length, 2);
   assert.equal(persistedOrders[1].order_type, 'donation');
   assert.equal(gatewayUrls.length, 2);

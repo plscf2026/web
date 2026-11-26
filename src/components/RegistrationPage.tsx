@@ -33,6 +33,7 @@ import { translations } from '../i18n/translations';
 import {
   validateRegistrationData,
   calculateTotalFee,
+  calculateGatewayCharge,
   normalizeBangladeshiMobileNumber,
   RegistrationFormData,
   isStudentBelowClass6,
@@ -355,6 +356,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
   const donationAmount = typeof donationInput === 'number' ? donationInput : 0;
   const fees = calculateTotalFee(category, feeSettings, donationAmount, effectiveHasParent);
+  const gatewayCharge = calculateGatewayCharge(fees.totalPayable);
+  const totalPayableWithCharge = Math.round((fees.totalPayable + gatewayCharge) * 100) / 100;
 
   // Auto-generate batch name based on category and selected academic fields
   const getComputedBatch = () => {
@@ -2100,9 +2103,13 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                 <span className="font-semibold">+ ৳ {fees.donationAmount}</span>
               </div>
             )}
+            <div className="pt-2 border-t border-slate-800/80 flex justify-between text-slate-300">
+              <span>{language === 'bn' ? 'গেটওয়ে চার্জ (১.৮%)' : 'Gateway Charge (1.8%)'}</span>
+              <span className="font-semibold text-indigo-300">+ ৳ {gatewayCharge.toLocaleString()}</span>
+            </div>
             <div className="pt-3 border-t border-slate-800 flex justify-between items-center text-lg sm:text-xl font-black text-[#38BDF8]">
               <span>{t.totalPayable}</span>
-              <span>৳ {fees.totalPayable} BDT</span>
+              <span>৳ {totalPayableWithCharge.toLocaleString()} BDT</span>
             </div>
           </div>
 
@@ -2119,12 +2126,12 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               {isSubmitting || isProcessingPayment ? (
                 <>
                   <RefreshCw className="w-5 h-5 text-white animate-spin" />
-                  <span>{language === 'bn' ? 'প্রক্রিয়াধীন...' : 'Processing...'}</span>
+                  <span>{language === 'bn' ? 'PayStation চেকআউটে যাওয়া হচ্ছে...' : 'Redirecting to PayStation...'}</span>
                 </>
               ) : (
                 <>
                   <ShieldCheck className="w-5 h-5 text-[#38BDF8]" />
-                  <span>{t.btnProceedToPayment} (৳ {fees.totalPayable})</span>
+                  <span>{t.btnProceedToPayment} (৳ {totalPayableWithCharge.toLocaleString()})</span>
                 </>
               )}
             </button>

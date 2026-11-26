@@ -42,6 +42,7 @@ export interface PayStationOrderPayload {
   category?: 'current' | 'former';
   has_parent?: boolean;
   donation_amount?: number;
+  gateway_charge?: number;
   payment_method?: PaymentMethod | string;
   student_id?: string | null;
   registration_id?: string;
