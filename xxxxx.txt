@@ -1,4 +1,35 @@
-sddsd
-new
-23/11/2026
-4.41 pm
+PLSCF 2027-এ PayStation লাইভ করার তালিকা
+লাইভ Merchant ID ও Password বসাতে মূল কাজ তিনটি ড্যাশবোর্ডে। কোডে যেসব জায়গা পর্যালোচনা বা পরিবর্তন দরকার, সেগুলো ৪ নম্বরে আছে।
+1. Supabase Dashboard → আপনার প্রজেক্ট → Edge Functions → Secrets
+   সেটিং	কী বসাবেন
+   PAYSTATION_ENV	production
+   PAYSTATION_MERCHANT_ID	PayStation থেকে পাওয়া Live Merchant ID
+   PAYSTATION_PASSWORD	PayStation থেকে পাওয়া Live Password
+   PAYMENT_SIGNING_SECRET	আপনার অ্যাপের production signing secret
+   APP_ALLOWED_ORIGINS	আপনার সাইটের আসল HTTPS origin। www ও মূল ডোমেইন দুটো থেকেই checkout চললে দুটোই দিন।
+   PAYSTATION_ALLOW_PAYMENT_FINALIZATION	লাইভ অর্ডার গ্রহণের জন্য প্রস্তুত হলে true
+   
+   
+   এখানকার production mode থেকেই backend লাইভ API ঠিকানা বেছে নেয়। APP_ALLOWED_ORIGINS থেকে অনুমোদিত সাইটের ঠিকানা নিয়ে backend callback URL তৈরি করে। Supabase Edge Function Secrets
+2. Vercel বা Netlify → যে হোস্টে লাইভ সাইট আছে → Environment Variables
+   Vercel-এ Settings → Environment Variables। Netlify-তে Project configuration → Environment variables। Production নির্বাচন করে নিচের মানগুলো বসান, তারপর frontend rebuild ও redeploy করুন। Vercel settings · Netlify environment variables
+   - VITE_PAYSTATION_ENV=production
+   - VITE_PAYSTATION_MERCHANT_ID=<LIVE_MERCHANT_ID>
+   - VITE_ENABLE_TEST_BYPASS=false
+3. PayStation-এর লাইভ merchant account → Merchant IPN
+   PDF অনুযায়ী এই HTTPS URL-টি আপনার লাইভ merchant account-এর IPN হিসেবে নিবন্ধন করতে হবে।
+   https://hnthoszbkhvygoowtvau.supabase.co/functions/v1/verify-payment
+   PayStation API Reference
+4. প্রজেক্টে যে ফাইলগুলো দেখতে হবে
+   - src/App.tsx, PDF-তে ২৭৩–২৭৬ লাইন। পেমেন্ট ব্যর্থ হলে গ্রাহককে দেখানো মেসেজ থেকে sandbox wallet, OTP ও PIN-এর নির্দেশনা সরিয়ে সাধারণ error message দিন।
+   - Donation চালু থাকলে আগে supabase/functions/verify-payment/index.ts এবং supabase/migrations/-এর donation RPC দেখুন। PDF-এর finding অনুযায়ী, গ্রাহক পেমেন্ট দিয়ে ব্রাউজার বন্ধ করলে IPN অর্ডারকে paid করতে পারে, কিন্তু donation রেকর্ড তৈরি গ্রাহকের ফিরে আসার ওপর নির্ভর করে। লাইভের আগে এই flow ঠিক করে পরীক্ষা করুন যাতে IPN থেকেই donation একবার রেকর্ড হয়।
+   - .env.example-এ উদাহরণের মান রাখুন। আসল Live Password শুধু Supabase Edge Secrets-এ বসবে।
+5. লাইভ চালুর পর যাচাই
+   ছোট অঙ্কের একটি registration payment এবং donation চালু থাকলে একটি donation payment পরীক্ষা করুন। PayStation-এর স্ট্যাটাস, আপনার অ্যাপের paid রেকর্ড এবং IPN আবার এলে duplicate হয় কি না মিলিয়ে দেখুন। লাইভ স্ট্যাটাসে currency অনুপস্থিত থাকলে এবং PayStation আপনার merchant account-এর settlement শুধু BDT-তে হয় বলে নিশ্চিত করলে তবেই Supabase-এ PAYSTATION_ALLOW_ORDER_BOUND_CURRENCY_ATTESTATION=true বিবেচনা করুন।
+প্রজেক্টের ফাইল ও লাইন নম্বর PDF-এর অডিট থেকে নেওয়া। বর্তমান রিপো সরাসরি যাচাই করা যায়নি। /Users/sagarkumarsaha/Desktop/1 plsc2027/plscf65/docs/PAYSTATION_PRODUCTION_CUTOVER_PLAN.pdf
+
+
+
+
+
+ তিনটা জায়গায় মূল সেটিংস লাগবে। এক নম্বর, Supabase ড্যাশবোর্ডের Edge Functions Origin আর Production Mode সহ Merchant ID-Password secrets-এ বসাবেন। দুই নম্বর, Vercel বা Netlify-এ Production environment variable-এ production mode, Live Merchant ID বসিয়ে test bypass বন্ধ করে দিন, তারপর rebuild লাগবে। তিন নম্বর, PayStation Merchant Portal-এ আপনার Supabase verify-payment ফাংশনের IPN URL সেট করবেন। কোডে App.tsx-এর উপরের sandbox মেসেজ মুছতে হবে। Donation লাইভ রাখলে, কেউ পেমেন্ট করে ব্রাউজার বন্ধ করলেও donation রেকর্ড একবারই হয় কিনা নিশ্চিত করুন। লোকেশনগুলো PDF অডিটে যেমন আছে সেভাবেই ধরুন।
