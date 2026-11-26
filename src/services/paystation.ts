@@ -243,6 +243,12 @@ export class PayStationService {
   }> {
     // 0. Super Admin Governance Enforcement (Security Validation)
     const settings = AppStore.getFeeSettings();
+    if ((settings as any)?.paymentEnabled === false) {
+      return {
+        success: false,
+        error: 'Online payment initiation is currently disabled.',
+      };
+    }
     const isDonationOrder =
       order.opt_a === 'DONATION' ||
       (typeof order.reference === 'string' && order.reference.startsWith('DON-'));

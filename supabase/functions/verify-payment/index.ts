@@ -20,8 +20,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { computeAuthoritativeOrderAmount } from './feeValidation.ts';
-import { parseAllowlistedOrigins, resolveServerCallbackUrl } from './callbackUrl.ts';
-import { validateAndBuildPendingRegistrationData } from './registrationPayload.ts';
+import { parseAllowlistedOrigins } from './callbackUrl.ts';
+import { executeInitiatePayment } from './initiationHandler.ts';
 
 // ── Required env secrets (fail closed if missing) ───────────────────────────
 const PAYSTATION_MERCHANT_ID = Deno.env.get('PAYSTATION_MERCHANT_ID');
@@ -124,7 +124,8 @@ async function verifyGatewayTransactionStatus(
     };
   }
 
-  if (data?.status_code !== '200' || !data?.data || !(data.data.trx_status || '').toLowerCase().includes('success')) {
+  const rawTrxStatus = typeof data?.data?.trx_status === 'string' ? data.data.trx_status.toLowerCase().trim() : '';
+  if (data?.status_code !== '200' || !data?.data || !['success', 'successful'].includes(rawTrxStatus)) {
     return {
       ok: false,
       statusCode: 402,
@@ -133,9 +134,13 @@ async function verifyGatewayTransactionStatus(
     };
   }
 
-  // Condition 2: NEVER default missing currency to BDT
-  const gwCurrency = data.data.currency ?? null;
-  if (gwCurrency === null || gwCurrency === undefined) {
+  // Condition 2 (HARD BLOCKER): Official PayStation /transaction-status & IPN schemas do not
+  // guarantee a returned `currency` field on all accounts. NEVER default missing currency to BDT.
+  const rawCurrency = data.data.currency;
+  const gwCurrency = typeof rawCurrency === 'string' && rawCurrency.trim() !== ''
+    ? rawCurrency.trim().toUpperCase()
+    : null;
+  if (gwCurrency === null) {
     return {
       ok: false,
       statusCode: 402,
@@ -244,19 +249,11 @@ serve(async (req) => {
 
     // ────────────────────────────────────────────────────────────────────────
     // 1. ACTION: initiate-payment / create-payment
-    // Loads authoritative fees from system_settings, computes expected total
-    // server-side, validates callback URL against APP_ALLOWED_ORIGINS, and
-    // persists pending_orders via service_role.
+    // Enforces paymentEnabled === true, open flow checks, authoritative fees,
+    // allowlisted callback URL, complete registration/donation payload, and
+    // service_role pending_orders persistence prior to gateway invocation.
     // ────────────────────────────────────────────────────────────────────────
     if (action === 'initiate-payment' || action === 'create-payment') {
-      const order = body.order || body;
-      if (!order?.invoice_number) {
-        return jsonResponse({ success: false, error: 'INVALID_INVOICE_NUMBER', message: 'invoice_number is required.' }, 400, corsHeaders);
-      }
-      if (order.currency !== undefined && order.currency !== null && String(order.currency).toUpperCase() !== 'BDT') {
-        return jsonResponse({ success: false, error: 'CURRENCY_MISMATCH', message: 'Only BDT currency is supported.' }, 400, corsHeaders);
-      }
-
       const supabaseUrl        = Deno.env.get('SUPABASE_URL');
       const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
       if (!supabaseUrl || !supabaseServiceKey) {
@@ -264,202 +261,44 @@ serve(async (req) => {
       }
 
       const sbAdmin = createClient(supabaseUrl, supabaseServiceKey);
-      const { data: settingsRow, error: settingsErr } = await sbAdmin
-        .from('system_settings')
-        .select('value')
-        .eq('key', 'portal_fee_settings')
-        .maybeSingle();
-
-      if (settingsErr || !settingsRow?.value) {
-        console.error('[initiate-payment] Missing portal_fee_settings in system_settings:', settingsErr?.message);
-        return jsonResponse({
-          success: false,
-          error: 'FEE_SETTINGS_MISSING',
-          message: 'Authoritative fee configuration is unavailable.',
-        }, 503, corsHeaders);
-      }
-
-      const rawSettings = settingsRow.value as Record<string, unknown>;
-      const feeEval = computeAuthoritativeOrderAmount(rawSettings, {
-        orderType: order.order_type,
-        category: order.category,
-        hasParent: order.has_parent ?? order.hasParent,
-        donationAmount: order.donation_amount ?? order.donationAmount ?? 0,
-        paymentMethod: order.payment_method ?? 'bkash',
-        payWithCharge: order.pay_with_charge ?? 0,
-        clientPaymentAmount: order.payment_amount,
-        clientRegistrationFee: order.registration_fee ?? order.registrationFee,
-        clientParentFee: order.parent_fee ?? order.parentFee,
-        clientGatewayCharge: order.gateway_charge ?? order.gatewayCharge,
+      const result = await executeInitiatePayment(body.order || body, {
+        loadSettings: async () => {
+          const { data: settingsRow, error: settingsErr } = await sbAdmin
+            .from('system_settings')
+            .select('value')
+            .eq('key', 'portal_fee_settings')
+            .maybeSingle();
+          if (settingsErr) {
+            console.error('[initiate-payment] Failed reading portal_fee_settings:', settingsErr.message);
+            return { value: null, error: settingsErr.message };
+          }
+          return { value: settingsRow?.value ?? null };
+        },
+        upsertPendingOrder: async (row) => {
+          const { error: orderUpsertErr } = await sbAdmin
+            .from('pending_orders')
+            .upsert(row, { onConflict: 'invoice_number' });
+          if (orderUpsertErr) {
+            console.error('[initiate-payment] Failed to persist pending_orders:', orderUpsertErr.message);
+            return { error: orderUpsertErr.message };
+          }
+          return {};
+        },
+        fetchGateway: async (url, init) => {
+          const res = await fetch(url, init);
+          return { status: res.status, text: await res.text() };
+        },
+        config: {
+          paystationEnv: PAYSTATION_ENV,
+          paystationBaseUrl: PAYSTATION_BASE_URL,
+          merchantId: PAYSTATION_MERCHANT_ID!,
+          password: PAYSTATION_PASSWORD!,
+          allowedOriginsRaw: ALLOWED_ORIGINS_RAW,
+          allowPaymentFinalization: ALLOW_PAYMENT_FINALIZATION,
+        },
       });
 
-      if (!feeEval.valid) {
-        const status = feeEval.error === 'FEE_SETTINGS_MISSING' || feeEval.error === 'INVALID_FEE_SETTINGS' ? 503 : 400;
-        return jsonResponse({ success: false, error: feeEval.error, message: feeEval.message }, status, corsHeaders);
-      }
-
-      if (feeEval.orderType === 'registration' && rawSettings.registrationOpen !== true && PAYSTATION_ENV === 'production') {
-        return jsonResponse({ success: false, error: 'REGISTRATION_CLOSED', message: 'Registration is closed.' }, 403, corsHeaders);
-      }
-      if (feeEval.orderType === 'donation' && rawSettings.donationOpen !== true && PAYSTATION_ENV === 'production') {
-        return jsonResponse({ success: false, error: 'DONATION_CLOSED', message: 'Donations are closed.' }, 403, corsHeaders);
-      }
-
-      const cbEval = resolveServerCallbackUrl({
-        allowedOriginsRaw: ALLOWED_ORIGINS_RAW,
-        paystationEnv: PAYSTATION_ENV,
-        requestedCallbackUrl: order.callback_url,
-        requestedOrigin: order.return_origin,
-        orderType: feeEval.orderType!,
-        invoiceNumber: String(order.invoice_number),
-      });
-
-      if (!cbEval.valid) {
-        const status = cbEval.error === 'CALLBACK_ORIGIN_NOT_CONFIGURED' ? 503 : 400;
-        return jsonResponse({ success: false, error: cbEval.error, message: cbEval.message }, status, corsHeaders);
-      }
-
-      let authoritativeFormData: Record<string, unknown>;
-      let customerName: string;
-      let customerPhone: string;
-      let customerEmail: string | null;
-
-      if (feeEval.orderType === 'registration') {
-        const regEval = validateAndBuildPendingRegistrationData(order, feeEval.category!, Boolean(feeEval.hasParent));
-        if (!regEval.valid || !regEval.data) {
-          return jsonResponse({
-            success: false,
-            error: regEval.error || 'INVALID_REGISTRATION_DATA',
-            message: regEval.message || 'Complete registration data is required before payment initiation.',
-          }, 400, corsHeaders);
-        }
-        authoritativeFormData = regEval.data as unknown as Record<string, unknown>;
-        customerName = regEval.data.fullName;
-        customerPhone = regEval.data.mobileNumber;
-        customerEmail = regEval.data.email;
-      } else {
-        const donorName = String(order.cust_name || '').trim().slice(0, 120);
-        const donorPhone = String(order.cust_phone || '').replace(/\D/g, '').slice(0, 32);
-        if (!donorName || !donorPhone) {
-          return jsonResponse({
-            success: false,
-            error: 'INVALID_DONATION_DATA',
-            message: 'Donor name and phone number are required.',
-          }, 400, corsHeaders);
-        }
-        customerName = donorName;
-        customerPhone = donorPhone;
-        customerEmail = order.cust_email ? String(order.cust_email).trim().slice(0, 160) : null;
-        authoritativeFormData = {
-          donorName: customerName,
-          mobileNumber: customerPhone,
-          email: customerEmail,
-          purpose: String(order.reference || 'General Reunion Fund').slice(0, 160),
-        };
-      }
-
-      // Persist authoritative server-calculated pending_order before invoking gateway
-      const { error: orderUpsertErr } = await sbAdmin
-        .from('pending_orders')
-        .upsert({
-          id: `ORD-${String(order.invoice_number).trim()}`,
-          invoice_number: String(order.invoice_number).trim(),
-          order_type: feeEval.orderType!,
-          amount: feeEval.expectedTotal!,
-          currency: 'BDT',
-          status: 'pending',
-          customer_name: customerName,
-          customer_phone: customerPhone,
-          customer_email: customerEmail,
-          form_data: authoritativeFormData,
-          fees: {
-            registrationFee: feeEval.registrationFee!,
-            parentFee: feeEval.parentFee!,
-            donationAmount: feeEval.donationAmount!,
-            gatewayCharge: feeEval.gatewayCharge!,
-            subtotal: feeEval.subtotal!,
-            totalPayable: feeEval.expectedTotal!,
-          },
-          gateway_provider: 'PAYSTATION',
-        }, { onConflict: 'invoice_number' });
-
-      if (orderUpsertErr) {
-        console.error('[initiate-payment] Failed to persist pending_orders:', orderUpsertErr.message);
-        return jsonResponse({ success: false, error: 'PENDING_ORDER_PERSIST_FAILED', message: 'Failed to create authoritative order.' }, 500, corsHeaders);
-      }
-
-      const formBody = new URLSearchParams();
-      formBody.append('merchantId',      PAYSTATION_MERCHANT_ID!);
-      formBody.append('password',        PAYSTATION_PASSWORD!);
-      formBody.append('invoice_number',  String(order.invoice_number).trim());
-      formBody.append('currency',        'BDT');
-      formBody.append('payment_amount',  String(feeEval.expectedTotal!));
-      formBody.append('pay_with_charge', String(feeEval.payWithCharge!));
-      if (order.reference)     formBody.append('reference',     String(order.reference));
-      formBody.append('cust_name',       String(order.cust_name || 'Customer'));
-      formBody.append('cust_phone',      String(order.cust_phone || '01700000000'));
-      if (order.cust_email)    formBody.append('cust_email',    String(order.cust_email));
-      if (order.cust_address)  formBody.append('cust_address',  String(order.cust_address));
-      formBody.append('callback_url',    cbEval.callbackUrl!);
-      if (order.checkout_items) formBody.append('checkout_items', String(order.checkout_items));
-      if (order.opt_a)         formBody.append('opt_a', String(order.opt_a));
-      if (order.opt_b)         formBody.append('opt_b', String(order.opt_b));
-      if (order.opt_c)         formBody.append('opt_c', String(order.opt_c));
-
-      try {
-        const createRes = await fetch(`${PAYSTATION_BASE_URL}/initiate-payment`, {
-          method:  'POST',
-          headers: { 'Accept': 'application/json' },
-          body:    formBody,
-        });
-
-        const rawText    = await createRes.text();
-        let createData: any = null;
-        try { createData = JSON.parse(rawText); } catch { /* non-JSON response */ }
-
-        if (createData?.status_code === '1008') {
-          return jsonResponse({ success: false, status_code: '1008', error: createData.message || 'Duplicate invoice' }, 400, corsHeaders);
-        }
-
-        if (createData && (createData.status_code === '200' || createData.status === 'success') && createData.payment_url) {
-          return jsonResponse({
-            success:       true,
-            status_code:   createData.status_code,
-            paymentUrl:    createData.payment_url,
-            invoiceNumber: createData.invoice_number || order.invoice_number,
-            payment_amount: String(feeEval.expectedTotal!),
-            message:       createData.message,
-          }, 200, corsHeaders);
-        }
-
-        // Sandbox simulation (only when finalization is NOT enabled)
-        if (PAYSTATION_ENV === 'sandbox' && !ALLOW_PAYMENT_FINALIZATION) {
-          const simTrxId = `PST-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-          return jsonResponse({
-            success:       true,
-            status_code:   '200',
-            paymentUrl:    `${cbEval.callbackUrl!}&status=Successful&trx_id=${simTrxId}&simulated=true`,
-            trxId:         simTrxId,
-            invoiceNumber: order.invoice_number,
-            payment_amount: String(feeEval.expectedTotal!),
-            message:       'Sandbox simulation payment URL created (finalization disabled).',
-          }, 200, corsHeaders);
-        }
-
-        return jsonResponse({ success: false, error: createData?.message || `PayStation error ${createRes.status}` }, 400, corsHeaders);
-
-      } catch (err: any) {
-        if (PAYSTATION_ENV === 'sandbox' && !ALLOW_PAYMENT_FINALIZATION) {
-          const simTrxId = `PST-SBX-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-          return jsonResponse({
-            success: true, status_code: '200',
-            paymentUrl: `${cbEval.callbackUrl!}&status=Successful&trx_id=${simTrxId}&simulated=true`,
-            trxId: simTrxId, invoiceNumber: order.invoice_number,
-            payment_amount: String(feeEval.expectedTotal!),
-          }, 200, corsHeaders);
-        }
-        return jsonResponse({ success: false, error: err.message || 'Payment initiation failed' }, 502, corsHeaders);
-      }
+      return jsonResponse(result.body, result.status, corsHeaders);
     }
 
     // ────────────────────────────────────────────────────────────────────────
