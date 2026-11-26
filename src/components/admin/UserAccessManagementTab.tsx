@@ -2866,7 +2866,15 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                 <span className="font-bold text-slate-200">
                   {oneTimeCredentials.role === 'finance_manager'
                     ? '/finance'
-                    : oneTimeCredentials.role === 'FINANCE_STAFF'
+                    : [
+                        'FINANCE_STAFF',
+                        'GATE_STAFF',
+                        'FOOD_STAFF',
+                        'BREAKFAST_STAFF',
+                        'LUNCH_STAFF',
+                        'DINNER_STAFF',
+                        'DRESS_STAFF',
+                      ].includes(oneTimeCredentials.role.toUpperCase())
                     ? '/scanner'
                     : '/admin'}
                 </span>
@@ -2886,7 +2894,15 @@ export const UserAccessManagementTab: React.FC<UserAccessManagementTabProps> = (
                   const portalPath =
                     oneTimeCredentials.role === 'finance_manager'
                       ? '/finance'
-                      : oneTimeCredentials.role === 'FINANCE_STAFF'
+                      : [
+                          'FINANCE_STAFF',
+                          'GATE_STAFF',
+                          'FOOD_STAFF',
+                          'BREAKFAST_STAFF',
+                          'LUNCH_STAFF',
+                          'DINNER_STAFF',
+                          'DRESS_STAFF',
+                        ].includes(oneTimeCredentials.role.toUpperCase())
                       ? '/scanner'
                       : '/admin';
                   const msg = [

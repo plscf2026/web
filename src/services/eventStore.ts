@@ -720,13 +720,21 @@ export class EventStore {
     let emailToAuth = normalized;
     if (!emailToAuth.includes('@') || emailToAuth.startsWith('@')) {
       const cleanUsername = emailToAuth.replace(/^@/, '');
-      const { data: userLookup } = await supabase
-        .from('staff_accounts')
-        .select('email')
-        .ilike('username', cleanUsername)
-        .maybeSingle();
-      if (userLookup?.email) {
-        emailToAuth = userLookup.email;
+      const { data: resolvedEmail } = await supabase.rpc('rpc_resolve_login_email', {
+        p_identifier: cleanUsername,
+        p_portal: 'staff',
+      });
+      if (typeof resolvedEmail === 'string' && resolvedEmail.includes('@')) {
+        emailToAuth = resolvedEmail;
+      } else {
+        const { data: userLookup } = await supabase
+          .from('staff_accounts')
+          .select('email')
+          .ilike('username', cleanUsername)
+          .maybeSingle();
+        if (userLookup?.email) {
+          emailToAuth = userLookup.email;
+        }
       }
     }
 
@@ -736,7 +744,9 @@ export class EventStore {
     });
 
     if (authError || !authData.user) {
-      return { success: false, error: 'Invalid email or password.' };
+      const rawMsg = authError?.message || '';
+      const isBadCreds = rawMsg.toLowerCase().includes('invalid login credentials');
+      return { success: false, error: isBadCreds || !rawMsg ? 'Invalid email or password.' : rawMsg };
     }
 
     const { data, error } = await supabase
