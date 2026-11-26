@@ -80,13 +80,15 @@ export const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
  */
 export function isDevTestBypassAllowed(): boolean {
   // P0-3: Must be explicitly 'true' AND must not be a production build or production Supabase project.
-  // 'hnthoszbkhvygoowtvau' is the production project — bypass is never allowed there.
-  const env = (import.meta as any)?.env;
-  if (env?.PROD === true || env?.MODE === 'production') return false;
+  // Access each import.meta.env property statically so Vite NEVER serializes the whole env dictionary into dist/.
+  if ((import.meta as any).env?.PROD === true || (import.meta as any).env?.MODE === 'production') {
+    return false;
+  }
   const procEnv = typeof process !== 'undefined' ? process.env : undefined;
-  const supabaseUrl = env?.VITE_SUPABASE_URL || procEnv?.VITE_SUPABASE_URL || (env ? SUPABASE_URL : '');
+  const viteSupabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
+  const supabaseUrl = viteSupabaseUrl || procEnv?.VITE_SUPABASE_URL || (typeof window !== 'undefined' ? SUPABASE_URL : '');
   if (supabaseUrl.includes('hnthoszbkhvygoowtvau')) return false;
-  const testBypassFlag = env?.VITE_ENABLE_TEST_BYPASS ?? procEnv?.VITE_ENABLE_TEST_BYPASS;
+  const testBypassFlag = (import.meta as any).env?.VITE_ENABLE_TEST_BYPASS ?? procEnv?.VITE_ENABLE_TEST_BYPASS;
   return testBypassFlag === 'true';
 }
 

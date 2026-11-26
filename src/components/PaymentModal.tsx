@@ -24,6 +24,7 @@ import { StudentIdCardBadge } from './idcard/StudentIdCardBadge';
 import { ParentIdCardBadge } from './idcard/ParentIdCardBadge';
 import { IdCardStore } from '../services/idCardStore';
 import { AppStore } from '../services/store';
+import { isDevTestBypassAllowed } from '../services/supabase';
 
 export interface PaymentModalProps {
   isOpen: boolean;
@@ -146,8 +147,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setProcessingStep(isBangla ? 'ডিজিটাল টিকিট তৈরি হচ্ছে...' : 'Generating secure digital ticket...');
     try {
       // Synchronize donationAmount so totalPaid matches actual payment.amount
-      const effectiveBaseFee = registrationData.category === 'current' ? 1000 : 1500;
-      const currentParentFee = registrationData.hasParent ? 1500 : 0;
+      const feeSettings = AppStore.getFeeSettings();
+      const effectiveBaseFee =
+        registrationData.category === 'current'
+          ? feeSettings.currentStudentFee
+          : feeSettings.formerStudentFee;
+      const currentParentFee = registrationData.hasParent ? (registrationData.parentFee ?? 500) : 0;
       const currentSubtotal = effectiveBaseFee + currentParentFee;
       const effectiveCharge = calculateGatewayCharge(currentSubtotal, payment.method);
       const effectiveDonation = Math.max(0, payment.amount - currentSubtotal - effectiveCharge);
@@ -368,12 +373,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }
     if (isFinalizingRef.current || completedTicket) return;
 
-    // In sandbox mode, PayStation's public demo account (104-1653730183) disabled Nagad, Rocket, Card, and Amex
-    // and its bKash upstream callback execution fails with "Sorry! Payment Failed Please contact with Merchant".
-    // Therefore, in sandbox mode (unless the user explicitly requests raw external hosted testing),
-    // we process all channels (including bKash) via our authoritative internal sandbox verification
-    // ensuring the user's booking, QR token, and ticket are generated with 100% reliability.
-    if (config.isSandbox && !forceHostedExternal) {
+    // P0-3: Instant sandbox simulation is strictly gated behind isDevTestBypassAllowed()
+    // so live/production project builds can NEVER bypass gateway payment verification.
+    if (config.isSandbox && !forceHostedExternal && isDevTestBypassAllowed()) {
       await handleInstantSandboxPayment(selectedMethod);
       return;
     }

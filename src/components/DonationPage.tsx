@@ -19,7 +19,7 @@ import {
 import { Language, DonationRecord, PaymentMethod, FeeSettings } from '../types';
 import { translations } from '../i18n/translations';
 import { AppStore } from '../services/store';
-import { SupabaseService } from '../services/supabase';
+import { SupabaseService, isDevTestBypassAllowed } from '../services/supabase';
 import { PayStationService, PayStationPaymentResult } from '../services/paystation';
 import { isValidBangladeshiMobile, normalizeBangladeshiMobileNumber, isDonationOpen, getDonationClosedMessage } from '../utils/rules';
 import { sanitizeInput } from '../utils/security';
@@ -143,8 +143,8 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
           PayStationService.clearPendingSession();
           setPendingPayment(null);
         } else {
-          // If in test/dev environment, fallback to complete immediately
-          const isTestAllowed = (import.meta as any).env?.VITE_ENABLE_TEST_BYPASS === 'true';
+          // If in test/dev environment (blocked on production project), fallback to complete immediately
+          const isTestAllowed = isDevTestBypassAllowed();
           if (isTestAllowed) {
             const simulatedResult: PayStationPaymentResult = {
               invoiceNumber: activeInvoice,
@@ -250,7 +250,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
     setIsVerifyingPending(true);
     setErrorMessage('');
     try {
-      const isTestAllowed = (import.meta as any).env?.VITE_ENABLE_TEST_BYPASS === 'true';
+      const isTestAllowed = isDevTestBypassAllowed();
       if (forceSimulate || isTestAllowed) {
         const simRes: PayStationPaymentResult = {
           invoiceNumber: pendingPayment.invoiceNumber,
@@ -827,7 +827,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({ language }) => {
                       )}
                       <span>{isBangla ? 'পেমেন্ট নিশ্চিত ও যাচাই করুন' : 'Verify Payment Status'}</span>
                     </button>
-                    {(import.meta as any).env?.VITE_ENABLE_TEST_BYPASS === 'true' && (
+                    {isDevTestBypassAllowed() && (
                       <button
                         type="button"
                         onClick={() => handleVerifyPendingDonation(true)}

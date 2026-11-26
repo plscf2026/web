@@ -230,8 +230,12 @@ export default function App() {
           const amountFromUrl = params.get('amount') ? Number(params.get('amount')) : null;
           const sessionAmount = amountFromUrl || pendingSession.amount || pendingSession.fees?.totalPayable;
           if (sessionAmount) {
-            const regFee = pendingSession.fees?.registrationFee || (pendingSession.formData.category === 'current' ? 1000 : 1500);
-            const donAmt = Math.max(0, sessionAmount - regFee);
+            const regFee =
+              pendingSession.fees?.registrationFee ||
+              (pendingSession.formData.category === 'current' ? 500 : 1500);
+            const parentFeeVal = pendingSession.fees?.parentFee ?? 0;
+            const gatewayChargeVal = pendingSession.fees?.gatewayCharge ?? 0;
+            const donAmt = Math.max(0, sessionAmount - regFee - parentFeeVal - gatewayChargeVal);
             setPendingFees({
               registrationFee: regFee,
               donationAmount: donAmt,

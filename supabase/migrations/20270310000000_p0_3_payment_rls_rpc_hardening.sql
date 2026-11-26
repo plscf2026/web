@@ -382,6 +382,7 @@ GRANT EXECUTE ON FUNCTION public.rpc_release_student_id_reservation(TEXT) TO ano
 --   e) amount > 0 and amount <= max_expected are validated before UPDATE
 -- ============================================================================
 
+DROP FUNCTION IF EXISTS public.rpc_verify_payment(TEXT, TEXT, TEXT, NUMERIC, TEXT, TEXT);
 DROP FUNCTION IF EXISTS public.rpc_verify_payment(TEXT, TEXT, TEXT, NUMERIC, TEXT, TEXT, JSONB);
 
 CREATE OR REPLACE FUNCTION public.rpc_verify_payment(
@@ -993,7 +994,7 @@ BEGIN
       roll_number, t_shirt_size, registration_fee, donation_amount,
       total_paid, payment_status, transaction_id, payment_method,
       gateway_invoice_number, gateway_provider, registered_at,
-      qr_token, is_t_shirt_collected, year, event_id,
+      qr_token, is_tshirt_collected, year, event_id,
       server_verification_signature, verification_timestamp, verified_by
     ) VALUES (
       v_reg_id,

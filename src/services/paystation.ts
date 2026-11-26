@@ -507,65 +507,12 @@ export class PayStationService {
       return { success: false, status: 'ignored', error: `Status not successful: ${payload.trx_status}` };
     }
 
-    // 1. Authoritative Server-Side Pending Order Promotion
-    // Promotes server-side public.pending_orders row if browser session was closed or lost
-    try {
-      const { data: promoData, error: promoError } = await supabase.rpc('rpc_promote_pending_order_to_registration', {
-        p_invoice_number: String(payload.invoice_number),
-        p_trx_id: String(payload.trx_id),
-        p_amount: Number(payload.trx_amount || 0),
-        p_method: String(payload.payment_method || 'bkash'),
-        p_verified_by: 'PAYSTATION_IPN',
-      });
-      if (!promoError && promoData?.success) {
-        return { success: true, status: 'PAID', registrationId: promoData.registration_id };
-      }
-    } catch (e) {
-      console.warn('[PayStation] pending_orders promotion notice:', e);
-    }
+    // 1 & 2. P0-3: Browser (anon) IPN RPC calls to rpc_promote_pending_order_to_registration
+    // and rpc_handle_paystation_ipn are blocked by RLS/GRANT (42501). Authoritative IPN
+    // processing executes server-side inside the `verify-payment` Edge Function (service_role).
+    console.warn('[PayStation] Direct browser IPN RPC invocation is disabled post-P0-3; server Edge Function handles live IPN.');
 
-    // 2. Fallback to registrations_2027 update via rpc_handle_paystation_ipn
-    try {
-      const { data, error } = await supabase.rpc('rpc_handle_paystation_ipn', {
-        p_invoice_number: String(payload.invoice_number),
-        p_trx_id: String(payload.trx_id),
-        p_amount: Number(payload.trx_amount || 0),
-        p_method: String(payload.payment_method || 'bkash'),
-        p_order_date_time: String(payload.order_date_time || new Date().toISOString()),
-        p_reference: payload.reference || null,
-        p_raw_payload: payload,
-      });
-
-      if (!error && data?.success) {
-        const registrations = AppStore.getRegistrations();
-        const found = registrations.find(
-          (r) => r.gatewayInvoiceNumber === payload.invoice_number || r.id === data.registration_id
-        );
-        if (found) {
-          AppStore.updateRegistration(found.id, {
-            paymentStatus: 'paid',
-            transactionId: payload.trx_id,
-            paymentMethod: normalizePaymentMethod(payload.payment_method),
-            totalPaid: Number(payload.trx_amount),
-            gatewayInvoiceNumber: payload.invoice_number,
-            gatewayProvider: 'PAYSTATION',
-          });
-        }
-        return {
-          success: true,
-          status: data.status || 'PAID',
-          registrationId: data.registration_id,
-        };
-      }
-
-      if (error) {
-        console.warn('[PayStation] IPN RPC error:', error);
-      }
-    } catch (e: any) {
-      console.warn('[PayStation] IPN RPC exception:', e);
-    }
-
-    // Local fallback for client tests or client-side IPN reception
+    // Local fallback for client tests or client-side IPN state sync
     const registrations = AppStore.getRegistrations();
     const match = registrations.find(
       (r) => r.gatewayInvoiceNumber === payload.invoice_number || r.id === payload.invoice_number
@@ -878,37 +825,9 @@ export class PayStationService {
       qrToken,
     });
 
-    // 2. Server-Side Pending Order Persistence (OWASP & Fault-Tolerant Checkout)
-    // Persists full registration draft to public.pending_orders BEFORE redirecting.
-    // If the student closes their browser/tab or mobile battery dies during external bKash redirect,
-    // the IPN webhook and reconciliation cron can reconstruct and confirm their ticket authoritatively.
-    try {
-      supabase.from('pending_orders').upsert({
-        id: `ORD-${invoiceNumber}`,
-        invoice_number: invoiceNumber,
-        amount: fees.totalPayable,
-        currency: 'BDT',
-        status: 'pending',
-        customer_name: sanitizeInput(formData.fullName),
-        customer_phone: sanitizeInput(formData.mobileNumber),
-        customer_email: formData.email ? sanitizeInput(formData.email) : null,
-        form_data: {
-          ...formData,
-          registrationId: regId,
-          qrToken,
-          parentFee: fees.parentFee,
-          gatewayCharge: fees.gatewayCharge,
-        },
-        fees,
-        gateway_provider: 'PAYSTATION',
-        created_at: nowIso,
-        updated_at: nowIso,
-      }, { onConflict: 'invoice_number' }).then(undefined, (err) => {
-        console.warn('[PayStation] Server-side pending_orders notice:', err);
-      });
-    } catch (dbErr) {
-      console.warn('[PayStation] pending_orders database save exception:', dbErr);
-    }
+    // 2. P0-3: Direct anon upsert into public.pending_orders is blocked by RLS.
+    // Browser session persistence via savePendingSession() preserves local recovery;
+    // authoritative pending_orders writes occur server-side only (service_role).
 
     return pendingRecord;
   }
@@ -984,9 +903,14 @@ export class PayStationService {
     }
 
     const hasParent = Boolean(formData.hasParent);
-    const parentFee = hasParent ? 1500 : 0;
-    const baseFee = formData.category === 'current' ? 1000 : 1500;
-    const totalBaseWithParent = baseFee + parentFee;
+    const feeSettings = AppStore.getFeeSettings();
+    const parentFee = hasParent ? (formData.parentFee ?? pendingSession?.fees?.parentFee ?? 500) : 0;
+    const baseFee =
+      formData.category === 'current'
+        ? feeSettings.currentStudentFee
+        : feeSettings.formerStudentFee;
+    const gatewayCharge = formData.gatewayCharge ?? pendingSession?.fees?.gatewayCharge ?? 0;
+    const totalBaseWithParent = baseFee + parentFee + gatewayCharge;
     const donation = Math.max(0, payment.amount - totalBaseWithParent);
 
     // Upload student photo to dedicated 'student-photos' bucket if Base64, or use Supabase CDN URL directly
@@ -1267,42 +1191,11 @@ export class PayStationService {
 
   /**
    * Stale Pending Order Reconciliation Worker
-   * Queries Supabase rpc_reconcile_pending_orders and verifies their settlement with PayStation.
-   * If money was captured by gateway but user closed browser, this automatically promotes their ticket!
+   * P0-3: rpc_reconcile_pending_orders & rpc_promote_pending_order_to_registration
+   * are restricted to service_role only. Client/anon callers must not invoke them.
    */
   static async reconcileStalePendingOrders(): Promise<{ checked: number; promoted: number }> {
-    try {
-      const { data: staleOrders, error } = await supabase.rpc('rpc_reconcile_pending_orders', {
-        p_max_age_minutes: 180,
-      });
-
-      if (error || !Array.isArray(staleOrders) || staleOrders.length === 0) {
-        return { checked: 0, promoted: 0 };
-      }
-
-      let promoted = 0;
-      for (const order of staleOrders) {
-        try {
-          const statusRes = await this.getTransactionStatusV1(order.invoice_number);
-          if (statusRes.success && statusRes.status === 'success' && statusRes.data) {
-            const { data: promoData } = await supabase.rpc('rpc_promote_pending_order_to_registration', {
-              p_invoice_number: order.invoice_number,
-              p_trx_id: statusRes.data.trx_id,
-              p_amount: Number(statusRes.data.payment_amount),
-              p_method: statusRes.data.payment_method || 'bkash',
-              p_verified_by: 'AUTO_RECONCILIATION_SERVICE',
-            });
-            if (promoData?.success) promoted++;
-          }
-        } catch (itemErr) {
-          console.warn(`[PayStation Reconciliation] Order ${order.invoice_number} check notice:`, itemErr);
-        }
-      }
-
-      return { checked: staleOrders.length, promoted };
-    } catch (e) {
-      console.warn('[PayStation] Reconciliation service exception:', e);
-      return { checked: 0, promoted: 0 };
-    }
+    console.warn('[PayStation] reconcileStalePendingOrders is restricted to server-side service_role workers post-P0-3.');
+    return { checked: 0, promoted: 0 };
   }
 }
