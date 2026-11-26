@@ -602,3 +602,32 @@ test('verifyPayStationTransaction falls back from v2 HTTP 500 to v1 and rejects 
     assert.equal(resBad.error, 'TRANSACTION_NOT_VERIFIED');
   }
 });
+
+test('PayStation verifyWithSupabaseEdge surfaces server JSON message from FunctionsHttpError instead of generic non-2xx text', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({
+          success: false,
+          error: 'INVALID_PAYMENT_METHOD',
+          message: 'Unsupported or unconfigured payment method: CyberSource',
+        }),
+        { status: 402, headers: { 'Content-Type': 'application/json' } }
+      )) as any;
+
+    const res = await PayStationService.verifyWithSupabaseEdge(
+      'PLSCF-2027-C2061',
+      'PLSCF27-MWXAQ713-3658',
+      '7956821112996175204807',
+      1018,
+      'CyberSource'
+    );
+
+    assert.equal(res.success, false);
+    assert.equal(res.rejected, true);
+    assert.equal(res.error, 'Unsupported or unconfigured payment method: CyberSource');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

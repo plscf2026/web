@@ -47,6 +47,26 @@ const PAYSTATION_BASE_URL = PAYSTATION_ENV === 'production'
   ? 'https://api.paystation.com.bd'
   : 'https://sandbox.paystation.com.bd';
 
+function normalizeGatewayMethodForPersistence(raw?: unknown): string {
+  const m = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  if (!m) return 'paystation';
+  if (m.includes('bkash')) return 'bkash';
+  if (m.includes('nagad')) return 'nagad';
+  if (m.includes('rocket') || m.includes('dbbl')) return 'rocket';
+  if (m.includes('upay')) return 'upay';
+  if (m.includes('amex')) return 'amex';
+  if (
+    m.includes('cybersource') ||
+    m.includes('visa') ||
+    m.includes('master') ||
+    m.includes('card') ||
+    m.includes('sslcommerz')
+  ) {
+    return 'card';
+  }
+  return 'paystation';
+}
+
 function jsonResponse(
   body: Record<string, unknown>,
   status: number,
@@ -433,7 +453,7 @@ serve(async (req) => {
           }, 402, corsHeaders);
         }
       }
-      const verifiedMethod = gwCheck.method || payment_method || 'bkash';
+      const verifiedMethod = normalizeGatewayMethodForPersistence(gwCheck.method || payment_method || 'paystation');
       const { data: ipnRes, error: ipnErr } = await supabase.rpc('rpc_handle_paystation_ipn', {
         p_invoice_number:  String(invoice_number).trim(),
         p_trx_id:          gwCheck.trxId!,
@@ -502,7 +522,7 @@ serve(async (req) => {
     }
 
     const verifiedAmount = gwCheck.amount!;
-    const verifiedMethod = gwCheck.method || payment_method || 'bkash';
+    const verifiedMethod = normalizeGatewayMethodForPersistence(gwCheck.method || payment_method || 'paystation');
 
     const serverSignature = await generateHmacSha256Signature(
       String(registration_id || invoice_number),

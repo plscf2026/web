@@ -287,6 +287,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         gatewayCharge: currentCharge,
       };
 
+      const reusableRegId =
+        pendingSession?.invoiceNumber === invoiceRef.current &&
+        pendingSession?.formData?.category === enrichedFormData.category
+          ? pendingSession.registrationId
+          : undefined;
+
       // 1. Authoritatively create pending session & upload photos prior to pending_orders persistence
       const pendingRecord = await PayStationService.createPendingRegistration(
         enrichedFormData,
@@ -298,7 +304,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           totalPayable: chargeAmount,
         },
         invoiceRef.current,
-        pendingSession?.registrationId
+        reusableRegId
       );
 
       let persistedPhotoUrl = enrichedFormData.photoUrl;

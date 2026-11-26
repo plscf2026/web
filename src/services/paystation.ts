@@ -689,7 +689,15 @@ export class PayStationService {
         };
       }
       if (error) {
-        const msg = String(error?.message || '');
+        let msg = String(error?.message || '');
+        if ((error as any).name === 'FunctionsHttpError' || typeof (error as any).context?.json === 'function') {
+          try {
+            const errJson = await (error as any).context.json();
+            if (errJson?.message || errJson?.error) {
+              msg = errJson.message || errJson.error;
+            }
+          } catch (_) { }
+        }
         const isFetchError =
           msg.includes('Failed to send') ||
           msg.includes('fetch failed') ||

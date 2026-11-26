@@ -971,6 +971,14 @@ export const SupabaseService = {
         }
         if (edgeError) {
           edgeFailureReason = edgeError?.message;
+          if ((edgeError as any).name === 'FunctionsHttpError' || typeof (edgeError as any).context?.json === 'function') {
+            try {
+              const errJson = await (edgeError as any).context.json();
+              if (errJson?.message || errJson?.error) {
+                edgeFailureReason = errJson.message || errJson.error;
+              }
+            } catch (_) { }
+          }
           console.warn('[SupabaseService] Edge verify-payment notice:', edgeFailureReason);
         }
         // If Edge Function returned a non-success response with error details
