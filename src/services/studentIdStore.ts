@@ -693,11 +693,12 @@ export class StudentIdService {
     };
 
     persistList(list);
-    supabase.from('current_student_ids').update({
-      verification_status: 'RESERVED',
-      reserved_until: reservedUntil,
-      updated_at: new Date().toISOString(),
-    }).eq('student_id', cleanId).then(undefined, () => {});
+    // P0-3: Use atomic SECURITY DEFINER RPC instead of direct anon UPDATE.
+    // anon UPDATE on current_student_ids is now blocked by RLS after P0-3.
+    supabase.rpc('rpc_reserve_student_id', {
+      p_student_id: cleanId,
+      p_reservation_minutes: durationMinutes,
+    }).then(undefined, (e) => console.warn('[StudentIdStore] rpc_reserve_student_id error:', e));
 
     return true;
   }
@@ -726,12 +727,10 @@ export class StudentIdService {
         updatedAt: new Date().toISOString(),
       };
       persistList(list);
-      supabase.from('current_student_ids').update({
-        verification_status: 'AVAILABLE',
-        reserved_until: null,
-        used_registration_id: null,
-        updated_at: new Date().toISOString(),
-      }).eq('student_id', cleanId).then(undefined, () => {});
+      // P0-3: Use atomic SECURITY DEFINER RPC instead of direct anon UPDATE.
+      supabase.rpc('rpc_release_student_id_reservation', {
+        p_student_id: cleanId,
+      }).then(undefined, (e) => console.warn('[StudentIdStore] rpc_release_student_id_reservation error:', e));
       return true;
     }
     return false;
@@ -757,12 +756,9 @@ export class StudentIdService {
     };
 
     persistList(list);
-    supabase.from('current_student_ids').update({
-      verification_status: 'USED',
-      used_registration_id: registrationId,
-      reserved_until: null,
-      updated_at: new Date().toISOString(),
-    }).eq('student_id', cleanId).then(undefined, () => {});
+    // P0-3: Authoritative server-side marking as USED happens exclusively inside
+    // service_role payment RPCs (rpc_verify_payment / rpc_promote_pending_order_to_registration)
+    // and rpc_approve_manual_registration. Anon clients cannot directly mark student IDs as USED.
 
     EventStore.recordAuditHistory({
       adminId: 'SYSTEM_PAYMENT',

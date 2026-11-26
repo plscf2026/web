@@ -92,35 +92,46 @@ test('4. Config Lookup By Role and By Slug', () => {
 });
 
 test('5. Strict Role Authentication - Allowed vs Unauthorized Mismatch', async () => {
-  // In development testing mode, SupabaseService checks credentials & verifies role match
-  // 5.1 Correct role login succeeds
-  const financeLogin = await SupabaseService.loginAdmin('finance@gmail.com', 'admin@123', 'finance_manager');
-  assert.equal(financeLogin.success, true);
-  assert.equal(financeLogin.account?.role, 'finance_manager');
+  // Explicitly opt into dev testing mode for this local unit test (fail-closed by default post P0-3)
+  const prevFlag = process.env.VITE_ENABLE_TEST_BYPASS;
+  const prevUrl = process.env.VITE_SUPABASE_URL;
+  process.env.VITE_ENABLE_TEST_BYPASS = 'true';
+  process.env.VITE_SUPABASE_URL = 'http://localhost:54321';
+  try {
+    // 5.1 Correct role login succeeds
+    const financeLogin = await SupabaseService.loginAdmin('finance@gmail.com', 'admin@123', 'finance_manager');
+    assert.equal(financeLogin.success, true);
+    assert.equal(financeLogin.account?.role, 'finance_manager');
 
-  const regLogin = await SupabaseService.loginAdmin('registration@gmail.com', 'admin@123', 'registration_officer');
-  assert.equal(regLogin.success, true);
-  assert.equal(regLogin.account?.role, 'registration_officer');
+    const regLogin = await SupabaseService.loginAdmin('registration@gmail.com', 'admin@123', 'registration_officer');
+    assert.equal(regLogin.success, true);
+    assert.equal(regLogin.account?.role, 'registration_officer');
 
-  const modLogin = await SupabaseService.loginAdmin('moderator@gmail.com', 'admin@123', 'moderator');
-  assert.equal(modLogin.success, true);
-  assert.equal(modLogin.account?.role, 'moderator');
+    const modLogin = await SupabaseService.loginAdmin('moderator@gmail.com', 'admin@123', 'moderator');
+    assert.equal(modLogin.success, true);
+    assert.equal(modLogin.account?.role, 'moderator');
 
-  // 5.2 Mismatched role is strictly REJECTED (Requirement 6: prevent accessing another portal)
-  const rejectedAttempt1 = await SupabaseService.loginAdmin('finance@gmail.com', 'admin@123', 'super_admin');
-  assert.equal(rejectedAttempt1.success, false);
-  assert.ok(rejectedAttempt1.error?.includes('Access Denied'));
-  assert.ok(rejectedAttempt1.error?.includes('Super Admin Portal'));
+    // 5.2 Mismatched role is strictly REJECTED (Requirement 6: prevent accessing another portal)
+    const rejectedAttempt1 = await SupabaseService.loginAdmin('finance@gmail.com', 'admin@123', 'super_admin');
+    assert.equal(rejectedAttempt1.success, false);
+    assert.ok(rejectedAttempt1.error?.includes('Access Denied'));
+    assert.ok(rejectedAttempt1.error?.includes('Super Admin Portal'));
 
-  const rejectedAttempt2 = await SupabaseService.loginAdmin('moderator@gmail.com', 'admin@123', 'finance_manager');
-  assert.equal(rejectedAttempt2.success, false);
-  assert.ok(rejectedAttempt2.error?.includes('Access Denied'));
-  assert.ok(rejectedAttempt2.error?.includes('Finance Portal'));
+    const rejectedAttempt2 = await SupabaseService.loginAdmin('moderator@gmail.com', 'admin@123', 'finance_manager');
+    assert.equal(rejectedAttempt2.success, false);
+    assert.ok(rejectedAttempt2.error?.includes('Access Denied'));
+    assert.ok(rejectedAttempt2.error?.includes('Finance Portal'));
 
-  // 5.3 Super Admin account can access any portal view (global oversight)
-  const superOnFinance = await SupabaseService.loginAdmin('admin@gmail.com', 'admin@123', 'finance_manager');
-  assert.equal(superOnFinance.success, true);
-  assert.equal(superOnFinance.account?.role, 'super_admin');
+    // 5.3 Super Admin account can access any portal view (global oversight)
+    const superOnFinance = await SupabaseService.loginAdmin('admin@gmail.com', 'admin@123', 'finance_manager');
+    assert.equal(superOnFinance.success, true);
+    assert.equal(superOnFinance.account?.role, 'super_admin');
+  } finally {
+    if (prevFlag === undefined) delete process.env.VITE_ENABLE_TEST_BYPASS;
+    else process.env.VITE_ENABLE_TEST_BYPASS = prevFlag;
+    if (prevUrl === undefined) delete process.env.VITE_SUPABASE_URL;
+    else process.env.VITE_SUPABASE_URL = prevUrl;
+  }
 });
 
 test('6. Role Module Permission Isolation (Allowed Tabs)', () => {

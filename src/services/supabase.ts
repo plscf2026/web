@@ -79,8 +79,15 @@ export const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
  * unless explicitly disabled via VITE_ENABLE_TEST_BYPASS="false".
  */
 export function isDevTestBypassAllowed(): boolean {
-  const testBypassFlag = (import.meta as any)?.env?.VITE_ENABLE_TEST_BYPASS;
-  return testBypassFlag !== 'false';
+  // P0-3: Must be explicitly 'true' AND must not be a production build or production Supabase project.
+  // 'hnthoszbkhvygoowtvau' is the production project — bypass is never allowed there.
+  const env = (import.meta as any)?.env;
+  if (env?.PROD === true || env?.MODE === 'production') return false;
+  const procEnv = typeof process !== 'undefined' ? process.env : undefined;
+  const supabaseUrl = env?.VITE_SUPABASE_URL || procEnv?.VITE_SUPABASE_URL || (env ? SUPABASE_URL : '');
+  if (supabaseUrl.includes('hnthoszbkhvygoowtvau')) return false;
+  const testBypassFlag = env?.VITE_ENABLE_TEST_BYPASS ?? procEnv?.VITE_ENABLE_TEST_BYPASS;
+  return testBypassFlag === 'true';
 }
 
 /**
@@ -134,80 +141,18 @@ export async function runSupabaseDiagnostic(): Promise<{
     errors.push(`READ exception: ${e.message}`);
   }
 
-  // 2. Write pending test (should pass — RLS allows anon pending insert)
-  const testId = `DIAG-TEST-${Date.now()}`;
-  try {
-    const { error } = await supabase.from(tableUsed).upsert({
-      id: testId,
-      full_name: '__DIAGNOSTIC_TEST__',
-      photo_url: '',
-      mobile_number: '01000000000',
-      address: 'DIAG',
-      category: 'former',
-      batch_name: 'DIAG',
-      t_shirt_size: 'L',
-      registration_fee: 0,
-      donation_amount: 0,
-      total_paid: 0,
-      payment_status: 'pending',
-      transaction_id: null,
-      payment_method: null,
-      registered_at: new Date().toISOString(),
-      qr_token: 'DIAGTEST',
-      is_tshirt_collected: false,
-      is_checked_in: false,
-      year: 2027,
-      is_demo: true,
-    }, { onConflict: 'id' });
-    if (!error) {
-      canWritePending = true;
-    } else {
-      errors.push(`WRITE-PENDING: ${error.message} (code: ${error.code})`);
-    }
-  } catch (e: any) {
-    errors.push(`WRITE-PENDING exception: ${e.message}`);
-  }
+  // 2. Write pending test — P0-3: anon INSERT on registrations_2027 is now BLOCKED.
+  //    This diagnostic no longer attempts a paid write (which is correctly denied after P0-3).
+  //    canWritePending stays false to signal the correct hardened state.
+  errors.push('WRITE-PENDING: Skipped — anon INSERT on registrations_2027 is correctly blocked after P0-3 hardening.');
+  canWritePending = false;
 
-  // 3. Write paid test (this is what fails if RLS blocks paid upserts for anon)
-  if (canWritePending) {
-    try {
-      const { error } = await supabase.from(tableUsed).update({
-        payment_status: 'paid',
-        total_paid: 1,
-        transaction_id: 'DIAG-TRX',
-        payment_method: 'bkash',
-        verification_timestamp: new Date().toISOString(),
-        verified_by: 'DIAGNOSTIC',
-      }).eq('id', testId);
-      if (!error) {
-        canWritePaid = true;
-        // Clean up test row
-        await supabase.from(tableUsed).delete().eq('id', testId);
-      } else {
-        errors.push(`WRITE-PAID (UPDATE): ${error.message} (code: ${error.code})`);
-        // Try upsert instead of update
-        const { error: upsertErr } = await supabase.from(tableUsed).upsert({
-          id: testId,
-          payment_status: 'paid',
-          total_paid: 1,
-          transaction_id: 'DIAG-TRX',
-          payment_method: 'bkash',
-          verification_timestamp: new Date().toISOString(),
-          verified_by: 'DIAGNOSTIC',
-        }, { onConflict: 'id' });
-        if (!upsertErr) {
-          canWritePaid = true;
-          await supabase.from(tableUsed).delete().eq('id', testId);
-        } else {
-          errors.push(`WRITE-PAID (UPSERT): ${upsertErr.message} (code: ${upsertErr.code})`);
-        }
-      }
-    } catch (e: any) {
-      errors.push(`WRITE-PAID exception: ${e.message}`);
-    }
-  }
+  // 3. Write paid test — P0-3: anon paid UPDATE is correctly blocked.
+  errors.push('WRITE-PAID: Skipped — anon paid UPDATE on registrations_2027 is correctly blocked after P0-3 hardening.');
+  canWritePaid = false;
 
-  // 4. RPC test
+  // 4. RPC test — P0-3: rpc_verify_payment is now service_role only.
+  //    anon call should return 42501 (permission denied), which means RPC exists and is hardened.
   try {
     const { error } = await supabase.rpc('rpc_verify_payment', {
       p_reg_id: '__diag__',
@@ -217,13 +162,16 @@ export async function runSupabaseDiagnostic(): Promise<{
       p_signature: '__diag__',
       p_verified_by: 'DIAGNOSTIC',
     });
-    // Any error except "not found" / "does not exist" means the RPC exists
     if (!error) {
+      // Should not succeed for anon after P0-3 — flag as unexpected
+      errors.push('WARN: rpc_verify_payment succeeded as anon — P0-3 grant revocation may not have applied.');
       rpcExists = true;
-    } else if (error.code === '42883' || error.code === 'PGRST202' || error.message?.includes('not exist') || error.message?.includes('not found')) {
+    } else if (error.code === '42501' || (error.message || '').includes('permission denied')) {
+      rpcExists = true; // RPC exists and is correctly hardened (anon denied)
+    } else if (error.code === '42883' || error.code === 'PGRST202') {
       errors.push(`RPC rpc_verify_payment does not exist: ${error.message}`);
     } else {
-      rpcExists = true; // RPC exists but returned a logical error (expected for bad test data)
+      rpcExists = true; // Some other logical error — RPC exists
     }
   } catch (e: any) {
     errors.push(`RPC test exception: ${e.message}`);
@@ -729,7 +677,7 @@ export const SupabaseService = {
         targetType: 'registration',
         targetId: cleanId,
         details: `Deleted registration ${cleanId}. Reason: ${reason}`,
-      }).catch(() => {});
+      }).catch(() => { });
 
       this.clearRegistrationCache(year);
       return { success: true, deletedId: cleanId };
@@ -974,13 +922,14 @@ export const SupabaseService = {
    * Verify and confirm payment on Supabase backend.
    *
    * Strategy (most robust → least):
-   *   1. rpc_verify_payment (SECURITY DEFINER — bypasses RLS)
-   *   2. Edge Function verify-payment (server-side, bypasses RLS)
-   *   3. Direct table upsert (works if RLS allows anon update/paid status)
+   *   1. Edge Function verify-payment (server-side, service_role — bypasses RLS)
+   *   2. rpc_verify_payment is now service_role ONLY; anon calls will get 42501.
+   *      This strategy is kept for authenticated admin contexts only.
    *
-   * Any error code — including PGRST202 (function not found), 42883 (function
-   * does not exist), 42501 (permission denied), or network — falls through to
-   * the next strategy so a paid customer is NEVER stranded.
+   * P0-3: Strategy 3 (direct anon table upsert for paid status) is REMOVED.
+   * After P0-3, anon UPDATE to payment_status='paid' on registrations_2027 is
+   * correctly blocked by RLS. If the Edge Function is unavailable, the payment
+   * is NOT finalized client-side. The pending_order remains for server reconciliation.
    */
   async verifyPayment(
     registrationId: string,
@@ -992,61 +941,46 @@ export const SupabaseService = {
     pendingData?: RegistrationRecord
   ): Promise<{ success: boolean; data?: any; error?: string; isNetworkError?: boolean }> {
 
-    // ── Helper: direct UPDATE (not upsert) for paid status ─────────────────
-    // We always UPDATE because the pending row already exists (savePendingRegistration ran first).
-    // Using upsert would trigger an INSERT attempt that hits the unique mobile_normalized index.
-    const tryDirectUpsert = async (): Promise<{ success: boolean; error?: string }> => {
-      if (!pendingData) return { success: false, error: 'No pending data for direct upsert' };
-      const year = pendingData.year || 2027;
-      const yearTableName = getRegistrationsTableName(year);
-      const paidFields = {
-        payment_status: 'paid',
-        total_paid: amount,
-        transaction_id: trxId,
-        payment_method: paymentMethod,
-        server_verification_signature: signature,
-        verification_timestamp: new Date().toISOString(),
-        verified_by: verifiedBy,
-      };
-      try {
-        // Strategy 3a: UPDATE only the payment fields — avoids touching mobile_normalized unique index
-        const { error: updateErr } = await supabase
-          .from(yearTableName)
-          .update(paidFields)
-          .eq('id', registrationId);
-        if (!updateErr) {
-          console.log(`[SupabaseService] Direct UPDATE succeeded for ${registrationId} → ${yearTableName}`);
-          return { success: true };
-        }
-        console.warn(`[SupabaseService] Direct UPDATE failed (${updateErr.code}): ${updateErr.message}`);
-
-        // Strategy 3b: Full row upsert with ignoreDuplicates=true as last resort
-        const row = toRegistrationDbRow(pendingData, year) as any;
-        Object.assign(row, paidFields);
-        const { error: upsertErr } = await supabase
-          .from(yearTableName)
-          .upsert(row, { onConflict: 'id', ignoreDuplicates: false });
-        if (!upsertErr) {
-          console.log(`[SupabaseService] Full-row upsert succeeded for ${registrationId} → ${yearTableName}`);
-          return { success: true };
-        }
-
-        // If the error is the mobile_normalized constraint, the pending row IS already there
-        // — the payment is recorded; treat as success rather than crashing the customer.
-        const errMsg = upsertErr.message || '';
-        if (errMsg.includes('uq_registrations_2027_mobile_normalized') || errMsg.includes('mobile_normalized')) {
-          console.warn(`[SupabaseService] Mobile-normalized constraint on upsert — pending row exists; treating paid UPDATE as already applied for ${registrationId}`);
-          return { success: true };
-        }
-
-        return { success: false, error: updateErr.message || upsertErr.message };
-      } catch (ex: any) {
-        return { success: false, error: ex.message };
-      }
-    };
+    // P0-3: Strategy 3 (direct table upsert from anon) is REMOVED — anon writes are blocked.
+    // Payment finalization flows exclusively through the Edge Function (Strategy 1) or
+    // server-side RPC with service_role (Strategy 2).
 
     try {
-      // ── Strategy 1: rpc_verify_payment ──────────────────────────────────
+      // ── Strategy 1: Edge Function verify-payment (server-side, service_role) ──
+      // P0-3: This is the ONLY authoritative path. Direct RPC and direct table
+      //        upsert from anon are both blocked after P0-3 hardening.
+      let edgeFailureReason: string | undefined;
+      try {
+        const { data: edgeData, error: edgeError } = await supabase.functions.invoke('verify-payment', {
+          body: {
+            action: 'verify-payment',
+            registration_id: registrationId,
+            trx_id: trxId,
+            payment_method: paymentMethod,
+            payment_amount: amount,
+          },
+        });
+        if (!edgeError && edgeData?.success) {
+          console.log(`[SupabaseService] Edge Function verify-payment succeeded for ${registrationId}`);
+          return { success: true, data: edgeData };
+        }
+        if (edgeError) {
+          edgeFailureReason = edgeError?.message;
+          console.warn('[SupabaseService] Edge verify-payment notice:', edgeFailureReason);
+        }
+        // If Edge Function returned a non-success response with error details
+        if (edgeData && edgeData.success === false) {
+          return {
+            success: false,
+            error: edgeData.error || edgeData.message || 'Payment verification rejected.',
+          };
+        }
+      } catch (edgeEx: any) {
+        edgeFailureReason = edgeEx?.message;
+        console.warn('[SupabaseService] Edge Function threw:', edgeFailureReason);
+      }
+
+      // ── Strategy 2: rpc_verify_payment (may succeed for service_role contexts) ──
       const payload: any = {
         p_reg_id: registrationId,
         p_trx_id: trxId,
@@ -1066,7 +1000,6 @@ export const SupabaseService = {
         rpcData = rpcRes.data;
         rpcError = rpcRes.error;
 
-        // If the RPC doesn't accept p_pending_data param, retry without it
         if (rpcError && rpcError.code === 'PGRST202' && payload.p_pending_data) {
           delete payload.p_pending_data;
           const res2 = await supabase.rpc('rpc_verify_payment', payload);
@@ -1078,7 +1011,6 @@ export const SupabaseService = {
         console.warn('[SupabaseService] rpc_verify_payment threw:', rpcEx?.message);
       }
 
-      // RPC succeeded — Supabase may return the JSONB as a plain object OR as an array wrapper
       const rpcPayload = Array.isArray(rpcData) ? rpcData[0] : rpcData;
       if (!rpcError && rpcPayload?.success) {
         console.log(`[SupabaseService] rpc_verify_payment succeeded for ${registrationId}`);
@@ -1086,53 +1018,21 @@ export const SupabaseService = {
       }
 
       const rpcErrCode = rpcError?.code || '';
-      const rpcErrMsg = (rpcError?.message || '').toLowerCase();
-      const rpcFailed =
-        rpcErrCode === '42501' ||         // permission denied
-        rpcErrCode === '42883' ||         // function does not exist
-        rpcErrCode === 'PGRST202' ||      // PostgREST: function not found
-        rpcErrMsg.includes('permission denied') ||
-        rpcErrMsg.includes('does not exist') ||
-        rpcErrMsg.includes('not found') ||
-        rpcError;
-
-      if (rpcFailed) {
-        console.warn(`[SupabaseService] rpc_verify_payment unavailable (${rpcErrCode}): ${rpcError?.message}. Trying Edge Function…`);
+      if (rpcErrCode === '42501' || (rpcError?.message || '').toLowerCase().includes('permission denied')) {
+        // Expected after P0-3: anon cannot call rpc_verify_payment
+        console.warn(`[SupabaseService] rpc_verify_payment correctly denied anon access (42501) — P0-3 hardening active.`);
+      } else if (rpcError) {
+        console.warn(`[SupabaseService] rpc_verify_payment error (${rpcErrCode}): ${rpcError?.message}`);
       }
 
-      // ── Strategy 2: Edge Function verify-payment ─────────────────────────
-      try {
-        const { data: edgeData, error: edgeError } = await supabase.functions.invoke('verify-payment', {
-          body: {
-            action: 'verify-payment',
-            registration_id: registrationId,
-            trx_id: trxId,
-            payment_method: paymentMethod,
-            payment_amount: amount,
-          },
-        });
-        if (!edgeError && edgeData?.success) {
-          console.log(`[SupabaseService] Edge Function verify-payment succeeded for ${registrationId}`);
-          return { success: true, data: edgeData };
-        }
-        if (edgeError) {
-          console.warn('[SupabaseService] Edge verify-payment notice:', edgeError?.message);
-        }
-      } catch (edgeEx: any) {
-        console.warn('[SupabaseService] Edge Function threw:', edgeEx?.message);
-      }
-
-      // ── Strategy 3: Direct table upsert ───────────────────────────────────
-      console.warn('[SupabaseService] Falling back to direct table upsert for paid registration…');
-      const upsertRes = await tryDirectUpsert();
-      if (upsertRes.success) {
-        return { success: true, data: { status: 'paid', mode: 'direct_upsert' } };
-      }
-
-      console.error('[SupabaseService] All 3 write strategies failed. Last error:', upsertRes.error);
+      // P0-3: Strategy 3 (direct anon table upsert for paid status) REMOVED.
+      // After P0-3, anon may not write payment_status='paid'. If both strategies
+      // above fail, return an error so the UI can display a user-facing message.
+      console.error('[SupabaseService] All server verification strategies failed. Payment NOT finalized client-side.');
       return {
         success: false,
-        error: upsertRes.error || rpcError?.message || 'All database write strategies failed.',
+        error: edgeFailureReason || rpcError?.message || 'Payment verification failed. Please contact support with your transaction reference.',
+        isNetworkError: false,
       };
 
     } catch (err: any) {
@@ -1217,7 +1117,7 @@ export const SupabaseService = {
         supabase
           .from('donations_2027')
           .upsert(canonicalRow, { onConflict: 'id' })
-      ).catch(() => {});
+      ).catch(() => { });
 
       if (!canonicalErr) {
         return { success: true, table: 'donations', donation };
@@ -1342,7 +1242,7 @@ export const SupabaseService = {
           return { donation: local };
         }
       }
-    } catch {}
+    } catch { }
 
     return { error: 'No verified donation found matching those details.' };
   },
@@ -1440,7 +1340,7 @@ export const SupabaseService = {
           return { type: 'registration', registration: match };
         }
       }
-    } catch {}
+    } catch { }
 
     return {
       error: 'No verified ticket or donation matched those details.',
@@ -2201,7 +2101,7 @@ export const SupabaseService = {
         sessionStorage.removeItem('plscf_scanner_module');
         sessionStorage.removeItem('plscf_scanner_prefill_user');
         sessionStorage.removeItem('plscf_scanner_auto_login');
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // Broadcast logout to all other open tabs (preventing self-echo)
