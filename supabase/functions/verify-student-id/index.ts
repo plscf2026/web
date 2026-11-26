@@ -61,10 +61,12 @@ serve(async (req) => {
     'Vary': 'Origin',
   };
 
-  if (origin && (allowedOrigins.length === 0 || allowedOrigins.includes(origin))) {
-    headers['Access-Control-Allow-Origin'] = origin;
-  } else if (origin && allowedOrigins.length > 0) {
-    return jsonResponse({ error: 'Origin not allowed' }, 403, headers);
+  if (origin) {
+    if (allowedOrigins.includes(origin)) {
+      headers['Access-Control-Allow-Origin'] = origin;
+    } else {
+      return jsonResponse({ error: 'Origin not allowed' }, 403, headers);
+    }
   }
 
   if (req.method === 'OPTIONS') {
@@ -138,11 +140,11 @@ serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // 1. Authoritative lookup in registrations_2027
+    // 1. Authoritative lookup in registrations_2027 (zero photo_url / zero PII)
     const targetTable = 'registrations_2027';
     let query = supabase
       .from(targetTable)
-      .select('id, full_name, full_name_bn, photo_url, category, passing_year, current_class, batch_name, payment_status, qr_token, year');
+      .select('id, full_name, full_name_bn, category, passing_year, current_class, batch_name, payment_status, registration_approval_status, qr_token, year');
 
     if (studentId && qrToken) {
       query = query.eq('id', studentId);
@@ -167,7 +169,33 @@ serve(async (req) => {
       );
     }
 
-    // 2. Enforce payment status validation
+    // 2. Enforce approval & payment status validation
+    if (registration.registration_approval_status === 'pending') {
+      return jsonResponse(
+        {
+          success: false,
+          verified: false,
+          status: 'PENDING_APPROVAL',
+          error: `Registration "${registration.id}" is pending Super Admin approval.`,
+        },
+        403,
+        headers
+      );
+    }
+
+    if (registration.registration_approval_status === 'rejected') {
+      return jsonResponse(
+        {
+          success: false,
+          verified: false,
+          status: 'REGISTRATION_REJECTED',
+          error: `Registration "${registration.id}" has been rejected by Super Admin.`,
+        },
+        403,
+        headers
+      );
+    }
+
     if (registration.payment_status !== 'paid') {
       return jsonResponse(
         {
@@ -198,15 +226,7 @@ serve(async (req) => {
       }
     }
 
-    // 4. Sanitize photo URL (accepts base64 or HTTPS only)
-    const photoUrl = String(registration.photo_url ?? '');
-    const safePhotoUrl =
-      /^data:image\/(?:jpeg|png|webp);base64,/i.test(photoUrl) ||
-      /^https:\/\//i.test(photoUrl)
-        ? photoUrl
-        : '';
-
-    // 5. Check if card generation record exists
+    // 4. Check if card generation record exists
     let cardStatus = 'ELIGIBLE';
     const { data: idCardRecord } = await supabase
       .from('student_id_cards')
@@ -218,7 +238,7 @@ serve(async (req) => {
       cardStatus = idCardRecord.card_status;
     }
 
-    // Return safe, sanitized verification payload with zero PII
+    // Return safe, sanitized verification payload with zero PII (photo_url omitted)
     return jsonResponse(
       {
         success: true,
@@ -234,7 +254,6 @@ serve(async (req) => {
           batchName: registration.batch_name,
           passingYear: registration.passing_year || null,
           currentClass: registration.current_class || null,
-          photoUrl: safePhotoUrl,
           paymentStatus: registration.payment_status,
           qrToken: registration.qr_token,
           cardStatus: cardStatus,

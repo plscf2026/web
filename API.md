@@ -38,8 +38,8 @@
 - **Endpoint**: `POST {BASE_URL}/grant-token` (Sandbox: `https://sandbox.paystation.com.bd`, Live: `https://api.paystation.com.bd`)
 - **Headers**:
   ```http
-  merchantId: 104-1653730183
-  password: gamecoderstorepass
+  merchantId: <PAYSTATION_MERCHANT_ID>
+  password: <PAYSTATION_PASSWORD>
   Content-Type: application/json
   ```
 - **Response (`200 OK`)**:
@@ -90,8 +90,8 @@
 - **Endpoint**: `POST {BASE_URL}/retrive-transaction`
 - **Headers**:
   ```http
-  merchantId: 104-1653730183
-  password: gamecoderstorepass
+  merchantId: <PAYSTATION_MERCHANT_ID>
+  password: <PAYSTATION_PASSWORD>
   Content-Type: application/json
   ```
 - **Request Body**:

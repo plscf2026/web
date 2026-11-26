@@ -961,6 +961,7 @@ export const SupabaseService = {
           body: {
             action: 'verify-payment',
             registration_id: registrationId,
+            invoice_number: pendingData?.gatewayInvoiceNumber || undefined,
             trx_id: trxId,
             payment_method: paymentMethod,
             payment_amount: amount,

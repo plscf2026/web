@@ -46,10 +46,12 @@ serve(async (req) => {
     'Vary': 'Origin',
   };
 
-  if (origin && (allowedOrigins.length === 0 || allowedOrigins.includes(origin))) {
-    headers['Access-Control-Allow-Origin'] = origin;
-  } else if (origin && allowedOrigins.length > 0) {
-    return jsonResponse({ error: 'Origin not allowed' }, 403, headers);
+  if (origin) {
+    if (allowedOrigins.includes(origin)) {
+      headers['Access-Control-Allow-Origin'] = origin;
+    } else {
+      return jsonResponse({ error: 'Origin not allowed' }, 403, headers);
+    }
   }
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers });
   if (req.method !== 'POST') {

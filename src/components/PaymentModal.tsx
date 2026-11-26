@@ -25,6 +25,7 @@ import { ParentIdCardBadge } from './idcard/ParentIdCardBadge';
 import { IdCardStore } from '../services/idCardStore';
 import { AppStore } from '../services/store';
 import { isDevTestBypassAllowed } from '../services/supabase';
+import { StudentPhotoStorageService, isBase64DataUrl, extractStoragePathFromPublicUrl } from '../services/studentPhotoStorageService';
 
 export interface PaymentModalProps {
   isOpen: boolean;
@@ -395,7 +396,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         gatewayCharge: currentCharge,
       };
 
-      // 1. Authoritatively create or update pending registration in Supabase (payment_status='pending', total_paid=0)
+      // 1. Authoritatively create pending session & upload photos prior to pending_orders persistence
       const pendingRecord = await PayStationService.createPendingRegistration(
         enrichedFormData,
         {
@@ -409,12 +410,66 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         pendingSession?.registrationId
       );
 
+      let persistedPhotoUrl = enrichedFormData.photoUrl;
+      let persistedPhotoPath = enrichedFormData.photoStoragePath || extractStoragePathFromPublicUrl(persistedPhotoUrl) || null;
+      if (persistedPhotoUrl && isBase64DataUrl(persistedPhotoUrl)) {
+        try {
+          const uploadRes = await StudentPhotoStorageService.uploadStudentPhoto({
+            fileOrDataUrl: persistedPhotoUrl,
+            registrationId: pendingRecord.id,
+            batchYear: enrichedFormData.passingYear,
+            category: enrichedFormData.category,
+            currentClass: enrichedFormData.currentClass,
+            isParent: false,
+          });
+          if (uploadRes.success && uploadRes.storagePath) {
+            persistedPhotoPath = uploadRes.storagePath;
+            persistedPhotoUrl = uploadRes.publicUrl;
+          }
+        } catch (photoErr) {
+          console.warn('[PaymentModal] Pre-checkout student photo upload warning:', photoErr);
+        }
+      }
+
+      let persistedParentPhotoUrl = enrichedFormData.parentPhotoUrl || null;
+      let persistedParentPhotoPath =
+        enrichedFormData.parentPhotoStoragePath ||
+        (persistedParentPhotoUrl ? extractStoragePathFromPublicUrl(persistedParentPhotoUrl) : null) ||
+        null;
+      if (persistedParentPhotoUrl && isBase64DataUrl(persistedParentPhotoUrl)) {
+        try {
+          const pUploadRes = await StudentPhotoStorageService.uploadStudentPhoto({
+            fileOrDataUrl: persistedParentPhotoUrl,
+            registrationId: pendingRecord.id,
+            batchYear: enrichedFormData.passingYear,
+            category: enrichedFormData.category,
+            currentClass: enrichedFormData.currentClass,
+            isParent: true,
+          });
+          if (pUploadRes.success && pUploadRes.storagePath) {
+            persistedParentPhotoPath = pUploadRes.storagePath;
+            persistedParentPhotoUrl = pUploadRes.publicUrl;
+          }
+        } catch (pPhotoErr) {
+          console.warn('[PaymentModal] Pre-checkout parent photo upload warning:', pPhotoErr);
+        }
+      }
+
+      const hydratedFormData: RegistrationFormData = {
+        ...enrichedFormData,
+        photoUrl: persistedPhotoUrl,
+        photoStoragePath: persistedPhotoPath || undefined,
+        parentPhotoUrl: persistedParentPhotoUrl || undefined,
+        parentPhotoStoragePath: persistedParentPhotoPath || undefined,
+      };
+
       const callbackUrl = PayStationService.buildCallbackUrl({
         type: 'registration',
         invoiceNumber: invoiceRef.current,
         amount: chargeAmount,
       });
 
+      const activeYear = (hydratedFormData as any).year || AppStore.getActiveEventYear() || 2027;
       const createRes = await PayStationService.createPayment({
         invoice_number: invoiceRef.current,
         order_type: 'registration',
@@ -423,6 +478,38 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         donation_amount: donationAmount,
         payment_method: selectedMethod,
         student_id: registrationData.studentId || null,
+        registration_id: pendingRecord.id,
+        qr_token: pendingRecord.qrToken,
+        year: activeYear,
+        form_data: {
+          registrationId: pendingRecord.id,
+          qrToken: pendingRecord.qrToken,
+          year: activeYear,
+          fullName: hydratedFormData.fullName,
+          mobileNumber: hydratedFormData.mobileNumber,
+          email: hydratedFormData.email || null,
+          address: hydratedFormData.address,
+          gender: hydratedFormData.gender || 'male',
+          bloodGroup: hydratedFormData.bloodGroup || null,
+          photoUrl: persistedPhotoUrl,
+          photoStoragePath: persistedPhotoPath,
+          category: hydratedFormData.category,
+          studentId: hydratedFormData.studentId || null,
+          passingYear: hydratedFormData.passingYear || null,
+          lastClassAttended: hydratedFormData.lastClassAttended || null,
+          currentClass: hydratedFormData.currentClass || null,
+          batchName: hydratedFormData.batchName,
+          groupOrSection: hydratedFormData.groupOrSection || null,
+          rollNumber: hydratedFormData.rollNumber || null,
+          tShirtSize: hydratedFormData.tShirtSize,
+          hasParent: Boolean(hydratedFormData.hasParent),
+          parentName: hydratedFormData.parentName || null,
+          parentAge: hydratedFormData.parentAge || null,
+          parentPhone: hydratedFormData.parentPhone || null,
+          parentRelation: hydratedFormData.parentRelation || null,
+          parentPhotoUrl: persistedParentPhotoUrl,
+          parentPhotoStoragePath: persistedParentPhotoPath,
+        },
         return_origin: typeof window !== 'undefined' ? window.location.origin : undefined,
         currency: 'BDT',
         payment_amount: chargeAmount,
@@ -433,7 +520,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         cust_name: studentName,
         cust_phone: registrationData.mobileNumber,
         cust_email: registrationData.email || undefined,
-        cust_address: registrationData.address || 'Faridpur',
+        cust_address: registrationData.address || '',
         callback_url: callbackUrl,
         checkout_items: JSON.stringify({
           type: 'reunion_registration',
@@ -462,7 +549,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         type: 'registration',
         invoiceNumber: invoiceRef.current,
         amount: chargeAmount,
-        formData: enrichedFormData,
+        formData: hydratedFormData,
         fees: {
           registrationFee,
           donationAmount,
@@ -471,6 +558,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           totalPayable: chargeAmount,
         },
         createdAt: new Date().toISOString(),
+        registrationId: pendingRecord.id,
+        qrToken: pendingRecord.qrToken,
       });
 
       // Redirect in the current window to ensure mobile Safari history & "GO BACK" redirects work seamlessly

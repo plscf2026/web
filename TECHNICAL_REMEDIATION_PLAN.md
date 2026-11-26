@@ -29,17 +29,17 @@ Every finding from `COMPLETE_TECHNICAL_AUDIT_REPORT.md` has been independently c
 ### 2.1 Critical Severity (Blockers for Production Security)
 
 #### Finding C-01: Production Secrets in `.env.example`
-- **Status:** CONFIRMED
+- **Status:** CONFIRMED & SCRUBBED
 - **Affected File:** [`.env.example`](file:///Users/sagarkumarsaha/Desktop/1%20plsc2027/plscf65/.env.example)
-- **Root Cause:** `.env.example` contains the raw PostgreSQL database password (`Puja%40337139`) and live Supabase Secret Key (`sb_secret_REDACTED_FOR_SECURITY`).
+- **Root Cause:** `.env.example` originally contained a raw PostgreSQL database password in `DATABASE_URL` and a Supabase Secret Key (`SUPABASE_SECRET_KEY`).
 - **Git Exposure Risk:** While `.env*` is in `.gitignore`, `.gitignore` contains `!.env.example`. Any subsequent `git init && git add .` will immediately track and commit these live secrets to version control.
 - **Remediation:** Replace all secret values in `.env.example` with clear sanitized placeholders (e.g. `your_db_password_here`, `your_secret_key_here`). Add explicit rotation notices.
 
 #### Finding C-02: Hardcoded Merchant Password Fallback in `verify-payment` Edge Function
-- **Status:** CONFIRMED & PARTIALLY MITIGATED
+- **Status:** CONFIRMED & REMOVED
 - **Affected File:** [`supabase/functions/verify-payment/index.ts`](file:///Users/sagarkumarsaha/Desktop/1%20plsc2027/plscf65/supabase/functions/verify-payment/index.ts)
-- **Root Cause:** Line 10 originally had fallback `|| 'gamecoderstorepass'`. If `PAYSTATION_PASSWORD` was not set in Supabase Edge Secrets, the function defaulted to a hardcoded string.
-- **Remediation:** Enforce strict validation on startup: if `PAYSTATION_PASSWORD` is undefined and `PAYSTATION_ENV === 'production'`, return an immediate secure 503 response and log a structured alert.
+- **Root Cause:** Edge Function originally had a hardcoded sandbox password fallback if `PAYSTATION_PASSWORD` was unset.
+- **Remediation:** Fail closed with 503 if `PAYSTATION_PASSWORD` is missing.
 
 ---
 

@@ -7,7 +7,7 @@
 ## 1. MANDATORY PRODUCTION ACTIONS
 
 ### ⚠️ Action 1: Rotate PostgreSQL Database Password & Supabase Service Key
-- **Why:** During initial setup, the database password (`Puja@337139`) and service role key (`sb_secret_...`) were stored in unencrypted `.env` files. Even though `.env` was never pushed to a public git repo, best practice requires rotating them before going live with 10,000+ attendees.
+- **Why:** During initial setup, the database direct-connection password (`DATABASE_URL`) and Supabase secret key (`SUPABASE_SECRET_KEY`) were stored in unencrypted local `.env` files and previously documented in repo files. Rotate both credentials before going live with 10,000+ attendees.
 - **How to execute:**
   1. Open [Supabase Dashboard](https://supabase.com/dashboard/project/hnthoszbkhvygoowtvau).
   2. Navigate to **Project Settings** → **Database** → **Database password** → Click **Reset database password**.

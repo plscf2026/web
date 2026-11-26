@@ -49,9 +49,9 @@ The **Police Lines School & College, Faridpur Grand Reunion** website is a **sin
 
 ### What Is Broken or Problematic ⚠️
 - **CRITICAL:** Default dev credentials (`admin@gmail.com` / `admin@123`) are **rendered in the production UI** of `ScannerPortal.tsx` and `AdminRmsSettings.tsx` even when `isDevTestBypassAllowed()` returns `false` — the display is correctly gated, but the credential strings are **hardcoded and visible in the source bundle**
-- **CRITICAL:** `.env` file contains the **database direct-connection password** (`Puja@337139`) and **Supabase Secret Key** — these must NEVER be committed to a repository
-- **HIGH:** `SUPABASE_SECRET_KEY` and full `DATABASE_URL` with plaintext password are in `.env` (not `.env.local`) which is likely committed
-- **HIGH:** `verify-payment` Edge Function fallback default `PAYSTATION_PASSWORD = 'gamecoderstorepass'` is a hardcoded fallback if the env secret is missing
+- **CRITICAL:** `.env` file previously contained the database direct-connection password (`DATABASE_URL`) and Supabase secret key (`SUPABASE_SECRET_KEY`) — keep local `.env*` gitignored and rotate exposed credentials
+- **HIGH:** `SUPABASE_SECRET_KEY` and `DATABASE_URL` with credentials were in local `.env` (must remain gitignored)
+- **HIGH:** `verify-payment` Edge Function previously had a hardcoded sandbox fallback if `PAYSTATION_PASSWORD` was missing (now remediated to fail closed with `503`)
 - **HIGH:** Anon key is hardcoded as a fallback in `src/services/supabase.ts` line 27
 - **HIGH:** `rpc_verify_payment` in `20270102` migration references `financial_ledger` table but that table uses a constraint `transaction_type IN ('ALLOCATION','EXPENSE','ADJUSTMENT','CASH_RETURN')` — `'REGISTRATION_INFLOW'` is **not in the original constraint**, causing RPC failures on payment verification
 - **MEDIUM:** `AppStore` is the primary data layer for the UI but reads/writes `localStorage` — if two tabs or devices are open, data diverges
@@ -555,7 +555,7 @@ erDiagram
   - `verify-payment` (default) — Queries PayStation API, generates HMAC-SHA256 signature, calls `rpc_verify_payment` to atomically mark payment as paid
 - **Secrets Required:** `PAYSTATION_MERCHANT_ID`, `PAYSTATION_PASSWORD`, `PAYSTATION_ENV`, `PAYMENT_SIGNING_SECRET`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_ALLOWED_ORIGINS`
 - **CORS:** Origin-whitelist enforced
-- **⚠️ Issue:** Default fallback `PAYSTATION_PASSWORD = 'gamecoderstorepass'` hardcoded if env secret missing
+- **⚠️ Issue (Resolved in P0-3):** Edge Function previously fell back to a hardcoded sandbox password if `PAYSTATION_PASSWORD` was missing; now fails closed with `503`.
 
 #### `secure-ticket-lookup`
 - **URL:** `https://hnthoszbkhvygoowtvau.supabase.co/functions/v1/secure-ticket-lookup`
@@ -761,23 +761,23 @@ sequenceDiagram
 #### C1 — Credentials and Secret Keys in `.env` file
 **File:** [`/.env`](file:///Users/sagarkumarsaha/Desktop/1%20plsc2027/plscf65/.env)  
 **Lines:** All  
-**Root Cause:** `.env` contains `SUPABASE_SECRET_KEY=sb_secret_...` and full `DATABASE_URL` with plaintext password `Puja@337139`. If this file is committed to git, the database is compromised.  
+**Root Cause:** `.env` held `SUPABASE_SECRET_KEY` and `DATABASE_URL` with a plaintext DB password. If ever committed to git, the database is compromised.  
 **Evidence:**
 ```
-SUPABASE_SECRET_KEY="sb_secret_REDACTED_FOR_SECURITY"
-DATABASE_URL="postgresql://postgres.hnthoszbkhvygoowtvau:Puja%40337139@..."
+SUPABASE_SECRET_KEY="<REDACTED_ROTATE_SECRET>"
+DATABASE_URL="postgresql://postgres.hnthoszbkhvygoowtvau:<REDACTED_DB_PASSWORD>@..."
 ```
 **Impact:** Full database access; ability to bypass all RLS policies using service_role key  
-**Fix:** Move sensitive keys to `.env.local` (gitignored); verify `.env` is in `.gitignore`; rotate the exposed secret key immediately
+**Fix:** Move sensitive keys to `.env.local` (gitignored); verify `.env` is in `.gitignore`; rotate the exposed secret key and DB password immediately
 
 ---
 
 #### C2 — Hardcoded Default PayStation Password in Edge Function
 **File:** [`supabase/functions/verify-payment/index.ts`](file:///Users/sagarkumarsaha/Desktop/1%20plsc2027/plscf65/supabase/functions/verify-payment/index.ts) line 10  
-**Root Cause:** `const PAYSTATION_PASSWORD = Deno.env.get('PAYSTATION_PASSWORD') || 'gamecoderstorepass';`  
-**Evidence:** Fallback plaintext merchant password hardcoded  
-**Impact:** If `PAYSTATION_PASSWORD` env secret is not set in Supabase, the production gateway authenticates with a known default password  
-**Fix:** Remove the fallback. If the secret is missing, fail the function with a 503 and log a critical error
+**Root Cause:** `const PAYSTATION_PASSWORD = Deno.env.get('PAYSTATION_PASSWORD') || '<REDACTED_LEGACY_FALLBACK>';`  
+**Evidence:** Legacy fallback plaintext merchant password previously hardcoded  
+**Impact:** If `PAYSTATION_PASSWORD` env secret is not set in Supabase, the gateway would authenticate with a known default password  
+**Fix:** Remove the fallback (fixed). Fail with `503` when missing.
 
 ---
 

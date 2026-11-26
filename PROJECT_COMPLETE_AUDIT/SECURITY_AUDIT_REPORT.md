@@ -113,9 +113,9 @@ However, several **critical operational vulnerabilities** were discovered—most
 - **Risk Level:** **MEDIUM**
 - **OWASP Category:** A02:2021 — Cryptographic Failures
 - **Vulnerability Description:**
-  In `supabase/functions/verify-payment/index.ts`, the HMAC signing secret defaults to a hardcoded string if the environment variable `PAYMENT_SIGNING_SECRET` is unset:
+  In `supabase/functions/verify-payment/index.ts`, the HMAC signing secret originally defaulted to a hardcoded fallback string (`<LEGACY_HMAC_SALT_REMOVED>`) if the environment variable `PAYMENT_SIGNING_SECRET` was unset:
   ```ts
-  const PAYMENT_SIGNING_SECRET = Deno.env.get('PAYMENT_SIGNING_SECRET') || 'PLSCF_SECURE_PAYMENT_HMAC_SALT_2027';
+  const PAYMENT_SIGNING_SECRET = Deno.env.get('PAYMENT_SIGNING_SECRET'); // fail closed if unset
   ```
 - **Evidence:**
   - `supabase/functions/verify-payment/index.ts:15`
