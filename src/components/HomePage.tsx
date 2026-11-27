@@ -220,7 +220,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     <div className="flex flex-col gap-16 pb-16">
       {/* HERO SECTION MATCHING MOCKUP */}
       <section
-        className="relative overflow-hidden min-h-[580px] lg:min-h-[660px] flex items-center pt-8 sm:pt-12 pb-24 sm:pb-32 px-4 sm:px-6 lg:px-8"
+        className="relative overflow-hidden min-h-[500px] sm:min-h-[580px] lg:min-h-[660px] flex items-center pt-6 sm:pt-12 pb-20 sm:pb-32 px-4 sm:px-6 lg:px-8"
         style={getHomePageSectionStyle('hero')}
       >
         {/* Full-bleed Panoramic Campus Hero Background */}
@@ -240,14 +240,14 @@ export const HomePage: React.FC<HomePageProps> = ({
         <div className="absolute inset-0 z-1 pointer-events-none bg-white/90 sm:hidden" />
 
         <div className="max-w-7xl mx-auto relative z-10 w-full">
-          <div className="max-w-2xl space-y-4 sm:space-y-5 text-left">
+          <div className="max-w-2xl space-y-3.5 sm:space-y-5 text-left">
             {/* Stylized Italic Tagline */}
-            <div className="font-serif italic text-2xl sm:text-3xl text-[#0284C7] tracking-wide font-medium drop-shadow-xs">
+            <div className="font-serif italic text-xl sm:text-3xl text-[#0284C7] tracking-wide font-medium drop-shadow-xs">
               {language === 'bn' ? 'একবার পিএলসিয়ান, চিরকাল পিএলসিয়ান...' : 'Once a PLSian, Always a PLSian...'}
             </div>
 
             {/* Institution Title */}
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-[#0F172A] tracking-tight leading-tight drop-shadow-xs">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-[#0F172A] tracking-tight leading-tight drop-shadow-xs">
               {language === 'bn'
                 ? 'পুলিশ লাইনস স্কুল অ্যান্ড কলেজ, ফরিদপুর'
                 : 'Police Lines School and College, Faridpur'}
@@ -255,8 +255,8 @@ export const HomePage: React.FC<HomePageProps> = ({
 
             {/* Deep Navy Pill Badge: Grand Reunion 2027 */}
             <div>
-              <div className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#0F172A] text-white shadow-xl hover:shadow-2xl transition-shadow">
-                <span className="text-xl sm:text-2xl md:text-3xl font-black tracking-wide">
+              <div className="inline-flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-full bg-[#0F172A] text-white shadow-xl hover:shadow-2xl transition-shadow">
+                <span className="text-lg sm:text-2xl md:text-3xl font-black tracking-wide">
                   {language === 'bn' ? 'গ্র্যান্ড রিইউনিয়ন' : 'Grand Reunion'}{' '}
                   <span className="text-[#38BDF8]">2027</span>
                 </span>
@@ -271,16 +271,16 @@ export const HomePage: React.FC<HomePageProps> = ({
             </p>
 
             {/* Date & Venue Pills */}
-            <div className="flex flex-wrap items-center gap-3 pt-1 text-xs sm:text-sm font-semibold text-[#0F172A]">
-              <div className="flex items-center gap-2 bg-[#E2EEF8]/90 backdrop-blur-md px-4 py-2 rounded-full border border-[#0284C7]/20 shadow-xs">
-                <Calendar className="w-4 h-4 text-[#0284C7]" />
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-2 sm:gap-3 pt-1 text-xs sm:text-sm font-semibold text-[#0F172A]">
+              <div className="flex items-center gap-2 bg-[#E2EEF8]/90 backdrop-blur-md px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-[#0284C7]/20 shadow-xs">
+                <Calendar className="w-4 h-4 text-[#0284C7] shrink-0" />
                 <span>
                   <strong className="text-[#0284C7] font-bold">{language === 'bn' ? 'তারিখ:' : 'Date:'}</strong>{' '}
                   {language === 'bn' ? '২৮ - ২৯ জানুয়ারি, ২০২৭' : 'January 28 - 29, 2027'}
                 </span>
               </div>
-              <div className="flex items-center gap-2 bg-[#E2EEF8]/90 backdrop-blur-md px-4 py-2 rounded-full border border-[#0284C7]/20 shadow-xs">
-                <MapPin className="w-4 h-4 text-[#0284C7]" />
+              <div className="flex items-center gap-2 bg-[#E2EEF8]/90 backdrop-blur-md px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-[#0284C7]/20 shadow-xs">
+                <MapPin className="w-4 h-4 text-[#0284C7] shrink-0" />
                 <span>
                   <strong className="text-[#0284C7] font-bold">{language === 'bn' ? 'স্থান:' : 'Venue:'}</strong>{' '}
                   {language === 'bn' ? 'স্কুল ক্যাম্পাস, বড় মাঠ, ফরিদপুর' : 'School Campus, Large Field, Faridpur'}
@@ -300,11 +300,11 @@ export const HomePage: React.FC<HomePageProps> = ({
             )}
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2.5 sm:gap-3 pt-2">
               {isGovernanceReady && isGlobalRegistrationOpen(feeSettings) && (
                 <button
                   onClick={() => onNavigate('register')}
-                  className="px-7 py-3.5 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-black text-sm sm:text-base shadow-lg shadow-sky-600/30 hover:shadow-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center gap-2 group"
+                  className="px-6 sm:px-7 py-3.5 rounded-full bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-black text-sm sm:text-base shadow-lg shadow-sky-600/30 hover:shadow-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center justify-center gap-2 group"
                 >
                   <PenLine className="w-4 h-4 text-white" />
                   <span>{language === 'bn' ? 'নিবন্ধন করুন' : 'Register Now'}</span>
@@ -315,7 +315,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               {isGovernanceReady && (
                 <button
                   onClick={() => onNavigate('donate')}
-                  className="px-6 py-3.5 rounded-full bg-[#E2EEF8] hover:bg-white text-[#0F172A] border border-[#0284C7]/30 font-bold text-sm sm:text-base shadow-xs hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer flex items-center gap-2"
+                  className="px-6 py-3.5 rounded-full bg-[#E2EEF8] hover:bg-white text-[#0F172A] border border-[#0284C7]/30 font-bold text-sm sm:text-base shadow-xs hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-2"
                 >
                   <HeartHandshake className="w-4 h-4 text-[#0284C7]" />
                   <span>{language === 'bn' ? 'অনুদান / সহায়তা' : 'Contribute / Donate'}</span>
@@ -333,62 +333,62 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* FLOATING STATS BAR */}
       <div className="-mt-12 sm:-mt-16 relative z-25 max-w-5xl mx-auto px-4 sm:px-6 w-full">
-        <div className="bg-white rounded-3xl shadow-xl border border-[#E2EEF8] px-6 py-5 grid grid-cols-2 md:grid-cols-4 gap-4 divide-y md:divide-y-0 md:divide-x divide-[#E2EEF8] text-center">
+        <div className="bg-white rounded-3xl shadow-xl border border-[#E2EEF8] px-3.5 py-4 sm:px-6 sm:py-5 grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 md:divide-x divide-[#E2EEF8] text-center">
           {/* Stat 1: Total Registered */}
-          <div className="flex items-center justify-center gap-3 pt-2 md:pt-0">
-            <div className="w-10 h-10 rounded-full bg-[#E2EEF8] flex items-center justify-center shrink-0">
-              <Users className="w-5 h-5 text-[#0284C7]" />
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-3 p-2.5 sm:p-0 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#E2EEF8] flex items-center justify-center shrink-0">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5 text-[#0284C7]" />
             </div>
-            <div className="text-left">
-              <div data-testid="stat-total-registered" className="text-2xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
+            <div className="text-center sm:text-left min-w-0">
+              <div data-testid="stat-total-registered" className="text-xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
                 {formatStatCount(statsSnapshot.stats?.totalRegistered)}
               </div>
-              <div className="text-xs text-slate-600 font-semibold">
+              <div className="text-[11px] sm:text-xs text-slate-600 font-semibold leading-snug">
                 {language === 'bn' ? 'মোট নিবন্ধিত' : 'Total Registered'}
               </div>
             </div>
           </div>
 
           {/* Stat 2: Former Students */}
-          <div className="flex items-center justify-center gap-3 pt-2 md:pt-0">
-            <div className="w-10 h-10 rounded-full bg-[#E2EEF8] flex items-center justify-center shrink-0">
-              <GraduationCap className="w-5 h-5 text-[#0284C7]" />
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-3 p-2.5 sm:p-0 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#E2EEF8] flex items-center justify-center shrink-0">
+              <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5 text-[#0284C7]" />
             </div>
-            <div className="text-left">
-              <div data-testid="stat-former-students" className="text-2xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
+            <div className="text-center sm:text-left min-w-0">
+              <div data-testid="stat-former-students" className="text-xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
                 {formatStatCount(statsSnapshot.stats?.formerStudents)}
               </div>
-              <div className="text-xs text-slate-600 font-semibold">
+              <div className="text-[11px] sm:text-xs text-slate-600 font-semibold leading-snug">
                 {language === 'bn' ? 'প্রাক্তন শিক্ষার্থী' : 'Former Students'}
               </div>
             </div>
           </div>
 
           {/* Stat 3: Current Students */}
-          <div className="flex items-center justify-center gap-3 pt-2 md:pt-0">
-            <div className="w-10 h-10 rounded-full bg-[#E2EEF8] flex items-center justify-center shrink-0">
-              <User className="w-5 h-5 text-[#0284C7]" />
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-3 p-2.5 sm:p-0 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#E2EEF8] flex items-center justify-center shrink-0">
+              <User className="w-4 h-4 sm:w-5 sm:h-5 text-[#0284C7]" />
             </div>
-            <div className="text-left">
-              <div data-testid="stat-current-students" className="text-2xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
+            <div className="text-center sm:text-left min-w-0">
+              <div data-testid="stat-current-students" className="text-xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
                 {formatStatCount(statsSnapshot.stats?.currentStudents)}
               </div>
-              <div className="text-xs text-slate-600 font-semibold">
+              <div className="text-[11px] sm:text-xs text-slate-600 font-semibold leading-snug">
                 {language === 'bn' ? 'বর্তমান শিক্ষার্থী' : 'Current Students'}
               </div>
             </div>
           </div>
 
           {/* Stat 4: Batches Represented */}
-          <div className="flex items-center justify-center gap-3 pt-2 md:pt-0">
-            <div className="w-10 h-10 rounded-full bg-[#E2EEF8] flex items-center justify-center shrink-0">
-              <Users className="w-5 h-5 text-[#0284C7]" />
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-3 p-2.5 sm:p-0 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#E2EEF8] flex items-center justify-center shrink-0">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5 text-[#0284C7]" />
             </div>
-            <div className="text-left">
-              <div data-testid="stat-batches-represented" className="text-2xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
+            <div className="text-center sm:text-left min-w-0">
+              <div data-testid="stat-batches-represented" className="text-xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
                 {formatStatCount(statsSnapshot.stats?.batchesRepresented)}
               </div>
-              <div className="text-xs text-slate-600 font-semibold">
+              <div className="text-[11px] sm:text-xs text-slate-600 font-semibold leading-snug">
                 {language === 'bn' ? 'ব্যাচ প্রতিনিধিত্বকারী' : 'Batches Represented'}
               </div>
             </div>
@@ -717,7 +717,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         ) : (
           /* ACTIVE LIVE COUNTDOWN TIMER */
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E2EEF8] shadow-xl space-y-6">
+          <div className="bg-white rounded-3xl p-4 sm:p-8 border border-[#E2EEF8] shadow-xl space-y-5 sm:space-y-6">
             <div className="text-center space-y-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2EEF8] text-xs font-bold text-[#0284C7] uppercase tracking-wider">
                 <Clock className="w-4 h-4 text-[#0284C7]" />
@@ -727,43 +727,43 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
 
             {/* Countdown Solid Cards */}
-            <div className="grid grid-cols-4 gap-2 sm:gap-4 max-w-2xl mx-auto text-center">
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-4 max-w-2xl mx-auto text-center">
               {/* Days */}
-              <div className="bg-[#0F172A] text-white rounded-2xl p-3 sm:p-5 shadow-md border border-[#0284C7]/30">
-                <span className="text-2xl sm:text-4xl md:text-5xl font-black text-[#38BDF8] block tabular-nums">
+              <div className="bg-[#0F172A] text-white rounded-xl sm:rounded-2xl px-1.5 py-3 sm:p-5 shadow-md border border-[#0284C7]/30 min-w-0">
+                <span className="text-xl sm:text-4xl md:text-5xl font-black text-[#38BDF8] block tabular-nums">
                   {String(timeLeft.days).padStart(2, '0')}
                 </span>
-                <span className="text-[10px] sm:text-xs font-bold text-[#E2EEF8] uppercase tracking-wider mt-1 block">
+                <span className="countdown-unit-label font-bold text-[#E2EEF8] uppercase sm:tracking-wider mt-1 block truncate">
                   {t.daysLabel}
                 </span>
               </div>
 
               {/* Hours */}
-              <div className="bg-[#0F172A] text-white rounded-2xl p-3 sm:p-5 shadow-md border border-[#0284C7]/30">
-                <span className="text-2xl sm:text-4xl md:text-5xl font-black text-[#0EA5E9] block tabular-nums">
+              <div className="bg-[#0F172A] text-white rounded-xl sm:rounded-2xl px-1.5 py-3 sm:p-5 shadow-md border border-[#0284C7]/30 min-w-0">
+                <span className="text-xl sm:text-4xl md:text-5xl font-black text-[#0EA5E9] block tabular-nums">
                   {String(timeLeft.hours).padStart(2, '0')}
                 </span>
-                <span className="text-[10px] sm:text-xs font-bold text-[#E2EEF8] uppercase tracking-wider mt-1 block">
+                <span className="countdown-unit-label font-bold text-[#E2EEF8] uppercase sm:tracking-wider mt-1 block truncate">
                   {t.hoursLabel}
                 </span>
               </div>
 
               {/* Minutes */}
-              <div className="bg-[#0F172A] text-white rounded-2xl p-3 sm:p-5 shadow-md border border-[#0284C7]/30">
-                <span className="text-2xl sm:text-4xl md:text-5xl font-black text-[#38BDF8] block tabular-nums">
+              <div className="bg-[#0F172A] text-white rounded-xl sm:rounded-2xl px-1.5 py-3 sm:p-5 shadow-md border border-[#0284C7]/30 min-w-0">
+                <span className="text-xl sm:text-4xl md:text-5xl font-black text-[#38BDF8] block tabular-nums">
                   {String(timeLeft.minutes).padStart(2, '0')}
                 </span>
-                <span className="text-[10px] sm:text-xs font-bold text-[#E2EEF8] uppercase tracking-wider mt-1 block">
+                <span className="countdown-unit-label font-bold text-[#E2EEF8] uppercase sm:tracking-wider mt-1 block truncate">
                   {t.minutesLabel}
                 </span>
               </div>
 
               {/* Seconds */}
-              <div className="bg-[#0F172A] text-white rounded-2xl p-3 sm:p-5 shadow-md border border-[#0284C7]/30">
-                <span className="text-2xl sm:text-4xl md:text-5xl font-black text-[#0EA5E9] block tabular-nums">
+              <div className="bg-[#0F172A] text-white rounded-xl sm:rounded-2xl px-1.5 py-3 sm:p-5 shadow-md border border-[#0284C7]/30 min-w-0">
+                <span className="text-xl sm:text-4xl md:text-5xl font-black text-[#0EA5E9] block tabular-nums">
                   {String(timeLeft.seconds).padStart(2, '0')}
                 </span>
-                <span className="text-[10px] sm:text-xs font-bold text-[#E2EEF8] uppercase tracking-wider mt-1 block">
+                <span className="countdown-unit-label font-bold text-[#E2EEF8] uppercase sm:tracking-wider mt-1 block truncate">
                   {t.secondsLabel}
                 </span>
               </div>
@@ -1308,7 +1308,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {[
               {
                 title: 'Campus Heritage 1962',

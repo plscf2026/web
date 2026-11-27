@@ -23,7 +23,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    overflow-x: hidden;
+    overflow-x: clip;
     width: 100%;
     touch-action: manipulation;
   }
@@ -68,7 +68,7 @@
     color: #0f172a;
     background-color: #f0f6fa;
     line-height: 1.5;
-    overflow-x: hidden;
+    overflow-x: clip;
     width: 100%;
     touch-action: manipulation;
   }
@@ -162,6 +162,24 @@
   font-size: 0.95rem !important;
   /* ~15.2px */
   line-height: 1.45rem !important;
+}
+
+/* Scoped compact label utilities for dense phone widgets (bottom nav, 4-col countdown) */
+.mobile-nav-label {
+  font-size: 0.65rem !important;
+  line-height: 1.15 !important;
+}
+
+.countdown-unit-label {
+  font-size: 0.625rem !important;
+  line-height: 1.15 !important;
+}
+
+@media (min-width: 640px) {
+  .countdown-unit-label {
+    font-size: 0.75rem !important;
+    line-height: 1.25 !important;
+  }
 }
 
 /* =========================================================================

@@ -100,16 +100,16 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-50 bg-[#F0F6FA]/95 backdrop-blur-md border-b border-[#E2EEF8] shadow-xs">
       {/* Main Institution Branding Navigation */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-18 sm:h-20">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between min-h-[4.25rem] py-2 sm:py-0 sm:h-20 gap-2">
           {/* Logo & School Crest */}
           <button
             type="button"
             onClick={() => handleNav('home')}
             aria-label={language === 'bn' ? 'হোম পেজে ফিরুন' : 'Go to home page'}
-            className="flex items-center gap-2.5 sm:gap-3.5 cursor-pointer select-none group min-w-0 text-left bg-transparent border-0 p-0"
+            className="flex items-center gap-2 sm:gap-3.5 cursor-pointer select-none group min-w-0 text-left bg-transparent border-0 p-0"
           >
-            <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-full overflow-hidden bg-white p-0.5 shadow-md group-hover:scale-105 transition-transform duration-200 border-2 border-[#0284C7] shrink-0 flex items-center justify-center">
+            <div className="w-10 h-10 sm:w-13 sm:h-13 rounded-full overflow-hidden bg-white p-0.5 shadow-md group-hover:scale-105 transition-transform duration-200 border-2 border-[#0284C7] shrink-0 flex items-center justify-center">
               <img
                 src="/assets/school_logo.png"
                 alt="Police Lines School & College Faridpur Crest"
@@ -117,11 +117,11 @@ export const Header: React.FC<HeaderProps> = ({
               />
             </div>
 
-            <div className="min-w-0 pr-3 border-r border-[#E2EEF8]">
-              <h1 className="text-xs sm:text-base font-extrabold text-[#0F172A] tracking-tight leading-tight group-hover:text-[#0284C7] transition-colors">
+            <div className="min-w-0 pr-1 sm:pr-3 sm:border-r sm:border-[#E2EEF8]">
+              <h1 className="text-[13px] sm:text-base font-extrabold text-[#0F172A] tracking-tight leading-snug group-hover:text-[#0284C7] transition-colors line-clamp-2 sm:line-clamp-none">
                 {t.institutionName}
               </h1>
-              <p className="text-[10px] sm:text-xs text-[#0284C7] font-semibold italic flex items-center gap-1.5 mt-0.5">
+              <p className="text-[10px] sm:text-xs text-[#0284C7] font-semibold italic flex items-center gap-1.5 mt-0.5 truncate">
                 <span>{language === 'bn' ? 'স্থাপিত ১৯৬২ • ফরিদপুর' : 'Est. 1962 • Faridpur'}</span>
               </p>
             </div>
@@ -161,17 +161,17 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
 
           {/* Mobile hamburger button */}
-          <div className="flex lg:hidden items-center gap-2">
+          <div className="flex lg:hidden items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={() => onLanguageChange(language === 'en' ? 'bn' : 'en')}
-              className="px-2.5 py-1 text-xs font-bold rounded-full bg-[#E2EEF8] text-[#0F172A] border border-[#0284C7]/20 cursor-pointer"
+              className="min-h-[38px] px-2.5 py-1.5 text-xs font-bold rounded-full bg-[#E2EEF8] text-[#0F172A] border border-[#0284C7]/20 cursor-pointer whitespace-nowrap"
             >
               {t.switchLanguage}
             </button>
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-[#0F172A] hover:bg-[#E2EEF8] cursor-pointer"
+              className="min-h-[40px] min-w-[40px] flex items-center justify-center p-2 rounded-lg text-[#0F172A] hover:bg-[#E2EEF8] cursor-pointer"
               aria-label="Toggle mobile menu"
               aria-expanded={mobileMenuOpen}
             >
@@ -183,7 +183,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="lg:hidden bg-[#F0F6FA] border-b border-[#E2EEF8] px-4 pt-2 pb-6 space-y-2 shadow-xl animate-in slide-in-from-top-2 duration-150">
+        <div className="lg:hidden bg-[#F0F6FA] border-b border-[#E2EEF8] px-4 pt-2 pb-8 space-y-2 shadow-xl animate-in slide-in-from-top-2 duration-150 max-h-[calc(100vh-4.5rem)] overflow-y-auto">
           {navItems.map((item) => (
             <button
               key={item.id}

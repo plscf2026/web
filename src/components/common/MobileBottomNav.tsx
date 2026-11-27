@@ -89,7 +89,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       aria-label="Mobile Quick Navigation"
       className="sm:hidden fixed-bottom-navigation"
     >
-      <div className="max-w-md mx-auto px-1.5 flex items-center justify-between gap-0.5">
+      <div className="max-w-md mx-auto px-1 flex items-center justify-between gap-0.5">
         {navItems.map((item) => {
           const isActive =
             activeView === item.id ||
@@ -108,7 +108,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 }
                 onNavigate(item.id);
               }}
-              className={`flex-1 min-w-0 flex flex-col items-center justify-center min-h-[44px] py-1 px-1 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+              className={`flex-1 min-w-0 overflow-hidden flex flex-col items-center justify-center min-h-[44px] py-1 px-0.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
                 isActive
                   ? 'text-[#38BDF8] bg-sky-950/60 font-bold shadow-inner'
                   : item.highlight
@@ -118,7 +118,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             >
               <div className="relative">
                 <Icon
-                  className={`w-5 h-5 transition-transform ${
+                  className={`w-[18px] h-[18px] transition-transform ${
                     isActive ? 'scale-110 text-[#38BDF8]' : ''
                   }`}
                 />
@@ -127,7 +127,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 )}
               </div>
               <span
-                className={`text-[10px] mt-1 tracking-tight leading-none ${
+                className={`mobile-nav-label max-w-full truncate whitespace-nowrap mt-1 tracking-tight ${
                   isActive ? 'font-black text-[#38BDF8]' : 'font-medium'
                 }`}
               >

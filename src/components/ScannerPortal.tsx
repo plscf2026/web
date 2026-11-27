@@ -395,8 +395,8 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language, initialM
   // 1. Staff Login Screen (if not logged in)
   if (!currentStaff) {
     return (
-      <div className="max-w-lg mx-auto px-4 py-16">
-        <div className="bg-white rounded-3xl p-8 shadow-xl border border-slate-200 space-y-6">
+      <div className="max-w-lg mx-auto px-4 py-10 sm:py-16">
+        <div className="bg-white rounded-3xl p-5 sm:p-8 shadow-xl border border-slate-200 space-y-6">
           <div className="text-center space-y-2">
             <div className="w-16 h-16 rounded-2xl bg-slate-900 text-amber-400 flex items-center justify-center mx-auto shadow-md">
               <Shield className="w-8 h-8" />

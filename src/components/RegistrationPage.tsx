@@ -1018,8 +1018,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
         {/* CURRENT STUDENT SPECIFIC: 1. ACADEMIC INFORMATION & INSTITUTIONAL VERIFICATION (FIRST STEP) */}
         {selectedCategoryOpen && category === 'current' && (
-          <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-sm border border-slate-200 space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <GraduationCap className="w-5 h-5 text-[#0284C7]" />
                 <h2 className="text-lg font-bold text-slate-900">
@@ -1068,8 +1068,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                     <span className="text-rose-600">*</span>
                   </label>
 
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
+                  <div className="flex flex-col sm:flex-row gap-2.5">
+                    <div className="relative flex-1 min-w-0">
                       <School className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                       <input
                         type="text"
@@ -1101,7 +1101,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                       type="button"
                       onClick={() => handleVerifyStudentId(studentId)}
                       disabled={!studentId.trim() || isVerifyingId}
-                      className="px-5 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
+                      className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0EA5E9] text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm shrink-0"
                     >
                       {isVerifyingId ? (
                         <>
@@ -2100,6 +2100,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   clearValidationError('tShirtSize');
                 }}
                 className={`py-3 px-2 rounded-xl border-2 font-bold text-sm transition-all cursor-pointer ${
+                  size === 'Oversize 50' ? 'col-span-3 sm:col-span-2 md:col-span-1' : ''
+                } ${
                   tShirtSize === size
                     ? 'border-[#0284C7] bg-[#0284C7] text-white shadow-xs'
                     : 'border-slate-200 hover:border-slate-300 text-slate-700 bg-white'
@@ -2170,8 +2172,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
         )}
 
         {/* Section 5: Order Summary & Terms */}
-        <div className="bg-[#0F172A] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-800 space-y-6">
-          <h2 className="text-lg font-bold border-b border-slate-800 pb-3 flex items-center justify-between">
+        <div className="bg-[#0F172A] text-white rounded-3xl p-5 sm:p-8 shadow-xl border border-slate-800 space-y-6">
+          <h2 className="text-lg font-bold border-b border-slate-800 pb-3 flex flex-wrap items-center justify-between gap-2">
             <span>{t.summaryHeading}</span>
             <span className="text-xs text-[#38BDF8] font-normal">
               {category === 'former' ? t.feeFormerTitle : t.feeCurrentTitle}

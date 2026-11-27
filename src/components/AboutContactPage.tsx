@@ -144,7 +144,7 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
           </p>
         </div>
 
-        <div className="bg-white rounded-3xl p-8 sm:p-12 border border-[#E2EEF8] shadow-sm grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+        <div className="bg-white rounded-3xl p-5 sm:p-12 border border-[#E2EEF8] shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-center">
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-[#0F172A]">
               <History className="w-5 h-5 text-[#0284C7]" />

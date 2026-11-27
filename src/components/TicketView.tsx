@@ -68,7 +68,7 @@ export const TicketView: React.FC<TicketViewProps> = ({
   const isRejected = approvalStatus === 'rejected';
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
       {/* Top Banner */}
       <div className="no-print mb-6 text-center space-y-2">
         <div
@@ -184,7 +184,7 @@ export const TicketView: React.FC<TicketViewProps> = ({
       {/* Official Student ID Card Section */}
       {isPaid ? (
         <>
-          <div className="no-print mb-8 bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 rounded-3xl p-6 text-white shadow-xl border border-sky-800/40">
+          <div className="no-print mb-8 bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 rounded-3xl p-4 sm:p-6 text-white shadow-xl border border-sky-800/40">
             <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
               <div className="text-center lg:text-left space-y-2 max-w-md">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 text-xs font-bold border border-sky-400/30">
@@ -214,7 +214,7 @@ export const TicketView: React.FC<TicketViewProps> = ({
                     : 'Print your official ID card photo directly, or download print-ready PDF and photo image for your mobile gallery.'}
                 </p>
               </div>
-              <div className="flex-shrink-0">
+              <div className="w-full max-w-[300px] sm:max-w-[320px] shrink-0 mx-auto lg:mx-0">
                 <StudentIdCardBadge
                   student={IdCardStore.getOrBuildCardForRegistration(registration)}
                   language={language}
@@ -225,7 +225,7 @@ export const TicketView: React.FC<TicketViewProps> = ({
 
           {/* Parent / Guardian Entry Pass Card Section (If registered with parent) */}
           {registration.hasParent && (
-            <div className="no-print mb-8 bg-gradient-to-br from-[#24040F] via-[#450A1A] to-[#24040F] rounded-3xl p-6 text-white shadow-xl border border-amber-500/40">
+            <div className="no-print mb-8 bg-gradient-to-br from-[#24040F] via-[#450A1A] to-[#24040F] rounded-3xl p-4 sm:p-6 text-white shadow-xl border border-amber-500/40">
               <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
                 <div className="text-center lg:text-left space-y-2 max-w-md">
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-400/30">
@@ -246,7 +246,7 @@ export const TicketView: React.FC<TicketViewProps> = ({
                     <div>মোবাইল / Phone: <span className="font-bold text-white">{registration.parentPhone || 'N/A'}</span></div>
                   </div>
                 </div>
-                <div className="flex-shrink-0">
+                <div className="w-full max-w-[300px] sm:max-w-[320px] shrink-0 mx-auto lg:mx-0">
                   <ParentIdCardBadge
                     student={IdCardStore.getOrBuildCardForRegistration(registration)}
                     language={language}

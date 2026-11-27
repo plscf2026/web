@@ -671,7 +671,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({
               />
             </div>
           ) : (
-          <div className="lg:col-span-8 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+          <div className="lg:col-span-8 bg-white rounded-3xl p-4 sm:p-8 border border-slate-200 shadow-sm space-y-6">
             {/* 1. Big International Payment Button */}
             {intlPaymentInfo.isEnabled && onNavigate && (
               <div className="pb-5 border-b border-slate-100">
@@ -717,7 +717,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({
                         key={amt}
                         type="button"
                         onClick={() => handleSelectPreset(amt)}
-                        className={`min-h-[44px] py-2.5 px-2 rounded-xl text-xs font-black transition-all cursor-pointer border text-center flex items-center justify-center whitespace-nowrap tabular-nums ${isSelected
+                        className={`min-h-[44px] py-2.5 px-1.5 sm:px-2 rounded-xl text-xs font-black transition-all cursor-pointer border text-center flex items-center justify-center whitespace-nowrap tabular-nums ${isSelected
                           ? 'bg-slate-900 text-amber-300 border-slate-900 shadow-md ring-2 ring-amber-400/30'
                           : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
                           }`}
@@ -826,7 +826,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({
 
               {/* Step 3: Uniform 1.8% Gateway Charge Summary (PayStation Hosted Checkout) */}
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
-                <div className="flex items-center justify-between font-bold text-slate-700 pb-1 border-b border-slate-200">
+                <div className="flex flex-wrap items-center justify-between gap-1.5 font-bold text-slate-700 pb-1.5 border-b border-slate-200">
                   <span className="flex items-center gap-1.5">
                     <CreditCard className="w-4 h-4 text-[#0284C7]" />
                     <span>{isBangla ? 'PayStation চেকআউট সারাংশ' : 'PayStation Checkout Summary'}</span>

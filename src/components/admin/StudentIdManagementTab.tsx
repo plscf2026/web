@@ -423,7 +423,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
 
       {/* Filter and Search Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex-1 min-w-[240px] relative">
+        <div className="flex-1 min-w-0 w-full sm:min-w-[240px] relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
           <input
             type="text"

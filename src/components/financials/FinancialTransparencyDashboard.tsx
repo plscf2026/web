@@ -395,7 +395,7 @@ export const FinancialTransparencyDashboard: React.FC<FinancialTransparencyDashb
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-4">
             {/* Metric 1: Total Approved Collection */}
-            <div className="p-3 bg-slate-800/80 rounded-2xl border border-emerald-500/30 space-y-1">
+            <div className="col-span-2 sm:col-span-1 p-3 bg-slate-800/80 rounded-2xl border border-emerald-500/30 space-y-1">
               <span className="text-[10px] uppercase font-bold text-emerald-400 block tracking-wider">
                 {isBangla ? 'সর্বমোট অনুমোদিত সংগ্রহ' : 'Approved Collection'}
               </span>
@@ -575,7 +575,7 @@ export const FinancialTransparencyDashboard: React.FC<FinancialTransparencyDashb
 
             {/* Detailed Expense Voucher Cards */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold px-1">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 font-semibold px-1">
                 <span>
                   {isBangla ? 'প্রদর্শিত ভাউচার সংখ্যা:' : 'Showing Vouchers:'}{' '}
                   <strong className="text-slate-900">{filteredExpenses.length}</strong>
@@ -671,7 +671,7 @@ export const FinancialTransparencyDashboard: React.FC<FinancialTransparencyDashb
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                <div className="relative min-w-[240px]">
+                <div className="relative w-full sm:min-w-[240px]">
                   <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
                   <input
                     type="text"
