@@ -734,18 +734,26 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
       }
     }
 
+    // Multiple students or family members can register using the same mobile number (e.g. parent's phone or shared contact).
+    // We only prevent duplicate registration if the EXACT same alumnus (same name, batch, and mobile) is already registered.
+    // For Current Students, Roll/Student ID verification above guarantees uniqueness.
     const normalizedMobileNumber = normalizeBangladeshiMobileNumber(mobileNumber);
-    if (
-      normalizedMobileNumber &&
-      AppStore.getRegistrations().some(
+    if (normalizedMobileNumber && category === 'former') {
+      const cleanName = fullName.trim().toLowerCase();
+      const cleanBatch = batchName.trim().toLowerCase();
+      const isAlumniExactDuplicate = AppStore.getRegistrations().some(
         (registration) =>
-          normalizeBangladeshiMobileNumber(registration.mobileNumber) === normalizedMobileNumber
-      )
-    ) {
-      customErrors.mobileNumber = {
-        en: 'This mobile number is already registered. Use a different number.',
-        bn: 'এই মোবাইল নম্বরটি ইতোমধ্যে নিবন্ধিত। অনুগ্রহ করে অন্য নম্বর দিন।',
-      };
+          registration.category === 'former' &&
+          normalizeBangladeshiMobileNumber(registration.mobileNumber) === normalizedMobileNumber &&
+          registration.fullName?.trim().toLowerCase() === cleanName &&
+          registration.batchName?.trim().toLowerCase() === cleanBatch
+      );
+      if (isAlumniExactDuplicate) {
+        customErrors.mobileNumber = {
+          en: 'A registration with this name, batch, and mobile number already exists.',
+          bn: 'এই নাম, ব্যাচ এবং মোবাইল নম্বর দিয়ে ইতোমধ্যে একটি নিবন্ধন রয়েছে।',
+        };
+      }
     }
 
     if (Object.keys(customErrors).length > 0) {
@@ -1590,8 +1598,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               </div>
               <span className="text-[10px] text-slate-500 mt-0.5 block">
                 {language === 'bn'
-                  ? '০১ দিয়ে শুরু, মোট ১১ ডিজিট — প্রতিটি নিবন্ধনে আলাদা নম্বর আবশ্যক'
-                  : 'Must start with 01, exactly 11 digits — each registration needs a unique number'}
+                  ? '০১ দিয়ে শুরু, মোট ১১ ডিজিট — একই পারিবারিক নম্বর একাধিক নিবন্ধনে ব্যবহারযোগ্য'
+                  : 'Must start with 01, exactly 11 digits — family/shared number allowed across registrations'}
               </span>
               {validationErrors.mobileNumber && (
                 <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">
