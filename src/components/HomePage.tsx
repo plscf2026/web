@@ -241,6 +241,12 @@ export const HomePage: React.FC<HomePageProps> = ({
 
         <div className="max-w-7xl mx-auto relative z-10 w-full">
           <div className="max-w-2xl space-y-3.5 sm:space-y-5 text-left">
+            {/* Institutional Celebration Eyebrow Badge */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-sky-200/90 text-[#0284C7] text-xs font-bold shadow-xs">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-400 shrink-0" />
+              <span>{language === 'bn' ? 'ঐতিহ্যের ৬৫ বছর পূর্তি মহোৎসব • ২০২৭' : '65th Anniversary Historic Milestone • 2027'}</span>
+            </div>
+
             {/* Stylized Italic Tagline */}
             <div className="font-serif italic text-xl sm:text-3xl text-[#0284C7] tracking-wide font-medium drop-shadow-xs">
               {language === 'bn' ? 'একবার পিএলসিয়ান, চিরকাল পিএলসিয়ান...' : 'Once a PLSian, Always a PLSian...'}
@@ -332,63 +338,64 @@ export const HomePage: React.FC<HomePageProps> = ({
       </section>
 
       {/* FLOATING STATS BAR */}
-      <div className="-mt-12 sm:-mt-16 relative z-25 max-w-5xl mx-auto px-4 sm:px-6 w-full">
-        <div className="bg-white rounded-3xl shadow-xl border border-[#E2EEF8] px-3.5 py-4 sm:px-6 sm:py-5 grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 md:divide-x divide-[#E2EEF8] text-center">
+      <div className="-mt-12 sm:-mt-16 relative z-25 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_12px_40px_-10px_rgba(2,132,199,0.14)] border border-[#E2EEF8] px-4 py-4 sm:px-6 sm:py-5 grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 md:divide-x divide-[#E2EEF8] text-center">
           {/* Stat 1: Total Registered */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-3 p-2.5 sm:p-0 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#E2EEF8] flex items-center justify-center shrink-0">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 p-3 sm:p-2 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0 transition-transform hover:scale-[1.02]">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-sky-100/80 border border-sky-200/60 flex items-center justify-center shrink-0 shadow-2xs">
               <Users className="w-4 h-4 sm:w-5 sm:h-5 text-[#0284C7]" />
             </div>
             <div className="text-center sm:text-left min-w-0">
-              <div data-testid="stat-total-registered" className="text-xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
-                {formatStatCount(statsSnapshot.stats?.totalRegistered)}
+              <div data-testid="stat-total-registered" className="text-xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums flex items-center justify-center sm:justify-start gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0 inline-block" />
+                <span>{formatStatCount(statsSnapshot.stats?.totalRegistered)}</span>
               </div>
-              <div className="text-[11px] sm:text-xs text-slate-600 font-semibold leading-snug">
+              <div className="text-[11px] sm:text-xs text-slate-600 font-bold leading-snug">
                 {language === 'bn' ? 'মোট নিবন্ধিত' : 'Total Registered'}
               </div>
             </div>
           </div>
 
           {/* Stat 2: Former Students */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-3 p-2.5 sm:p-0 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#E2EEF8] flex items-center justify-center shrink-0">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 p-3 sm:p-2 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0 transition-transform hover:scale-[1.02]">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-sky-100/80 border border-sky-200/60 flex items-center justify-center shrink-0 shadow-2xs">
               <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5 text-[#0284C7]" />
             </div>
             <div className="text-center sm:text-left min-w-0">
               <div data-testid="stat-former-students" className="text-xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
                 {formatStatCount(statsSnapshot.stats?.formerStudents)}
               </div>
-              <div className="text-[11px] sm:text-xs text-slate-600 font-semibold leading-snug">
+              <div className="text-[11px] sm:text-xs text-slate-600 font-bold leading-snug">
                 {language === 'bn' ? 'প্রাক্তন শিক্ষার্থী' : 'Former Students'}
               </div>
             </div>
           </div>
 
           {/* Stat 3: Current Students */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-3 p-2.5 sm:p-0 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#E2EEF8] flex items-center justify-center shrink-0">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 p-3 sm:p-2 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0 transition-transform hover:scale-[1.02]">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-sky-100/80 border border-sky-200/60 flex items-center justify-center shrink-0 shadow-2xs">
               <User className="w-4 h-4 sm:w-5 sm:h-5 text-[#0284C7]" />
             </div>
             <div className="text-center sm:text-left min-w-0">
               <div data-testid="stat-current-students" className="text-xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
                 {formatStatCount(statsSnapshot.stats?.currentStudents)}
               </div>
-              <div className="text-[11px] sm:text-xs text-slate-600 font-semibold leading-snug">
+              <div className="text-[11px] sm:text-xs text-slate-600 font-bold leading-snug">
                 {language === 'bn' ? 'বর্তমান শিক্ষার্থী' : 'Current Students'}
               </div>
             </div>
           </div>
 
           {/* Stat 4: Batches Represented */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-3 p-2.5 sm:p-0 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#E2EEF8] flex items-center justify-center shrink-0">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 p-3 sm:p-2 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0 transition-transform hover:scale-[1.02]">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-sky-100/80 border border-sky-200/60 flex items-center justify-center shrink-0 shadow-2xs">
               <Users className="w-4 h-4 sm:w-5 sm:h-5 text-[#0284C7]" />
             </div>
             <div className="text-center sm:text-left min-w-0">
               <div data-testid="stat-batches-represented" className="text-xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
                 {formatStatCount(statsSnapshot.stats?.batchesRepresented)}
               </div>
-              <div className="text-[11px] sm:text-xs text-slate-600 font-semibold leading-snug">
+              <div className="text-[11px] sm:text-xs text-slate-600 font-bold leading-snug">
                 {language === 'bn' ? 'ব্যাচ প্রতিনিধিত্বকারী' : 'Batches Represented'}
               </div>
             </div>
@@ -398,13 +405,13 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* THREE MAIN FEATURE CARDS */}
       <section
-        className="max-w-6xl mx-auto px-4 sm:px-6 w-full -mt-6"
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full -mt-6"
         style={getHomePageSectionStyle('featureCards')}
       >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Card 1: Latest Notices */}
-          <div className="bg-white rounded-2xl shadow-md border border-[#E2EEF8] overflow-hidden flex flex-col">
-            <div className="bg-[#0F172A] text-white px-4 py-3 flex items-center justify-between">
+          <div className="bg-white rounded-3xl shadow-sm hover:shadow-xl border border-[#E2EEF8] overflow-hidden flex flex-col transition-all duration-300 group hover:-translate-y-1">
+            <div className="bg-gradient-to-r from-slate-950 via-[#0F172A] to-slate-950 text-white px-5 py-3.5 flex items-center justify-between">
               <div className="flex items-center gap-2 font-bold text-sm sm:text-base">
                 <Megaphone className="w-4 h-4 text-[#38BDF8]" />
                 <span>{language === 'bn' ? 'সর্বশেষ নোটিশ' : 'Latest Notices'}</span>
@@ -432,9 +439,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                   <div
                     key={notice.id}
                     onClick={() => onNavigate('notices')}
-                    className="flex items-start gap-3 p-2 rounded-xl hover:bg-[#E2EEF8]/60 transition-colors cursor-pointer group"
+                    className="flex items-start gap-3 p-2.5 rounded-2xl hover:bg-[#E2EEF8]/60 transition-colors cursor-pointer group"
                   >
-                    <div className="bg-[#E2EEF8] text-[#0284C7] font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg text-center shrink-0 leading-tight min-w-[42px]">
+                    <div className="bg-[#E2EEF8] text-[#0284C7] font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-xl text-center shrink-0 leading-tight min-w-[42px] border border-sky-200/50">
                       <div>{monthLabel}</div>
                       <div className="text-sm">{dayLabel}</div>
                     </div>
@@ -453,8 +460,8 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
 
           {/* Card 2: Our Memories */}
-          <div className="bg-white rounded-2xl shadow-md border border-[#E2EEF8] overflow-hidden flex flex-col">
-            <div className="bg-[#0F172A] text-white px-4 py-3 flex items-center justify-between">
+          <div className="bg-white rounded-3xl shadow-sm hover:shadow-xl border border-[#E2EEF8] overflow-hidden flex flex-col transition-all duration-300 group hover:-translate-y-1">
+            <div className="bg-gradient-to-r from-slate-950 via-[#0F172A] to-slate-950 text-white px-5 py-3.5 flex items-center justify-between">
               <div className="flex items-center gap-2 font-bold text-sm sm:text-base">
                 <ImageIcon className="w-4 h-4 text-[#38BDF8]" />
                 <span>{language === 'bn' ? 'আমাদের স্মৃতিমালা' : 'Our Memories'}</span>
@@ -470,46 +477,55 @@ export const HomePage: React.FC<HomePageProps> = ({
             <div className="p-4 flex-1 flex items-center justify-between gap-2.5">
               <div
                 onClick={() => onNavigate('gallery')}
-                className="relative flex-1 aspect-square rounded-xl overflow-hidden border border-[#E2EEF8] hover:shadow-md transition-all cursor-pointer group"
+                className="relative flex-1 aspect-square rounded-2xl overflow-hidden border border-[#E2EEF8] hover:shadow-md transition-all cursor-pointer group"
               >
                 <img
                   src="/assets/homepage/memory_1.jpg"
                   alt="School Campus Memory"
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                
-            loading="lazy"
-            decoding="async"/>
+                  loading="lazy"
+                  decoding="async"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/assets/homepage/campus_hero.jpg';
+                  }}
+                />
               </div>
               <div
                 onClick={() => onNavigate('gallery')}
-                className="relative flex-1 aspect-square rounded-xl overflow-hidden border border-[#E2EEF8] hover:shadow-md transition-all cursor-pointer group"
+                className="relative flex-1 aspect-square rounded-2xl overflow-hidden border border-[#E2EEF8] hover:shadow-md transition-all cursor-pointer group"
               >
                 <img
                   src="/assets/homepage/memory_2.jpg"
                   alt="Students Group Memory"
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                
-            loading="lazy"
-            decoding="async"/>
+                  loading="lazy"
+                  decoding="async"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/assets/homepage/campus_hero.jpg';
+                  }}
+                />
               </div>
               <div
                 onClick={() => onNavigate('gallery')}
-                className="relative flex-1 aspect-square rounded-xl overflow-hidden border border-[#E2EEF8] hover:shadow-md transition-all cursor-pointer group"
+                className="relative flex-1 aspect-square rounded-2xl overflow-hidden border border-[#E2EEF8] hover:shadow-md transition-all cursor-pointer group"
               >
                 <img
                   src="/assets/homepage/memory_3.jpg"
                   alt="School Assembly Memory"
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                
-            loading="lazy"
-            decoding="async"/>
+                  loading="lazy"
+                  decoding="async"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/assets/homepage/campus_hero.jpg';
+                  }}
+                />
               </div>
             </div>
           </div>
 
           {/* Card 3: Our Videos */}
-          <div className="bg-white rounded-2xl shadow-md border border-[#E2EEF8] overflow-hidden flex flex-col">
-            <div className="bg-[#0F172A] text-white px-4 py-3 flex items-center justify-between">
+          <div className="bg-white rounded-3xl shadow-sm hover:shadow-xl border border-[#E2EEF8] overflow-hidden flex flex-col transition-all duration-300 group hover:-translate-y-1">
+            <div className="bg-gradient-to-r from-slate-950 via-[#0F172A] to-slate-950 text-white px-5 py-3.5 flex items-center justify-between">
               <div className="flex items-center gap-2 font-bold text-sm sm:text-base">
                 <Play className="w-4 h-4 text-[#38BDF8]" />
                 <span>{language === 'bn' ? 'আমাদের ভিডিও' : 'Our Videos'}</span>
@@ -525,15 +541,18 @@ export const HomePage: React.FC<HomePageProps> = ({
             <div className="p-4 flex-1 flex items-center justify-center">
               <div
                 onClick={() => setIsVideoModalOpen(true)}
-                className="relative w-full rounded-xl overflow-hidden shadow-xs cursor-pointer group border border-[#E2EEF8]"
+                className="relative w-full rounded-2xl overflow-hidden shadow-xs cursor-pointer group border border-[#E2EEF8]"
               >
                 <img
                   src="/assets/homepage/video_thumb.jpg"
                   alt="Reunion Promo Video"
                   className="w-full h-36 sm:h-40 object-cover group-hover:scale-105 transition-transform duration-500"
-                
-            loading="lazy"
-            decoding="async"/>
+                  loading="lazy"
+                  decoding="async"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/assets/homepage/campus_hero.jpg';
+                  }}
+                />
                 {/* Perfectly Centered Play Button */}
                 <div className="absolute inset-0 bg-black/35 group-hover:bg-black/25 flex items-center justify-center transition-colors">
                   <div className="w-14 h-14 rounded-full bg-white/95 text-[#0284C7] shadow-2xl flex items-center justify-center transition-all group-hover:scale-110">
@@ -553,10 +572,10 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* BOTTOM NAVY WAVE RIBBON */}
       <section
-        className="max-w-6xl mx-auto px-4 sm:px-6 w-full -mt-6"
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full -mt-6"
         style={getHomePageSectionStyle('pillarsRibbon')}
       >
-        <div className="relative overflow-hidden rounded-3xl bg-[#0F172A] text-white p-6 sm:p-8 shadow-xl border border-[#0284C7]/30">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-950 via-[#0F172A] to-slate-950 text-white p-6 sm:p-8 shadow-xl border border-[#0284C7]/30">
           {/* Subtle watermark illustration of campus */}
           <div className="absolute right-0 bottom-0 top-0 w-96 opacity-15 pointer-events-none overflow-hidden">
             <img
@@ -646,12 +665,12 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* SECTION 2 & 3: COUNTDOWN TIMER / POST-EVENT CELEBRATION */}
       <section
-        className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 relative z-20"
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 relative z-20"
         style={getHomePageSectionStyle('countdown')}
       >
         {timeLeft.isOver ? (
           /* AFTER THE EVENT STATE */
-          <div className="bg-[#0F172A] rounded-3xl p-8 border border-[#0284C7]/40 shadow-2xl text-white text-center space-y-6">
+          <div className="max-w-4xl mx-auto bg-gradient-to-b from-slate-950 via-[#0F172A] to-slate-950 rounded-3xl p-8 border border-[#0284C7]/40 shadow-2xl text-white text-center space-y-6">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#0284C7]/20 border border-[#38BDF8]/40 text-[#38BDF8] text-xs font-bold uppercase tracking-wider">
               <Sparkles className="w-4 h-4 text-[#38BDF8]" />
               <span>{language === 'bn' ? 'ঐতিহাসিক মুহূর্ত উদযাপিত' : 'Historic Milestone Celebrated'}</span>
@@ -695,53 +714,53 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         ) : (
           /* ACTIVE LIVE COUNTDOWN TIMER */
-          <div className="bg-white rounded-3xl p-4 sm:p-8 border border-[#E2EEF8] shadow-xl space-y-5 sm:space-y-6">
-            <div className="text-center space-y-1">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2EEF8] text-xs font-bold text-[#0284C7] uppercase tracking-wider">
+          <div className="max-w-4xl mx-auto bg-white rounded-3xl p-6 sm:p-8 border border-[#E2EEF8] shadow-xl space-y-5 sm:space-y-6">
+            <div className="text-center space-y-1.5">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#E2EEF8] text-xs font-bold text-[#0284C7] uppercase tracking-wider border border-[#0284C7]/20">
                 <Clock className="w-4 h-4 text-[#0284C7]" />
                 <span>{t.countdownHeading}</span>
               </div>
-              <p className="text-xs text-slate-500">{t.countdownSubtitle}</p>
+              <p className="text-xs sm:text-sm text-slate-500 font-medium">{t.countdownSubtitle}</p>
             </div>
 
             {/* Countdown Solid Cards */}
-            <div className="grid grid-cols-4 gap-1.5 sm:gap-4 max-w-2xl mx-auto text-center">
+            <div className="grid grid-cols-4 gap-2 sm:gap-4 max-w-2xl mx-auto text-center">
               {/* Days */}
-              <div className="bg-[#0F172A] text-white rounded-xl sm:rounded-2xl px-1.5 py-3 sm:p-5 shadow-md border border-[#0284C7]/30 min-w-0">
-                <span className="text-xl sm:text-4xl md:text-5xl font-black text-[#38BDF8] block tabular-nums">
+              <div className="bg-gradient-to-b from-slate-950 to-[#0F172A] text-white rounded-2xl px-2 py-3.5 sm:p-5 shadow-md border border-[#0284C7]/30 min-w-0 transition-transform hover:scale-105">
+                <span className="text-2xl sm:text-4xl md:text-5xl font-black text-[#38BDF8] block tabular-nums tracking-tight">
                   {String(timeLeft.days).padStart(2, '0')}
                 </span>
-                <span className="countdown-unit-label font-bold text-[#E2EEF8] uppercase sm:tracking-wider mt-1 block truncate">
+                <span className="countdown-unit-label font-bold text-[#E2EEF8] uppercase sm:tracking-wider mt-1.5 block truncate">
                   {t.daysLabel}
                 </span>
               </div>
 
               {/* Hours */}
-              <div className="bg-[#0F172A] text-white rounded-xl sm:rounded-2xl px-1.5 py-3 sm:p-5 shadow-md border border-[#0284C7]/30 min-w-0">
-                <span className="text-xl sm:text-4xl md:text-5xl font-black text-[#0EA5E9] block tabular-nums">
+              <div className="bg-gradient-to-b from-slate-950 to-[#0F172A] text-white rounded-2xl px-2 py-3.5 sm:p-5 shadow-md border border-[#0284C7]/30 min-w-0 transition-transform hover:scale-105">
+                <span className="text-2xl sm:text-4xl md:text-5xl font-black text-[#0EA5E9] block tabular-nums tracking-tight">
                   {String(timeLeft.hours).padStart(2, '0')}
                 </span>
-                <span className="countdown-unit-label font-bold text-[#E2EEF8] uppercase sm:tracking-wider mt-1 block truncate">
+                <span className="countdown-unit-label font-bold text-[#E2EEF8] uppercase sm:tracking-wider mt-1.5 block truncate">
                   {t.hoursLabel}
                 </span>
               </div>
 
               {/* Minutes */}
-              <div className="bg-[#0F172A] text-white rounded-xl sm:rounded-2xl px-1.5 py-3 sm:p-5 shadow-md border border-[#0284C7]/30 min-w-0">
-                <span className="text-xl sm:text-4xl md:text-5xl font-black text-[#38BDF8] block tabular-nums">
+              <div className="bg-gradient-to-b from-slate-950 to-[#0F172A] text-white rounded-2xl px-2 py-3.5 sm:p-5 shadow-md border border-[#0284C7]/30 min-w-0 transition-transform hover:scale-105">
+                <span className="text-2xl sm:text-4xl md:text-5xl font-black text-[#38BDF8] block tabular-nums tracking-tight">
                   {String(timeLeft.minutes).padStart(2, '0')}
                 </span>
-                <span className="countdown-unit-label font-bold text-[#E2EEF8] uppercase sm:tracking-wider mt-1 block truncate">
+                <span className="countdown-unit-label font-bold text-[#E2EEF8] uppercase sm:tracking-wider mt-1.5 block truncate">
                   {t.minutesLabel}
                 </span>
               </div>
 
               {/* Seconds */}
-              <div className="bg-[#0F172A] text-white rounded-xl sm:rounded-2xl px-1.5 py-3 sm:p-5 shadow-md border border-[#0284C7]/30 min-w-0">
-                <span className="text-xl sm:text-4xl md:text-5xl font-black text-[#0EA5E9] block tabular-nums">
+              <div className="bg-gradient-to-b from-slate-950 to-[#0F172A] text-white rounded-2xl px-2 py-3.5 sm:p-5 shadow-md border border-[#0284C7]/30 min-w-0 transition-transform hover:scale-105">
+                <span className="text-2xl sm:text-4xl md:text-5xl font-black text-[#0EA5E9] block tabular-nums tracking-tight">
                   {String(timeLeft.seconds).padStart(2, '0')}
                 </span>
-                <span className="countdown-unit-label font-bold text-[#E2EEF8] uppercase sm:tracking-wider mt-1 block truncate">
+                <span className="countdown-unit-label font-bold text-[#E2EEF8] uppercase sm:tracking-wider mt-1.5 block truncate">
                   {t.secondsLabel}
                 </span>
               </div>
@@ -753,10 +772,10 @@ export const HomePage: React.FC<HomePageProps> = ({
       {/* SECTION 4: CHECK REGISTRATION STATUS & TICKET WIDGET */}
       <section
         id="check-status-section"
-        className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8"
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
         style={getHomePageSectionStyle('status')}
       >
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E2EEF8] shadow-xl space-y-6">
+        <div className="max-w-4xl mx-auto bg-white rounded-3xl p-6 sm:p-10 border border-[#E2EEF8] shadow-xl space-y-6">
           <div className="text-center max-w-xl mx-auto space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#E2EEF8] text-[#0284C7] text-xs font-bold border border-[#0284C7]/20">
               <Search className="w-3.5 h-3.5" />
@@ -1218,18 +1237,19 @@ export const HomePage: React.FC<HomePageProps> = ({
       >
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
-            <div className="flex items-center gap-2">
-              <Bell className="w-5 h-5 text-[#0284C7]" />
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-                {t.noticesHeading}
-              </h2>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200/80 text-xs font-bold tracking-wide mb-2">
+              <Bell className="w-3.5 h-3.5 text-[#0284C7]" />
+              <span>{language === 'bn' ? 'অফিসিয়াল বিজ্ঞপ্তি' : 'Official Circulars'}</span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">{t.noticesSubtitle}</p>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              {t.noticesHeading}
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">{t.noticesSubtitle}</p>
           </div>
 
           <button
             onClick={() => onNavigate('notices')}
-            className="text-xs font-bold text-[#0284C7] hover:text-[#0EA5E9] flex items-center gap-1 cursor-pointer"
+            className="text-xs font-bold text-[#0284C7] hover:text-[#0EA5E9] flex items-center gap-1.5 cursor-pointer bg-sky-50 hover:bg-sky-100 px-4 py-2 rounded-full border border-sky-200/60 transition-colors shadow-2xs"
           >
             <span>{language === 'bn' ? 'সকল নোটিশ দেখুন' : 'View All Notices'}</span>
             <ArrowRight className="w-4 h-4" />
@@ -1240,30 +1260,30 @@ export const HomePage: React.FC<HomePageProps> = ({
           {notices.slice(0, 3).map((notice) => (
             <div
               key={notice.id}
-              className="bg-white rounded-2xl p-6 border border-[#E2EEF8] shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between space-y-4"
+              className="bg-white rounded-3xl p-6 border border-[#E2EEF8] shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between space-y-4 hover:-translate-y-1 group"
             >
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="px-2.5 py-0.5 rounded-full font-bold uppercase bg-[#E2EEF8] text-[#0284C7]">
+                  <span className="px-2.5 py-0.5 rounded-full font-bold uppercase bg-sky-50 text-[#0284C7] border border-sky-200/60">
                     {notice.category}
                   </span>
-                  <span className="text-slate-400">{notice.date}</span>
+                  <span className="text-slate-400 font-medium">{notice.date}</span>
                 </div>
-                <h3 className="font-bold text-slate-900 text-sm leading-snug">
+                <h3 className="font-extrabold text-slate-900 text-sm sm:text-base leading-snug group-hover:text-[#0284C7] transition-colors">
                   {language === 'bn' ? notice.titleBn : notice.titleEn}
                 </h3>
-                <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-600 line-clamp-3 leading-relaxed">
                   {language === 'bn' ? notice.contentBn : notice.contentEn}
                 </p>
               </div>
 
-              <div className="pt-2 border-t border-[#E2EEF8]">
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                 <button
                   onClick={() => onNavigate('notices')}
-                  className="text-xs font-semibold text-[#0284C7] hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-xs font-bold text-[#0284C7] hover:text-sky-600 flex items-center gap-1.5 cursor-pointer"
                 >
                   <span>{language === 'bn' ? 'বিস্তারিত পড়ুন' : 'Read Notice'}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
             </div>
@@ -1273,29 +1293,31 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* PHOTO & VIDEO PREVIEW */}
       <section
-        className="bg-slate-900 text-white py-16 px-4 sm:px-6 lg:px-8"
+        className="bg-gradient-to-b from-slate-950 via-[#0F172A] to-slate-950 text-white py-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden"
         style={getHomePageSectionStyle('gallery')}
       >
-        <div className="max-w-7xl mx-auto space-y-10">
+        <div className="max-w-7xl mx-auto space-y-10 relative z-10">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
-                {language === 'bn' ? 'স্মৃতি আর্কাইভ' : 'Historical Archive'}
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-black text-white mt-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-950/80 text-sky-300 border border-sky-500/30 text-xs font-bold tracking-wide mb-2">
+                <Camera className="w-3.5 h-3.5 text-sky-400" />
+                <span>{language === 'bn' ? 'স্মৃতি আর্কাইভ' : 'Historical Archive'}</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">
                 {t.galleryHeading}
               </h2>
             </div>
 
             <button
               onClick={() => onNavigate('gallery')}
-              className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white transition-colors cursor-pointer"
+              className="px-5 py-2.5 rounded-full bg-slate-800/90 hover:bg-slate-700 text-xs font-bold text-white transition-all border border-slate-700 shadow-md cursor-pointer flex items-center gap-1.5 active:scale-95"
             >
-              {language === 'bn' ? 'সম্পূর্ণ গ্যালারি দেখুন' : 'Explore Full Archive'}
+              <span>{language === 'bn' ? 'সম্পূর্ণ গ্যালারি দেখুন' : 'Explore Full Archive'}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
             {[
               {
                 title: 'Campus Heritage 1962',
@@ -1321,18 +1343,22 @@ export const HomePage: React.FC<HomePageProps> = ({
               <div
                 key={idx}
                 onClick={() => onNavigate('gallery')}
-                className="group relative rounded-2xl overflow-hidden aspect-4/3 cursor-pointer shadow-lg"
+                className="group relative rounded-3xl overflow-hidden aspect-4/3 cursor-pointer shadow-lg border border-slate-800 hover:border-sky-500/50 transition-all duration-300 hover:-translate-y-1"
               >
                 <img
                   src={item.img}
                   alt={item.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500"
+                  loading="lazy"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/assets/homepage/campus_hero.jpg';
+                  }}
                 />
-                <div className="absolute inset-x-0 bottom-0 bg-[#0F172A]/90 p-3 flex flex-col justify-end border-t border-[#0284C7]/40">
-                  <span className="text-[10px] font-bold text-[#38BDF8] uppercase tracking-wider">
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-900/90 to-transparent p-3 sm:p-4 flex flex-col justify-end border-t border-sky-500/30">
+                  <span className="text-[10px] font-bold text-[#38BDF8] uppercase tracking-wider font-mono">
                     {item.year}
                   </span>
-                  <h4 className="font-bold text-white text-sm">{item.title}</h4>
+                  <h4 className="font-extrabold text-white text-xs sm:text-sm line-clamp-1">{item.title}</h4>
                 </div>
               </div>
             ))}
