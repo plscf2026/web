@@ -19,7 +19,6 @@ export interface GalleryMediaItem {
 const STORAGE_KEY = 'plscf_gallery_media_v1';
 // Tracks IDs explicitly deleted by admin so they never resurface from defaults or fallback files.
 const STORAGE_KEY_DELETED = 'plscf_gallery_media_deleted_v1';
-const DATA_FILE_URL = '/data/gallery_media.json';
 
 function getDeletedIds(): Set<string> {
   try {
