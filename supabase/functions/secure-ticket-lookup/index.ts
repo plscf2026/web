@@ -133,7 +133,7 @@ serve(async (req) => {
     const { data: registration, error } = await supabase
       .from(targetTable)
       .select(
-        'id, full_name, full_name_bn, photo_url, mobile_number, category, passing_year, current_class, batch_name, t_shirt_size, registration_fee, donation_amount, total_paid, payment_status, registration_approval_status, transaction_id, payment_method, registered_at, qr_token, year'
+        'id, full_name, full_name_bn, photo_url, mobile_number, category, passing_year, current_class, batch_name, t_shirt_size, registration_fee, donation_amount, total_paid, payment_status, registration_approval_status, transaction_id, payment_method, registered_at, qr_token, year, has_parent, parent_name, parent_phone, parent_relation, parent_photo_url'
       )
       .eq('id', registrationId)
       .eq('year', year)
@@ -144,13 +144,80 @@ serve(async (req) => {
       return jsonResponse({ error: 'Ticket lookup is temporarily unavailable.' }, 503, headers);
     }
 
+    if (registration) {
+      if (
+        normalizeMobile(String(registration.mobile_number ?? '')) !== mobileNumber ||
+        registration.payment_status !== 'paid' ||
+        registration.registration_approval_status === 'pending' ||
+        registration.registration_approval_status === 'rejected' ||
+        !registration.qr_token
+      ) {
+        return jsonResponse(
+          { success: false, error: 'No verified ticket matched those details.' },
+          404,
+          headers
+        );
+      }
+
+      const photoUrl = String(registration.photo_url ?? '');
+      const safePhotoUrl =
+        /^data:image\/(?:jpeg|jpg|png|webp);base64,/i.test(photoUrl) ||
+        /^https:\/\//i.test(photoUrl)
+          ? photoUrl
+          : '';
+
+      const { data: guardianRow } = await supabase
+        .from('guardian_registrations_2027')
+        .select('id, student_registration_id, guardian_name, guardian_phone, guardian_relation, photo_url, qr_token, payment_status, registration_approval_status, is_checked_in, gate_status, year')
+        .eq('student_registration_id', registration.id)
+        .eq('payment_status', 'paid')
+        .maybeSingle();
+
+      const parentPhotoUrl = String(guardianRow?.photo_url ?? registration.parent_photo_url ?? '');
+      const safeParentPhotoUrl =
+        /^data:image\/(?:jpeg|jpg|png|webp);base64,/i.test(parentPhotoUrl) ||
+        /^https:\/\//i.test(parentPhotoUrl)
+          ? parentPhotoUrl
+          : '';
+
+      return jsonResponse(
+        {
+          success: true,
+          ticket: {
+            ...registration,
+            photo_url: safePhotoUrl,
+            parent_photo_url: safeParentPhotoUrl || null,
+            guardian_registration_id: guardianRow?.id || null,
+            guardian_qr_token: guardianRow?.qr_token || null,
+            email: null,
+            address: '',
+            student_id: null,
+            roll_number: null,
+            group_or_section: null,
+            is_tshirt_collected: false,
+          },
+          guardian: guardianRow ? { ...guardianRow, photo_url: safeParentPhotoUrl || null } : null,
+        },
+        200,
+        headers
+      );
+    }
+
+    // Fallback: Direct Guardian lookup by Guardian ID + Guardian Mobile
+    const { data: guardianDirect } = await supabase
+      .from('guardian_registrations_2027')
+      .select('id, student_registration_id, guardian_name, guardian_phone, mobile_number, guardian_relation, photo_url, qr_token, payment_status, registration_approval_status, is_checked_in, gate_status, year, registered_at')
+      .eq('id', registrationId)
+      .eq('year', year)
+      .maybeSingle();
+
     if (
-      !registration ||
-      normalizeMobile(String(registration.mobile_number ?? '')) !== mobileNumber ||
-      registration.payment_status !== 'paid' ||
-      registration.registration_approval_status === 'pending' ||
-      registration.registration_approval_status === 'rejected' ||
-      !registration.qr_token
+      !guardianDirect ||
+      normalizeMobile(String(guardianDirect.guardian_phone ?? guardianDirect.mobile_number ?? '')) !== mobileNumber ||
+      guardianDirect.payment_status !== 'paid' ||
+      guardianDirect.registration_approval_status === 'pending' ||
+      guardianDirect.registration_approval_status === 'rejected' ||
+      !guardianDirect.qr_token
     ) {
       return jsonResponse(
         { success: false, error: 'No verified ticket matched those details.' },
@@ -159,26 +226,47 @@ serve(async (req) => {
       );
     }
 
-    const photoUrl = String(registration.photo_url ?? '');
-    const safePhotoUrl =
-      /^data:image\/(?:jpeg|jpg|png|webp);base64,/i.test(photoUrl) ||
-      /^https:\/\//i.test(photoUrl)
-        ? photoUrl
+    const { data: linkedStudent } = await supabase
+      .from(targetTable)
+      .select('id, full_name, category, batch_name, current_class, passing_year')
+      .eq('id', guardianDirect.student_registration_id)
+      .maybeSingle();
+
+    const gPhotoUrl = String(guardianDirect.photo_url ?? '');
+    const safeGPhoto =
+      /^data:image\/(?:jpeg|jpg|png|webp);base64,/i.test(gPhotoUrl) ||
+      /^https:\/\//i.test(gPhotoUrl)
+        ? gPhotoUrl
         : '';
 
     return jsonResponse(
       {
         success: true,
+        type: 'guardian',
         ticket: {
-          ...registration,
-          photo_url: safePhotoUrl,
-          email: null,
-          address: '',
-          student_id: null,
-          roll_number: null,
-          group_or_section: null,
-          is_tshirt_collected: false,
+          id: guardianDirect.id,
+          participant_type: 'guardian',
+          student_registration_id: guardianDirect.student_registration_id,
+          full_name: guardianDirect.guardian_name,
+          photo_url: safeGPhoto,
+          mobile_number: guardianDirect.guardian_phone || guardianDirect.mobile_number,
+          category: linkedStudent?.category || 'current',
+          batch_name: linkedStudent?.batch_name || 'Guardian Pass',
+          current_class: linkedStudent?.current_class || null,
+          passing_year: linkedStudent?.passing_year || null,
+          payment_status: guardianDirect.payment_status,
+          qr_token: guardianDirect.qr_token,
+          year: guardianDirect.year,
+          registered_at: guardianDirect.registered_at,
+          has_parent: true,
+          parent_name: guardianDirect.guardian_name,
+          parent_phone: guardianDirect.guardian_phone || guardianDirect.mobile_number,
+          parent_relation: guardianDirect.guardian_relation,
+          parent_photo_url: safeGPhoto,
+          guardian_registration_id: guardianDirect.id,
+          guardian_qr_token: guardianDirect.qr_token,
         },
+        guardian: { ...guardianDirect, photo_url: safeGPhoto },
       },
       200,
       headers

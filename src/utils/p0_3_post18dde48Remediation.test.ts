@@ -180,6 +180,7 @@ test('P1 Registration Payload Validation: rejects missing required fields and pr
         parentName: 'Parent Name',
         parentPhone: '01812345678',
         parentRelation: 'Father',
+        parentPhotoUrl: 'https://hnthoszbkhvygoowtvau.supabase.co/storage/v1/object/public/student-photos/2014/PLSCF-2027-F4321/parent.webp',
       },
     },
     'former',

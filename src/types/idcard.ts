@@ -73,6 +73,8 @@ export interface StudentIdCardRecord {
   parentRelation?: string;
   parentFee?: number;
   parentPhotoUrl?: string;
+  guardianRegistrationId?: string;
+  guardianQrToken?: string;
   cardDimensions: '54x86mm';
   version: number;
   generatedAt?: string;

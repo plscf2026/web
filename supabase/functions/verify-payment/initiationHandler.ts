@@ -103,9 +103,16 @@ export async function executeInitiatePayment(
     };
   }
 
+  const rawFormObj =
+    order.form_data && typeof order.form_data === 'object' && !Array.isArray(order.form_data)
+      ? (order.form_data as Record<string, unknown>)
+      : {};
+
   const feeEval = computeAuthoritativeOrderAmount(rawSettings, {
     orderType: order.order_type,
     category: order.category,
+    gender: order.gender ?? rawFormObj.gender,
+    currentClass: order.current_class ?? order.currentClass ?? rawFormObj.currentClass ?? rawFormObj.current_class,
     hasParent: order.has_parent ?? order.hasParent,
     donationAmount: order.donation_amount ?? order.donationAmount ?? 0,
     paymentMethod: order.payment_method ?? 'bkash',
@@ -173,6 +180,7 @@ export async function executeInitiatePayment(
   let customerPhone: string;
   let customerEmail: string | null;
   let registrationId: string | undefined;
+  let guardianRegistrationId: string | undefined;
 
   if (feeEval.orderType === 'registration') {
     const regEval = validateAndBuildPendingRegistrationData(order, feeEval.category!, Boolean(feeEval.hasParent));
@@ -191,6 +199,7 @@ export async function executeInitiatePayment(
     customerPhone = regEval.data.mobileNumber;
     customerEmail = regEval.data.email;
     registrationId = regEval.data.registrationId;
+    guardianRegistrationId = regEval.data.guardianRegistrationId || undefined;
   } else {
     const donorName = String(order.cust_name ?? '').trim().slice(0, 120);
     const donorPhone = normalizePhoneDigits(order.cust_phone);
@@ -323,6 +332,7 @@ export async function executeInitiatePayment(
           paymentUrl: validGatewayUrl.toString(),
           invoiceNumber: createData.invoice_number || cleanInvoice,
           registrationId,
+          guardianRegistrationId,
           payment_amount: String(feeEval.expectedTotal!),
           message: createData.message,
         },

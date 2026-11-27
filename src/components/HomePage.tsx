@@ -339,14 +339,14 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* FLOATING STATS BAR */}
       <div className="-mt-12 sm:-mt-16 relative z-25 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_12px_40px_-10px_rgba(2,132,199,0.14)] border border-[#E2EEF8] px-4 py-4 sm:px-6 sm:py-5 grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 md:divide-x divide-[#E2EEF8] text-center">
+        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_12px_40px_-10px_rgba(2,132,199,0.14)] border border-[#E2EEF8] px-4 py-4 sm:px-6 sm:py-5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3 lg:divide-x divide-[#E2EEF8] text-center">
           {/* Stat 1: Total Registered */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 p-3 sm:p-2 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0 transition-transform hover:scale-[1.02]">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-sky-100/80 border border-sky-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-2.5 p-3 sm:p-2 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0 transition-transform hover:scale-[1.02]">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-sky-100/80 border border-sky-200/60 flex items-center justify-center shrink-0 shadow-2xs">
               <Users className="w-4 h-4 sm:w-5 sm:h-5 text-[#0284C7]" />
             </div>
             <div className="text-center sm:text-left min-w-0">
-              <div data-testid="stat-total-registered" className="text-xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums flex items-center justify-center sm:justify-start gap-1">
+              <div data-testid="stat-total-registered" className="text-xl sm:text-2xl font-black text-[#0F172A] leading-tight tabular-nums flex items-center justify-center sm:justify-start gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0 inline-block" />
                 <span>{formatStatCount(statsSnapshot.stats?.totalRegistered)}</span>
               </div>
@@ -356,13 +356,28 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           </div>
 
-          {/* Stat 2: Former Students */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 p-3 sm:p-2 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0 transition-transform hover:scale-[1.02]">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-sky-100/80 border border-sky-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+          {/* Stat 2: Total Students */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-2.5 p-3 sm:p-2 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0 transition-transform hover:scale-[1.02]">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-sky-100/80 border border-sky-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5 text-[#0284C7]" />
+            </div>
+            <div className="text-center sm:text-left min-w-0">
+              <div data-testid="stat-total-students" className="text-xl sm:text-2xl font-black text-[#0F172A] leading-tight tabular-nums">
+                {formatStatCount(statsSnapshot.stats?.totalStudents)}
+              </div>
+              <div className="text-[11px] sm:text-xs text-slate-600 font-bold leading-snug">
+                {language === 'bn' ? 'মোট শিক্ষার্থী' : 'Total Students'}
+              </div>
+            </div>
+          </div>
+
+          {/* Stat 3: Former Students */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-2.5 p-3 sm:p-2 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0 transition-transform hover:scale-[1.02]">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-sky-100/80 border border-sky-200/60 flex items-center justify-center shrink-0 shadow-2xs">
               <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5 text-[#0284C7]" />
             </div>
             <div className="text-center sm:text-left min-w-0">
-              <div data-testid="stat-former-students" className="text-xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
+              <div data-testid="stat-former-students" className="text-xl sm:text-2xl font-black text-[#0F172A] leading-tight tabular-nums">
                 {formatStatCount(statsSnapshot.stats?.formerStudents)}
               </div>
               <div className="text-[11px] sm:text-xs text-slate-600 font-bold leading-snug">
@@ -371,13 +386,13 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           </div>
 
-          {/* Stat 3: Current Students */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 p-3 sm:p-2 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0 transition-transform hover:scale-[1.02]">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-sky-100/80 border border-sky-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+          {/* Stat 4: Current Students */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-2.5 p-3 sm:p-2 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0 transition-transform hover:scale-[1.02]">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-sky-100/80 border border-sky-200/60 flex items-center justify-center shrink-0 shadow-2xs">
               <User className="w-4 h-4 sm:w-5 sm:h-5 text-[#0284C7]" />
             </div>
             <div className="text-center sm:text-left min-w-0">
-              <div data-testid="stat-current-students" className="text-xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
+              <div data-testid="stat-current-students" className="text-xl sm:text-2xl font-black text-[#0F172A] leading-tight tabular-nums">
                 {formatStatCount(statsSnapshot.stats?.currentStudents)}
               </div>
               <div className="text-[11px] sm:text-xs text-slate-600 font-bold leading-snug">
@@ -386,13 +401,28 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           </div>
 
-          {/* Stat 4: Batches Represented */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 p-3 sm:p-2 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0 transition-transform hover:scale-[1.02]">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-sky-100/80 border border-sky-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+          {/* Stat 5: Guardians */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-2.5 p-3 sm:p-2 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0 transition-transform hover:scale-[1.02]">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-amber-100/80 border border-amber-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700" />
+            </div>
+            <div className="text-center sm:text-left min-w-0">
+              <div data-testid="stat-guardians" className="text-xl sm:text-2xl font-black text-[#0F172A] leading-tight tabular-nums">
+                {formatStatCount(statsSnapshot.stats?.guardians)}
+              </div>
+              <div className="text-[11px] sm:text-xs text-slate-600 font-bold leading-snug">
+                {language === 'bn' ? 'অভিভাবক' : 'Guardians'}
+              </div>
+            </div>
+          </div>
+
+          {/* Stat 6: Batches Represented */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-2.5 p-3 sm:p-2 rounded-2xl sm:rounded-none bg-[#F8FBFE] sm:bg-transparent border border-[#E2EEF8] sm:border-0 min-w-0 transition-transform hover:scale-[1.02]">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-sky-100/80 border border-sky-200/60 flex items-center justify-center shrink-0 shadow-2xs">
               <Users className="w-4 h-4 sm:w-5 sm:h-5 text-[#0284C7]" />
             </div>
             <div className="text-center sm:text-left min-w-0">
-              <div data-testid="stat-batches-represented" className="text-xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
+              <div data-testid="stat-batches-represented" className="text-xl sm:text-2xl font-black text-[#0F172A] leading-tight tabular-nums">
                 {formatStatCount(statsSnapshot.stats?.batchesRepresented)}
               </div>
               <div className="text-[11px] sm:text-xs text-slate-600 font-bold leading-snug">

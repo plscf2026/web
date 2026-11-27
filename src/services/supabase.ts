@@ -372,6 +372,10 @@ export function fromRegistrationDbRow(row: any): RegistrationRecord {
     parentPhone: row.parent_phone || row.parentPhone || undefined,
     parentRelation: row.parent_relation || row.parentRelation || undefined,
     parentPhotoUrl: resolvedParentPhotoUrl || undefined,
+    guardianRegistrationId: row.guardian_registration_id || row.guardianRegistrationId || undefined,
+    guardianQrToken: row.guardian_qr_token || row.guardianQrToken || undefined,
+    participantType: (row.participant_type || row.participantType || undefined) as any,
+    studentRegistrationId: row.student_registration_id || row.studentRegistrationId || undefined,
     parentFee: Number(row.parent_fee ?? row.parentFee ?? 0),
     gatewayCharge: Number(row.gateway_charge ?? row.gatewayCharge ?? 0),
     category: (row.category === 'current' ? 'current' : 'former'),
@@ -1307,7 +1311,22 @@ export const SupabaseService = {
           return { type: 'donation', donation: fromDonationDbRow(data.donation) };
         }
         if (data.student || data.ticket) {
-          return { type: 'registration', registration: fromRegistrationDbRow(data.student || data.ticket) };
+          const reg = fromRegistrationDbRow(data.student || data.ticket);
+          if (data.guardian) {
+            reg.hasParent = true;
+            reg.guardianRegistrationId = data.guardian.id || reg.guardianRegistrationId;
+            reg.guardianQrToken = data.guardian.qr_token || reg.guardianQrToken;
+            reg.parentName = data.guardian.guardian_name || reg.parentName;
+            reg.parentRelation = data.guardian.guardian_relation || reg.parentRelation;
+            reg.parentPhone = data.guardian.guardian_phone || data.guardian.mobile_number || reg.parentPhone;
+            if (data.guardian.photo_url) {
+              reg.parentPhotoUrl = data.guardian.photo_url;
+            }
+          }
+          if (data.type === 'guardian') {
+            reg.participantType = 'guardian';
+          }
+          return { type: 'registration', registration: reg };
         }
       }
     } catch (rpcErr) {
@@ -1417,9 +1436,13 @@ export const SupabaseService = {
             address: '',
             tShirtSize: 'L',
             // Guardian / Accompanying Parent Details
-            hasParent: Boolean(s.hasParent),
-            parentName: s.parentName || undefined,
-            parentRelation: s.parentRelation || undefined,
+            hasParent: Boolean(s.hasParent || s.isGuardianPass),
+            participantType: (s.participantType || res.participantType || (s.isGuardianPass ? 'guardian' : 'student')) as 'student' | 'guardian',
+            studentRegistrationId: s.studentRegistrationId || undefined,
+            guardianRegistrationId: s.isGuardianPass ? s.id : undefined,
+            guardianQrToken: s.isGuardianPass ? s.qrToken : undefined,
+            parentName: s.parentName || (s.isGuardianPass ? s.fullName : undefined),
+            parentRelation: s.parentRelation || s.guardianRelation || undefined,
             parentPhone: s.parentPhone || undefined,
             parentPhotoUrl: s.parentPhotoUrl || undefined,
             isManualRegistration: Boolean(s.isManualRegistration),

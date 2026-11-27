@@ -142,6 +142,23 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
 
     const verifyRes = await AppStore.verifyStudentTicketAsync(clean, expectedToken, staffUser?.id || 'DRESS_STAFF');
 
+    if (verifyRes.verified && verifyRes.student?.participantType === 'guardian') {
+      playScanErrorSound();
+      setScannedStudent(null);
+      setValidationResult({
+        canReceive: false,
+        status: 'GUARDIAN_NO_ACCESS',
+        messageEn: 'Guardian Pass: Accompanying parents/guardians are NOT eligible for T-shirts. Only registered students receive a reunion T-shirt.',
+        messageBn: 'অভিভাবক পাস: অভিভাবকের জন্য টি-শার্ট বরাদ্দ নেই। শুধুমাত্র নিবন্ধিত শিক্ষার্থী টি-শার্ট পাবেন।',
+      });
+      setFeedbackNotice({
+        type: 'error',
+        message: 'Guardian Pass: Not eligible for T-shirt (Entry & Food pass only).',
+      });
+      setIsResultPopupOpen(true);
+      return;
+    }
+
     if (!verifyRes.verified || !verifyRes.student) {
       playScanErrorSound();
       setScannedStudent(null);

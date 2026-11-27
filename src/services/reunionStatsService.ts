@@ -2,8 +2,10 @@ import { supabase } from './supabase';
 
 export interface PublicReunionStats {
   totalRegistered: number;
+  totalStudents: number;
   formerStudents: number;
   currentStudents: number;
+  guardians: number;
   batchesRepresented: number;
   updatedAt: string;
 }
@@ -30,10 +32,24 @@ export function normalizePublicReunionStats(raw: unknown): PublicReunionStats | 
     return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
   };
 
+  const formerStudents = toNonNegInt(obj.former_students ?? obj.formerStudents);
+  const currentStudents = toNonNegInt(obj.current_students ?? obj.currentStudents);
+  const guardians = toNonNegInt(obj.guardians ?? obj.guardian_registrations ?? obj.guardianCount ?? 0);
+  const hasExplicitTotalStudents = obj.total_students !== undefined || obj.totalStudents !== undefined;
+  const totalStudents = hasExplicitTotalStudents
+    ? toNonNegInt(obj.total_students ?? obj.totalStudents)
+    : formerStudents + currentStudents;
+  const hasExplicitTotalRegistered = obj.total_registered !== undefined || obj.totalRegistered !== undefined;
+  const totalRegistered = hasExplicitTotalRegistered
+    ? toNonNegInt(obj.total_registered ?? obj.totalRegistered)
+    : totalStudents + guardians;
+
   return {
-    totalRegistered: toNonNegInt(obj.total_registered ?? obj.totalRegistered),
-    formerStudents: toNonNegInt(obj.former_students ?? obj.formerStudents),
-    currentStudents: toNonNegInt(obj.current_students ?? obj.currentStudents),
+    totalRegistered,
+    totalStudents,
+    formerStudents,
+    currentStudents,
+    guardians,
     batchesRepresented: toNonNegInt(obj.batches_represented ?? obj.batchesRepresented),
     updatedAt: typeof obj.updated_at === 'string' ? obj.updated_at : new Date().toISOString(),
   };

@@ -41,6 +41,8 @@ export interface NormalizedRegistrationFormData {
   parentRelation: string | null;
   parentPhotoUrl: string | null;
   parentPhotoStoragePath: string | null;
+  guardianRegistrationId: string | null;
+  guardianQrToken: string | null;
   year: number;
 }
 
@@ -158,11 +160,11 @@ export function validateAndBuildPendingRegistrationData(
         message: 'parentName, parentRelation, and valid parentPhone are required when hasParent is true.',
       };
     }
-    if (parentPhotoUrl && !isValidImageReference(parentPhotoUrl)) {
+    if (!parentPhotoUrl || !isValidImageReference(parentPhotoUrl)) {
       return {
         valid: false,
         error: 'INVALID_REGISTRATION_DATA',
-        message: 'Invalid parentPhotoUrl format.',
+        message: 'Valid parentPhotoUrl (HTTPS or data:image base64) is required when hasParent is true.',
       };
     }
   }
@@ -180,6 +182,34 @@ export function validateAndBuildPendingRegistrationData(
 
   const requestedQrToken = cleanStr(rawForm.qrToken ?? rawForm.qr_token ?? order.qr_token, 16).toUpperCase();
   const qrToken = /^[A-Z0-9]{6,12}$/.test(requestedQrToken) ? requestedQrToken : generateServerQrToken();
+
+  let guardianRegistrationId: string | null = null;
+  let guardianQrToken: string | null = null;
+  if (hasParent) {
+    const requestedGuardId = cleanStr(
+      rawForm.guardianRegistrationId ?? rawForm.guardian_registration_id ?? order.guardian_registration_id,
+      40
+    ).toUpperCase();
+    const gBuf = new Uint32Array(1);
+    crypto.getRandomValues(gBuf);
+    const gSuffix = String(1000 + (gBuf[0] % 9000));
+    guardianRegistrationId =
+      /^PLSCF-\d{4}-G[A-Z0-9]{3,10}$/.test(requestedGuardId) && requestedGuardId !== registrationId
+        ? requestedGuardId
+        : `PLSCF-${year}-G${gSuffix}`;
+
+    const requestedGuardTok = cleanStr(
+      rawForm.guardianQrToken ?? rawForm.guardian_qr_token ?? order.guardian_qr_token,
+      16
+    ).toUpperCase();
+    guardianQrToken =
+      /^[A-Z0-9]{6,12}$/.test(requestedGuardTok) && requestedGuardTok !== qrToken
+        ? requestedGuardTok
+        : generateServerQrToken();
+    while (guardianQrToken === qrToken) {
+      guardianQrToken = generateServerQrToken();
+    }
+  }
 
   const rawGender = cleanStr(rawForm.gender, 16).toLowerCase();
   const gender: 'male' | 'female' | 'other' =
@@ -217,6 +247,8 @@ export function validateAndBuildPendingRegistrationData(
       parentRelation,
       parentPhotoUrl,
       parentPhotoStoragePath: cleanStr(rawForm.parentPhotoStoragePath ?? rawForm.parent_photo_storage_path, 300) || null,
+      guardianRegistrationId,
+      guardianQrToken,
       year,
     },
   };

@@ -65,6 +65,7 @@ test('Server Fee Validation: computes exact totals & rejects unknown types/categ
   const currentWithParentCharge = computeAuthoritativeOrderAmount(AUTHORITATIVE_FEE_SETTINGS, {
     orderType: 'registration',
     category: 'current',
+    gender: 'female',
     hasParent: true,
     donationAmount: 200,
     paymentMethod: 'bkash',
@@ -103,6 +104,7 @@ test('Server Fee Validation: rejects client amount tampering, fee decomposition 
   const spoofedParentFee = computeAuthoritativeOrderAmount(AUTHORITATIVE_FEE_SETTINGS, {
     orderType: 'registration',
     category: 'current',
+    gender: 'female',
     hasParent: true,
     paymentMethod: 'bkash',
     payWithCharge: 0,

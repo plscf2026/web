@@ -37,7 +37,7 @@ import {
   calculateGatewayCharge,
   normalizeBangladeshiMobileNumber,
   RegistrationFormData,
-  isStudentBelowClass6,
+  isGuardianEligible,
   isGlobalRegistrationOpen,
   isAlumniRegistrationOpen,
   isCurrentStudentRegistrationOpen,
@@ -366,13 +366,13 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   };
 
   // Accompanying Parent Eligibility Rule:
-  // Eligible if female (any category/class), OR if current student below Class 6 (male or female)
+  // Current female student: always eligible (1 guardian)
+  // Current male student: eligible only if strictly below Class 6 (Play, Nursery, KG, Class 1–5)
   const effectiveCurrentClass =
     (category === 'current' && idVerificationResult?.record?.className)
       ? idVerificationResult.record.className
       : currentClass;
-  const isBelowClass6 = category === 'current' && isStudentBelowClass6(effectiveCurrentClass);
-  const isParentEligible = gender === 'female' || isBelowClass6;
+  const isParentEligible = isGuardianEligible(category, gender, effectiveCurrentClass);
   const effectiveHasParent = isParentEligible && hasParent;
 
   const isOptionalDonationOpen = isDonationOpen(feeSettings);
@@ -1706,20 +1706,20 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                 </div>
                 <div>
                   <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <span>{language === 'bn' ? 'অভিভাবক সহ অংশগ্রহণ' : 'Accompanying Parent / Guardian'}</span>
+                    <span>{language === 'bn' ? 'অভিভাবকদের জন্য (অভিভাবক সহ অংশগ্রহণ)' : 'For Parents — Accompanying Parent / Guardian'}</span>
                     <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
                       ১ জন মাত্র / 1 Person Only
                     </span>
                   </h2>
                   <p className="text-xs text-slate-600 mt-0.5">
                     {language === 'bn'
-                      ? 'নারী শিক্ষার্থী অথবা ৬ষ্ঠ শ্রেণির নিচের বর্তমান শিক্ষার্থীরা কেবল ১ জন অভিভাবক সঙ্গে আনতে পারবেন।'
-                      : 'Eligible for female students or current students below Class 6 (Strictly 1 Parent/Guardian).'}
+                      ? 'বর্তমান নারী শিক্ষার্থী অথবা ৬ষ্ঠ শ্রেণির নিচের বর্তমান শিক্ষার্থীরা কেবল ১ জন অভিভাবক সঙ্গে আনতে পারবেন।'
+                      : 'Eligible for current female students or current male students below Class 6 (Strictly 1 Parent/Guardian).'}
                   </p>
                 </div>
               </div>
               <span className="px-3 py-1 rounded-full bg-amber-600 text-white font-black text-xs shrink-0 self-start sm:self-auto shadow-2xs">
-                + ৳ 1,500 BDT
+                + ৳ {(feeSettings.parentFee ?? 500).toLocaleString()} BDT
               </span>
             </div>
 
@@ -2021,8 +2021,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             <HeartHandshake className="w-4 h-4 text-slate-400 shrink-0" />
             <span>
               {language === 'bn'
-                ? 'অভিভাবক নিবন্ধন কেবল নারী শিক্ষার্থী অথবা ৬ষ্ঠ শ্রেণির নিচের বর্তমান শিক্ষার্থীদের জন্য প্রযোজ্য (সর্বোচ্চ ১ জন, ফি ৳১,৫০০)।'
-                : 'Accompanying parent pass is reserved for female students and current students below Class 6 (Max 1 Person, ৳1,500).'}
+                ? `অভিভাবক নিবন্ধন কেবল বর্তমান নারী শিক্ষার্থী অথবা ৬ষ্ঠ শ্রেণির নিচের বর্তমান শিক্ষার্থীদের জন্য প্রযোজ্য (সর্বোচ্চ ১ জন, ফি ৳${(feeSettings.parentFee ?? 500).toLocaleString()})।`
+                : `Accompanying parent pass is reserved for current female students and current male students below Class 6 (Max 1 Person, ৳${(feeSettings.parentFee ?? 500).toLocaleString()}).`}
             </span>
           </div>
         )}

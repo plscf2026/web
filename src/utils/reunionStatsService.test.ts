@@ -17,23 +17,30 @@ test('ReunionStatsService: normalizes snake_case Supabase RPC stats cleanly with
   });
   assert.deepEqual(zeroStats, {
     totalRegistered: 0,
+    totalStudents: 0,
     formerStudents: 0,
     currentStudents: 0,
+    guardians: 0,
     batchesRepresented: 0,
     updatedAt: '2026-11-27T07:40:29Z',
   });
 
+  // Example from specification: 2 former students, 1 current student, 1 guardian -> Total Registered = 4, Total Students = 3
   const liveStats = normalizePublicReunionStats({
-    total_registered: 5,
-    former_students: 5,
-    current_students: 0,
+    total_registered: 4,
+    total_students: 3,
+    former_students: 2,
+    current_students: 1,
+    guardians: 1,
     batches_represented: 2,
     updated_at: '2026-11-27T07:40:29Z',
   });
   assert.deepEqual(liveStats, {
-    totalRegistered: 5,
-    formerStudents: 5,
-    currentStudents: 0,
+    totalRegistered: 4,
+    totalStudents: 3,
+    formerStudents: 2,
+    currentStudents: 1,
+    guardians: 1,
     batchesRepresented: 2,
     updatedAt: '2026-11-27T07:40:29Z',
   });

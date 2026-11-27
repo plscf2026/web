@@ -18,6 +18,8 @@ export interface AuthoritativeFeeSettings {
 export interface OrderFeeInput {
   orderType: unknown;
   category?: unknown;
+  gender?: unknown;
+  currentClass?: unknown;
   hasParent?: unknown;
   donationAmount?: unknown;
   paymentMethod?: unknown;
@@ -26,6 +28,33 @@ export interface OrderFeeInput {
   clientRegistrationFee?: unknown;
   clientParentFee?: unknown;
   clientGatewayCharge?: unknown;
+}
+
+export function isStudentBelowClass6Server(className?: unknown): boolean {
+  if (typeof className !== 'string' || !className.trim()) return false;
+  const clean = className.trim().toLowerCase();
+  if (/^(play|nursery|kg|kindergarten|pre|shishu|baby|infant)/i.test(clean)) return true;
+  if (/^(class\s*|std\s*|grade\s*)?(i|ii|iii|iv|v)$/i.test(clean)) return true;
+  if (/[১-৫]/.test(clean)) return true;
+  if (/\b(one|two|three|four|five)\b/i.test(clean)) return true;
+  const match = clean.match(/\d+/);
+  if (match) {
+    const classNum = parseInt(match[0], 10);
+    if (classNum >= 1 && classNum <= 5) return true;
+  }
+  return ['play', 'nursery', 'kg', '1', '2', '3', '4', '5', 'class 1', 'class 2', 'class 3', 'class 4', 'class 5'].includes(clean);
+}
+
+export function isGuardianEligibleServer(
+  category: unknown,
+  gender: unknown,
+  currentClass: unknown
+): boolean {
+  const cat = typeof category === 'string' ? category.trim().toLowerCase() : '';
+  if (cat !== 'current') return false;
+  const gen = typeof gender === 'string' ? gender.trim().toLowerCase() : '';
+  if (gen === 'female') return true;
+  return isStudentBelowClass6Server(currentClass);
 }
 
 export interface ComputedOrderBreakdown {
@@ -156,6 +185,13 @@ export function computeAuthoritativeOrderAmount(
       };
     }
     resolvedCategory = rawCat;
+    if (hasParent && !isGuardianEligibleServer(rawCat, input.gender, input.currentClass)) {
+      return {
+        valid: false,
+        error: 'GUARDIAN_NOT_ELIGIBLE',
+        message: 'Accompanying parent/guardian pass is only available for current female students or current male students below Class 6.',
+      };
+    }
     registrationFee = rawCat === 'current' ? currentStudentFee : formerStudentFee;
     parentFee = hasParent ? parentFeeCfg : 0;
   } else {

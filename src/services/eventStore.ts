@@ -26,7 +26,7 @@ import {
 } from '../types';
 import { supabase, isDevTestBypassAllowed, SupabaseService } from './supabase';
 import { safeRandomUUID } from '../utils/security';
-import { findRegistrationByTokenOrId } from '../utils/tokenGenerator';
+import { findRegistrationByTokenOrId, parseScannedInput } from '../utils/tokenGenerator';
 import { AppStore } from './store';
 
 export const STAFF_SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
@@ -979,11 +979,35 @@ export class EventStore {
       };
     }
 
-    // 2. Student Lookup via 6-character token, ID, or parsed QR payload (Main DB + Dedicated Manual DB)
+    // 2. Participant Lookup via 6-character token, ID, or parsed QR payload
+    // Supports independent Guardian registrations as well as Student registrations.
+    const parsedScan = parseScannedInput(tokenOrId);
+    const cleanLookupId = (parsedScan.id || tokenOrId || '').trim().toUpperCase();
+    const cleanLookupToken = (parsedScan.token || '').trim().toUpperCase();
+
     const registrations = AppStore.getRegistrations();
-    const student =
-      findRegistrationByTokenOrId(registrations, tokenOrId) ||
-      AppStore.findManualRegistration(tokenOrId);
+    const manualMatch = AppStore.findManualRegistration(tokenOrId);
+
+    // 2a. Check if input matches an independent Guardian ID / Token first
+    let matchedGuardianOwner = registrations.find((r) => {
+      if (r.participantType === 'guardian') {
+        const idMatch = cleanLookupId && (r.id.toUpperCase() === cleanLookupId || r.qrToken?.toUpperCase() === cleanLookupId);
+        const tokMatch = cleanLookupToken && r.qrToken?.toUpperCase() === cleanLookupToken;
+        return Boolean(idMatch || tokMatch);
+      }
+      if (r.hasParent && (r.guardianRegistrationId || r.guardianQrToken)) {
+        const gId = r.guardianRegistrationId?.toUpperCase();
+        const gTok = r.guardianQrToken?.toUpperCase();
+        const idMatch = cleanLookupId && ((gId && gId === cleanLookupId) || (gTok && gTok === cleanLookupId));
+        const tokMatch = cleanLookupToken && gTok && gTok === cleanLookupToken;
+        return Boolean(idMatch || tokMatch);
+      }
+      return false;
+    });
+
+    const isGuardianMatch = Boolean(matchedGuardianOwner);
+    const student = matchedGuardianOwner || findRegistrationByTokenOrId(registrations, tokenOrId) || manualMatch;
+
     if (!student) {
       return {
         valid: false,
@@ -991,6 +1015,19 @@ export class EventStore {
         message: `No registration found matching token or ID "${tokenOrId}".`,
       };
     }
+
+    const effectiveId = isGuardianMatch
+      ? (student.participantType === 'guardian' ? student.id : (student.guardianRegistrationId || student.id))
+      : student.id;
+    const effectiveName = isGuardianMatch
+      ? (student.participantType === 'guardian' ? student.fullName : (student.parentName || 'Parent / Guardian'))
+      : student.fullName;
+    const effectivePhoto = isGuardianMatch
+      ? (student.participantType === 'guardian' ? student.photoUrl : (student.parentPhotoUrl || student.photoUrl))
+      : student.photoUrl;
+    const effectiveToken = isGuardianMatch
+      ? (student.participantType === 'guardian' ? student.qrToken : (student.guardianQrToken || student.qrToken))
+      : student.qrToken;
 
     // 2.1 CRITICAL: Inactive QR Code check for manual registrations pending or rejected
     if (student.registrationApprovalStatus === 'pending') {
@@ -1008,23 +1045,32 @@ export class EventStore {
       };
     }
 
-    // 3. Department Specific Status Evaluation
+    // 2.2 Guardians are NOT eligible for T-shirt / Dress redemption
+    if (isGuardianMatch && department === 'DRESS') {
+      return {
+        valid: false,
+        status: 'NOT_ELIGIBLE',
+        message: 'GUARDIAN_TSHIRT_NOT_ELIGIBLE: Guardians are not eligible for T-shirt redemption. Reunion T-shirt is exclusively for registered students.',
+      };
+    }
+
+    // 3. Department Specific Status Evaluation (tracked per effectiveId: student or guardian independently)
     let isCollected = false;
     let collectedAt: string | undefined;
     let details: string | undefined;
 
-    const isStudentInsideVenue = this.isStudentCurrentlyInside(student.id) || Boolean(student.isCheckedIn);
+    const isStudentInsideVenue = this.isStudentCurrentlyInside(effectiveId) || (!isGuardianMatch && Boolean(student.isCheckedIn));
 
     if (department === 'BREAKFAST' || department === 'LUNCH' || department === 'DINNER') {
       const meal = department.toLowerCase() as 'breakfast' | 'lunch' | 'dinner';
-      const foodRec = this.getMealStatus(student.id, meal);
+      const foodRec = this.getMealStatus(effectiveId, meal);
       if (foodRec) {
         isCollected = true;
         collectedAt = foodRec.collectedAt;
       }
-      details = `Meal: ${department}`;
+      details = isGuardianMatch ? `Guardian Meal: ${department}` : `Meal: ${department}`;
     } else if (department === 'DRESS') {
-      const dressRec = this.getDressStatus(student.id, 'reunion_tshirt');
+      const dressRec = this.getDressStatus(effectiveId, 'reunion_tshirt');
       if (dressRec) {
         isCollected = true;
         collectedAt = dressRec.receivedAt;
@@ -1044,14 +1090,14 @@ export class EventStore {
 
     if (!isGateSatisfied) {
       evalStatus = 'NOT_ELIGIBLE';
-      const gateStatus = this.getStudentGateStatus(student.id);
+      const gateStatus = this.getStudentGateStatus(effectiveId);
       if (gateStatus === 'BACK') {
         evalMessage =
           department === 'DRESS'
             ? 'Student has exited the event. T-shirt collection is currently blocked. Please ask the student to enter through the gate first.'
-            : 'Student has exited the event. Food collection is not allowed. Please ask the student to enter through the gate first.';
+            : `${isGuardianMatch ? 'Guardian' : 'Student'} has exited the event. Food collection is not allowed. Please enter through the gate first.`;
       } else {
-        evalMessage = 'Student has not entered the event. Please complete gate entry first.';
+        evalMessage = `${isGuardianMatch ? 'Guardian' : 'Student'} has not entered the event. Please complete gate entry first.`;
       }
     } else if (isCollected) {
       evalStatus = 'ALREADY_COLLECTED';
@@ -1063,12 +1109,12 @@ export class EventStore {
       status: evalStatus,
       message: evalMessage,
       student: {
-        id: student.id,
-        fullName: student.fullName,
-        photoUrl: student.photoUrl,
+        id: effectiveId,
+        fullName: effectiveName,
+        photoUrl: effectivePhoto,
         batchName: student.batchName,
-        category: student.category,
-        qrToken: student.qrToken,
+        category: isGuardianMatch ? 'guardian' : student.category,
+        qrToken: effectiveToken,
         departmentStatus: {
           department,
           canDistribute,
@@ -1150,7 +1196,9 @@ export class EventStore {
 
     // Inactive QR Code check for pending/rejected manual registrations
     const studentCheck =
-      AppStore.getRegistrations().find((r) => r.id === registrationId) ||
+      AppStore.getRegistrations().find(
+        (r) => r.id === registrationId || (r.guardianRegistrationId && r.guardianRegistrationId === registrationId)
+      ) ||
       AppStore.findManualRegistration(registrationId);
     if (studentCheck && studentCheck.registrationApprovalStatus === 'pending') {
       return {
@@ -1359,7 +1407,9 @@ export class EventStore {
 
     // Inactive QR Code check for pending/rejected manual registrations
     const studentCheck =
-      AppStore.getRegistrations().find((r) => r.id === registrationId) ||
+      AppStore.getRegistrations().find(
+        (r) => r.id === registrationId || (r.guardianRegistrationId && r.guardianRegistrationId === registrationId)
+      ) ||
       AppStore.findManualRegistration(registrationId);
     if (studentCheck && studentCheck.registrationApprovalStatus === 'pending') {
       return {
@@ -1644,6 +1694,24 @@ export class EventStore {
       return {
         success: false,
         error: `PERMISSION_DENIED: Staff member "${staff.fullName}" is not authorized for dress kit distribution approval.`,
+      };
+    }
+
+    // Explicitly reject Guardian IDs or Guardian tokens for T-shirt / Dress distribution
+    const cleanRegIdUpper = (registrationId || '').trim().toUpperCase();
+    const isGuardianDirect =
+      cleanRegIdUpper.startsWith('PAR-') ||
+      /^PLSCF-\d{4}-G[A-Z0-9]+$/.test(cleanRegIdUpper) ||
+      AppStore.getRegistrations().some(
+        (r) =>
+          (r.participantType === 'guardian' && (r.id.toUpperCase() === cleanRegIdUpper || r.qrToken?.toUpperCase() === cleanRegIdUpper)) ||
+          (r.guardianRegistrationId && r.guardianRegistrationId.toUpperCase() === cleanRegIdUpper) ||
+          (r.guardianQrToken && r.guardianQrToken.toUpperCase() === cleanRegIdUpper)
+      );
+    if (isGuardianDirect) {
+      return {
+        success: false,
+        error: 'GUARDIAN_TSHIRT_NOT_ELIGIBLE: Guardians are not eligible for T-shirt redemption. Reunion T-shirt is exclusively for registered students.',
       };
     }
 

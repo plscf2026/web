@@ -867,6 +867,8 @@ export class PayStationService {
     }
 
     let signature = '';
+    let authoritativeGuardianId: string | undefined;
+    let authoritativeGuardianToken: string | undefined;
     const edgeVerify = await this.verifyWithSupabaseEdge(
       regId,
       payment.invoiceNumber,
@@ -881,6 +883,21 @@ export class PayStationService {
     }
     if (edgeVerify.success && edgeVerify.result?.signature) {
       signature = String(edgeVerify.result.signature);
+    }
+    const rpcResPayload = edgeVerify.result?.rpc_result;
+    if (rpcResPayload) {
+      if (rpcResPayload.registration_id) {
+        regId = String(rpcResPayload.registration_id);
+      }
+      if (rpcResPayload.qr_token) {
+        qrToken = String(rpcResPayload.qr_token);
+      }
+      if (rpcResPayload.guardian_id) {
+        authoritativeGuardianId = String(rpcResPayload.guardian_id);
+      }
+      if (rpcResPayload.guardian_qr_token) {
+        authoritativeGuardianToken = String(rpcResPayload.guardian_qr_token);
+      }
     }
 
     if (!signature) {
@@ -962,6 +979,8 @@ export class PayStationService {
       parentRelation: formData.parentRelation || undefined,
       parentPhotoUrl: finalParentPhotoUrl || undefined,
       parentPhotoStoragePath: parentPhotoStoragePath || undefined,
+      guardianRegistrationId: hasParent ? (authoritativeGuardianId || (formData as any).guardianRegistrationId || undefined) : undefined,
+      guardianQrToken: hasParent ? (authoritativeGuardianToken || (formData as any).guardianQrToken || undefined) : undefined,
       parentFee: parentFee,
       category: formData.category,
       studentId: formData.studentId

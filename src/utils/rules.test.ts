@@ -314,7 +314,7 @@ test('Accompanying Parent / Guardian validation & fee calculation rules', () => 
   assert.equal(customParentFees.parentFee, 1200);
   assert.equal(customParentFees.totalPayable, 2700);
 
-  // 3. Parent field validation when hasParent is true
+  // 3. Parent field validation when hasParent is true (Current female student)
   const baseStudent: RegistrationFormData = {
     fullName: 'Fatema Begum',
     photoUrl: 'data:image/png;base64,sample',
@@ -322,9 +322,10 @@ test('Accompanying Parent / Guardian validation & fee calculation rules', () => 
     address: 'Faridpur',
     gender: 'female',
     bloodGroup: 'O+',
-    category: 'former',
-    passingYear: '2018',
-    batchName: 'SSC 2018',
+    category: 'current',
+    studentId: 'PLSC-2026-101',
+    currentClass: 'Class 8',
+    batchName: 'Class 8',
     tShirtSize: 'S',
     donationAmount: 0,
     termsAccepted: true,

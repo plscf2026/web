@@ -102,8 +102,8 @@ test('Registration Form: Academic & T-shirt initial state and validation invaria
   });
 
   await t.test('6. Fresh registration initializes with empty selections (no pre-selected defaults)', () => {
-    const draft = null; // Fresh registration without draft
-    const initialData = undefined; // No editing data
+    const draft = null as Partial<RegistrationFormData> | null; // Fresh registration without draft
+    const initialData = undefined as Partial<RegistrationFormData> | undefined; // No editing data
 
     const passingYear = draft?.passingYear || initialData?.passingYear || '';
     const lastClassAttended = draft?.lastClassAttended || initialData?.lastClassAttended || '';

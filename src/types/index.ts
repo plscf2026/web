@@ -49,6 +49,10 @@ export interface RegistrationRecord {
   parentRelation?: string;
   parentFee?: number;
   parentPhotoUrl?: string;
+  guardianRegistrationId?: string; // Independent guardian registration ID (e.g. PLSCF-2027-G1234)
+  guardianQrToken?: string; // Independent 6-char cryptographic guardian token
+  participantType?: 'student' | 'guardian'; // Set when record represents a scanned/looked-up guardian
+  studentRegistrationId?: string; // Linked student registration ID when participantType === 'guardian'
   gatewayCharge?: number;
   notes?: string;
   year?: number;

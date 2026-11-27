@@ -59,7 +59,7 @@ import { SynchronizedCameraCardModal } from '../../idcard/SynchronizedCameraCard
 import { TicketView } from '../../TicketView';
 import {
   normalizeBangladeshiMobileNumber,
-  isStudentBelowClass6,
+  isGuardianEligible,
   calculateTotalFee,
   validateRegistrationData,
   RegistrationFormData,
@@ -219,8 +219,7 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
     category === 'current' && idVerificationResult?.record?.className
       ? idVerificationResult.record.className
       : currentClass;
-  const isBelowClass6 = category === 'current' && isStudentBelowClass6(effectiveCurrentClass);
-  const isParentEligible = gender === 'female' || isBelowClass6;
+  const isParentEligible = isGuardianEligible(category, gender, effectiveCurrentClass);
   const effectiveHasParent = isParentEligible && hasParent;
 
   const calculatedFees = useMemo(

@@ -120,6 +120,17 @@ export const MultiStationDesk: React.FC<MultiStationDeskProps> = ({
 
     const verifyRes = await AppStore.verifyStudentTicketAsync(clean, expectedToken, staffUser?.id || 'MULTI_STATION_STAFF');
 
+    if (verifyRes.verified && verifyRes.student?.participantType === 'guardian' && activeStation === 'DRESS_BOOTH') {
+      playScanErrorSound();
+      setScannedStudent(null);
+      setActionNotice({
+        type: 'error',
+        message: 'Guardian Pass: Accompanying parents/guardians are NOT eligible for T-shirts. Only registered students receive a T-shirt.',
+      });
+      setIsResultPopupOpen(true);
+      return;
+    }
+
     if (!verifyRes.verified || !verifyRes.student) {
       playScanErrorSound();
       setScannedStudent(null);

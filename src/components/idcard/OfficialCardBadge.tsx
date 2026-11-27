@@ -90,15 +90,22 @@ export const OfficialCardBadge: React.FC<OfficialCardBadgeProps> = ({
     };
   }, [student?.photoUrl, student?.parentPhotoUrl, isParent]);
 
+  // Use independent stored Guardian Registration ID & Token when available;
+  // fallback only for legacy unmigrated records that have not yet been reissued.
   const parentPassId = student
-    ? student.idNumber?.startsWith('PAR-')
-      ? student.idNumber
-      : `PAR-${student.idNumber || student.registrationId || 'ID'}`
+    ? student.guardianRegistrationId ||
+      (student.idNumber?.startsWith('PLSCF-') && student.idNumber.includes('-G')
+        ? student.idNumber
+        : student.idNumber?.startsWith('PAR-')
+        ? student.idNumber
+        : `PAR-${student.idNumber || student.registrationId || 'ID'}`)
     : 'PAR-ID';
   const parentToken = student
-    ? student.qrToken?.startsWith('P-')
-      ? student.qrToken
-      : `P-${student.qrToken || 'TOKEN'}`
+    ? student.guardianQrToken ||
+      (student.guardianRegistrationId ? student.qrToken : undefined) ||
+      (student.qrToken?.startsWith('P-')
+        ? student.qrToken
+        : `P-${student.qrToken || 'TOKEN'}`)
     : 'P-TOKEN';
 
   // Target QR URL
@@ -192,7 +199,7 @@ export const OfficialCardBadge: React.FC<OfficialCardBadgeProps> = ({
 
   const safeFilename = `${
     isParent ? 'Parent_Pass' : resolvedCardType === 'alumni' ? 'Alumni_Card' : 'Student_ID'
-  }_${(student.idNumber || student.registrationId || 'card').replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+  }_${(isParent ? parentPassId : (student.idNumber || student.registrationId || 'card')).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 
   const handlePrint = async () => {
     try {

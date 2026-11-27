@@ -66,6 +66,26 @@ export function isStudentBelowClass6(className?: string | null): boolean {
 }
 
 /**
+ * Authoritative guardian eligibility rule:
+ * - Current female student: always eligible (1 guardian)
+ * - Current male student: eligible only if strictly below Class 6 (Play, Nursery, KG, Class 1–5; Class 6 is NOT included)
+ * - Former students (alumni): NOT eligible for accompanying parent/guardian pass
+ */
+export function isGuardianEligible(
+  category: StudentCategory | string | undefined | null,
+  gender?: string | null,
+  currentClass?: string | null
+): boolean {
+  if (String(category || '').trim().toLowerCase() !== 'current') {
+    return false;
+  }
+  if (String(gender || '').trim().toLowerCase() === 'female') {
+    return true;
+  }
+  return isStudentBelowClass6(currentClass);
+}
+
+/**
  * Validates email addresses
  */
 export function isValidEmail(email: string): boolean {
@@ -154,6 +174,12 @@ export function validateRegistrationData(data: RegistrationFormData): Validation
 
   // Accompanying Parent validation (if enabled)
   if (data.hasParent) {
+    if (!isGuardianEligible(data.category, data.gender, data.currentClass)) {
+      errors.hasParent = {
+        en: 'Accompanying parent/guardian pass is only available for current female students or current male students below Class 6.',
+        bn: 'অভিভাবক পাস শুধুমাত্র বর্তমান নারী শিক্ষার্থী অথবা ৬ষ্ঠ শ্রেণির নিচের বর্তমান পুরুষ শিক্ষার্থীদের জন্য প্রযোজ্য।',
+      };
+    }
     if (!data.parentName || data.parentName.trim().length < 2) {
       errors.parentName = {
         en: 'Parent / Guardian full name is required (minimum 2 characters)',
