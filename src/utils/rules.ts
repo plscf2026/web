@@ -624,12 +624,12 @@ export function getStructuredClosureNotice(
         ? 'প্রাক্তন শিক্ষার্থী নিবন্ধন সাময়িকভাবে বন্ধ রয়েছে'
         : 'Alumni Registration Is Temporarily Closed'
       : target === 'currentStudent'
-      ? isBn
-        ? 'বর্তমান শিক্ষার্থী নিবন্ধন সাময়িকভাবে বন্ধ রয়েছে'
-        : 'Current Student Registration Is Temporarily Closed'
-      : isBn
-      ? 'অনলাইন অনুদান কার্যক্রম সাময়িকভাবে বন্ধ রয়েছে'
-      : 'Online Donations Are Temporarily Closed';
+        ? isBn
+          ? 'বর্তমান শিক্ষার্থী নিবন্ধন সাময়িকভাবে বন্ধ রয়েছে'
+          : 'Current Student Registration Is Temporarily Closed'
+        : isBn
+          ? 'অনলাইন অনুদান কার্যক্রম সাময়িকভাবে বন্ধ রয়েছে'
+          : 'Online Donations Are Temporarily Closed';
 
   const fallbackMessage =
     target === 'donation'

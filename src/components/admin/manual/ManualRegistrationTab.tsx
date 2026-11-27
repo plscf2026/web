@@ -110,7 +110,7 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
 
   useEffect(() => {
     refreshStaffList(true);
-    StudentIdService.syncWithSupabase().catch(() => {});
+    StudentIdService.syncWithSupabase().catch(() => { });
 
     const handleSync = () => {
       setMyRegistrations(
@@ -737,11 +737,10 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
               <button
                 type="button"
                 onClick={() => setSubView('form')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  subView === 'form'
-                    ? 'bg-sky-500 text-slate-950 shadow-sm'
-                    : 'text-slate-300 hover:text-white'
-                }`}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${subView === 'form'
+                  ? 'bg-sky-500 text-slate-950 shadow-sm'
+                  : 'text-slate-300 hover:text-white'
+                  }`}
               >
                 <UserPlus className="w-3.5 h-3.5" />
                 <span>{isBangla ? 'নতুন নিবন্ধন' : 'New Registration'}</span>
@@ -752,11 +751,10 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
                   setSubView('myRegistrations');
                   refreshStaffList(true);
                 }}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  subView === 'myRegistrations'
-                    ? 'bg-amber-400 text-slate-950 shadow-sm'
-                    : 'text-slate-300 hover:text-white'
-                }`}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${subView === 'myRegistrations'
+                  ? 'bg-amber-400 text-slate-950 shadow-sm'
+                  : 'text-slate-300 hover:text-white'
+                  }`}
               >
                 <ListChecks className="w-3.5 h-3.5" />
                 <span>
@@ -765,8 +763,8 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
                       ? `সকল ম্যানুয়াল (${staffStats.total})`
                       : `All Manual (${staffStats.total})`
                     : isBangla
-                    ? `আমার নিবন্ধন (${staffStats.total})`
-                    : `My Registrations (${staffStats.total})`}
+                      ? `আমার নিবন্ধন (${staffStats.total})`
+                      : `My Registrations (${staffStats.total})`}
                 </span>
               </button>
             </div>
@@ -910,13 +908,12 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
                           </div>
                           <div className="flex flex-wrap items-center gap-2 text-[11px] pt-1">
                             <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg font-bold border ${
-                                regStatus === 'approved'
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                  : regStatus === 'rejected'
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg font-bold border ${regStatus === 'approved'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : regStatus === 'rejected'
                                   ? 'bg-rose-50 text-rose-800 border-rose-200'
                                   : 'bg-amber-50 text-amber-900 border-amber-200'
-                              }`}
+                                }`}
                             >
                               {regStatus === 'approved' ? (
                                 <CheckCircle2 className="w-3 h-3" />
@@ -931,21 +928,20 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
                             </span>
 
                             <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg font-bold border ${
-                                finStatus === 'approved'
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                  : finStatus === 'rejected'
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg font-bold border ${finStatus === 'approved'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : finStatus === 'rejected'
                                   ? 'bg-rose-50 text-rose-800 border-rose-200'
                                   : 'bg-indigo-50 text-indigo-800 border-indigo-200'
-                              }`}
+                                }`}
                             >
                               <DollarSign className="w-3 h-3" />
                               <span>
                                 {finStatus === 'approved'
                                   ? `Approved Amount: ৳${approvedAmt.toLocaleString()}`
                                   : finStatus === 'rejected'
-                                  ? 'Payment Rejected'
-                                  : 'Payment: Pending Verification'}
+                                    ? 'Payment Rejected'
+                                    : 'Payment: Pending Verification'}
                               </span>
                             </span>
                           </div>
@@ -1031,11 +1027,10 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
                     setIdVerificationResult(null);
                     setValidationErrors({});
                   }}
-                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
-                    category === 'former'
-                      ? 'border-[#0284C7] bg-[#E2EEF8]/40 shadow-xs'
-                      : 'border-slate-200 hover:border-slate-300 bg-white'
-                  }`}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${category === 'former'
+                    ? 'border-[#0284C7] bg-[#E2EEF8]/40 shadow-xs'
+                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-[#0F172A] text-base">
@@ -1058,11 +1053,10 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
                     setCategory('current');
                     setValidationErrors({});
                   }}
-                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
-                    category === 'current'
-                      ? 'border-[#0EA5E9] bg-[#E2EEF8]/40 shadow-xs'
-                      : 'border-slate-200 hover:border-slate-300 bg-white'
-                  }`}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${category === 'current'
+                    ? 'border-[#0EA5E9] bg-[#E2EEF8]/40 shadow-xs'
+                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-[#0F172A] text-base">
@@ -1255,8 +1249,8 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
                           ? '২. যোগাযোগ, ছবি ও পরিচয় বিবরণী'
                           : '2. Contact, Photo & Identity Details'
                         : isBangla
-                        ? '১. ব্যক্তিগত, ছবি ও একাডেমিক তথ্য'
-                        : '1. Personal, Photo & Academic Details'}
+                          ? '১. ব্যক্তিগত, ছবি ও একাডেমিক তথ্য'
+                          : '1. Personal, Photo & Academic Details'}
                     </h3>
                   </div>
 
@@ -1718,16 +1712,14 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
                             clearValidationError('transactionId');
                             clearValidationError('paymentAmount');
                           }}
-                          className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-start gap-3 ${
-                            active
-                              ? 'border-emerald-600 bg-emerald-50/60 shadow-xs'
-                              : 'border-slate-200 hover:border-slate-300 bg-white'
-                          }`}
+                          className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-start gap-3 ${active
+                            ? 'border-emerald-600 bg-emerald-50/60 shadow-xs'
+                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                            }`}
                         >
                           <div
-                            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                              active ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
-                            }`}
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${active ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
+                              }`}
                           >
                             <Icon className="w-4 h-4" />
                           </div>
@@ -1749,8 +1741,8 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
                             ? 'প্রাপ্ত নগদ টাকার পরিমাণ (BDT) *'
                             : 'Cash Amount Received (BDT) *'
                           : isBangla
-                          ? 'প্রদানকৃত টাকার পরিমাণ (BDT) *'
-                          : 'Submitted Payment Amount (BDT) *'}
+                            ? 'প্রদানকৃত টাকার পরিমাণ (BDT) *'
+                            : 'Submitted Payment Amount (BDT) *'}
                       </label>
                       <div className="relative">
                         <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">৳</span>
@@ -1810,8 +1802,8 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
                             ? 'পেমেন্ট স্লিপ / স্ক্রিনশট (ঐচ্ছিক)'
                             : 'Payment Slip / Screenshot (Optional)'
                           : isBangla
-                          ? 'প্রমাণক / ডকুমেন্ট (ঐচ্ছিক)'
-                          : 'Supporting Slip / ID Copy (Optional)'}
+                            ? 'প্রমাণক / ডকুমেন্ট (ঐচ্ছিক)'
+                            : 'Supporting Slip / ID Copy (Optional)'}
                       </label>
                       <label className="w-full px-3 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-bold cursor-pointer inline-flex items-center justify-between gap-2">
                         <span className="truncate">
@@ -1945,8 +1937,8 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
                         ? '✅ সুপার অ্যাডমিন অনুমোদিত — কিউআর কোড সক্রিয়'
                         : '✅ Approved by Super Admin — QR Code Active'
                       : isBangla
-                      ? '⏳ ম্যানুয়াল ডাটাবেজে সংরক্ষিত (অনুমোদনের অপেক্ষায়) — কার্ড এখনই প্রিন্ট করতে পারেন, অনুমোদনের পর QR সক্রিয় হবে'
-                      : '⏳ Saved to Manual Database (Pending Approval) — You may print now; QR activates upon Super Admin approval'}
+                        ? '⏳ ম্যানুয়াল ডাটাবেজে সংরক্ষিত (অনুমোদনের অপেক্ষায়) — কার্ড এখনই প্রিন্ট করতে পারেন, অনুমোদনের পর QR সক্রিয় হবে'
+                        : '⏳ Saved to Manual Database (Pending Approval) — You may print now; QR activates upon Super Admin approval'}
                   </p>
                 </div>
               </div>
