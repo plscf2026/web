@@ -1,36 +1,24 @@
-# Police Lines School & College Faridpur — Grand Reunion 2027
+# Police Lines School & College, Faridpur — 65 Years Grand Reunion 2027
 
-> Official bilingual (Bengali & English) grand reunion registration and event management platform for alumni of Police Lines School and College, Faridpur, Bangladesh (Est. 1962).
+> Official bilingual (Bengali & English) portal for the 65th anniversary Grand Reunion 2027 of Police Lines School and College, Faridpur, Bangladesh (Est. 1962), hosted at https://www.plscf65.online/.
 
-## About
+## Event Details
 
-Police Lines School and College, Faridpur (PLSCF) is a premier educational institution in Faridpur, Bangladesh. This portal serves the Grand Reunion 2027 event, allowing alumni to register, purchase digital tickets, donate, and participate in event activities.
+- **Institution**: Police Lines School and College, Faridpur (Est. 1962)
+- **Event**: 65th Anniversary Grand Reunion 2027
+- **Dates**: January 28 – 29, 2027
+- **Venue**: School Campus & Police Lines Large Field, Kamlapur, Faridpur Sadar, Faridpur-7800, Bangladesh
 
-## Key Features
+## Public Pages
 
-- **Alumni Registration**: Online registration with payment gateway integration (PayStation)
-- **Digital QR Tickets**: Verifiable QR-coded entry tickets
-- **Live Gate Scanning**: Real-time QR scan and entry verification at venue
-- **Donor Hall of Fame**: Transparent donation tracking with optional privacy controls
-- **Admin Portal**: Multi-role admin portal (Super Admin, Admin, Finance Manager, Gate Staff, Registration Desk)
-- **Bilingual**: Full Bengali (বাংলা) and English language support
+- `https://www.plscf65.online/` — Official Reunion Portal homepage, countdown, committee overview, and event summary
+- `https://www.plscf65.online/register` — Alumni and current student online registration form
+- `https://www.plscf65.online/donate` — Contribution and alumni welfare donation portal
+- `https://www.plscf65.online/international-payment` — International remittance support for overseas alumni
+- `https://www.plscf65.online/notices` — Official notices and event announcements
+- `https://www.plscf65.online/gallery` — Campus heritage photo and video archive
+- `https://www.plscf65.online/about` — Institutional history, 65th anniversary objectives, and secretariat helpdesk contact
 
-## Public Routes
+## Privacy Notice
 
-- `/` — Home page with event information and countdown
-- `/register` — Alumni registration form with payment
-- `/donate` — Donation portal with Thank You card generation
-- `/gallery` — Photo gallery
-- `/about` — About the school and reunion committee
-- `/notice` — Announcements and notices
-
-## Technical Stack
-
-- Frontend: React 19 + TypeScript + Tailwind CSS v4 + Vite
-- Backend: Supabase (PostgreSQL + Auth + Storage)
-- Payment: PayStation (Bangladesh payment gateway)
-- Hosting: Vercel
-
-## Contact
-
-For inquiries about the reunion, contact the organizing committee via the official portal.
+Private administrative dashboards, gate/food verification stations, and individual attendee ticket records are excluded from search indexing.

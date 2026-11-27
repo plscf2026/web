@@ -1,42 +1,52 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 
   <url>
-    <loc>https://plscf65.vercel.app/</loc>
+    <loc>https://www.plscf65.online/</loc>
+    <lastmod>2026-11-28</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://plscf65.vercel.app/"/>
-    <xhtml:link rel="alternate" hreflang="bn" href="https://plscf65.vercel.app/"/>
   </url>
 
   <url>
-    <loc>https://plscf65.vercel.app/register</loc>
+    <loc>https://www.plscf65.online/register</loc>
+    <lastmod>2026-11-28</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://plscf65.vercel.app/donate</loc>
+    <loc>https://www.plscf65.online/donate</loc>
+    <lastmod>2026-11-28</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://plscf65.vercel.app/gallery</loc>
+    <loc>https://www.plscf65.online/notices</loc>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://www.plscf65.online/about</loc>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://www.plscf65.online/gallery</loc>
+    <lastmod>2026-11-28</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
 
   <url>
-    <loc>https://plscf65.vercel.app/about</loc>
+    <loc>https://www.plscf65.online/international-payment</loc>
+    <lastmod>2026-11-28</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-
-  <url>
-    <loc>https://plscf65.vercel.app/notice</loc>
-    <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
 

@@ -1,16 +1,25 @@
-# robots.txt for Police Lines School & College Faridpur — Grand Reunion 2027
-# https://plscf65.vercel.app/
+# robots.txt for Police Lines School & College, Faridpur — 65 Years Grand Reunion 2027
+# Primary Canonical Domain: https://www.plscf65.online/
 
 User-agent: *
 Allow: /
+
+# Disallow private portals, verification stations, individual passes, and backend endpoints
+Disallow: /admin
+Disallow: /admin/
+Disallow: /dashboard
 Disallow: /dashboard/
+Disallow: /portal
+Disallow: /portal/
+Disallow: /scanner
+Disallow: /scanner/
+Disallow: /super-admin
+Disallow: /finance
+Disallow: /moderator
+Disallow: /ticket
+Disallow: /ticket/
+Disallow: /profile
 Disallow: /api/
 Disallow: /rest/
 
-# Allow public-facing routes
-Allow: /donate
-Allow: /gallery
-Allow: /about
-Allow: /notice
-
-Sitemap: https://plscf65.vercel.app/sitemap.xml
+Sitemap: https://www.plscf65.online/sitemap.xml

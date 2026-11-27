@@ -72,6 +72,18 @@
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
+    },
+    {
+      "source": "/(admin|dashboard|portal|scanner|super-admin|finance|moderator|ticket|profile)(.*)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" }
+      ]
     }
   ],
   "rewrites": [
@@ -84,7 +96,7 @@
       "destination": "/api/:path*"
     },
     {
-      "source": "/((?!api/|rest/|robots\\.txt|sitemap\\.xml|llms\\.txt|ai-catalog\\.json|assets/).*)",
+      "source": "/((?!api/|rest/|robots\\.txt|sitemap\\.xml|llms\\.txt|ai-catalog\\.json|favicon\\.png|apple-touch-icon\\.png|assets/).*)",
       "destination": "/index.html"
     }
   ]

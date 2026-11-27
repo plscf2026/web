@@ -1,30 +1,37 @@
 {
   "$schema": "https://ai-catalog.schema.org/v1/schema.json",
-  "name": "Police Lines School & College Faridpur — Grand Reunion 2027",
-  "description": "Official bilingual (Bengali & English) grand reunion registration and event management platform for alumni of Police Lines School and College, Faridpur, Bangladesh (Est. 1962).",
-  "url": "https://plscf65.vercel.app",
-  "logo": "https://plscf65.vercel.app/assets/school_logo.png",
-  "language": ["en", "bn"],
-  "category": "Education / Event Management",
-  "keywords": ["reunion", "alumni", "Bangladesh", "school", "registration", "ticket", "donation"],
+  "name": "Police Lines School & College, Faridpur — 65 Years Grand Reunion 2027",
+  "description": "Official bilingual (Bengali & English) portal for the 65 Years Grand Reunion 2027 of Police Lines School and College, Faridpur, Bangladesh (Est. 1962).",
+  "url": "https://www.plscf65.online",
+  "logo": "https://www.plscf65.online/assets/school_logo.png",
+  "language": ["bn", "en"],
+  "category": "Education / Alumni Reunion Event",
+  "keywords": [
+    "Police Lines School and College Faridpur",
+    "Police Lines 65 Years Reunion",
+    "Police Lines Reunion Registration",
+    "পুলিশ লাইনস স্কুল এন্ড কলেজ ফরিদপুর",
+    "পুলিশ লাইনস ৬৫ বছর পূর্তি",
+    "পুলিশ লাইনস পুনর্মিলনী"
+  ],
   "contact": {
-    "url": "https://plscf65.vercel.app/about"
+    "url": "https://www.plscf65.online/about"
   },
   "capabilities": [
     {
-      "name": "Alumni Registration",
-      "description": "Register as an alumni attendee for the Grand Reunion 2027 with digital ticket issuance.",
-      "url": "https://plscf65.vercel.app/register"
+      "name": "Alumni & Student Registration",
+      "description": "Online registration for former and current students attending Grand Reunion 2027.",
+      "url": "https://www.plscf65.online/register"
     },
     {
-      "name": "Donation Portal",
-      "description": "Donate to the reunion fund and receive an official Thank You card with unique token ID.",
-      "url": "https://plscf65.vercel.app/donate"
+      "name": "Contribution & Donation Portal",
+      "description": "Support the reunion development and student welfare fund.",
+      "url": "https://www.plscf65.online/donate"
     },
     {
-      "name": "Ticket Status Check",
-      "description": "Check registration and ticket status using Registration ID and phone number.",
-      "url": "https://plscf65.vercel.app/register"
+      "name": "Notices & Event Schedule",
+      "description": "Official announcements and schedule updates for Grand Reunion 2027.",
+      "url": "https://www.plscf65.online/notices"
     }
   ]
 }

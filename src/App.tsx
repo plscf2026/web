@@ -25,6 +25,7 @@ import {
   syncRouteHistory,
   parseRegistrationCategory,
 } from './utils/navigation';
+import { syncDocumentSeo } from './utils/seo';
 import { SupabaseService } from './services/supabase';
 import { subscribeToAuthSync } from './services/authSync';
 import { AboutContactService } from './services/aboutContactService';
@@ -126,6 +127,11 @@ export default function App() {
     syncRouteHistory(view, replace, extraParams);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Synchronize non-visual <head> SEO metadata per route & active language
+  useEffect(() => {
+    syncDocumentSeo(activeView, language);
+  }, [activeView, language]);
 
   // Cross-tab authentication synchronization listener
   useEffect(() => {
