@@ -42,6 +42,7 @@ import {
 import { translations } from '../i18n/translations';
 import { AppStore } from '../services/store';
 import { SupabaseService } from '../services/supabase';
+import { ReunionStatsService, ReunionStatsSnapshot } from '../services/reunionStatsService';
 import { FinancialTransparencyDashboard } from './financials/FinancialTransparencyDashboard';
 import { ThankYouCardModal } from './ThankYouCardModal';
 import { GovernanceClosureNoticeCard } from './common/GovernanceClosureNoticeCard';
@@ -82,7 +83,6 @@ export const HomePage: React.FC<HomePageProps> = ({
 }) => {
   const isGovernanceReady = governanceStatus === 'ready';
   const t = translations[language];
-  const registrations = AppStore.getRegistrations();
   const notices = AppStore.getNotices();
   const homePageSections = useMemo(
     () => reconcileHomePageSections(feeSettings.homePageSections),
@@ -98,17 +98,27 @@ export const HomePage: React.FC<HomePageProps> = ({
     };
   };
 
-  const paidCount = registrations.filter((r) => r.paymentStatus === 'paid').length;
-  const formerCount = registrations.filter(
-    (r) => r.category === 'former' && r.paymentStatus === 'paid'
-  ).length;
-  const currentCount = registrations.filter(
-    (r) => r.category === 'current' && r.paymentStatus === 'paid'
-  ).length;
+  const [statsSnapshot, setStatsSnapshot] = useState<ReunionStatsSnapshot>(() =>
+    ReunionStatsService.getSnapshot()
+  );
 
-  const displayPaidCount = Math.max(paidCount, 36);
-  const displayFormerCount = Math.max(formerCount, 23);
-  const displayCurrentCount = Math.max(currentCount, 13);
+  useEffect(() => {
+    const unsubStats = ReunionStatsService.subscribe((snap) => {
+      setStatsSnapshot(snap);
+    });
+    const cleanupStatsSync = ReunionStatsService.initLiveSync();
+    return () => {
+      unsubStats();
+      cleanupStatsSync();
+    };
+  }, []);
+
+  const formatStatCount = (val?: number): string => {
+    if (statsSnapshot.status === 'loading') return '...';
+    if (statsSnapshot.status === 'error' || typeof val !== 'number') return '—';
+    return val.toLocaleString();
+  };
+
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
   // --- 1. COUNTDOWN TIMER STATE & LOGIC ---
@@ -329,8 +339,8 @@ export const HomePage: React.FC<HomePageProps> = ({
               <Users className="w-5 h-5 text-[#0284C7]" />
             </div>
             <div className="text-left">
-              <div className="text-2xl sm:text-3xl font-black text-[#0F172A] leading-tight">
-                {displayPaidCount}
+              <div data-testid="stat-total-registered" className="text-2xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
+                {formatStatCount(statsSnapshot.stats?.totalRegistered)}
               </div>
               <div className="text-xs text-slate-600 font-semibold">
                 {language === 'bn' ? 'মোট নিবন্ধিত' : 'Total Registered'}
@@ -344,8 +354,8 @@ export const HomePage: React.FC<HomePageProps> = ({
               <GraduationCap className="w-5 h-5 text-[#0284C7]" />
             </div>
             <div className="text-left">
-              <div className="text-2xl sm:text-3xl font-black text-[#0F172A] leading-tight">
-                {displayFormerCount}
+              <div data-testid="stat-former-students" className="text-2xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
+                {formatStatCount(statsSnapshot.stats?.formerStudents)}
               </div>
               <div className="text-xs text-slate-600 font-semibold">
                 {language === 'bn' ? 'প্রাক্তন শিক্ষার্থী' : 'Former Students'}
@@ -359,8 +369,8 @@ export const HomePage: React.FC<HomePageProps> = ({
               <User className="w-5 h-5 text-[#0284C7]" />
             </div>
             <div className="text-left">
-              <div className="text-2xl sm:text-3xl font-black text-[#0F172A] leading-tight">
-                {displayCurrentCount}
+              <div data-testid="stat-current-students" className="text-2xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
+                {formatStatCount(statsSnapshot.stats?.currentStudents)}
               </div>
               <div className="text-xs text-slate-600 font-semibold">
                 {language === 'bn' ? 'বর্তমান শিক্ষার্থী' : 'Current Students'}
@@ -374,8 +384,8 @@ export const HomePage: React.FC<HomePageProps> = ({
               <Users className="w-5 h-5 text-[#0284C7]" />
             </div>
             <div className="text-left">
-              <div className="text-2xl sm:text-3xl font-black text-[#0F172A] leading-tight">
-                50+
+              <div data-testid="stat-batches-represented" className="text-2xl sm:text-3xl font-black text-[#0F172A] leading-tight tabular-nums">
+                {formatStatCount(statsSnapshot.stats?.batchesRepresented)}
               </div>
               <div className="text-xs text-slate-600 font-semibold">
                 {language === 'bn' ? 'ব্যাচ প্রতিনিধিত্বকারী' : 'Batches Represented'}
