@@ -28,6 +28,7 @@ import {
   Language,
 } from '../types';
 import { AppStore } from '../services/store';
+import { isDevTestBypassAllowed } from '../services/supabase';
 import { EventStore, hasDepartmentPermission } from '../services/eventStore';
 import { GuestService } from '../services/guestService';
 import { GuestCard, GuestMealFacilities } from '../types/guest';
@@ -985,7 +986,8 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
               </form>
             </div>
 
-            {/* Quick Demo Student Buttons for testing without camera */}
+            {/* Quick Demo Student Buttons for testing without camera — dev-only */}
+            {isDevTestBypassAllowed() && (
             <div className="pt-2 border-t border-slate-100">
               <span className="text-[11px] font-bold text-slate-500 block mb-2">
                 Quick Test Student Tickets:
@@ -1011,6 +1013,7 @@ export const FoodScannerModule: React.FC<FoodScannerModuleProps> = ({
                 ))}
               </div>
             </div>
+            )}
           </div>
         </div>
 

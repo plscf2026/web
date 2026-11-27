@@ -24,7 +24,7 @@ import {
   TShirtSize,
 } from '../types';
 import { AppStore } from '../services/store';
-import { SupabaseService } from '../services/supabase';
+import { SupabaseService, isDevTestBypassAllowed } from '../services/supabase';
 import { EventStore, hasDepartmentPermission } from '../services/eventStore';
 import { parseScannedInput } from '../utils/tokenGenerator';
 import { validateDressDistribution } from '../utils/eventRules';
@@ -477,7 +477,8 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
               </form>
             </div>
 
-            {/* Quick Demo Student Buttons */}
+            {/* Quick Demo Student Buttons — dev-only */}
+            {isDevTestBypassAllowed() && (
             <div className="pt-2 border-t border-slate-100">
               <span className="text-[11px] font-bold text-slate-500 block mb-2">
                 Quick Test Student Tickets:
@@ -503,6 +504,7 @@ export const DressScannerModule: React.FC<DressScannerModuleProps> = ({
                 ))}
               </div>
             </div>
+            )}
           </div>
         </div>
 

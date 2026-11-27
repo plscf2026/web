@@ -35,6 +35,7 @@ import { QrCameraScanner } from './common/QrCameraScanner';
 import { GlobalPagination } from './common/GlobalPagination';
 import { paginate } from '../utils/pagination';
 import { DEFAULT_STUDENT_AVATAR_PLACEHOLDER } from '../services/studentPhotoStorageService';
+import { isDevTestBypassAllowed } from '../services/supabase';
 
 interface GateScannerModuleProps {
   language: Language;
@@ -565,7 +566,8 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
               </form>
             </div>
 
-            {/* Quick Demo Test Buttons */}
+            {/* Quick Demo Test Buttons — dev-only */}
+            {isDevTestBypassAllowed() && (
             <div className="pt-2 border-t border-slate-100">
               <span className="text-[11px] font-bold text-slate-500 block mb-2">
                 Quick Test Tickets (Student • Staff • Guest):
@@ -592,6 +594,7 @@ export const GateScannerModule: React.FC<GateScannerModuleProps> = ({
                 ))}
               </div>
             </div>
+            )}
           </div>
         </div>
 
