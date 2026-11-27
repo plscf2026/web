@@ -1127,28 +1127,32 @@ export class PayStationService {
       createdAt: nowIso,
     };
 
-    AppStore.addDonation(donation, year);
+    let finalDonation: DonationRecord = donation;
+    try {
+      const saveRes = await SupabaseService.saveDonation(donation, year);
+      if (saveRes.success && saveRes.donation) {
+        finalDonation = saveRes.donation;
+      }
+    } catch (err) {
+      console.warn('[PayStation] Background Supabase donation sync notice:', err);
+    }
+
+    AppStore.addDonation(finalDonation, year);
 
     try {
       EventStore.addLedgerEntry({
         staffId: 'GATEWAY_PAYSTATION',
         transactionType: 'REGISTRATION_INFLOW',
-        amount: payment.amount,
-        referenceId: donationId,
-        description: `PayStation Online Donation from ${donation.donorName} (${donation.purpose}) via ${payment.method.toUpperCase()} [Trx: ${payment.trxId}]`,
+        amount: finalDonation.amount,
+        referenceId: finalDonation.id,
+        description: `PayStation Online Donation from ${finalDonation.donorName} (${finalDonation.purpose}) via ${payment.method.toUpperCase()} [Trx: ${finalDonation.transactionId}]`,
         createdBy: 'GATEWAY_PAYSTATION',
       });
     } catch (e) {
       console.warn('[PayStation] Donation ledger entry notice:', e);
     }
 
-    try {
-      await SupabaseService.saveDonation(donation, year);
-    } catch (err) {
-      console.warn('[PayStation] Background Supabase donation sync notice:', err);
-    }
-
-    return donation;
+    return finalDonation;
   }
 
   /**

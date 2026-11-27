@@ -61,8 +61,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   initialErrorMessage,
   initialInvoice,
 }) => {
-  if (!isOpen) return null;
-
   const isBangla = language === 'bn';
 
   const [step, setStep] = useState<ModalStep>(() => initialStep || 'processing');
@@ -132,7 +130,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         registrationData.category === 'current'
           ? feeSettings.currentStudentFee
           : feeSettings.formerStudentFee;
-      const currentParentFee = registrationData.hasParent ? (registrationData.parentFee ?? 500) : 0;
+      const currentParentFee = registrationData.hasParent ? (registrationData.parentFee ?? (feeSettings.parentFee ?? 500)) : 0;
       const currentSubtotal = effectiveBaseFee + currentParentFee;
       const impliedSubtotal = Math.round((payment.amount / 1.018) * 100) / 100;
       const effectiveCharge = Math.max(0, Math.round((payment.amount - impliedSubtotal) * 100) / 100);
@@ -216,15 +214,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   // ── Auto-verify on mount / step change ─────────────────────────────────────
 
   useEffect(() => {
-    if (step === 'verifying' && !completedTicket && !isFinalizingRef.current) {
-      handleManualVerify();
-    }
-  }, [step]);
+    if (!isOpen || step !== 'verifying' || completedTicket || isFinalizingRef.current) return;
+    handleManualVerify();
+  }, [isOpen, step]);
 
   // ── Status polling ───────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (step !== 'waiting') return;
+    if (!isOpen || step !== 'waiting') return;
 
     let attempts = 0;
     const interval = setInterval(async () => {
@@ -498,6 +495,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   // ── Render ───────────────────────────────────────────────────────────────
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-slate-950/85 backdrop-blur-xs p-3 sm:p-6 flex items-start sm:items-center justify-center min-h-[100dvh]">
       <section
@@ -576,7 +575,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               )}
 
               {/* Official ID Card Badge with Live Preview, Direct Print, and Download Actions */}
-              <div className="py-2 flex flex-col items-center justify-center bg-slate-50/80 p-3 sm:p-4 rounded-3xl border border-slate-200">
+              <div className="flex flex-col items-center justify-center bg-slate-50/80 p-3 sm:p-4 rounded-3xl border border-slate-200">
                 {activeCardTab === 'parent' && completedTicket.hasParent ? (
                   <ParentIdCardBadge
                     student={IdCardStore.getOrBuildCardForRegistration(completedTicket)}
@@ -696,8 +695,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </h2>
                 <p className="text-xs text-slate-500">
                   {isBangla
-                    ? 'নতুন ট্যাবে PayStation চেকআউট খোলা হয়েছে'
-                    : 'PayStation checkout opened in a new tab'}
+                    ? 'PayStation চেকআউটে পেমেন্ট সম্পন্ন করুন'
+                    : 'Please complete your payment on PayStation checkout'}
                 </p>
               </div>
             </div>

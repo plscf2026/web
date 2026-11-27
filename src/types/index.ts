@@ -423,6 +423,7 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
       'committeeManagement',
       'aboutContactManagement',
       'internationalPaymentManagement',
+      'supabaseLimits',
       'reports',
     ],
     demoCredentials: {

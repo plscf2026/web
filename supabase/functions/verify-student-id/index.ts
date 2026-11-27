@@ -179,6 +179,7 @@ serve(async (req) => {
         .from('registrations_2027')
         .select(selectCols)
         .eq('id', studentId)
+        .eq('year', year)
         .limit(1)
         .maybeSingle();
       registration = byIdRes.data;
@@ -189,6 +190,7 @@ serve(async (req) => {
           .from('registrations_2027')
           .select(selectCols)
           .eq('qr_token', studentId)
+          .eq('year', year)
           .limit(1)
           .maybeSingle();
         registration = byTokenRes.data;
@@ -199,6 +201,7 @@ serve(async (req) => {
         .from('registrations_2027')
         .select(selectCols)
         .eq('qr_token', qrToken)
+        .eq('year', year)
         .limit(1)
         .maybeSingle();
       registration = byQrRes.data;
@@ -259,32 +262,42 @@ serve(async (req) => {
     }
 
     // 3. Mandatory cryptographic token matching (case-insensitive)
-    if (registration.qr_token) {
-      const regToken = String(registration.qr_token).trim().toUpperCase();
-      if (qrToken && regToken !== qrToken) {
-        return jsonResponse(
-          {
-            success: false,
-            verified: false,
-            status: 'TOKEN_MISMATCH',
-            error: `Cryptographic QR token mismatch for registration "${registration.id}".`,
-          },
-          403,
-          headers
-        );
-      }
-      if (!qrToken && regToken !== studentId) {
-        return jsonResponse(
-          {
-            success: false,
-            verified: false,
-            status: 'TOKEN_REQUIRED',
-            error: 'Cryptographic QR token is required for ID verification.',
-          },
-          403,
-          headers
-        );
-      }
+    if (!registration.qr_token) {
+      return jsonResponse(
+        {
+          success: false,
+          verified: false,
+          status: 'TOKEN_MISSING',
+          error: `Registration "${registration.id}" has no valid QR token assigned.`,
+        },
+        403,
+        headers
+      );
+    }
+    const regToken = String(registration.qr_token).trim().toUpperCase();
+    if (qrToken && regToken !== qrToken) {
+      return jsonResponse(
+        {
+          success: false,
+          verified: false,
+          status: 'TOKEN_MISMATCH',
+          error: `Cryptographic QR token mismatch for registration "${registration.id}".`,
+        },
+        403,
+        headers
+      );
+    }
+    if (!qrToken && regToken !== studentId) {
+      return jsonResponse(
+        {
+          success: false,
+          verified: false,
+          status: 'TOKEN_REQUIRED',
+          error: 'Cryptographic QR token is required for ID verification.',
+        },
+        403,
+        headers
+      );
     }
 
     // 4. Check if card generation record exists

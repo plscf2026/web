@@ -171,9 +171,12 @@ export function validateAndBuildPendingRegistrationData(
   const year = Number.isInteger(rawYear) && rawYear >= 2020 && rawYear <= 2100 ? rawYear : 2027;
 
   const requestedRegId = cleanStr(rawForm.registrationId ?? rawForm.registration_id ?? order.registration_id, 40).toUpperCase();
+  const csprngBuf = new Uint32Array(1);
+  crypto.getRandomValues(csprngBuf);
+  const randomSuffix = String(1000 + (csprngBuf[0] % 9000));
   const registrationId = /^PLSCF-\d{4}-[CF][A-Z0-9]{3,10}$/.test(requestedRegId)
     ? requestedRegId
-    : `PLSCF-${year}-${category === 'current' ? 'C' : 'F'}${Math.floor(1000 + Math.random() * 9000)}`;
+    : `PLSCF-${year}-${category === 'current' ? 'C' : 'F'}${randomSuffix}`;
 
   const requestedQrToken = cleanStr(rawForm.qrToken ?? rawForm.qr_token ?? order.qr_token, 16).toUpperCase();
   const qrToken = /^[A-Z0-9]{6,12}$/.test(requestedQrToken) ? requestedQrToken : generateServerQrToken();

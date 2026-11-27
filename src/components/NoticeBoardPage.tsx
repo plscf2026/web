@@ -34,19 +34,20 @@ export const NoticeBoardPage: React.FC<NoticeBoardPageProps> = ({ language }) =>
   });
 
   const handleDownload = (filename: string, title: string) => {
-    // Generate simulated PDF text download
+    const safeBaseName = (filename || 'PLSCF_Reunion_Notice').replace(/\.pdf$/i, '.txt');
+    const finalName = safeBaseName.toLowerCase().endsWith('.txt') ? safeBaseName : `${safeBaseName}.txt`;
     const blob = new Blob(
       [
-        `POLICE LINES SCHOOL AND COLLEGE, FARIDPUR\nGRAND REUNION 2027 OFFICIAL NOTICE\n\nTitle: ${title}\nDate: ${new Date().toLocaleDateString()}\n\nOfficial notice copy from the Reunion Organizing Committee.`,
+        `POLICE LINES SCHOOL AND COLLEGE, FARIDPUR\nGRAND REUNION 2027 OFFICIAL NOTICE\n\nTitle: ${title}\nDate: ${new Date().toLocaleDateString()}\n\nOfficial notice summary from the Reunion Organizing Committee.`,
       ],
-      { type: 'text/plain' }
+      { type: 'text/plain;charset=utf-8' }
     );
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename || 'PLSCF_Reunion_Notice.txt';
+    a.download = finalName;
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (

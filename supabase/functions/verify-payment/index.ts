@@ -344,6 +344,19 @@ serve(async (req) => {
       }
       const sbAdmin = createClient(supabaseUrl, supabaseServiceKey);
       const pendingOrder = await loadPendingOrderBinding(sbAdmin, invoice_number ? String(invoice_number) : undefined);
+      if (pendingOrder && pendingOrder.order_type && pendingOrder.order_type !== 'donation') {
+        return jsonResponse({ success: false, error: 'ORDER_TYPE_MISMATCH', message: 'Invoice does not correspond to a donation order.' }, 400, corsHeaders);
+      }
+      if (pendingOrder?.promoted_registration_id) {
+        const { data: existingDon } = await sbAdmin
+          .from('donations')
+          .select('*')
+          .eq('id', String(pendingOrder.promoted_registration_id))
+          .maybeSingle();
+        if (existingDon) {
+          return jsonResponse({ success: true, donation: existingDon }, 200, corsHeaders);
+        }
+      }
 
       const gwCheck = await verifyGatewayTransactionStatus(
         String(transaction_id),
@@ -605,7 +618,7 @@ serve(async (req) => {
       success:   true,
       verified:  true,
       status:    'paid',
-      trx_id,
+      trx_id:    gwCheck.trxId!,
       amount:    verifiedAmount,
       method:    verifiedMethod,
       signature: serverSignature,

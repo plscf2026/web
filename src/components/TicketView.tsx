@@ -369,11 +369,20 @@ export const TicketView: React.FC<TicketViewProps> = ({
           {/* Col 1: Attendee Photograph & Name */}
           <div className="flex flex-col items-center text-center space-y-3">
             <div className="relative">
-              <img
-                src={registration.photoUrl}
-                alt={registration.fullName}
-                className="w-36 h-36 rounded-2xl object-cover border-4 border-[#0284C7] shadow-md bg-slate-100"
-              />
+              {registration.photoUrl ? (
+                <img
+                  src={registration.photoUrl}
+                  alt={registration.fullName}
+                  className="w-36 h-36 rounded-2xl object-cover border-4 border-[#0284C7] shadow-md bg-slate-100"
+                />
+              ) : (
+                <div
+                  aria-label={registration.fullName}
+                  className="w-36 h-36 rounded-2xl border-4 border-[#0284C7] shadow-md bg-gradient-to-br from-sky-100 to-slate-200 text-[#0284C7] font-black text-4xl flex items-center justify-center uppercase select-none"
+                >
+                  {(registration.fullName || 'P').trim().charAt(0)}
+                </div>
+              )}
               <span className="absolute -bottom-2 -right-2 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-slate-900 text-amber-400 border border-slate-700 shadow-sm">
                 {registration.category === 'former'
                   ? language === 'bn'

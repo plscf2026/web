@@ -133,9 +133,10 @@ serve(async (req) => {
     const { data: registration, error } = await supabase
       .from(targetTable)
       .select(
-        'id, full_name, full_name_bn, photo_url, mobile_number, category, passing_year, current_class, batch_name, t_shirt_size, registration_fee, donation_amount, total_paid, payment_status, transaction_id, payment_method, registered_at, qr_token, year'
+        'id, full_name, full_name_bn, photo_url, mobile_number, category, passing_year, current_class, batch_name, t_shirt_size, registration_fee, donation_amount, total_paid, payment_status, registration_approval_status, transaction_id, payment_method, registered_at, qr_token, year'
       )
       .eq('id', registrationId)
+      .eq('year', year)
       .maybeSingle();
 
     if (error) {
@@ -147,6 +148,8 @@ serve(async (req) => {
       !registration ||
       normalizeMobile(String(registration.mobile_number ?? '')) !== mobileNumber ||
       registration.payment_status !== 'paid' ||
+      registration.registration_approval_status === 'pending' ||
+      registration.registration_approval_status === 'rejected' ||
       !registration.qr_token
     ) {
       return jsonResponse(
@@ -158,7 +161,7 @@ serve(async (req) => {
 
     const photoUrl = String(registration.photo_url ?? '');
     const safePhotoUrl =
-      /^data:image\/(?:jpeg|png|webp);base64,/i.test(photoUrl) ||
+      /^data:image\/(?:jpeg|jpg|png|webp);base64,/i.test(photoUrl) ||
       /^https:\/\//i.test(photoUrl)
         ? photoUrl
         : '';

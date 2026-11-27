@@ -1118,25 +1118,27 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   </div>
                 </div>
 
-                {/* More test IDs */}
-                <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5 pt-1">
-                  <span className="font-semibold text-slate-700">
-                    {language === 'bn' ? 'অন্যান্য টেস্ট আইডি:' : 'More Sample IDs:'}
-                  </span>
-                  {['PLSC-2026-104', 'PLSC-2026-105', 'PLSC-2026-106'].map((demoId) => (
-                    <button
-                      key={demoId}
-                      type="button"
-                      onClick={() => {
-                        setStudentId(demoId);
-                        handleVerifyStudentId(demoId);
-                      }}
-                      className="px-1.5 py-0.5 rounded bg-slate-200 hover:bg-slate-300 font-mono text-[10px] text-slate-700 cursor-pointer"
-                    >
-                      {demoId}
-                    </button>
-                  ))}
-                </div>
+                {/* More test IDs (dev/sandbox only) */}
+                {isDevTestBypassAllowed() && (
+                  <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="font-semibold text-slate-700">
+                      {language === 'bn' ? 'অন্যান্য টেস্ট আইডি:' : 'More Sample IDs:'}
+                    </span>
+                    {['PLSC-2026-104', 'PLSC-2026-105', 'PLSC-2026-106'].map((demoId) => (
+                      <button
+                        key={demoId}
+                        type="button"
+                        onClick={() => {
+                          setStudentId(demoId);
+                          handleVerifyStudentId(demoId);
+                        }}
+                        className="px-1.5 py-0.5 rounded bg-slate-200 hover:bg-slate-300 font-mono text-[10px] text-slate-700 cursor-pointer"
+                      >
+                        {demoId}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {/* Status Error feedback */}
                 {idVerificationResult && !idVerificationResult.success && (

@@ -199,9 +199,9 @@ export async function runSupabaseDiagnostic(): Promise<{
   const summary = allGood
     ? '✅ Supabase connection healthy — read & write both working'
     : canRead && canWritePending && !canWritePaid
-      ? '⚠️ Read & pending-write OK, but PAID status update blocked by RLS. Grant anon UPDATE on registrations_2027.'
+      ? 'ℹ️ Public read & pending initiation active. Authoritative PAID finalization is protected server-side via Edge Functions & RLS.'
       : canRead && !canWritePending
-        ? '❌ Read OK but INSERT blocked by RLS. Check registration_insert_pending_2027 policy.'
+        ? 'ℹ️ Public tables readable via safe RPCs; direct anon table writes are restricted by P0-3 RLS hardening.'
         : '❌ Cannot reach Supabase. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local.';
 
   return {
@@ -1264,7 +1264,7 @@ export const SupabaseService = {
       }
     }
 
-    // 1. Primary: Edge Function (invoked when both registrationId and mobileNumber are supplied)
+    // 1. Primary: Authoritative rate-limited Edge Function `secure-ticket-lookup`
     if (cleanId && cleanMobile) {
       try {
         const { data, error } = await supabase.functions.invoke<{
@@ -1284,6 +1284,11 @@ export const SupabaseService = {
           if (data.ticket) {
             return { type: 'registration', registration: fromRegistrationDbRow(data.ticket) };
           }
+        }
+        // Fail closed cleanly if rate limited (HTTP 429) without bypassing to un-rate-limited RPC
+        const errMsg = error?.message || data?.error || '';
+        if (/too many attempts|429/i.test(errMsg)) {
+          return { error: 'Too many attempts. Please wait one minute and try again.' };
         }
       } catch {
         // Edge Function unavailable or network failure; continue to database RPC fallback
@@ -1900,14 +1905,7 @@ export const SupabaseService = {
       if (typeof resolvedEmail === 'string' && resolvedEmail.includes('@')) {
         emailToAuth = resolvedEmail;
       } else {
-        const { data: adminLookup } = await supabase
-          .from('admin_accounts')
-          .select('email')
-          .ilike('username', cleanUsername)
-          .maybeSingle();
-        if (adminLookup?.email) {
-          emailToAuth = adminLookup.email;
-        }
+        return { success: false, error: 'Invalid email or password.' };
       }
     }
 
@@ -2260,10 +2258,14 @@ export const SupabaseService = {
       }
 
       // Direct fallback update
-      await supabase
+      const { error: updErr } = await supabase
         .from('registrations_2027')
         .update({ is_tshirt_collected: collected })
         .eq('id', regId);
+
+      if (updErr) {
+        return { success: false, error: updErr.message };
+      }
 
       return { success: true };
     } catch (err: any) {
@@ -2300,7 +2302,7 @@ export const SupabaseService = {
 
       // Direct fallback
       if (collected) {
-        await supabase
+        const { error: upsertErr } = await supabase
           .from('food_distributions')
           .upsert({
             id: `FOOD-${Date.now()}-${Math.floor(Math.random() * 900 + 100)}`,
@@ -2313,12 +2315,18 @@ export const SupabaseService = {
             staff_id: staffId,
             staff_name: staffName,
           }, { onConflict: 'registration_id,meal_type' });
+        if (upsertErr) {
+          return { success: false, error: upsertErr.message };
+        }
       } else {
-        await supabase
+        const { error: delErr } = await supabase
           .from('food_distributions')
           .delete()
           .eq('registration_id', regId)
           .eq('meal_type', mealType);
+        if (delErr) {
+          return { success: false, error: delErr.message };
+        }
       }
 
       return { success: true };

@@ -46,6 +46,7 @@ import {
   Crown,
   FileEdit,
   Globe,
+  Server,
 } from 'lucide-react';
 import {
   RegistrationRecord,
@@ -93,6 +94,10 @@ import { StudentIdManagementTab } from './admin/StudentIdManagementTab';
 import { MealTimeScannerControlPanel } from './admin/MealTimeScannerControlPanel';
 import { RegistrationDonationControlPanel } from './admin/RegistrationDonationControlPanel';
 import { GovernanceSettingsService } from '../services/governanceSettingsService';
+import {
+  SupabaseLimitsService,
+  SupabaseLimitsSnapshot,
+} from '../services/supabaseLimitsService';
 import { StudentIdService } from '../services/studentIdStore';
 import { EventStore } from '../services/eventStore';
 import { IdCardStore } from '../services/idCardStore';
@@ -130,6 +135,11 @@ const AboutContactManagementTab = lazy(() =>
 const InternationalPaymentManagementTab = lazy(() =>
   import('./admin/InternationalPaymentManagementTab').then((m) => ({
     default: m.InternationalPaymentManagementTab,
+  }))
+);
+const SupabaseLimitsTab = lazy(() =>
+  import('./admin/SupabaseLimitsTab').then((m) => ({
+    default: m.SupabaseLimitsTab,
   }))
 );
 
@@ -173,7 +183,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         if (parsed) return parsed;
         const saved = sessionStorage.getItem('plscf_current_portal_role');
         if (saved) return getPortalRoleFromSlug(saved) || undefined;
-      } catch (_) {}
+      } catch (_) { }
     }
     return undefined;
   });
@@ -287,7 +297,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       sessionStorage.removeItem('plscf_current_portal_role');
       sessionStorage.removeItem('plscf_admin_active_tab');
-    } catch (_) {}
+    } catch (_) { }
   };
 
   // Handle portal switching with strict session isolation
@@ -354,6 +364,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'committeeManagement'
     | 'aboutContactManagement'
     | 'internationalPaymentManagement'
+    | 'supabaseLimits'
     | 'reports';
 
   const isSuperAdmin = adminSession?.role === 'super_admin';
@@ -374,7 +385,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         if (tabParam && tabParam !== 'reunionManagement') return tabParam as AdminTab;
         const saved = sessionStorage.getItem('plscf_admin_active_tab');
         if (saved && saved !== 'reunionManagement') return saved as AdminTab;
-      } catch (_) {}
+      } catch (_) { }
     }
     return 'overview';
   });
@@ -386,7 +397,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const url = new URL(window.location.href);
       url.searchParams.set('tab', tabId);
       window.history.replaceState({ ...window.history.state, tab: tabId }, '', url.toString());
-    } catch (_) {}
+    } catch (_) { }
   };
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [navSearchQuery, setNavSearchQuery] = useState('');
@@ -486,8 +497,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!window.confirm(confirmMsg)) return;
 
     try {
-      await supabase.from('donations').delete().eq('id', d.id);
-      await supabase.from('donations_2027').delete().eq('id', d.id);
+      const { error: donErr } = await supabase.from('donations').delete().eq('id', d.id);
+      if (donErr) throw donErr;
+      const { error: don27Err } = await supabase.from('donations_2027').delete().eq('id', d.id);
+      if (don27Err && !/does not exist|schema cache/i.test(don27Err.message || '')) {
+        throw don27Err;
+      }
       const updated = donations.filter((item) => item.id !== d.id);
       setDonations(updated);
       AppStore.saveDonations(updated);
@@ -578,9 +593,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setHideDonationAmountsInput(prevValue);
       setSettingsErrorNotice(
         res.error ||
-          (language === 'bn'
-            ? 'গোপনীয়তা সেটিংস সংরক্ষণ করা যায়নি।'
-            : 'Failed to update privacy setting in Supabase.')
+        (language === 'bn'
+          ? 'গোপনীয়তা সেটিংস সংরক্ষণ করা যায়নি।'
+          : 'Failed to update privacy setting in Supabase.')
       );
     }
   };
@@ -669,6 +684,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
     }
   }, [adminSession, isSuperAdminAccount, currentPortalConfig, activeTab]);
+
+  // Real-time Supabase Usage & Plan Limits Telemetry (Super Admin Exclusive)
+  const [supabaseLimitsSnapshot, setSupabaseLimitsSnapshot] = useState<SupabaseLimitsSnapshot | null>(() =>
+    isSuperAdminAccount ? SupabaseLimitsService.getSnapshot() : null
+  );
+
+  useEffect(() => {
+    if (!isSuperAdminAccount || isLoadingSession) {
+      if (!isSuperAdminAccount) {
+        setSupabaseLimitsSnapshot(null);
+        SupabaseLimitsService.reset();
+      }
+      return;
+    }
+    setSupabaseLimitsSnapshot(SupabaseLimitsService.getSnapshot());
+    const unsubscribe = SupabaseLimitsService.subscribe((next) => {
+      setSupabaseLimitsSnapshot(next);
+    });
+    const stopSync = SupabaseLimitsService.initRealtimeSync();
+    return () => {
+      unsubscribe();
+      stopSync();
+    };
+  }, [isSuperAdminAccount, isLoadingSession]);
 
   // Synchronize component state with local storage & event stores without network overhead
   const syncLocalState = () => {
@@ -987,9 +1026,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         setHideDonationAmountsInput(Boolean(confirmed.hideDonationAmounts));
         setSettingsErrorNotice(
           res.error ||
-            (language === 'bn'
-              ? 'সুপাবেজ ডাটাবেজে ইভেন্ট সেটিংস সংরক্ষণ করা যায়নি। পূর্বের নিশ্চিতকৃত মান বহাল রাখা হয়েছে।'
-              : 'Failed to save event settings to Supabase. Previous confirmed values have been restored.')
+          (language === 'bn'
+            ? 'সুপাবেজ ডাটাবেজে ইভেন্ট সেটিংস সংরক্ষণ করা যায়নি। পূর্বের নিশ্চিতকৃত মান বহাল রাখা হয়েছে।'
+            : 'Failed to save event settings to Supabase. Previous confirmed values have been restored.')
         );
       }
     } finally {
@@ -1044,7 +1083,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       },
       { id: adminSession?.id || 'admin', name: adminSession?.fullName || 'Administrator' },
       `Expense voucher recorded by ${adminSession?.fullName || 'Administrator'}: ${expenseReason}`
-    ).catch(() => {});
+    ).catch(() => { });
 
     setShowAddExpenseModal(false);
     setExpenseAmount('');
@@ -1056,31 +1095,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!noticeTitleEn || !noticeContentEn) return;
     const updated = editingNoticeId
       ? notices.map((notice) =>
-          notice.id === editingNoticeId
-            ? {
-                ...notice,
-                titleEn: noticeTitleEn.trim(),
-                titleBn: noticeTitleBn.trim() || noticeTitleEn.trim(),
-                category: noticeCategory,
-                contentEn: noticeContentEn.trim(),
-                contentBn: noticeContentBn.trim() || noticeContentEn.trim(),
-                date: new Date().toISOString().split('T')[0],
-              }
-            : notice
-        )
-      : [
-          {
-            id: `NOT-${Date.now()}`,
+        notice.id === editingNoticeId
+          ? {
+            ...notice,
             titleEn: noticeTitleEn.trim(),
             titleBn: noticeTitleBn.trim() || noticeTitleEn.trim(),
             category: noticeCategory,
-            date: new Date().toISOString().split('T')[0],
             contentEn: noticeContentEn.trim(),
             contentBn: noticeContentBn.trim() || noticeContentEn.trim(),
-            isPinned: false,
-          },
-          ...notices,
-        ];
+            date: new Date().toISOString().split('T')[0],
+          }
+          : notice
+      )
+      : [
+        {
+          id: `NOT-${Date.now()}`,
+          titleEn: noticeTitleEn.trim(),
+          titleBn: noticeTitleBn.trim() || noticeTitleEn.trim(),
+          category: noticeCategory,
+          date: new Date().toISOString().split('T')[0],
+          contentEn: noticeContentEn.trim(),
+          contentBn: noticeContentBn.trim() || noticeContentEn.trim(),
+          isPinned: false,
+        },
+        ...notices,
+      ];
     AppStore.saveNotices(updated);
     setNotices(updated);
     setShowAddNoticeModal(false);
@@ -1511,7 +1550,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               const parsed = JSON.parse(raw);
               localStorage.setItem('plscf_test_admin_session', JSON.stringify({ ...parsed, mustChangePassword: false }));
             }
-          } catch (_) {}
+          } catch (_) { }
         }}
       />
     );
@@ -1555,29 +1594,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     },
     ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('manualApproval' as any)
       ? [
-          {
-            id: 'manualApproval' as const,
-            label: language === 'bn' ? 'ম্যানুয়াল নিবন্ধন অনুমোদন' : 'Registration Approvals',
-            icon: ShieldCheck,
-            category: 'operations' as const,
-            highlight: true,
-            badge: 'Admin',
-            badgeColor: 'amber' as const,
-          },
-        ]
+        {
+          id: 'manualApproval' as const,
+          label: language === 'bn' ? 'ম্যানুয়াল নিবন্ধন অনুমোদন' : 'Registration Approvals',
+          icon: ShieldCheck,
+          category: 'operations' as const,
+          highlight: true,
+          badge: 'Admin',
+          badgeColor: 'amber' as const,
+        },
+      ]
       : []),
     ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('mealControl' as any)
       ? [
-          {
-            id: 'mealControl' as const,
-            label: language === 'bn' ? 'খাবার সময়সূচী ও স্ক্যানার' : 'Meal Time & Scanner Control',
-            icon: Clock,
-            category: 'operations' as const,
-            highlight: true,
-            badge: 'Food',
-            badgeColor: 'amber' as const,
-          },
-        ]
+        {
+          id: 'mealControl' as const,
+          label: language === 'bn' ? 'খাবার সময়সূচী ও স্ক্যানার' : 'Meal Time & Scanner Control',
+          icon: Clock,
+          category: 'operations' as const,
+          highlight: true,
+          badge: 'Food',
+          badgeColor: 'amber' as const,
+        },
+      ]
       : []),
     {
       id: 'allBookings',
@@ -1604,29 +1643,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     },
     ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('guestManagement' as any)
       ? [
-          {
-            id: 'guestManagement' as const,
-            label: language === 'bn' ? 'ভিআইপি গেস্ট ও খাবার' : 'VIP Guest Pass & Meals',
-            icon: Crown,
-            category: 'credentials' as const,
-            highlight: true,
-            badge: 'VIP',
-            badgeColor: 'amber' as const,
-          },
-        ]
+        {
+          id: 'guestManagement' as const,
+          label: language === 'bn' ? 'ভিআইপি গেস্ট ও খাবার' : 'VIP Guest Pass & Meals',
+          icon: Crown,
+          category: 'credentials' as const,
+          highlight: true,
+          badge: 'VIP',
+          badgeColor: 'amber' as const,
+        },
+      ]
       : []),
     ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('staffCardManagement' as any)
       ? [
-          {
-            id: 'staffCardManagement' as const,
-            label: language === 'bn' ? 'স্টাফ কার্ড ও খাবার' : 'Staff Pass & Meal Suite',
-            icon: Shield,
-            category: 'credentials' as const,
-            highlight: true,
-            badge: 'Staff',
-            badgeColor: 'emerald' as const,
-          },
-        ]
+        {
+          id: 'staffCardManagement' as const,
+          label: language === 'bn' ? 'স্টাফ কার্ড ও খাবার' : 'Staff Pass & Meal Suite',
+          icon: Shield,
+          category: 'credentials' as const,
+          highlight: true,
+          badge: 'Staff',
+          badgeColor: 'emerald' as const,
+        },
+      ]
       : []),
     {
       id: 'tickets',
@@ -1667,26 +1706,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     // 4. Security & Access
     ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('userAccessManagement' as any)
       ? [
-          {
-            id: 'userAccessManagement' as const,
-            label: language === 'bn' ? 'ইউজার ও এক্সেস কন্ট্রোল' : 'User & Access Control',
-            icon: Users,
-            category: 'admin' as const,
-            highlight: true,
-            badge: 'RBAC',
-            badgeColor: 'violet' as const,
-          },
-        ]
+        {
+          id: 'userAccessManagement' as const,
+          label: language === 'bn' ? 'ইউজার ও এক্সেস কন্ট্রোল' : 'User & Access Control',
+          icon: Users,
+          category: 'admin' as const,
+          highlight: true,
+          badge: 'RBAC',
+          badgeColor: 'violet' as const,
+        },
+      ]
       : []),
     ...(isSuperAdminAccount
       ? [
-          {
-            id: 'staffManagement' as const,
-            label: language === 'bn' ? 'স্টাফ অ্যাকাউন্টস ও রোলস' : 'Staff Accounts & Roles',
-            icon: Users,
-            category: 'admin' as const,
-          },
-        ]
+        {
+          id: 'staffManagement' as const,
+          label: language === 'bn' ? 'স্টাফ অ্যাকাউন্টস ও রোলস' : 'Staff Accounts & Roles',
+          icon: Users,
+          category: 'admin' as const,
+        },
+        {
+          id: 'supabaseLimits' as const,
+          label: language === 'bn' ? 'সুপাবেস লিমিট ও রিয়েলটাইম মনিটর' : 'Supabase Limits & Monitor',
+          icon: Server,
+          category: 'admin' as const,
+          highlight: true,
+          badge:
+            supabaseLimitsSnapshot?.evaluation?.alertSummary.level === 'critical'
+              ? 'RED ALERT'
+              : supabaseLimitsSnapshot?.evaluation?.alertSummary.level === 'warning'
+                ? 'WARN'
+                : 'LIVE',
+          badgeColor:
+            supabaseLimitsSnapshot?.evaluation?.alertSummary.level === 'critical'
+              ? ('rose' as const)
+              : supabaseLimitsSnapshot?.evaluation?.alertSummary.level === 'warning'
+                ? ('amber' as const)
+                : ('emerald' as const),
+        },
+      ]
       : []),
     {
       id: 'auditHistory',
@@ -1725,29 +1783,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     },
     ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('aboutContactManagement' as any)
       ? [
-          {
-            id: 'aboutContactManagement' as const,
-            label: language === 'bn' ? 'About ও Contact পেজ এডিট' : 'Edit About & Contact Page',
-            icon: FileEdit,
-            category: 'media' as const,
-            highlight: true,
-            badge: 'Edit',
-            badgeColor: 'emerald' as const,
-          },
-        ]
+        {
+          id: 'aboutContactManagement' as const,
+          label: language === 'bn' ? 'About ও Contact পেজ এডিট' : 'Edit About & Contact Page',
+          icon: FileEdit,
+          category: 'media' as const,
+          highlight: true,
+          badge: 'Edit',
+          badgeColor: 'emerald' as const,
+        },
+      ]
       : []),
     ...(isSuperAdminAccount || currentPortalConfig.allowedTabs.includes('internationalPaymentManagement' as any)
       ? [
-          {
-            id: 'internationalPaymentManagement' as const,
-            label: language === 'bn' ? 'আন্তর্জাতিক পেমেন্ট এডিট' : 'International Payment Page',
-            icon: Globe,
-            category: 'media' as const,
-            highlight: true,
-            badge: 'Global',
-            badgeColor: 'blue' as const,
-          },
-        ]
+        {
+          id: 'internationalPaymentManagement' as const,
+          label: language === 'bn' ? 'আন্তর্জাতিক পেমেন্ট এডিট' : 'International Payment Page',
+          icon: Globe,
+          category: 'media' as const,
+          highlight: true,
+          badge: 'Global',
+          badgeColor: 'blue' as const,
+        },
+      ]
       : []),
     {
       id: 'notices',
@@ -1771,13 +1829,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const filteredNavTabs = navSearchQuery.trim()
     ? visibleNavTabs.filter((tab) => {
-        const q = navSearchQuery.toLowerCase().trim();
-        return (
-          tab.label.toLowerCase().includes(q) ||
-          tab.id.toLowerCase().includes(q) ||
-          (tab.badge && tab.badge.toLowerCase().includes(q))
-        );
-      })
+      const q = navSearchQuery.toLowerCase().trim();
+      return (
+        tab.label.toLowerCase().includes(q) ||
+        tab.id.toLowerCase().includes(q) ||
+        (tab.badge && tab.badge.toLowerCase().includes(q))
+      );
+    })
     : visibleNavTabs;
 
   const getBadgeClasses = (color?: string, isActive?: boolean) => {
@@ -1816,23 +1874,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           handleTabChange(tab.id as any);
           if (onClickExtra) onClickExtra();
         }}
-        className={`w-full group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
-          isActive
-            ? 'bg-slate-900 text-white shadow-sm ring-1 ring-slate-800 font-bold'
-            : tab.highlight
+        className={`w-full group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${isActive
+          ? 'bg-slate-900 text-white shadow-sm ring-1 ring-slate-800 font-bold'
+          : tab.highlight
             ? 'text-slate-700 bg-sky-50/50 hover:bg-sky-50 hover:text-sky-900'
             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
-        }`}
+          }`}
       >
         <div className="flex items-center gap-2.5 min-w-0 pr-1.5">
           <Icon
-            className={`w-4 h-4 shrink-0 transition-colors ${
-              isActive
-                ? 'text-sky-400'
-                : tab.highlight
+            className={`w-4 h-4 shrink-0 transition-colors ${isActive
+              ? 'text-sky-400'
+              : tab.highlight
                 ? 'text-sky-600 group-hover:text-sky-700'
                 : 'text-slate-400 group-hover:text-slate-600'
-            }`}
+              }`}
           />
           <span className="truncate tracking-tight text-left">{tab.label}</span>
         </div>
@@ -1847,6 +1903,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             >
               {tab.badge === 'LIVE' && (
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              )}
+              {tab.badge === 'RED ALERT' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
               )}
               {tab.badge}
             </span>
@@ -1877,43 +1936,69 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             />
           </div>
           <div>
-            <div className="flex flex-wrap items-center gap-2 mb-1.5">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[11px] font-bold text-[#38BDF8]">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#38BDF8]" />
-              <span>{adminSession.fullName}</span>
-              <span className="text-slate-300 font-mono">(@{adminSession.username})</span>
-            </span>
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white/10 border border-white/10 text-xs font-medium text-[var(--color-soft-sky)]">
+                <ShieldCheck className="w-3.5 h-3.5 text-[var(--color-soft-sky)]" />
+                <span>{adminSession.fullName}</span>
+                <span className="text-slate-300 font-mono">(@{adminSession.username})</span>
+              </span>
 
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[11px] font-mono text-emerald-300">
-              <Database className="w-3 h-3 text-emerald-400" />
-              <span>Supabase: {SUPABASE_PROJECT_ID}</span>
-            </span>
+              {isSuperAdminAccount ? (
+                <button
+                  type="button"
+                  onClick={() => handleTabChange('supabaseLimits')}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[11px] font-mono transition-colors cursor-pointer ${supabaseLimitsSnapshot?.evaluation?.alertSummary.hasRedAlert
+                    ? 'bg-rose-600/90 hover:bg-rose-500 border-rose-400 text-white animate-pulse'
+                    : supabaseLimitsSnapshot?.evaluation?.alertSummary.level === 'warning'
+                      ? 'bg-amber-500/25 hover:bg-amber-500/35 border-amber-400/60 text-amber-200'
+                      : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-emerald-300'
+                    }`}
+                  title={
+                    language === 'bn'
+                      ? 'সুপাবেস ফ্রি ও পেইড লিমিট বিস্তারিত দেখতে ক্লিক করুন'
+                      : 'Click to inspect live Supabase Free vs Pro plan limits'
+                  }
+                >
+                  <Database className="w-3 h-3" />
+                  <span>Supabase: {SUPABASE_PROJECT_ID}</span>
+                  {supabaseLimitsSnapshot?.evaluation && (
+                    <span className="font-bold">
+                      · {supabaseLimitsSnapshot.evaluation.activePlan.toUpperCase()}{' '}
+                      {supabaseLimitsSnapshot.evaluation.alertSummary.highestPercent.toFixed(0)}%
+                    </span>
+                  )}
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[11px] font-mono text-emerald-300">
+                  <Database className="w-3 h-3 text-emerald-400" />
+                  <span>Supabase: {SUPABASE_PROJECT_ID}</span>
+                </span>
+              )}
 
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-950 border border-blue-800 text-[10px] font-bold uppercase text-[#C5A45D]">
-              <Lock className="w-3 h-3 text-[#C5A45D]" />
-              <span>{language === 'bn' ? currentPortalConfig.badgeLabelBn : currentPortalConfig.badgeLabelEn}</span>
-            </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[var(--color-electric)]/25 border border-[var(--color-soft-sky)]/30 text-[11px] font-medium uppercase text-[var(--color-soft-sky)]">
+                <Lock className="w-3 h-3 text-[var(--color-soft-sky)]" />
+                <span>{language === 'bn' ? currentPortalConfig.badgeLabelBn : currentPortalConfig.badgeLabelEn}</span>
+              </span>
+            </div>
+
+            <h1 className="editorial-h2 text-2xl sm:text-4xl font-normal text-white">
+              {language === 'bn' ? currentPortalConfig.titleBn : currentPortalConfig.titleEn}
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-300 mt-1">
+              {language === 'bn' ? currentPortalConfig.taglineBn : currentPortalConfig.taglineEn}
+            </p>
           </div>
-
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            {language === 'bn' ? currentPortalConfig.titleBn : currentPortalConfig.titleEn}
-          </h1>
-          <p className="text-xs text-slate-300 mt-1">
-            {language === 'bn' ? currentPortalConfig.taglineBn : currentPortalConfig.taglineEn}
-          </p>
         </div>
-      </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
           {isSuperAdminAccount && (
             <button
               type="button"
               onClick={() => handleTabChange('aboutContactManagement')}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
-                activeTab === 'aboutContactManagement'
-                  ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md'
-                  : 'bg-sky-600/90 hover:bg-sky-500 text-white border-sky-400/50'
-              }`}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium transition-colors cursor-pointer border ${activeTab === 'aboutContactManagement'
+                ? 'bg-white text-[var(--color-black)] border-white'
+                : 'bg-[var(--color-electric)] hover:bg-[var(--color-cyan)] text-white border-[var(--color-soft-sky)]/30'
+                }`}
               title={language === 'bn' ? 'About & Contact পেজ সম্পাদনা করুন' : 'Edit About & Contact Page Content'}
             >
               <FileEdit className="w-3.5 h-3.5" />
@@ -1922,8 +2007,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           )}
 
           <button
+            type="button"
             onClick={refreshAll}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 text-xs font-medium text-white border border-white/10 transition-colors cursor-pointer"
             title="Refresh local and Supabase data"
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -1931,34 +2017,94 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </button>
 
           <button
+            type="button"
             onClick={handleLogout}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-900/60 hover:bg-rose-900 text-rose-200 text-xs font-semibold border border-rose-700/60 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 text-xs font-medium border border-rose-400/30 transition-colors cursor-pointer"
             title="Log out of admin session"
           >
-            <LogOut className="w-3.5 h-3.5 text-rose-400" />
+            <LogOut className="w-3.5 h-3.5 text-rose-300" />
             <span>{language === 'bn' ? 'লগআউট' : 'Log Out'}</span>
           </button>
         </div>
       </div>
+
+      {/* Global Super Admin Supabase Quota Red Alert Banner (visible across all tabs) */}
+      {isSuperAdminAccount &&
+        supabaseLimitsSnapshot?.evaluation?.alertSummary?.hasAnyWarningOrAlert &&
+        activeTab !== 'supabaseLimits' && (
+          <div
+            role="alert"
+            className={`rounded-2xl p-4 sm:px-6 border-2 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${supabaseLimitsSnapshot.evaluation.alertSummary.hasRedAlert
+              ? 'bg-gradient-to-r from-rose-700 via-red-600 to-rose-700 text-white border-rose-300 shadow-rose-500/25'
+              : 'bg-amber-50 text-amber-950 border-amber-300'
+              }`}
+          >
+            <div className="flex items-start sm:items-center gap-3 min-w-0">
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${supabaseLimitsSnapshot.evaluation.alertSummary.hasRedAlert
+                  ? 'bg-white/20 text-white animate-pulse'
+                  : 'bg-amber-200 text-amber-900'
+                  }`}
+              >
+                {supabaseLimitsSnapshot.evaluation.alertSummary.hasRedAlert ? (
+                  <AlertOctagon className="w-5 h-5" />
+                ) : (
+                  <AlertTriangle className="w-5 h-5" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-black leading-snug">
+                  {language === 'bn'
+                    ? supabaseLimitsSnapshot.evaluation.alertSummary.headlineBn
+                    : supabaseLimitsSnapshot.evaluation.alertSummary.headlineEn}
+                </p>
+                <p
+                  className={`text-[11px] sm:text-xs mt-0.5 ${supabaseLimitsSnapshot.evaluation.alertSummary.hasRedAlert
+                    ? 'text-rose-100'
+                    : 'text-amber-800'
+                    }`}
+                >
+                  {language === 'bn'
+                    ? supabaseLimitsSnapshot.evaluation.alertSummary.recommendationBn
+                    : supabaseLimitsSnapshot.evaluation.alertSummary.recommendationEn}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleTabChange('supabaseLimits')}
+              className={`px-4 py-2 min-h-[40px] rounded-xl text-xs font-black shrink-0 transition-colors cursor-pointer flex items-center gap-1.5 ${supabaseLimitsSnapshot.evaluation.alertSummary.hasRedAlert
+                ? 'bg-white text-rose-700 hover:bg-rose-50'
+                : 'bg-amber-900 text-white hover:bg-amber-800'
+                }`}
+            >
+              <Server className="w-3.5 h-3.5" />
+              <span>
+                {language === 'bn' ? 'সুপাবেস লিমিট দেখুন →' : 'Inspect Supabase Limits →'}
+              </span>
+            </button>
+          </div>
+        )}
 
       {/* Admin Navigation & Content Layout */}
       <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* ======================================================== */}
         {/* 1. LEFT SIDEBAR NAVIGATION (Desktop: lg+)                */}
         {/* ======================================================== */}
-        <aside className="hidden lg:flex flex-col w-72 xl:w-80 shrink-0 bg-white rounded-3xl p-3.5 border border-slate-200/90 shadow-sm sticky top-20 max-h-[calc(100vh-6rem)]">
+        <aside className="hidden lg:flex flex-col w-72 xl:w-80 shrink-0 bg-white rounded-3xl p-4 border border-[var(--color-tint)] sticky top-24 max-h-[calc(100vh-7rem)]">
           {/* Header Section */}
-          <div className="px-2 pb-3 border-b border-slate-100 space-y-2.5">
+          <div className="px-2 pb-3 border-b border-[var(--color-tint)] space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center border border-sky-100">
+                <div className="w-7 h-7 rounded-xl bg-[var(--color-tint)] text-[var(--color-electric)] flex items-center justify-center">
                   <Layers className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-black tracking-wide text-slate-800 uppercase block leading-tight">
+                  <span className="text-[11px] font-semibold tracking-wide text-[var(--color-slate)] uppercase block leading-tight">
                     {language === 'bn' ? currentPortalConfig.badgeLabelBn : currentPortalConfig.badgeLabelEn}
                   </span>
-                  <span className="text-[10px] font-medium text-slate-400">
+                  <span className="text-[10px] font-medium text-[var(--color-muted)]">
                     {language === 'bn' ? `${visibleNavTabs.length}টি মডিউল উপলব্ধ` : `${visibleNavTabs.length} active modules`}
                   </span>
                 </div>
@@ -2175,1597 +2321,1620 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           </div>
 
-      {/* TAB: STUDENT ID CARD MANAGEMENT SYSTEM */}
-      {activeTab === 'idCardManagement' && (
-        <ErrorBoundary>
-          <Suspense fallback={<AdminTabFallback />}>
-            <IdCardManagementPortal
-              currentUserEmail={adminSession?.email || ''}
-              currentUserRole={adminSession?.role || 'super_admin'}
-              isSuperAdmin={adminSession?.role === 'super_admin'}
-              registrations={registrations}
-            />
-          </Suspense>
-        </ErrorBoundary>
-      )}
-
-      {/* TAB: MANUAL STUDENT REGISTRATION (ADMIN VENUE ASSISTANCE) */}
-      {activeTab === 'manualRegistration' && (
-        <ErrorBoundary>
-          <ManualRegistrationTab
-            language={language}
-            currentAdmin={effectiveAdmin}
-          />
-        </ErrorBoundary>
-      )}
-
-      {/* TAB: MANUAL REGISTRATION & FINANCIAL APPROVAL PORTAL */}
-      {activeTab === 'manualApproval' && (isSuperAdmin || effectiveAdmin.role === 'finance_manager' || currentPortalConfig.allowedTabs.includes('manualApproval')) && (
-        <ErrorBoundary>
-          <ManualApprovalTab
-            language={language}
-            currentAdmin={effectiveAdmin}
-          />
-        </ErrorBoundary>
-      )}
-
-      {/* TAB: CENTRALIZED ROLE-BASED USER MANAGEMENT DASHBOARD (SUPER ADMIN EXCLUSIVE) */}
-      {activeTab === 'userAccessManagement' && isSuperAdmin && (
-        <ErrorBoundary>
-          <UserAccessManagementTab
-            language={language}
-            currentAdmin={effectiveAdmin}
-          />
-        </ErrorBoundary>
-      )}
-
-      {/* TAB: DYNAMIC GUEST PASS & FOOD MANAGEMENT SYSTEM */}
-      {activeTab === 'guestManagement' && (
-        <ErrorBoundary>
-          <Suspense fallback={<AdminTabFallback />}>
-            <GuestManagementTab
-              language={language}
-              currentAdmin={effectiveAdmin}
-            />
-          </Suspense>
-        </ErrorBoundary>
-      )}
-
-      {/* TAB: DYNAMIC STAFF CARD & MEAL ENTITLEMENT SYSTEM */}
-      {activeTab === 'staffCardManagement' && (
-        <ErrorBoundary>
-          <Suspense fallback={<AdminTabFallback />}>
-            <StaffCardManagementTab
-              language={language}
-              currentAdmin={effectiveAdmin}
-            />
-          </Suspense>
-        </ErrorBoundary>
-      )}
-
-      {/* TAB: MASTER EVENT OVERVIEW (PART 9) */}
-      {activeTab === 'masterOverview' && (
-        <MasterEventOverview
-          language={language}
-          registrations={registrations}
-          onNavigateTab={(tab) => {
-            if (tab === 'dailyRegAnalytics' || tab === 'dailyPayAnalytics') {
-              handleTabChange('dailyAnalytics');
-            } else if (tab === 'gateManagement') {
-              handleTabChange('gateManagement');
-            } else {
-              handleTabChange(tab as any);
-            }
-          }}
-        />
-      )}
-
-      {/* TAB: BUDGET & EXPENSE MANAGEMENT (PART 8) */}
-      {activeTab === 'budgetManagement' && (
-        <BudgetManagementTab
-          language={language}
-          adminSession={{
-            id: adminSession?.id || effectiveAdmin.id,
-            fullName: adminSession?.fullName || effectiveAdmin.fullName,
-            username: adminSession?.username || effectiveAdmin.username,
-          }}
-          adminId={adminSession?.id || effectiveAdmin.id}
-          adminName={adminSession?.fullName || effectiveAdmin.fullName}
-          adminRole={adminSession?.role || effectiveAdmin.role}
-        />
-      )}
-
-      {/* TAB: DAILY REGISTRATION & PAYMENT ANALYTICS (PARTS 6 & 7) */}
-      {activeTab === 'dailyAnalytics' && (
-        <DailyAnalyticsTab language={language} registrations={registrations} />
-      )}
-
-      {/* TAB: STAFF ACCOUNTS & ROLE ISOLATION (SUPER ADMIN EXCLUSIVE) */}
-      {activeTab === 'staffManagement' && isSuperAdmin && (
-        <StaffManagementTab
-          currentAdminEmail={adminSession?.email || effectiveAdmin.email}
-          currentAdminRole={adminSession?.role || effectiveAdmin.role}
-        />
-      )}
-
-      {/* TAB: PRIVILEGED OPERATIONS AUDIT TRAIL (PART 10) */}
-      {activeTab === 'auditHistory' && (
-        <AuditHistoryTab />
-      )}
-
-      {/* TAB: LIVE GATE ACCESS & SCANNER MANAGEMENT (Super Admin & Venue Admin) */}
-      {activeTab === 'gateManagement' && (
-        <div className="space-y-6">
-          {/* Top Gate Status Overview Banner */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black shadow-md">
-                  <DoorOpen className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
-                      Live Gate Control
-                    </span>
-                    <span className="text-xs text-slate-400 font-mono">Grand Reunion 2027</span>
-                  </div>
-                  <h2 className="text-lg font-black text-slate-900 mt-0.5">
-                    {language === 'bn' ? 'গেইট প্রবেশ ও প্রস্থান কন্ট্রোল পোর্টাল' : 'Gate Entry / Back Live Access Control'}
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    {language === 'bn'
-                      ? 'রিয়েল-টাইম গেইট এন্ট্রি (সবুজ) ও ব্যাক (লাল) স্ট্যাটাস পর্যবেক্ষণ ও সুপার অ্যাডমিন সরাসরি স্ক্যানার।'
-                      : 'Authoritative real-time Gate Entry (Green) & Back (Red) monitoring with live QR scanning and audit trail.'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Quick Actions to All Bookings filtered by Gate */}
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGateFilter('entry');
-                    handleTabChange('allBookings');
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-                  title="View all students currently inside venue"
-                >
-                  <Users className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>{language === 'bn' ? 'ভেতরে উপস্থিত তালিকা (ENTRY)' : 'View Inside List (ENTRY)'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGateFilter('back');
-                    handleTabChange('allBookings');
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-                  title="View all students who exited (BACK)"
-                >
-                  <DoorClosed className="w-3.5 h-3.5 text-rose-600" />
-                  <span>{language === 'bn' ? 'প্রস্থানকারী তালিকা (BACK)' : 'View Exited List (BACK)'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* KPI Summary Cards */}
-            {(() => {
-              const insideCount = registrations.filter((r) => getStudentGateStatus(r) === 'ENTRY').length;
-              const backCount = registrations.filter((r) => getStudentGateStatus(r) === 'BACK').length;
-              const notEnteredCount = registrations.filter((r) => getStudentGateStatus(r) === 'NOT_ENTERED').length;
-              const allEvents = EventStore.getGateEvents();
-
-              return (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-emerald-800 tracking-wider flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Currently Inside (ENTRY)
-                    </span>
-                    <div className="text-2xl font-black text-emerald-950 font-mono">
-                      {insideCount}
-                    </div>
-                    <span className="text-[10px] text-emerald-700 block font-medium">Eligible for Food & T-Shirts</span>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-rose-800 tracking-wider flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-rose-500" />
-                      Exited Campus (BACK)
-                    </span>
-                    <div className="text-2xl font-black text-rose-950 font-mono">
-                      {backCount}
-                    </div>
-                    <span className="text-[10px] text-rose-700 block font-medium">Collection strictly blocked</span>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-slate-600 tracking-wider">
-                      Not Yet Entered
-                    </span>
-                    <div className="text-2xl font-black text-slate-800 font-mono">
-                      {notEnteredCount}
-                    </div>
-                    <span className="text-[10px] text-slate-500 block font-medium">Awaiting first arrival</span>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-amber-300 tracking-wider">
-                      Total Gate Audit Logs
-                    </span>
-                    <div className="text-2xl font-black text-amber-400 font-mono">
-                      {allEvents.length}
-                    </div>
-                    <span className="text-[10px] text-slate-400 block font-medium">Immutable transitions</span>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* Embedded Full Gate Scanner Module */}
-          <ErrorBoundary>
-            <Suspense fallback={<AdminTabFallback />}>
-              <GateScannerModule
-                language={language}
-                staffUser={{
-                  id: effectiveAdmin.id || 'SUPER_ADMIN_01',
-                  authUserId: effectiveAdmin.id || 'SUPER_ADMIN_01',
-                  username: effectiveAdmin.username || 'admin',
-                  fullName: effectiveAdmin.fullName || 'Super Administrator',
-                  email: effectiveAdmin.email || 'admin@gmail.com',
-                  role: 'SUPER_ADMIN',
-                  department: 'ALL_SERVICES',
-                  permissions: ['VERIFY', 'APPROVE', 'REJECT', 'MANAGE'],
-                  status: 'ACTIVE',
-                  assignedGate: 'Gate 01 - Main Entrance',
-                  createdAt: effectiveAdmin.createdAt || new Date().toISOString(),
-                }}
-                isSuperAdmin={true}
-              />
-            </Suspense>
-          </ErrorBoundary>
-        </div>
-      )}
-
-      {/* TAB 1: ALL BOOKINGS (SUPABASE BACKEND - YEAR SPECIFIC) */}
-      {activeTab === 'allBookings' && (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
-          {/* Header & Year Selector Bar */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-5">
-            <div>
-              <div className="flex items-center gap-2">
-                <Database className="w-5 h-5 text-emerald-600" />
-                <h2 className="text-lg font-black text-slate-900">
-                  {language === 'bn'
-                    ? 'ওয়েবসাইটে সম্পন্ন সকল স্টুডেন্ট বুকিং ও নিবন্ধন'
-                    : 'All Student Bookings & Registrations'}
-                </h2>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                {language === 'bn'
-                  ? `সুপাবেস ব্যাকএন্ড টেবিল: ${supabaseTableUsed} • বছর অনুযায়ী পৃথক টেবিল সংরক্ষণ`
-                  : `Target Supabase Backend Table: ${supabaseTableUsed} • Stored separately per event year`}
-              </p>
-            </div>
-
-            {/* Consolidated Registration Database Status & Sync Control */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200">
-                <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{language === 'bn' ? 'কনসোলিডেটেড ডাটাবেস:' : 'Consolidated Table:'} <code className="font-mono font-bold text-[11px] text-emerald-900">registrations_2027</code></span>
-              </span>
-
-              <button
-                onClick={() => fetchSupabaseRegistrationsForYear(2027)}
-                disabled={isFetchingFromSupabase}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold cursor-pointer transition-colors"
-                title="Fetch latest bookings directly from Supabase (registrations_2027)"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isFetchingFromSupabase ? 'animate-spin' : ''}`} />
-                <span>{isFetchingFromSupabase ? 'Syncing...' : 'Fetch from Supabase'}</span>
-              </button>
-
-              <button
-                onClick={() => exportToCSV(filteredRegistrations, `PLSCF_Bookings_2027`)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>{t.btnExportCsv}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Bookings Statistics Bar */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <span className="text-[11px] text-slate-500 font-bold uppercase block">Genuine Paid Bookings</span>
-              <span className="text-2xl font-black text-slate-900 mt-1 block">
-                {genuineRegistrations.filter((r) => r.paymentStatus === 'paid').length}
-              </span>
-              <span className="text-[10px] text-emerald-600 font-medium">
-                {registrationsForYear.length > genuineRegistrations.length
-                  ? `+${registrationsForYear.length - genuineRegistrations.length} demo seed records preserved`
-                  : `In Table: ${supabaseTableUsed}`}
-              </span>
-            </div>
-
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <span className="text-[11px] text-slate-500 font-bold uppercase block">Former Students</span>
-              <span className="text-2xl font-black text-emerald-700 mt-1 block">
-                {genuineRegistrations.filter((r) => r.category === 'former').length}
-              </span>
-              <span className="text-[10px] text-slate-400">Alumni SSC/HSC</span>
-            </div>
-
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <span className="text-[11px] text-slate-500 font-bold uppercase block">Current Students</span>
-              <span className="text-2xl font-black text-teal-700 mt-1 block">
-                {genuineRegistrations.filter((r) => r.category === 'current').length}
-              </span>
-              <span className="text-[10px] text-slate-400">Enrolled School & College</span>
-            </div>
-
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <span className="text-[11px] text-slate-500 font-bold uppercase block">Total Booking Revenue</span>
-              <span className="text-2xl font-black text-amber-700 mt-1 block">
-                ৳{genuineRegistrations.reduce((sum, r) => sum + r.totalPaid, 0).toLocaleString()}
-              </span>
-              <span className="text-[10px] text-slate-400">Genuine Paid Inflow</span>
-            </div>
-          </div>
-
-          {/* Enhanced Search & Column Filters Toolbar */}
-          <div className="space-y-2.5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                <input
-                  type="text"
-                  placeholder={
-                    language === 'bn'
-                      ? 'নাম, আইডি, মোবাইল বা ব্যাচ দিয়ে খুঁজুন...'
-                      : 'Search by student name, ID, mobile, or batch...'
-                  }
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs"
+          {/* TAB: STUDENT ID CARD MANAGEMENT SYSTEM */}
+          {activeTab === 'idCardManagement' && (
+            <ErrorBoundary>
+              <Suspense fallback={<AdminTabFallback />}>
+                <IdCardManagementPortal
+                  currentUserEmail={adminSession?.email || ''}
+                  currentUserRole={adminSession?.role || 'super_admin'}
+                  isSuperAdmin={adminSession?.role === 'super_admin'}
+                  registrations={registrations}
                 />
-              </div>
+              </Suspense>
+            </ErrorBoundary>
+          )}
 
-              {/* Category Filter */}
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value as any)}
-                className="px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700"
-              >
-                <option value="all">All Student Categories (সকল ক্যাটাগরি)</option>
-                <option value="former">Former Students (প্রাক্তন অ্যালামনাই)</option>
-                <option value="current">Current Students (বর্তমান শিক্ষার্থী)</option>
-              </select>
+          {/* TAB: MANUAL STUDENT REGISTRATION (ADMIN VENUE ASSISTANCE) */}
+          {activeTab === 'manualRegistration' && (
+            <ErrorBoundary>
+              <ManualRegistrationTab
+                language={language}
+                currentAdmin={effectiveAdmin}
+              />
+            </ErrorBoundary>
+          )}
 
-              {/* Payment Status Filter */}
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700"
-              >
-                <option value="all">All Payment Statuses (সকল পেমেন্ট স্ট্যাটাস)</option>
-                <option value="paid">PAID & VERIFIED (পরিশোধিত)</option>
-                <option value="pending">PENDING (অপেক্ষমান)</option>
-                <option value="refunded">REFUNDED / CANCELLED (বাতিল)</option>
-              </select>
+          {/* TAB: MANUAL REGISTRATION & FINANCIAL APPROVAL PORTAL */}
+          {activeTab === 'manualApproval' && (isSuperAdmin || effectiveAdmin.role === 'finance_manager' || currentPortalConfig.allowedTabs.includes('manualApproval')) && (
+            <ErrorBoundary>
+              <ManualApprovalTab
+                language={language}
+                currentAdmin={effectiveAdmin}
+              />
+            </ErrorBoundary>
+          )}
 
-              {/* Gate Attendance Filter (ENTRY / BACK / NOT_ENTERED) */}
-              <select
-                value={gateFilter}
-                onChange={(e) => setGateFilter(e.target.value as any)}
-                className={`px-3 py-2.5 rounded-xl border text-xs focus:outline-hidden font-bold shadow-2xs ${
-                  gateFilter === 'entry' || gateFilter === 'in'
-                    ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
-                    : gateFilter === 'back'
-                    ? 'border-rose-400 bg-rose-50 text-rose-900'
-                    : gateFilter === 'not_entered'
-                    ? 'border-slate-400 bg-slate-100 text-slate-700'
-                    : 'border-slate-300 bg-white text-slate-700 focus:border-emerald-500'
-                }`}
-              >
-                <option value="all">All Gate Statuses (সকল গেইট স্ট্যাটাস)</option>
-                <option value="entry">Gate: ENTRY (উপস্থিত - সবুজ)</option>
-                <option value="back">Gate: BACK (প্রস্থান - লাল)</option>
-                <option value="not_entered">Gate: NOT ENTERED (প্রবেশ করেনি)</option>
-              </select>
-            </div>
+          {/* TAB: CENTRALIZED ROLE-BASED USER MANAGEMENT DASHBOARD (SUPER ADMIN EXCLUSIVE) */}
+          {activeTab === 'userAccessManagement' && isSuperAdmin && (
+            <ErrorBoundary>
+              <UserAccessManagementTab
+                language={language}
+                currentAdmin={effectiveAdmin}
+              />
+            </ErrorBoundary>
+          )}
 
-            {/* Column-Specific Granular Filters Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-              {/* Food Distribution Filter */}
-              <select
-                value={foodFilter}
-                onChange={(e) => setFoodFilter(e.target.value)}
-                className="px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700"
-              >
-                <option value="all">Food: All Statuses (সকল খাবার স্ট্যাটাস)</option>
-                <option value="all_taken">All Meals Taken (সকল খাবার গৃহীত: B+L+D)</option>
-                <option value="any_taken">Any Meal Taken (যে কোনো খাবার গৃহীত)</option>
-                <option value="none_taken">No Meals Taken (কোনো খাবার নেয়নি)</option>
-                <option value="breakfast_taken">Breakfast Taken (সকালের নাস্তা নেওয়া)</option>
-                <option value="breakfast_pending">Breakfast Pending (সকালের নাস্তা বাকি)</option>
-                <option value="lunch_taken">Lunch Taken (দুপুরের খাবার নেওয়া)</option>
-                <option value="lunch_pending">Lunch Pending (দুপুরের খাবার বাকি)</option>
-                <option value="dinner_taken">Dinner Taken (রাতের খাবার নেওয়া)</option>
-                <option value="dinner_pending">Dinner Pending (রাতের খাবার বাকি)</option>
-              </select>
+          {/* TAB: DYNAMIC GUEST PASS & FOOD MANAGEMENT SYSTEM */}
+          {activeTab === 'guestManagement' && (
+            <ErrorBoundary>
+              <Suspense fallback={<AdminTabFallback />}>
+                <GuestManagementTab
+                  language={language}
+                  currentAdmin={effectiveAdmin}
+                />
+              </Suspense>
+            </ErrorBoundary>
+          )}
 
-              {/* T-Shirt Distribution Filter */}
-              <select
-                value={tshirtFilter}
-                onChange={(e) => setTshirtFilter(e.target.value as any)}
-                className="px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700"
-              >
-                <option value="all">T-Shirt: All Statuses (সকল টি-শার্ট স্ট্যাটাস)</option>
-                <option value="given">T-Shirt Handed Over (টি-শার্ট প্রাপ্ত)</option>
-                <option value="pending">T-Shirt Pending (টি-শার্ট বাকি)</option>
-              </select>
+          {/* TAB: DYNAMIC STAFF CARD & MEAL ENTITLEMENT SYSTEM */}
+          {activeTab === 'staffCardManagement' && (
+            <ErrorBoundary>
+              <Suspense fallback={<AdminTabFallback />}>
+                <StaffCardManagementTab
+                  language={language}
+                  currentAdmin={effectiveAdmin}
+                />
+              </Suspense>
+            </ErrorBoundary>
+          )}
 
-              {/* T-Shirt Size Filter */}
-              <select
-                value={tshirtSizeFilter}
-                onChange={(e) => setTshirtSizeFilter(e.target.value)}
-                className="px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700"
-              >
-                <option value="all">T-Shirt Size: All Sizes (সকল সাইজ)</option>
-                <option value="S">Size: S</option>
-                <option value="M">Size: M</option>
-                <option value="L">Size: L</option>
-                <option value="XL">Size: XL</option>
-                <option value="XXL">Size: XXL</option>
-                <option value="XXXL">Size: XXXL</option>
-                <option value="Oversize 50">Size: Oversize 50</option>
-              </select>
+          {/* TAB: MASTER EVENT OVERVIEW (PART 9) */}
+          {activeTab === 'masterOverview' && (
+            <MasterEventOverview
+              language={language}
+              registrations={registrations}
+              onNavigateTab={(tab) => {
+                if (tab === 'dailyRegAnalytics' || tab === 'dailyPayAnalytics') {
+                  handleTabChange('dailyAnalytics');
+                } else if (tab === 'gateManagement') {
+                  handleTabChange('gateManagement');
+                } else {
+                  handleTabChange(tab as any);
+                }
+              }}
+            />
+          )}
 
-              {/* Batch Filter & Reset Button */}
-              <div className="flex items-center gap-2">
-                <select
-                  value={batchFilter}
-                  onChange={(e) => setBatchFilter(e.target.value)}
-                  className="flex-1 px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700 min-w-0"
-                >
-                  <option value="all">All Batches (সকল ব্যাচ)</option>
-                  {uniqueBatches.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
+          {/* TAB: BUDGET & EXPENSE MANAGEMENT (PART 8) */}
+          {activeTab === 'budgetManagement' && (
+            <BudgetManagementTab
+              language={language}
+              adminSession={{
+                id: adminSession?.id || effectiveAdmin.id,
+                fullName: adminSession?.fullName || effectiveAdmin.fullName,
+                username: adminSession?.username || effectiveAdmin.username,
+              }}
+              adminId={adminSession?.id || effectiveAdmin.id}
+              adminName={adminSession?.fullName || effectiveAdmin.fullName}
+              adminRole={adminSession?.role || effectiveAdmin.role}
+            />
+          )}
 
-                {activeFilterCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleResetFilters}
-                    className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border border-slate-200 shadow-2xs"
-                    title="Reset all filters to default"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Reset ({activeFilterCount})</span>
-                  </button>
-                )}
-              </div>
-            </div>
+          {/* TAB: DAILY REGISTRATION & PAYMENT ANALYTICS (PARTS 6 & 7) */}
+          {activeTab === 'dailyAnalytics' && (
+            <DailyAnalyticsTab language={language} registrations={registrations} />
+          )}
 
-            {/* Live Filter Indicator Bar */}
-            <div className="flex items-center justify-between flex-wrap gap-2 pt-1 pb-1 text-xs text-slate-500">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-slate-700">
-                  Showing <strong className="text-slate-900 font-black">{filteredRegistrations.length}</strong> of{' '}
-                  <strong className="text-slate-900 font-bold">{registrationsForYear.length}</strong> attendees
-                </span>
-                {gateFilter !== 'all' && (
-                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[11px] font-bold text-slate-700 border border-slate-200">
-                    Gate: {gateFilter.toUpperCase()}
-                  </span>
-                )}
-                {foodFilter !== 'all' && (
-                  <span className="px-2 py-0.5 rounded-md bg-amber-50 text-[11px] font-bold text-amber-800 border border-amber-200">
-                    Food: {foodFilter}
-                  </span>
-                )}
-                {tshirtFilter !== 'all' && (
-                  <span className="px-2 py-0.5 rounded-md bg-teal-50 text-[11px] font-bold text-teal-800 border border-teal-200">
-                    T-Shirt: {tshirtFilter}
-                  </span>
-                )}
-                {batchFilter !== 'all' && (
-                  <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-[11px] font-bold text-indigo-800 border border-indigo-200">
-                    Batch: {batchFilter}
-                  </span>
-                )}
-              </div>
+          {/* TAB: STAFF ACCOUNTS & ROLE ISOLATION (SUPER ADMIN EXCLUSIVE) */}
+          {activeTab === 'staffManagement' && isSuperAdmin && (
+            <StaffManagementTab
+              currentAdminEmail={adminSession?.email || effectiveAdmin.email}
+              currentAdminRole={adminSession?.role || effectiveAdmin.role}
+            />
+          )}
 
-              <div className="flex items-center gap-3 text-[11px] font-bold">
-                <span className="flex items-center gap-1 text-emerald-700">
-                  <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block"></span>
-                  IN Campus: {registrationsForYear.filter(isStudentInside).length}
-                </span>
-                <span className="flex items-center gap-1 text-rose-600">
-                  <span className="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>
-                  OUT: {registrationsForYear.filter((r) => !isStudentInside(r)).length}
-                </span>
-              </div>
-            </div>
-          </div>
+          {/* TAB: PRIVILEGED OPERATIONS AUDIT TRAIL (PART 10) */}
+          {activeTab === 'auditHistory' && (
+            <AuditHistoryTab />
+          )}
 
-          {/* Bookings Table: Desktop Responsive View (>= 640px) */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase text-[11px]">
-                  <th className="py-3 px-3">Student</th>
-                  <th className="py-3 px-3">Category & Batch</th>
-                  <th className="py-3 px-3">Contact</th>
-                  <th className="py-3 px-3">T-Shirt</th>
-                  <th className="py-3 px-3 text-center min-w-[85px]">
-                    <div className="flex items-center justify-center gap-1">
-                      <DoorOpen className="w-3.5 h-3.5 text-slate-500" />
-                      <span>Gate</span>
+          {/* TAB: LIVE GATE ACCESS & SCANNER MANAGEMENT (Super Admin & Venue Admin) */}
+          {activeTab === 'gateManagement' && (
+            <div className="space-y-6">
+              {/* Top Gate Status Overview Banner */}
+              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black shadow-md">
+                      <DoorOpen className="w-6 h-6" />
                     </div>
-                  </th>
-                  <th className="py-3 px-3 text-center min-w-[130px]">
-                    <div className="flex items-center justify-center gap-1">
-                      <Utensils className="w-3.5 h-3.5 text-slate-500" />
-                      <span>Food</span>
-                    </div>
-                  </th>
-                  <th className="py-3 px-3">Amount Paid</th>
-                  <th className="py-3 px-3">Status</th>
-                  <th className="py-3 px-3">Transaction</th>
-                  <th className="py-3 px-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredRegistrations.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="py-8 text-center text-slate-400">
-                      No bookings found for year {selectedYear} matching your criteria.
-                    </td>
-                  </tr>
-                ) : (
-                  paginate(filteredRegistrations, regPage, regPageSize).map((reg) => (
-                    <tr key={reg.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-3">
-                          <div
-                            onClick={() => setSelectedStudentForPhoto(reg)}
-                            className="relative group cursor-pointer shrink-0"
-                            title="Click to view & manage student photo in Supabase Storage"
-                          >
-                            <img
-                              src={reg.photoUrl}
-                              alt={reg.fullName}
-                              className="w-10 h-10 rounded-xl object-cover border border-slate-200 group-hover:ring-2 group-hover:ring-emerald-500 transition-all shadow-xs"
-                            />
-                            <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-[10px]">
-                              <Camera className="w-3.5 h-3.5" />
-                            </div>
-                          </div>
-                          <div>
-                            <span className="font-bold text-slate-900 block">{reg.fullName}</span>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-mono text-[10px] text-emerald-700 font-bold">
-                                {reg.id}
-                              </span>
-                              {reg.isDemo && (
-                                <span className="px-1.5 py-0.2 bg-amber-100 text-amber-800 text-[9px] font-bold rounded">
-                                  DEMO SEED
-                                </span>
-                              )}
-                              {reg.isLegacy && !reg.isDemo && (
-                                <span className="px-1.5 py-0.2 bg-sky-100 text-sky-800 text-[9px] font-bold rounded">
-                                  MIGRATED
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-3">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                            reg.category === 'former'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-teal-100 text-teal-800'
-                          }`}
-                        >
-                          {reg.category}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                          Live Gate Control
                         </span>
-                        <span className="block text-slate-700 font-medium mt-1">
-                          {reg.batchName}
-                        </span>
-                      </td>
-
-                      <td className="py-3 px-3 text-slate-600">
-                        <div className="font-mono">{reg.mobileNumber}</div>
-                        <div className="text-[10px] text-slate-400">{reg.email}</div>
-                      </td>
-
-                      <td className="py-3 px-3">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleTShirtCollected(reg.id, isTShirtGiven(reg))}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 shadow-xs whitespace-nowrap ${
-                            isTShirtGiven(reg)
-                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-1 ring-emerald-500'
-                              : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
-                          }`}
-                          title={
-                            isTShirtGiven(reg)
-                              ? 'T-Shirt Status: Given (Green). Click to reset to Pending (allows re-scanning).'
-                              : 'T-Shirt Status: Pending (Yellow). Click to mark as Given.'
-                          }
-                        >
-                          {isTShirtGiven(reg) ? (
-                            <>
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>{reg.tShirtSize} • Given</span>
-                            </>
-                          ) : (
-                            <>
-                              <Clock className="w-3.5 h-3.5 text-amber-700" />
-                              <span>{reg.tShirtSize} • Pending</span>
-                            </>
-                          )}
-                        </button>
-                      </td>
-
-                      <td className="py-3 px-3 text-center">
-                        {(() => {
-                          const gateStatus = getStudentGateStatus(reg);
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => handleToggleGateAttendance(reg, gateStatus)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-black cursor-pointer transition-all transform active:scale-95 shadow-xs whitespace-nowrap min-w-[72px] ${
-                                gateStatus === 'ENTRY'
-                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
-                                  : gateStatus === 'BACK'
-                                  ? 'bg-rose-600 hover:bg-rose-700 text-white ring-1 ring-rose-400'
-                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300'
-                              }`}
-                              title={
-                                gateStatus === 'ENTRY'
-                                  ? 'Gate Status: ENTRY (Green Box). Student has entered event. Click to record BACK (Exit).'
-                                  : gateStatus === 'BACK'
-                                  ? 'Gate Status: BACK (Red Box). Student has exited event. Click to record ENTRY (Re-enter).'
-                                  : 'Gate Status: NOT ENTERED (Neutral). Click to record ENTRY.'
-                              }
-                            >
-                              {gateStatus === 'ENTRY'
-                                ? 'ENTRY'
-                                : gateStatus === 'BACK'
-                                ? 'BACK'
-                                : 'NOT ENTERED'}
-                            </button>
-                          );
-                        })()}
-                      </td>
-
-                      <td className="py-3 px-3">
-                        <div className="flex items-center justify-center gap-1.5">
-                          {/* Morning Breakfast */}
-                          <button
-                            type="button"
-                            onClick={() => handleToggleFoodDistribution(reg, 'breakfast')}
-                            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-xs font-black transition-all transform active:scale-95 cursor-pointer shadow-xs ${
-                              isMealCollected(reg, 'breakfast')
-                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
-                                : 'bg-rose-500 hover:bg-rose-600 text-white ring-1 ring-rose-400'
-                            }`}
-                            title={`Breakfast (সকালের নাস্তা): ${
-                              isMealCollected(reg, 'breakfast')
-                                ? 'Taken (Green - Click to toggle)'
-                                : 'Not Taken (Red - Click to toggle)'
-                            }`}
-                          >
-                            B
-                          </button>
-
-                          {/* Lunch */}
-                          <button
-                            type="button"
-                            onClick={() => handleToggleFoodDistribution(reg, 'lunch')}
-                            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-xs font-black transition-all transform active:scale-95 cursor-pointer shadow-xs ${
-                              isMealCollected(reg, 'lunch')
-                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
-                                : 'bg-rose-500 hover:bg-rose-600 text-white ring-1 ring-rose-400'
-                            }`}
-                            title={`Lunch (দুপুরের খাবার): ${
-                              isMealCollected(reg, 'lunch')
-                                ? 'Taken (Green - Click to toggle)'
-                                : 'Not Taken (Red - Click to toggle)'
-                            }`}
-                          >
-                            L
-                          </button>
-
-                          {/* Dinner */}
-                          <button
-                            type="button"
-                            onClick={() => handleToggleFoodDistribution(reg, 'dinner')}
-                            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-xs font-black transition-all transform active:scale-95 cursor-pointer shadow-xs ${
-                              isMealCollected(reg, 'dinner')
-                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
-                                : 'bg-rose-500 hover:bg-rose-600 text-white ring-1 ring-rose-400'
-                            }`}
-                            title={`Dinner (রাতের খাবার): ${
-                              isMealCollected(reg, 'dinner')
-                                ? 'Taken (Green - Click to toggle)'
-                                : 'Not Taken (Red - Click to toggle)'
-                            }`}
-                          >
-                            D
-                          </button>
-                        </div>
-                        <div className="flex items-center justify-center gap-1.5 text-[9px] text-slate-400 font-semibold mt-1">
-                          <span>B: সকাল</span>
-                          <span>•</span>
-                          <span>L: দুপুর</span>
-                          <span>•</span>
-                          <span>D: রাত</span>
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-3">
-                        <div className="font-black text-slate-900 whitespace-nowrap inline-block tabular-nums">৳{reg.totalPaid}</div>
-                        {reg.donationAmount > 0 && (
-                          <div className="text-[10px] text-rose-600 font-semibold whitespace-nowrap">
-                            (+৳{reg.donationAmount} Donation)
-                          </div>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-3">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                            reg.paymentStatus === 'paid'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : reg.paymentStatus === 'pending'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-rose-100 text-rose-800'
-                          }`}
-                        >
-                          {reg.paymentStatus}
-                        </span>
-                      </td>
-
-                      <td className="py-3 px-3 text-[11px] text-slate-600">
-                        <span className="font-mono font-bold block">{reg.transactionId}</span>
-                        <span className="text-[10px] text-slate-400 uppercase">{reg.paymentMethod}</span>
-                      </td>
-
-                      <td className="py-3 px-3 text-right space-x-1 whitespace-nowrap">
-                        <button
-                          onClick={() => onSelectTicket && onSelectTicket(reg)}
-                          className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
-                          title="View Digital Ticket"
-                        >
-                          View Ticket
-                        </button>
-
-                        <button
-                          onClick={() => setSelectedStudentForPhoto(reg)}
-                          className="p-1.5 text-emerald-600 hover:text-emerald-800 rounded hover:bg-emerald-50 cursor-pointer"
-                          title="Manage Student Photo in Supabase Storage (student-photos)"
-                        >
-                          <Camera className="w-3.5 h-3.5" />
-                        </button>
-
-                        <button
-                          onClick={() => setShowEditStudentModal(reg)}
-                          className="p-1.5 text-slate-600 hover:text-slate-900 rounded hover:bg-slate-100 cursor-pointer"
-                          title="Edit Student Info"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setBookingToDelete(reg);
-                            setDeleteReason('');
-                          }}
-                          className="p-1.5 text-rose-600 hover:text-rose-800 rounded hover:bg-rose-50 cursor-pointer"
-                          title={language === 'bn' ? 'বুকিং মুছে ফেলুন' : 'Delete Registration'}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Bookings Table: Mobile Responsive Cards (< 640px) */}
-          <div className="sm:hidden space-y-3.5">
-            {filteredRegistrations.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
-                No bookings found for year {selectedYear} matching your criteria.
-              </div>
-            ) : (
-              paginate(filteredRegistrations, regPage, regPageSize).map((reg) => (
-                <div
-                  key={`mobile-reg-${reg.id}`}
-                  className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3"
-                >
-                  {/* Card Header: Photo, Name, ID, Category & Payment Status */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <img
-                        src={reg.photoUrl}
-                        alt={reg.fullName}
-                        className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <span className="font-bold text-slate-900 block text-sm truncate">
-                          {reg.fullName}
-                        </span>
-                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                          <span className="font-mono text-xs text-emerald-700 font-bold">
-                            {reg.id}
-                          </span>
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                              reg.category === 'former'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-teal-100 text-teal-800'
-                            }`}
-                          >
-                            {reg.category}
-                          </span>
-                        </div>
+                        <span className="text-xs text-slate-400 font-mono">Grand Reunion 2027</span>
                       </div>
+                      <h2 className="text-lg font-black text-slate-900 mt-0.5">
+                        {language === 'bn' ? 'গেইট প্রবেশ ও প্রস্থান কন্ট্রোল পোর্টাল' : 'Gate Entry / Back Live Access Control'}
+                      </h2>
+                      <p className="text-xs text-slate-500">
+                        {language === 'bn'
+                          ? 'রিয়েল-টাইম গেইট এন্ট্রি (সবুজ) ও ব্যাক (লাল) স্ট্যাটাস পর্যবেক্ষণ ও সুপার অ্যাডমিন সরাসরি স্ক্যানার।'
+                          : 'Authoritative real-time Gate Entry (Green) & Back (Red) monitoring with live QR scanning and audit trail.'}
+                      </p>
                     </div>
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 ${
-                        reg.paymentStatus === 'paid'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : reg.paymentStatus === 'pending'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-rose-100 text-rose-800'
-                      }`}
-                    >
-                      {reg.paymentStatus}
-                    </span>
                   </div>
 
-                  {/* Card Body Grid: Key Info with Clear Labels */}
-                  <div className="grid grid-cols-2 gap-2.5 text-xs pt-2 border-t border-slate-100">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                        Batch
-                      </span>
-                      <span className="font-semibold text-slate-800 block truncate">
-                        {reg.batchName}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                        Amount Paid
-                      </span>
-                      <span className="font-black text-slate-900 whitespace-nowrap inline-block tabular-nums text-sm">
-                        ৳{reg.totalPaid}
-                      </span>
-                      {reg.donationAmount > 0 && (
-                        <span className="text-[10px] text-rose-600 font-semibold block whitespace-nowrap">
-                          (+৳{reg.donationAmount} Don.)
-                        </span>
-                      )}
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                        Contact Phone
-                      </span>
-                      <a
-                        href={`tel:${reg.mobileNumber}`}
-                        className="font-mono text-emerald-700 font-semibold hover:underline block truncate"
-                      >
-                        {reg.mobileNumber}
-                      </a>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                        T-Shirt & Kit
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleTShirtCollected(reg.id, isTShirtGiven(reg))}
-                        className={`mt-0.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all w-full text-center cursor-pointer min-h-[38px] flex items-center justify-center gap-1.5 shadow-xs whitespace-nowrap ${
-                          isTShirtGiven(reg)
-                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-1 ring-emerald-500'
-                            : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
-                        }`}
-                        title={
-                          isTShirtGiven(reg)
-                            ? 'T-Shirt Status: Given (Green). Click to reset to Pending.'
-                            : 'T-Shirt Status: Pending (Yellow). Click to mark as Given.'
-                        }
-                      >
-                        {isTShirtGiven(reg) ? `✓ ${reg.tShirtSize} • Given` : `⏳ ${reg.tShirtSize} • Pending`}
-                      </button>
-                    </div>
-
-                    <div className="col-span-2">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-                        Gate Status (গেট)
-                      </span>
-                      {(() => {
-                        const gateStatus = getStudentGateStatus(reg);
-                        return (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleGateAttendance(reg, gateStatus)}
-                            className={`px-3 py-2 rounded-lg text-xs font-black transition-all w-full text-center cursor-pointer min-h-[40px] flex items-center justify-center gap-2 shadow-xs whitespace-nowrap ${
-                              gateStatus === 'ENTRY'
-                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
-                                : gateStatus === 'BACK'
-                                ? 'bg-rose-600 hover:bg-rose-700 text-white ring-1 ring-rose-400'
-                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
-                            }`}
-                            title={
-                              gateStatus === 'ENTRY'
-                                ? 'Gate Status: ENTRY (Green Box). Student is inside event. Tap to record BACK (Exit).'
-                                : gateStatus === 'BACK'
-                                ? 'Gate Status: BACK (Red Box). Student has exited event. Tap to record ENTRY (Re-enter).'
-                                : 'Gate Status: NOT ENTERED (Neutral). Tap to record ENTRY.'
-                            }
-                          >
-                            <span className="px-2 py-0.5 rounded bg-black/20 text-xs font-black">
-                              {gateStatus}
-                            </span>
-                            <span>
-                              {gateStatus === 'ENTRY'
-                                ? 'Inside Venue (ভেতরে আছেন - সবুজ)'
-                                : gateStatus === 'BACK'
-                                ? 'Exited / BACK (বাইরে আছেন - লাল)'
-                                : 'Not Entered (এখনও প্রবেশ করেননি)'}
-                            </span>
-                          </button>
-                        );
-                      })()}
-                    </div>
-
-                    <div className="col-span-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] uppercase font-bold text-slate-500">
-                          Food Distribution (খাবার বিতরণ)
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-medium">
-                          Green: Taken • Red: Pending
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleFoodDistribution(reg, 'breakfast')}
-                          className={`min-h-[40px] px-2 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1 ${
-                            isMealCollected(reg, 'breakfast')
-                              ? 'bg-emerald-600 active:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
-                              : 'bg-rose-500 active:bg-rose-600 text-white ring-1 ring-rose-400'
-                          }`}
-                          title={`Breakfast (সকালের নাস্তা): ${
-                            isMealCollected(reg, 'breakfast') ? 'Taken (Green)' : 'Pending (Red)'
-                          }`}
-                        >
-                          B • সকাল
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleFoodDistribution(reg, 'lunch')}
-                          className={`min-h-[40px] px-2 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1 ${
-                            isMealCollected(reg, 'lunch')
-                              ? 'bg-emerald-600 active:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
-                              : 'bg-rose-500 active:bg-rose-600 text-white ring-1 ring-rose-400'
-                          }`}
-                          title={`Lunch (দুপুরের খাবার): ${
-                            isMealCollected(reg, 'lunch') ? 'Taken (Green)' : 'Pending (Red)'
-                          }`}
-                        >
-                          L • দুপুর
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleFoodDistribution(reg, 'dinner')}
-                          className={`min-h-[40px] px-2 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1 ${
-                            isMealCollected(reg, 'dinner')
-                              ? 'bg-emerald-600 active:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
-                              : 'bg-rose-500 active:bg-rose-600 text-white ring-1 ring-rose-400'
-                          }`}
-                          title={`Dinner (রাতের খাবার): ${
-                            isMealCollected(reg, 'dinner') ? 'Taken (Green)' : 'Pending (Red)'
-                          }`}
-                        >
-                          D • রাত
-                        </button>
-                      </div>
-                    </div>
-
-                    {reg.transactionId && (
-                      <div className="col-span-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex items-center justify-between text-xs">
-                        <span className="text-slate-500 font-mono">
-                          Tx: <strong className="text-slate-800">{reg.transactionId}</strong>
-                        </span>
-                        <span className="uppercase font-bold text-slate-600 text-[10px] px-2 py-0.5 bg-white rounded border border-slate-200">
-                          {reg.paymentMethod}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Card Actions: 44px Minimum Touch Targets & Generous Spacing */}
-                  <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                  {/* Quick Actions to All Bookings filtered by Gate */}
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => onSelectTicket && onSelectTicket(reg)}
-                      className="flex-1 min-h-[44px] px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                      onClick={() => {
+                        setGateFilter('entry');
+                        handleTabChange('allBookings');
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                      title="View all students currently inside venue"
                     >
-                      <QrCode className="w-4 h-4" />
-                      <span>View Ticket</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowEditStudentModal(reg)}
-                      className="min-h-[44px] min-w-[44px] p-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 rounded-xl transition-colors flex items-center justify-center cursor-pointer"
-                      title="Edit Student Info"
-                    >
-                      <Edit2 className="w-4 h-4" />
+                      <Users className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{language === 'bn' ? 'ভেতরে উপস্থিত তালিকা (ENTRY)' : 'View Inside List (ENTRY)'}</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => {
-                        setBookingToDelete(reg);
-                        setDeleteReason('');
+                        setGateFilter('back');
+                        handleTabChange('allBookings');
                       }}
-                      className="min-h-[44px] min-w-[44px] p-2 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-600 rounded-xl transition-colors flex items-center justify-center cursor-pointer"
-                      title={language === 'bn' ? 'বুকিং মুছে ফেলুন' : 'Delete Registration'}
+                      className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                      title="View all students who exited (BACK)"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <DoorClosed className="w-3.5 h-3.5 text-rose-600" />
+                      <span>{language === 'bn' ? 'প্রস্থানকারী তালিকা (BACK)' : 'View Exited List (BACK)'}</span>
                     </button>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
 
-          {/* Registrations Global Pagination */}
-          <GlobalPagination
-            currentPage={regPage}
-            totalRecords={filteredRegistrations.length}
-            pageSize={regPageSize}
-            onPageChange={setRegPage}
-            onPageSizeChange={setRegPageSize}
-            language={language}
-          />
-        </div>
-      )}
+                {/* KPI Summary Cards */}
+                {(() => {
+                  const insideCount = registrations.filter((r) => getStudentGateStatus(r) === 'ENTRY').length;
+                  const backCount = registrations.filter((r) => getStudentGateStatus(r) === 'BACK').length;
+                  const notEnteredCount = registrations.filter((r) => getStudentGateStatus(r) === 'NOT_ENTERED').length;
+                  const allEvents = EventStore.getGateEvents();
 
-      {/* TAB: CURRENT STUDENT ID MANAGEMENT */}
-      {activeTab === 'studentIds' && (
-        <ErrorBoundary
-          fallbackTitle={language === 'bn' ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা ত্রুটি' : 'Student ID Management Error'}
-          fallbackMessage={
-            language === 'bn'
-              ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা লোড করার সময় একটি সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।'
-              : 'An error occurred while loading the Student ID Management tab. Please click retry.'
-          }
-        >
-          <StudentIdManagementTab
-            language={language}
-            onSelectTicket={(regId) => {
-              const reg = registrations.find((r) => r.id === regId);
-              if (reg && onSelectTicket) onSelectTicket(reg);
-            }}
-          />
-        </ErrorBoundary>
-      )}
+                  return (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-emerald-800 tracking-wider flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          Currently Inside (ENTRY)
+                        </span>
+                        <div className="text-2xl font-black text-emerald-950 font-mono">
+                          {insideCount}
+                        </div>
+                        <span className="text-[10px] text-emerald-700 block font-medium">Eligible for Food & T-Shirts</span>
+                      </div>
 
-      {/* TAB 3: OVERVIEW & TELEMETRY */}
-      {activeTab === 'overview' && (
-        <div className="space-y-6">
-          {/* KPI Stat Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-              <span className="text-[11px] font-semibold text-slate-500 block uppercase">
-                {language === 'bn' ? 'মোট নিবন্ধিত শিক্ষার্থী' : 'Total Registrations'}
-              </span>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-3xl font-black text-slate-900">
-                  {financial.paidRegistrationsCount}
-                </span>
-                <span className="text-xs text-emerald-600 font-bold">10,000+ Capacity</span>
+                      <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-rose-800 tracking-wider flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-rose-500" />
+                          Exited Campus (BACK)
+                        </span>
+                        <div className="text-2xl font-black text-rose-950 font-mono">
+                          {backCount}
+                        </div>
+                        <span className="text-[10px] text-rose-700 block font-medium">Collection strictly blocked</span>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-slate-600 tracking-wider">
+                          Not Yet Entered
+                        </span>
+                        <div className="text-2xl font-black text-slate-800 font-mono">
+                          {notEnteredCount}
+                        </div>
+                        <span className="text-[10px] text-slate-500 block font-medium">Awaiting first arrival</span>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-amber-300 tracking-wider">
+                          Total Gate Audit Logs
+                        </span>
+                        <div className="text-2xl font-black text-amber-400 font-mono">
+                          {allEvents.length}
+                        </div>
+                        <span className="text-[10px] text-slate-400 block font-medium">Immutable transitions</span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
-              <div className="mt-2 text-[11px] text-slate-500 flex justify-between">
-                <span>Former: {financial.formerStudentsCount}</span>
-                <span>Current: {financial.currentStudentsCount}</span>
-              </div>
+
+              {/* Embedded Full Gate Scanner Module */}
+              <ErrorBoundary>
+                <Suspense fallback={<AdminTabFallback />}>
+                  <GateScannerModule
+                    language={language}
+                    staffUser={{
+                      id: effectiveAdmin.id || 'SUPER_ADMIN_01',
+                      authUserId: effectiveAdmin.id || 'SUPER_ADMIN_01',
+                      username: effectiveAdmin.username || 'admin',
+                      fullName: effectiveAdmin.fullName || 'Super Administrator',
+                      email: effectiveAdmin.email || 'admin@gmail.com',
+                      role: 'SUPER_ADMIN',
+                      department: 'ALL_SERVICES',
+                      permissions: ['VERIFY', 'APPROVE', 'REJECT', 'MANAGE'],
+                      status: 'ACTIVE',
+                      assignedGate: 'Gate 01 - Main Entrance',
+                      createdAt: effectiveAdmin.createdAt || new Date().toISOString(),
+                    }}
+                    isSuperAdmin={true}
+                  />
+                </Suspense>
+              </ErrorBoundary>
             </div>
+          )}
 
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-              <span className="text-[11px] font-semibold text-slate-500 block uppercase">
-                {language === 'bn' ? 'মোট সংগৃহীত নিবন্ধন ফি' : 'Total Registration Fees'}
-              </span>
-              <div className="text-3xl font-black text-emerald-700 mt-1">
-                ৳ {financial.totalRegistrationRevenue.toLocaleString()}
-              </div>
-              <div className="mt-2 text-[11px] text-slate-500">
-                Avg: ৳{Math.round(financial.totalRegistrationRevenue / (financial.paidRegistrationsCount || 1))} / student
-              </div>
-            </div>
+          {/* TAB 1: ALL BOOKINGS (SUPABASE BACKEND - YEAR SPECIFIC) */}
+          {activeTab === 'allBookings' && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
+              {/* Header & Year Selector Bar */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Database className="w-5 h-5 text-emerald-600" />
+                    <h2 className="text-lg font-black text-slate-900">
+                      {language === 'bn'
+                        ? 'ওয়েবসাইটে সম্পন্ন সকল স্টুডেন্ট বুকিং ও নিবন্ধন'
+                        : 'All Student Bookings & Registrations'}
+                    </h2>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {language === 'bn'
+                      ? `সুপাবেস ব্যাকএন্ড টেবিল: ${supabaseTableUsed} • বছর অনুযায়ী পৃথক টেবিল সংরক্ষণ`
+                      : `Target Supabase Backend Table: ${supabaseTableUsed} • Stored separately per event year`}
+                  </p>
+                </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-              <span className="text-[11px] font-semibold text-slate-500 block uppercase">
-                {language === 'bn' ? 'মোট অনুদান' : 'Total Donations'}
-              </span>
-              <div className="text-3xl font-black text-teal-700 mt-1">
-                ৳ {financial.totalDonations.toLocaleString()}
-              </div>
-              <div className="mt-2 text-[11px] text-slate-500">
-                {donations.length} institutional patrons
-              </div>
-            </div>
+                {/* Consolidated Registration Database Status & Sync Control */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{language === 'bn' ? 'কনসোলিডেটেড ডাটাবেস:' : 'Consolidated Table:'} <code className="font-mono font-bold text-[11px] text-emerald-900">registrations_2027</code></span>
+                  </span>
 
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-              <span className="text-[11px] font-semibold text-slate-500 block uppercase">
-                {language === 'bn' ? 'অবশিষ্ট কার্যকরী তহবিল' : 'Net Operating Balance'}
-              </span>
-              <div
-                className={`text-3xl font-black mt-1 ${
-                  financial.remainingBalance >= 0 ? 'text-emerald-700' : 'text-rose-600'
-                }`}
-              >
-                ৳ {financial.remainingBalance.toLocaleString()}
-              </div>
-              <div className="mt-2 text-[11px] text-slate-500">
-                Expenses: ৳{financial.totalExpenses.toLocaleString()}
-              </div>
-            </div>
-          </div>
+                  <button
+                    onClick={() => fetchSupabaseRegistrationsForYear(2027)}
+                    disabled={isFetchingFromSupabase}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold cursor-pointer transition-colors"
+                    title="Fetch latest bookings directly from Supabase (registrations_2027)"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isFetchingFromSupabase ? 'animate-spin' : ''}`} />
+                    <span>{isFetchingFromSupabase ? 'Syncing...' : 'Fetch from Supabase'}</span>
+                  </button>
 
-          {/* Operational Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* T-Shirt Breakdown */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                  <Shirt className="w-4 h-4 text-emerald-600" />
-                  <span>{language === 'bn' ? 'টি-শার্ট সাইজ বিভাজন' : 'T-Shirt Size Breakdown'}</span>
-                </h3>
-                <span className="text-xs font-semibold text-slate-500">
-                  {tshirtCollectedCount}/{registrations.length} Delivered
-                </span>
+                  <button
+                    onClick={() => exportToCSV(filteredRegistrations, `PLSCF_Bookings_2027`)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>{t.btnExportCsv}</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                {tshirtSizes.map((size) => (
-                  <div key={size} className="p-2 rounded-xl bg-slate-50 border border-slate-100">
-                    <span className="font-bold text-slate-700 block">{size}</span>
-                    <span className="text-lg font-black text-slate-900 mt-0.5 block">
-                      {tshirtCounts[size] || 0}
+              {/* Bookings Statistics Bar */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <span className="text-[11px] text-slate-500 font-bold uppercase block">Genuine Paid Bookings</span>
+                  <span className="text-2xl font-black text-slate-900 mt-1 block">
+                    {genuineRegistrations.filter((r) => r.paymentStatus === 'paid').length}
+                  </span>
+                  <span className="text-[10px] text-emerald-600 font-medium">
+                    {registrationsForYear.length > genuineRegistrations.length
+                      ? `+${registrationsForYear.length - genuineRegistrations.length} demo seed records preserved`
+                      : `In Table: ${supabaseTableUsed}`}
+                  </span>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <span className="text-[11px] text-slate-500 font-bold uppercase block">Former Students</span>
+                  <span className="text-2xl font-black text-emerald-700 mt-1 block">
+                    {genuineRegistrations.filter((r) => r.category === 'former').length}
+                  </span>
+                  <span className="text-[10px] text-slate-400">Alumni SSC/HSC</span>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <span className="text-[11px] text-slate-500 font-bold uppercase block">Current Students</span>
+                  <span className="text-2xl font-black text-teal-700 mt-1 block">
+                    {genuineRegistrations.filter((r) => r.category === 'current').length}
+                  </span>
+                  <span className="text-[10px] text-slate-400">Enrolled School & College</span>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <span className="text-[11px] text-slate-500 font-bold uppercase block">Total Booking Revenue</span>
+                  <span className="text-2xl font-black text-amber-700 mt-1 block">
+                    ৳{genuineRegistrations.reduce((sum, r) => sum + r.totalPaid, 0).toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-slate-400">Genuine Paid Inflow</span>
+                </div>
+              </div>
+
+              {/* Enhanced Search & Column Filters Toolbar */}
+              <div className="space-y-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {/* Search Bar */}
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <input
+                      type="text"
+                      placeholder={
+                        language === 'bn'
+                          ? 'নাম, আইডি, মোবাইল বা ব্যাচ দিয়ে খুঁজুন...'
+                          : 'Search by student name, ID, mobile, or batch...'
+                      }
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs"
+                    />
+                  </div>
+
+                  {/* Category Filter */}
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value as any)}
+                    className="px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700"
+                  >
+                    <option value="all">All Student Categories (সকল ক্যাটাগরি)</option>
+                    <option value="former">Former Students (প্রাক্তন অ্যালামনাই)</option>
+                    <option value="current">Current Students (বর্তমান শিক্ষার্থী)</option>
+                  </select>
+
+                  {/* Payment Status Filter */}
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as any)}
+                    className="px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700"
+                  >
+                    <option value="all">All Payment Statuses (সকল পেমেন্ট স্ট্যাটাস)</option>
+                    <option value="paid">PAID & VERIFIED (পরিশোধিত)</option>
+                    <option value="pending">PENDING (অপেক্ষমান)</option>
+                    <option value="refunded">REFUNDED / CANCELLED (বাতিল)</option>
+                  </select>
+
+                  {/* Gate Attendance Filter (ENTRY / BACK / NOT_ENTERED) */}
+                  <select
+                    value={gateFilter}
+                    onChange={(e) => setGateFilter(e.target.value as any)}
+                    className={`px-3 py-2.5 rounded-xl border text-xs focus:outline-hidden font-bold shadow-2xs ${gateFilter === 'entry' || gateFilter === 'in'
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
+                      : gateFilter === 'back'
+                        ? 'border-rose-400 bg-rose-50 text-rose-900'
+                        : gateFilter === 'not_entered'
+                          ? 'border-slate-400 bg-slate-100 text-slate-700'
+                          : 'border-slate-300 bg-white text-slate-700 focus:border-emerald-500'
+                      }`}
+                  >
+                    <option value="all">All Gate Statuses (সকল গেইট স্ট্যাটাস)</option>
+                    <option value="entry">Gate: ENTRY (উপস্থিত - সবুজ)</option>
+                    <option value="back">Gate: BACK (প্রস্থান - লাল)</option>
+                    <option value="not_entered">Gate: NOT ENTERED (প্রবেশ করেনি)</option>
+                  </select>
+                </div>
+
+                {/* Column-Specific Granular Filters Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {/* Food Distribution Filter */}
+                  <select
+                    value={foodFilter}
+                    onChange={(e) => setFoodFilter(e.target.value)}
+                    className="px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700"
+                  >
+                    <option value="all">Food: All Statuses (সকল খাবার স্ট্যাটাস)</option>
+                    <option value="all_taken">All Meals Taken (সকল খাবার গৃহীত: B+L+D)</option>
+                    <option value="any_taken">Any Meal Taken (যে কোনো খাবার গৃহীত)</option>
+                    <option value="none_taken">No Meals Taken (কোনো খাবার নেয়নি)</option>
+                    <option value="breakfast_taken">Breakfast Taken (সকালের নাস্তা নেওয়া)</option>
+                    <option value="breakfast_pending">Breakfast Pending (সকালের নাস্তা বাকি)</option>
+                    <option value="lunch_taken">Lunch Taken (দুপুরের খাবার নেওয়া)</option>
+                    <option value="lunch_pending">Lunch Pending (দুপুরের খাবার বাকি)</option>
+                    <option value="dinner_taken">Dinner Taken (রাতের খাবার নেওয়া)</option>
+                    <option value="dinner_pending">Dinner Pending (রাতের খাবার বাকি)</option>
+                  </select>
+
+                  {/* T-Shirt Distribution Filter */}
+                  <select
+                    value={tshirtFilter}
+                    onChange={(e) => setTshirtFilter(e.target.value as any)}
+                    className="px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700"
+                  >
+                    <option value="all">T-Shirt: All Statuses (সকল টি-শার্ট স্ট্যাটাস)</option>
+                    <option value="given">T-Shirt Handed Over (টি-শার্ট প্রাপ্ত)</option>
+                    <option value="pending">T-Shirt Pending (টি-শার্ট বাকি)</option>
+                  </select>
+
+                  {/* T-Shirt Size Filter */}
+                  <select
+                    value={tshirtSizeFilter}
+                    onChange={(e) => setTshirtSizeFilter(e.target.value)}
+                    className="px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700"
+                  >
+                    <option value="all">T-Shirt Size: All Sizes (সকল সাইজ)</option>
+                    <option value="S">Size: S</option>
+                    <option value="M">Size: M</option>
+                    <option value="L">Size: L</option>
+                    <option value="XL">Size: XL</option>
+                    <option value="XXL">Size: XXL</option>
+                    <option value="XXXL">Size: XXXL</option>
+                    <option value="Oversize 50">Size: Oversize 50</option>
+                  </select>
+
+                  {/* Batch Filter & Reset Button */}
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={batchFilter}
+                      onChange={(e) => setBatchFilter(e.target.value)}
+                      className="flex-1 px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:border-emerald-500 focus:outline-hidden bg-white shadow-2xs font-medium text-slate-700 min-w-0"
+                    >
+                      <option value="all">All Batches (সকল ব্যাচ)</option>
+                      {uniqueBatches.map((b) => (
+                        <option key={b} value={b}>
+                          {b}
+                        </option>
+                      ))}
+                    </select>
+
+                    {activeFilterCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleResetFilters}
+                        className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border border-slate-200 shadow-2xs"
+                        title="Reset all filters to default"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Reset ({activeFilterCount})</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Live Filter Indicator Bar */}
+                <div className="flex items-center justify-between flex-wrap gap-2 pt-1 pb-1 text-xs text-slate-500">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-slate-700">
+                      Showing <strong className="text-slate-900 font-black">{filteredRegistrations.length}</strong> of{' '}
+                      <strong className="text-slate-900 font-bold">{registrationsForYear.length}</strong> attendees
+                    </span>
+                    {gateFilter !== 'all' && (
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[11px] font-bold text-slate-700 border border-slate-200">
+                        Gate: {gateFilter.toUpperCase()}
+                      </span>
+                    )}
+                    {foodFilter !== 'all' && (
+                      <span className="px-2 py-0.5 rounded-md bg-amber-50 text-[11px] font-bold text-amber-800 border border-amber-200">
+                        Food: {foodFilter}
+                      </span>
+                    )}
+                    {tshirtFilter !== 'all' && (
+                      <span className="px-2 py-0.5 rounded-md bg-teal-50 text-[11px] font-bold text-teal-800 border border-teal-200">
+                        T-Shirt: {tshirtFilter}
+                      </span>
+                    )}
+                    {batchFilter !== 'all' && (
+                      <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-[11px] font-bold text-indigo-800 border border-indigo-200">
+                        Batch: {batchFilter}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3 text-[11px] font-bold">
+                    <span className="flex items-center gap-1 text-emerald-700">
+                      <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block"></span>
+                      IN Campus: {registrationsForYear.filter(isStudentInside).length}
+                    </span>
+                    <span className="flex items-center gap-1 text-rose-600">
+                      <span className="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>
+                      OUT: {registrationsForYear.filter((r) => !isStudentInside(r)).length}
                     </span>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Gate Attendance Telemetry */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                <QrCode className="w-4 h-4 text-emerald-600" />
-                <span>{language === 'bn' ? 'গেট প্রবেশ ও প্রস্থান' : 'Gate Attendance'}</span>
-              </h3>
-
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between p-2 rounded-lg bg-emerald-50 text-emerald-900 font-semibold">
-                  <span>Approved Entries:</span>
-                  <span className="font-bold">
-                    {gateEvents.filter((e) => e.eventType === 'ENTRY' && e.status === 'APPROVED').length ||
-                      scanLogs.filter((s) => s.scanType === 'entry' && s.status === 'approved').length}
-                  </span>
-                </div>
-                <div className="flex justify-between p-2 rounded-lg bg-slate-50 text-slate-700 font-semibold">
-                  <span>Approved Exits:</span>
-                  <span className="font-bold">
-                    {gateEvents.filter((e) => e.eventType === 'EXIT' && e.status === 'APPROVED').length ||
-                      scanLogs.filter((s) => s.scanType === 'exit' && s.status === 'approved').length}
-                  </span>
-                </div>
-                <div className="flex justify-between p-2 rounded-lg bg-amber-50 text-amber-900 font-semibold">
-                  <span>Currently Inside Campus:</span>
-                  <span className="font-bold">
-                    {registrationsForYear.filter(isStudentInside).length}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* School Profile Summary */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-              <h3 className="font-bold text-slate-900 text-sm">
-                {t.institutionName}
-              </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                64 Years of Academic Glory & Discipline. The Grand Reunion 2026 hosts 10,000+ alumni,
-                current students, faculty, and national dignitaries at the college campus.
-              </p>
-              <div className="text-xs text-slate-500 pt-2 border-t border-slate-100 space-y-1">
-                <div>Dates: Dec 25-26, 2026</div>
-                <div>Security: High District Police Protection</div>
-              </div>
-              {isSuperAdminAccount && (
-                <button
-                  type="button"
-                  onClick={() => handleTabChange('aboutContactManagement')}
-                  className="w-full py-2 px-3 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#0284C7] border border-sky-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <FileEdit className="w-3.5 h-3.5" />
-                  <span>
-                    {language === 'bn' ? 'About & Contact পেজ এডিট করুন' : 'Edit About & Contact Page'}
-                  </span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: FEE SETTINGS & REGISTRATION STATUS */}
-      {(activeTab === 'feeSettings' || (activeTab as any) === 'registrationControl') && (
-        <div className="space-y-6 max-w-4xl">
-          {/* Registration & Donation Governance Control System */}
-          <RegistrationDonationControlPanel
-            language={language}
-            adminName={effectiveAdmin.fullName || 'Super Admin'}
-            isSuperAdmin={isSuperAdmin}
-            onSettingsChanged={(updated) => {
-              setFeeSettings(updated);
-            }}
-          />
-
-          {/* Meal Time & Scanner Control System */}
-          <MealTimeScannerControlPanel
-            language={language}
-            adminName={effectiveAdmin.fullName || 'Super Admin'}
-          />
-
-          <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">
-              {language === 'bn' ? 'রেজিস্ট্রেশন ফি, সময়সূচি ও হোমপেজ কনফিগারেশন' : 'Registration Fees, Schedule & Homepage Settings'}
-            </h2>
-            <p className="text-xs text-slate-500">
-              {language === 'bn'
-                ? 'ক্যাটাগরি ফি, ইভেন্ট সময়সূচি, ওয়েবসাইট কাউন্টডাউন এবং হোমপেজ সেকশন ক্রম নিয়ন্ত্রণ করুন (উপরের সুইচ ও বন্ধের নোটিশ অপরিবর্তিত থাকবে)।'
-                : 'Manage category fees, target event countdown, homepage layout, and privacy without altering live governance switches or closure notices.'}
-            </p>
-          </div>
-
-          {settingsSuccessNotice && (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
-              <Check className="w-4 h-4 text-emerald-600" />
-              <span>
-                {language === 'bn'
-                  ? 'ইভেন্ট ও ফি সেটিংস সুপাবেজ ডাটাবেজে সফলভাবে সংরক্ষিত হয়েছে!'
-                  : 'Event & fee settings confirmed in Supabase and updated across visitors!'}
-              </span>
-            </div>
-          )}
-
-          {settingsErrorNotice && (
-            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-              <span>{settingsErrorNotice}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleSaveFeeSettings} className="space-y-6">
-
-            {/* 3. REGISTRATION FEES */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Former Student Fee (BDT)
-                </label>
-                <input
-                  type="number"
-                  value={formerFeeInput}
-                  onChange={(e) => setFormerFeeInput(Number(e.target.value))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-emerald-500 focus:outline-hidden"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Current Student Fee (BDT)
-                </label>
-                <input
-                  type="number"
-                  value={currentFeeInput}
-                  onChange={(e) => setCurrentFeeInput(Number(e.target.value))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-emerald-500 focus:outline-hidden"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* 4. EVENT DATE & COUNTDOWN CONFIGURATION */}
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-4">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  {language === 'bn' ? 'কাউন্টডাউন ও পুনর্মিলনী তারিখ কনফিগারেশন' : 'Countdown & Event Schedule'}
-                </h3>
-                <p className="text-xs text-slate-500">
-                  {language === 'bn'
-                    ? 'পুনর্মিলনী শুরুর তারিখ অনুযায়ী হোমপেজের কাউন্টডাউন স্বয়ংক্রিয়ভাবে চলবে।'
-                    : 'The homepage countdown automatically ticks towards this date and time.'}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    Event Date & Time (ISO format)
-                  </label>
-                  <input
-                    type="text"
-                    value={eventTargetDateInput}
-                    onChange={(e) => setEventTargetDateInput(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:border-emerald-500 focus:outline-hidden"
-                    placeholder="2026-12-25T09:00:00"
-                    required
-                  />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    Confirmed: Dec 25, 2026 at 09:00 AM
-                  </span>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    Registration Deadline
-                  </label>
-                  <input
-                    type="text"
-                    value={endDateInput}
-                    onChange={(e) => setEndDateInput(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:border-emerald-500 focus:outline-hidden"
-                    placeholder="2026-12-15"
-                    required
-                  />
                 </div>
               </div>
 
-              {/* POST EVENT SIMULATION SWITCH */}
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    <span>
-                      {language === 'bn'
-                        ? 'ইভেন্ট পরবর্তী অবস্থা টেস্ট (Simulate Post-Event)'
-                        : 'Simulate Post-Event Mode'}
-                    </span>
-                  </span>
-                  <p className="text-[11px] text-slate-500">
-                    {language === 'bn'
-                      ? 'চালু করলে হোমপেজের কাউন্টডাউন সমাপ্ত দেখিয়ে গ্যালারি, ভিডিও ও স্মরণিকার লিঙ্ক প্রদর্শন করবে।'
-                      : 'Switches the homepage countdown to the completed state with memories & souvenir links.'}
-                  </p>
-                </div>
+              {/* Bookings Table: Desktop Responsive View (>= 640px) */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase text-[11px]">
+                      <th className="py-3 px-3">Student</th>
+                      <th className="py-3 px-3">Category & Batch</th>
+                      <th className="py-3 px-3">Contact</th>
+                      <th className="py-3 px-3">T-Shirt</th>
+                      <th className="py-3 px-3 text-center min-w-[85px]">
+                        <div className="flex items-center justify-center gap-1">
+                          <DoorOpen className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Gate</span>
+                        </div>
+                      </th>
+                      <th className="py-3 px-3 text-center min-w-[130px]">
+                        <div className="flex items-center justify-center gap-1">
+                          <Utensils className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Food</span>
+                        </div>
+                      </th>
+                      <th className="py-3 px-3">Amount Paid</th>
+                      <th className="py-3 px-3">Status</th>
+                      <th className="py-3 px-3">Transaction</th>
+                      <th className="py-3 px-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredRegistrations.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="py-8 text-center text-slate-400">
+                          No bookings found for year {selectedYear} matching your criteria.
+                        </td>
+                      </tr>
+                    ) : (
+                      paginate(filteredRegistrations, regPage, regPageSize).map((reg) => (
+                        <tr key={reg.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-3">
+                              <div
+                                onClick={() => setSelectedStudentForPhoto(reg)}
+                                className="relative group cursor-pointer shrink-0"
+                                title="Click to view & manage student photo in Supabase Storage"
+                              >
+                                {reg.photoUrl ? (
+                                  <img
+                                    src={reg.photoUrl}
+                                    alt={reg.fullName}
+                                    className="w-10 h-10 rounded-xl object-cover border border-slate-200 group-hover:ring-2 group-hover:ring-emerald-500 transition-all shadow-xs"
+                                  />
+                                ) : (
+                                  <div
+                                    aria-label={reg.fullName}
+                                    className="w-10 h-10 rounded-xl border border-slate-200 bg-sky-50 text-sky-700 font-black text-xs flex items-center justify-center uppercase shadow-xs"
+                                  >
+                                    {(reg.fullName || 'S').trim().charAt(0)}
+                                  </div>
+                                )}
+                                <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-[10px]">
+                                  <Camera className="w-3.5 h-3.5" />
+                                </div>
+                              </div>
+                              <div>
+                                <span className="font-bold text-slate-900 block">{reg.fullName}</span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-mono text-[10px] text-emerald-700 font-bold">
+                                    {reg.id}
+                                  </span>
+                                  {reg.isDemo && (
+                                    <span className="px-1.5 py-0.2 bg-amber-100 text-amber-800 text-[9px] font-bold rounded">
+                                      DEMO SEED
+                                    </span>
+                                  )}
+                                  {reg.isLegacy && !reg.isDemo && (
+                                    <span className="px-1.5 py-0.2 bg-sky-100 text-sky-800 text-[9px] font-bold rounded">
+                                      MIGRATED
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
 
-                <button
-                  type="button"
-                  onClick={() => setSimulateEventCompletedInput(!simulateEventCompletedInput)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    simulateEventCompletedInput
-                      ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
-                      : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                  }`}
-                >
-                  {simulateEventCompletedInput ? 'Active (ইভেন্ট সমাপ্ত)' : 'Inactive (কাউন্টডাউন চালু)'}
-                </button>
-              </div>
-            </div>
+                          <td className="py-3 px-3">
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${reg.category === 'former'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-teal-100 text-teal-800'
+                                }`}
+                            >
+                              {reg.category}
+                            </span>
+                            <span className="block text-slate-700 font-medium mt-1">
+                              {reg.batchName}
+                            </span>
+                          </td>
 
-            <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                    Home page sections
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Hide sections or change their display order, then save the settings.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setHomePageSectionsInput([...DEFAULT_HOME_PAGE_SECTIONS])}
-                  className="px-2.5 py-1 text-[11px] font-semibold text-[#0284C7] hover:text-[#0EA5E9] border border-slate-200 hover:border-sky-300 rounded-lg bg-white transition cursor-pointer self-start sm:self-auto shadow-2xs"
-                >
-                  {language === 'bn' ? 'ডিফল্ট সাজান' : 'Reset to Default Order'}
-                </button>
+                          <td className="py-3 px-3 text-slate-600">
+                            <div className="font-mono">{reg.mobileNumber}</div>
+                            <div className="text-[10px] text-slate-400">{reg.email}</div>
+                          </td>
+
+                          <td className="py-3 px-3">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleTShirtCollected(reg.id, isTShirtGiven(reg))}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 shadow-xs whitespace-nowrap ${isTShirtGiven(reg)
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-1 ring-emerald-500'
+                                : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                                }`}
+                              title={
+                                isTShirtGiven(reg)
+                                  ? 'T-Shirt Status: Given (Green). Click to reset to Pending (allows re-scanning).'
+                                  : 'T-Shirt Status: Pending (Yellow). Click to mark as Given.'
+                              }
+                            >
+                              {isTShirtGiven(reg) ? (
+                                <>
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>{reg.tShirtSize} • Given</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Clock className="w-3.5 h-3.5 text-amber-700" />
+                                  <span>{reg.tShirtSize} • Pending</span>
+                                </>
+                              )}
+                            </button>
+                          </td>
+
+                          <td className="py-3 px-3 text-center">
+                            {(() => {
+                              const gateStatus = getStudentGateStatus(reg);
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleGateAttendance(reg, gateStatus)}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-black cursor-pointer transition-all transform active:scale-95 shadow-xs whitespace-nowrap min-w-[72px] ${gateStatus === 'ENTRY'
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
+                                    : gateStatus === 'BACK'
+                                      ? 'bg-rose-600 hover:bg-rose-700 text-white ring-1 ring-rose-400'
+                                      : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300'
+                                    }`}
+                                  title={
+                                    gateStatus === 'ENTRY'
+                                      ? 'Gate Status: ENTRY (Green Box). Student has entered event. Click to record BACK (Exit).'
+                                      : gateStatus === 'BACK'
+                                        ? 'Gate Status: BACK (Red Box). Student has exited event. Click to record ENTRY (Re-enter).'
+                                        : 'Gate Status: NOT ENTERED (Neutral). Click to record ENTRY.'
+                                  }
+                                >
+                                  {gateStatus === 'ENTRY'
+                                    ? 'ENTRY'
+                                    : gateStatus === 'BACK'
+                                      ? 'BACK'
+                                      : 'NOT ENTERED'}
+                                </button>
+                              );
+                            })()}
+                          </td>
+
+                          <td className="py-3 px-3">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {/* Morning Breakfast */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleFoodDistribution(reg, 'breakfast')}
+                                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-xs font-black transition-all transform active:scale-95 cursor-pointer shadow-xs ${isMealCollected(reg, 'breakfast')
+                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
+                                  : 'bg-rose-500 hover:bg-rose-600 text-white ring-1 ring-rose-400'
+                                  }`}
+                                title={`Breakfast (সকালের নাস্তা): ${isMealCollected(reg, 'breakfast')
+                                  ? 'Taken (Green - Click to toggle)'
+                                  : 'Not Taken (Red - Click to toggle)'
+                                  }`}
+                              >
+                                B
+                              </button>
+
+                              {/* Lunch */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleFoodDistribution(reg, 'lunch')}
+                                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-xs font-black transition-all transform active:scale-95 cursor-pointer shadow-xs ${isMealCollected(reg, 'lunch')
+                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
+                                  : 'bg-rose-500 hover:bg-rose-600 text-white ring-1 ring-rose-400'
+                                  }`}
+                                title={`Lunch (দুপুরের খাবার): ${isMealCollected(reg, 'lunch')
+                                  ? 'Taken (Green - Click to toggle)'
+                                  : 'Not Taken (Red - Click to toggle)'
+                                  }`}
+                              >
+                                L
+                              </button>
+
+                              {/* Dinner */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleFoodDistribution(reg, 'dinner')}
+                                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-xs font-black transition-all transform active:scale-95 cursor-pointer shadow-xs ${isMealCollected(reg, 'dinner')
+                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
+                                  : 'bg-rose-500 hover:bg-rose-600 text-white ring-1 ring-rose-400'
+                                  }`}
+                                title={`Dinner (রাতের খাবার): ${isMealCollected(reg, 'dinner')
+                                  ? 'Taken (Green - Click to toggle)'
+                                  : 'Not Taken (Red - Click to toggle)'
+                                  }`}
+                              >
+                                D
+                              </button>
+                            </div>
+                            <div className="flex items-center justify-center gap-1.5 text-[9px] text-slate-400 font-semibold mt-1">
+                              <span>B: সকাল</span>
+                              <span>•</span>
+                              <span>L: দুপুর</span>
+                              <span>•</span>
+                              <span>D: রাত</span>
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-3">
+                            <div className="font-black text-slate-900 whitespace-nowrap inline-block tabular-nums">৳{reg.totalPaid}</div>
+                            {reg.donationAmount > 0 && (
+                              <div className="text-[10px] text-rose-600 font-semibold whitespace-nowrap">
+                                (+৳{reg.donationAmount} Donation)
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-3">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${reg.paymentStatus === 'paid'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : reg.paymentStatus === 'pending'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-rose-100 text-rose-800'
+                                }`}
+                            >
+                              {reg.paymentStatus}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-3 text-[11px] text-slate-600">
+                            <span className="font-mono font-bold block">{reg.transactionId}</span>
+                            <span className="text-[10px] text-slate-400 uppercase">{reg.paymentMethod}</span>
+                          </td>
+
+                          <td className="py-3 px-3 text-right space-x-1 whitespace-nowrap">
+                            <button
+                              onClick={() => onSelectTicket && onSelectTicket(reg)}
+                              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
+                              title="View Digital Ticket"
+                            >
+                              View Ticket
+                            </button>
+
+                            <button
+                              onClick={() => setSelectedStudentForPhoto(reg)}
+                              className="p-1.5 text-emerald-600 hover:text-emerald-800 rounded hover:bg-emerald-50 cursor-pointer"
+                              title="Manage Student Photo in Supabase Storage (student-photos)"
+                            >
+                              <Camera className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => setShowEditStudentModal(reg)}
+                              className="p-1.5 text-slate-600 hover:text-slate-900 rounded hover:bg-slate-100 cursor-pointer"
+                              title="Edit Student Info"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setBookingToDelete(reg);
+                                setDeleteReason('');
+                              }}
+                              className="p-1.5 text-rose-600 hover:text-rose-800 rounded hover:bg-rose-50 cursor-pointer"
+                              title={language === 'bn' ? 'বুকিং মুছে ফেলুন' : 'Delete Registration'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
-              <ol className="space-y-2">
-                {homePageSectionsInput.map((section, index) => (
-                  <li
-                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3"
-                    key={section.id}
-                  >
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                        <input
-                          checked={section.visible}
-                          onChange={() => toggleHomePageSection(section.id)}
-                          type="checkbox"
-                        />
-                        <span>{homePageSectionLabels[section.id]}</span>
-                      </label>
-                      {section.id === 'committee' && (
+
+              {/* Bookings Table: Mobile Responsive Cards (< 640px) */}
+              <div className="sm:hidden space-y-3.5">
+                {filteredRegistrations.length === 0 ? (
+                  <div className="py-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
+                    No bookings found for year {selectedYear} matching your criteria.
+                  </div>
+                ) : (
+                  paginate(filteredRegistrations, regPage, regPageSize).map((reg) => (
+                    <div
+                      key={`mobile-reg-${reg.id}`}
+                      className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3"
+                    >
+                      {/* Card Header: Photo, Name, ID, Category & Payment Status */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          {reg.photoUrl ? (
+                            <img
+                              src={reg.photoUrl}
+                              alt={reg.fullName}
+                              className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0"
+                            />
+                          ) : (
+                            <div
+                              aria-label={reg.fullName}
+                              className="w-12 h-12 rounded-xl border border-slate-200 bg-sky-50 text-sky-700 font-black text-base flex items-center justify-center uppercase shrink-0"
+                            >
+                              {(reg.fullName || 'S').trim().charAt(0)}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-900 block text-sm truncate">
+                              {reg.fullName}
+                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                              <span className="font-mono text-xs text-emerald-700 font-bold">
+                                {reg.id}
+                              </span>
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${reg.category === 'former'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-teal-100 text-teal-800'
+                                  }`}
+                              >
+                                {reg.category}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 ${reg.paymentStatus === 'paid'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : reg.paymentStatus === 'pending'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-rose-100 text-rose-800'
+                            }`}
+                        >
+                          {reg.paymentStatus}
+                        </span>
+                      </div>
+
+                      {/* Card Body Grid: Key Info with Clear Labels */}
+                      <div className="grid grid-cols-2 gap-2.5 text-xs pt-2 border-t border-slate-100">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                            Batch
+                          </span>
+                          <span className="font-semibold text-slate-800 block truncate">
+                            {reg.batchName}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                            Amount Paid
+                          </span>
+                          <span className="font-black text-slate-900 whitespace-nowrap inline-block tabular-nums text-sm">
+                            ৳{reg.totalPaid}
+                          </span>
+                          {reg.donationAmount > 0 && (
+                            <span className="text-[10px] text-rose-600 font-semibold block whitespace-nowrap">
+                              (+৳{reg.donationAmount} Don.)
+                            </span>
+                          )}
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                            Contact Phone
+                          </span>
+                          <a
+                            href={`tel:${reg.mobileNumber}`}
+                            className="font-mono text-emerald-700 font-semibold hover:underline block truncate"
+                          >
+                            {reg.mobileNumber}
+                          </a>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                            T-Shirt & Kit
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleTShirtCollected(reg.id, isTShirtGiven(reg))}
+                            className={`mt-0.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all w-full text-center cursor-pointer min-h-[38px] flex items-center justify-center gap-1.5 shadow-xs whitespace-nowrap ${isTShirtGiven(reg)
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-1 ring-emerald-500'
+                              : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                              }`}
+                            title={
+                              isTShirtGiven(reg)
+                                ? 'T-Shirt Status: Given (Green). Click to reset to Pending.'
+                                : 'T-Shirt Status: Pending (Yellow). Click to mark as Given.'
+                            }
+                          >
+                            {isTShirtGiven(reg) ? `✓ ${reg.tShirtSize} • Given` : `⏳ ${reg.tShirtSize} • Pending`}
+                          </button>
+                        </div>
+
+                        <div className="col-span-2">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                            Gate Status (গেট)
+                          </span>
+                          {(() => {
+                            const gateStatus = getStudentGateStatus(reg);
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleGateAttendance(reg, gateStatus)}
+                                className={`px-3 py-2 rounded-lg text-xs font-black transition-all w-full text-center cursor-pointer min-h-[40px] flex items-center justify-center gap-2 shadow-xs whitespace-nowrap ${gateStatus === 'ENTRY'
+                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
+                                  : gateStatus === 'BACK'
+                                    ? 'bg-rose-600 hover:bg-rose-700 text-white ring-1 ring-rose-400'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                                  }`}
+                                title={
+                                  gateStatus === 'ENTRY'
+                                    ? 'Gate Status: ENTRY (Green Box). Student is inside event. Tap to record BACK (Exit).'
+                                    : gateStatus === 'BACK'
+                                      ? 'Gate Status: BACK (Red Box). Student has exited event. Tap to record ENTRY (Re-enter).'
+                                      : 'Gate Status: NOT ENTERED (Neutral). Tap to record ENTRY.'
+                                }
+                              >
+                                <span className="px-2 py-0.5 rounded bg-black/20 text-xs font-black">
+                                  {gateStatus}
+                                </span>
+                                <span>
+                                  {gateStatus === 'ENTRY'
+                                    ? 'Inside Venue (ভেতরে আছেন - সবুজ)'
+                                    : gateStatus === 'BACK'
+                                      ? 'Exited / BACK (বাইরে আছেন - লাল)'
+                                      : 'Not Entered (এখনও প্রবেশ করেননি)'}
+                                </span>
+                              </button>
+                            );
+                          })()}
+                        </div>
+
+                        <div className="col-span-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] uppercase font-bold text-slate-500">
+                              Food Distribution (খাবার বিতরণ)
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              Green: Taken • Red: Pending
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleFoodDistribution(reg, 'breakfast')}
+                              className={`min-h-[40px] px-2 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1 ${isMealCollected(reg, 'breakfast')
+                                ? 'bg-emerald-600 active:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
+                                : 'bg-rose-500 active:bg-rose-600 text-white ring-1 ring-rose-400'
+                                }`}
+                              title={`Breakfast (সকালের নাস্তা): ${isMealCollected(reg, 'breakfast') ? 'Taken (Green)' : 'Pending (Red)'
+                                }`}
+                            >
+                              B • সকাল
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleFoodDistribution(reg, 'lunch')}
+                              className={`min-h-[40px] px-2 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1 ${isMealCollected(reg, 'lunch')
+                                ? 'bg-emerald-600 active:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
+                                : 'bg-rose-500 active:bg-rose-600 text-white ring-1 ring-rose-400'
+                                }`}
+                              title={`Lunch (দুপুরের খাবার): ${isMealCollected(reg, 'lunch') ? 'Taken (Green)' : 'Pending (Red)'
+                                }`}
+                            >
+                              L • দুপুর
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleFoodDistribution(reg, 'dinner')}
+                              className={`min-h-[40px] px-2 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1 ${isMealCollected(reg, 'dinner')
+                                ? 'bg-emerald-600 active:bg-emerald-700 text-white ring-2 ring-emerald-400/50'
+                                : 'bg-rose-500 active:bg-rose-600 text-white ring-1 ring-rose-400'
+                                }`}
+                              title={`Dinner (রাতের খাবার): ${isMealCollected(reg, 'dinner') ? 'Taken (Green)' : 'Pending (Red)'
+                                }`}
+                            >
+                              D • রাত
+                            </button>
+                          </div>
+                        </div>
+
+                        {reg.transactionId && (
+                          <div className="col-span-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex items-center justify-between text-xs">
+                            <span className="text-slate-500 font-mono">
+                              Tx: <strong className="text-slate-800">{reg.transactionId}</strong>
+                            </span>
+                            <span className="uppercase font-bold text-slate-600 text-[10px] px-2 py-0.5 bg-white rounded border border-slate-200">
+                              {reg.paymentMethod}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Card Actions: 44px Minimum Touch Targets & Generous Spacing */}
+                      <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                         <button
                           type="button"
-                          onClick={() => handleTabChange('committeeManagement')}
-                          className="px-2 py-0.5 rounded-md bg-sky-50 text-[#0284C7] hover:bg-sky-100 border border-sky-200 text-[11px] font-bold cursor-pointer transition-colors"
+                          onClick={() => onSelectTicket && onSelectTicket(reg)}
+                          className="flex-1 min-h-[44px] px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                         >
-                          {language === 'bn' ? '👥 ১৬ সদস্য ও ক্যারোসেল পরিচালনা' : '👥 Edit 16 Members & Carousel'}
+                          <QrCode className="w-4 h-4" />
+                          <span>View Ticket</span>
                         </button>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        aria-label={`Move ${homePageSectionLabels[section.id]} up`}
-                        className="rounded p-1 text-slate-600 hover:bg-slate-100 disabled:opacity-40"
-                        disabled={index === 0}
-                        onClick={() => moveHomePageSection(section.id, -1)}
-                        type="button"
-                      >
-                        <ChevronUp className="h-4 w-4" />
-                      </button>
-                      <button
-                        aria-label={`Move ${homePageSectionLabels[section.id]} down`}
-                        className="rounded p-1 text-slate-600 hover:bg-slate-100 disabled:opacity-40"
-                        disabled={index === homePageSectionsInput.length - 1}
-                        onClick={() => moveHomePageSection(section.id, 1)}
-                        type="button"
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </section>
 
-            {/* 7. DONORS HALL OF FAME PRIVACY CONTROL */}
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                    <Award className="w-4 h-4 text-amber-600" />
-                    <span>{language === 'bn' ? 'অনুদাতা তালিকার গোপনীয়তা নিয়ন্ত্রণ' : 'Donors Hall of Fame Privacy Control'}</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowEditStudentModal(reg)}
+                          className="min-h-[44px] min-w-[44px] p-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 rounded-xl transition-colors flex items-center justify-center cursor-pointer"
+                          title="Edit Student Info"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBookingToDelete(reg);
+                            setDeleteReason('');
+                          }}
+                          className="min-h-[44px] min-w-[44px] p-2 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-600 rounded-xl transition-colors flex items-center justify-center cursor-pointer"
+                          title={language === 'bn' ? 'বুকিং মুছে ফেলুন' : 'Delete Registration'}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Registrations Global Pagination */}
+              <GlobalPagination
+                currentPage={regPage}
+                totalRecords={filteredRegistrations.length}
+                pageSize={regPageSize}
+                onPageChange={setRegPage}
+                onPageSizeChange={setRegPageSize}
+                language={language}
+              />
+            </div>
+          )}
+
+          {/* TAB: CURRENT STUDENT ID MANAGEMENT */}
+          {activeTab === 'studentIds' && (
+            <ErrorBoundary
+              fallbackTitle={language === 'bn' ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা ত্রুটি' : 'Student ID Management Error'}
+              fallbackMessage={
+                language === 'bn'
+                  ? 'স্টুডেন্ট আইডি ব্যবস্থাপনা লোড করার সময় একটি সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।'
+                  : 'An error occurred while loading the Student ID Management tab. Please click retry.'
+              }
+            >
+              <StudentIdManagementTab
+                language={language}
+                onSelectTicket={(regId) => {
+                  const reg = registrations.find((r) => r.id === regId);
+                  if (reg && onSelectTicket) onSelectTicket(reg);
+                }}
+              />
+            </ErrorBoundary>
+          )}
+
+          {/* TAB 3: OVERVIEW & TELEMETRY */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              {/* KPI Stat Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                  <span className="text-[11px] font-semibold text-slate-500 block uppercase">
+                    {language === 'bn' ? 'মোট নিবন্ধিত শিক্ষার্থী' : 'Total Registrations'}
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-3xl font-black text-slate-900">
+                      {financial.paidRegistrationsCount}
+                    </span>
+                    <span className="text-xs text-emerald-600 font-bold">10,000+ Capacity</span>
+                  </div>
+                  <div className="mt-2 text-[11px] text-slate-500 flex justify-between">
+                    <span>Former: {financial.formerStudentsCount}</span>
+                    <span>Current: {financial.currentStudentsCount}</span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                  <span className="text-[11px] font-semibold text-slate-500 block uppercase">
+                    {language === 'bn' ? 'মোট সংগৃহীত নিবন্ধন ফি' : 'Total Registration Fees'}
+                  </span>
+                  <div className="text-3xl font-black text-emerald-700 mt-1">
+                    ৳ {financial.totalRegistrationRevenue.toLocaleString()}
+                  </div>
+                  <div className="mt-2 text-[11px] text-slate-500">
+                    Avg: ৳{Math.round(financial.totalRegistrationRevenue / (financial.paidRegistrationsCount || 1))} / student
+                  </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                  <span className="text-[11px] font-semibold text-slate-500 block uppercase">
+                    {language === 'bn' ? 'মোট অনুদান' : 'Total Donations'}
+                  </span>
+                  <div className="text-3xl font-black text-teal-700 mt-1">
+                    ৳ {financial.totalDonations.toLocaleString()}
+                  </div>
+                  <div className="mt-2 text-[11px] text-slate-500">
+                    {donations.length} institutional patrons
+                  </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                  <span className="text-[11px] font-semibold text-slate-500 block uppercase">
+                    {language === 'bn' ? 'অবশিষ্ট কার্যকরী তহবিল' : 'Net Operating Balance'}
+                  </span>
+                  <div
+                    className={`text-3xl font-black mt-1 ${financial.remainingBalance >= 0 ? 'text-emerald-700' : 'text-rose-600'
+                      }`}
+                  >
+                    ৳ {financial.remainingBalance.toLocaleString()}
+                  </div>
+                  <div className="mt-2 text-[11px] text-slate-500">
+                    Expenses: ৳{financial.totalExpenses.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Operational Metrics */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* T-Shirt Breakdown */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                      <Shirt className="w-4 h-4 text-emerald-600" />
+                      <span>{language === 'bn' ? 'টি-শার্ট সাইজ বিভাজন' : 'T-Shirt Size Breakdown'}</span>
+                    </h3>
+                    <span className="text-xs font-semibold text-slate-500">
+                      {tshirtCollectedCount}/{registrations.length} Delivered
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    {tshirtSizes.map((size) => (
+                      <div key={size} className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                        <span className="font-bold text-slate-700 block">{size}</span>
+                        <span className="text-lg font-black text-slate-900 mt-0.5 block">
+                          {tshirtCounts[size] || 0}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Gate Attendance Telemetry */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                  <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                    <QrCode className="w-4 h-4 text-emerald-600" />
+                    <span>{language === 'bn' ? 'গেট প্রবেশ ও প্রস্থান' : 'Gate Attendance'}</span>
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
+
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between p-2 rounded-lg bg-emerald-50 text-emerald-900 font-semibold">
+                      <span>Approved Entries:</span>
+                      <span className="font-bold">
+                        {gateEvents.filter((e) => e.eventType === 'ENTRY' && e.status === 'APPROVED').length ||
+                          scanLogs.filter((s) => s.scanType === 'entry' && s.status === 'approved').length}
+                      </span>
+                    </div>
+                    <div className="flex justify-between p-2 rounded-lg bg-slate-50 text-slate-700 font-semibold">
+                      <span>Approved Exits:</span>
+                      <span className="font-bold">
+                        {gateEvents.filter((e) => e.eventType === 'EXIT' && e.status === 'APPROVED').length ||
+                          scanLogs.filter((s) => s.scanType === 'exit' && s.status === 'approved').length}
+                      </span>
+                    </div>
+                    <div className="flex justify-between p-2 rounded-lg bg-amber-50 text-amber-900 font-semibold">
+                      <span>Currently Inside Campus:</span>
+                      <span className="font-bold">
+                        {registrationsForYear.filter(isStudentInside).length}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* School Profile Summary */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                  <h3 className="font-bold text-slate-900 text-sm">
+                    {t.institutionName}
+                  </h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    64 Years of Academic Glory & Discipline. The Grand Reunion 2026 hosts 10,000+ alumni,
+                    current students, faculty, and national dignitaries at the college campus.
+                  </p>
+                  <div className="text-xs text-slate-500 pt-2 border-t border-slate-100 space-y-1">
+                    <div>Dates: Dec 25-26, 2026</div>
+                    <div>Security: High District Police Protection</div>
+                  </div>
+                  {isSuperAdminAccount && (
+                    <button
+                      type="button"
+                      onClick={() => handleTabChange('aboutContactManagement')}
+                      className="w-full py-2 px-3 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#0284C7] border border-sky-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <FileEdit className="w-3.5 h-3.5" />
+                      <span>
+                        {language === 'bn' ? 'About & Contact পেজ এডিট করুন' : 'Edit About & Contact Page'}
+                      </span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: FEE SETTINGS & REGISTRATION STATUS */}
+          {(activeTab === 'feeSettings' || (activeTab as any) === 'registrationControl') && (
+            <div className="space-y-6 max-w-4xl">
+              {/* Registration & Donation Governance Control System */}
+              <RegistrationDonationControlPanel
+                language={language}
+                adminName={effectiveAdmin.fullName || 'Super Admin'}
+                isSuperAdmin={isSuperAdmin}
+                onSettingsChanged={(updated) => {
+                  setFeeSettings(updated);
+                }}
+              />
+
+              {/* Meal Time & Scanner Control System */}
+              <MealTimeScannerControlPanel
+                language={language}
+                adminName={effectiveAdmin.fullName || 'Super Admin'}
+              />
+
+              <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">
+                    {language === 'bn' ? 'রেজিস্ট্রেশন ফি, সময়সূচি ও হোমপেজ কনফিগারেশন' : 'Registration Fees, Schedule & Homepage Settings'}
+                  </h2>
+                  <p className="text-xs text-slate-500">
                     {language === 'bn'
-                      ? 'অনলাইন অনুদান পেজে শীর্ষ ১০ অনুদাতার টাকার পরিমাণ প্রদর্শন বা গোপন রাখুন।'
-                      : 'Control whether donation amounts are publicly visible or hidden in the Donors Hall of Fame.'}
+                      ? 'ক্যাটাগরি ফি, ইভেন্ট সময়সূচি, ওয়েবসাইট কাউন্টডাউন এবং হোমপেজ সেকশন ক্রম নিয়ন্ত্রণ করুন (উপরের সুইচ ও বন্ধের নোটিশ অপরিবর্তিত থাকবে)।'
+                      : 'Manage category fees, target event countdown, homepage layout, and privacy without altering live governance switches or closure notices.'}
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setHideDonationAmountsInput(!hideDonationAmountsInput)}
-                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 shadow-xs shrink-0 ${
-                    hideDonationAmountsInput
-                      ? 'bg-amber-600 text-white hover:bg-amber-700'
-                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                  }`}
-                >
-                  {hideDonationAmountsInput ? (
-                    <>
-                      <EyeOff className="w-3.5 h-3.5" />
-                      <span>{language === 'bn' ? 'টাকার পরিমাণ লুকানো (HIDDEN)' : 'AMOUNTS HIDDEN'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>{language === 'bn' ? 'টাকার পরিমাণ দৃশ্যমান (VISIBLE)' : 'AMOUNTS VISIBLE'}</span>
-                    </>
-                  )}
-                </button>
+                {settingsSuccessNotice && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    <span>
+                      {language === 'bn'
+                        ? 'ইভেন্ট ও ফি সেটিংস সুপাবেজ ডাটাবেজে সফলভাবে সংরক্ষিত হয়েছে!'
+                        : 'Event & fee settings confirmed in Supabase and updated across visitors!'}
+                    </span>
+                  </div>
+                )}
+
+                {settingsErrorNotice && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{settingsErrorNotice}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveFeeSettings} className="space-y-6">
+
+                  {/* 3. REGISTRATION FEES */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Former Student Fee (BDT)
+                      </label>
+                      <input
+                        type="number"
+                        value={formerFeeInput}
+                        onChange={(e) => setFormerFeeInput(Number(e.target.value))}
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-emerald-500 focus:outline-hidden"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Current Student Fee (BDT)
+                      </label>
+                      <input
+                        type="number"
+                        value={currentFeeInput}
+                        onChange={(e) => setCurrentFeeInput(Number(e.target.value))}
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-emerald-500 focus:outline-hidden"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* 4. EVENT DATE & COUNTDOWN CONFIGURATION */}
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-4">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                        {language === 'bn' ? 'কাউন্টডাউন ও পুনর্মিলনী তারিখ কনফিগারেশন' : 'Countdown & Event Schedule'}
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        {language === 'bn'
+                          ? 'পুনর্মিলনী শুরুর তারিখ অনুযায়ী হোমপেজের কাউন্টডাউন স্বয়ংক্রিয়ভাবে চলবে।'
+                          : 'The homepage countdown automatically ticks towards this date and time.'}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          Event Date & Time (ISO format)
+                        </label>
+                        <input
+                          type="text"
+                          value={eventTargetDateInput}
+                          onChange={(e) => setEventTargetDateInput(e.target.value)}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:border-emerald-500 focus:outline-hidden"
+                          placeholder="2026-12-25T09:00:00"
+                          required
+                        />
+                        <span className="text-[10px] text-slate-400 mt-0.5 block">
+                          Confirmed: Dec 25, 2026 at 09:00 AM
+                        </span>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          Registration Deadline
+                        </label>
+                        <input
+                          type="text"
+                          value={endDateInput}
+                          onChange={(e) => setEndDateInput(e.target.value)}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:border-emerald-500 focus:outline-hidden"
+                          placeholder="2026-12-15"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* POST EVENT SIMULATION SWITCH */}
+                    <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                          <span>
+                            {language === 'bn'
+                              ? 'ইভেন্ট পরবর্তী অবস্থা টেস্ট (Simulate Post-Event)'
+                              : 'Simulate Post-Event Mode'}
+                          </span>
+                        </span>
+                        <p className="text-[11px] text-slate-500">
+                          {language === 'bn'
+                            ? 'চালু করলে হোমপেজের কাউন্টডাউন সমাপ্ত দেখিয়ে গ্যালারি, ভিডিও ও স্মরণিকার লিঙ্ক প্রদর্শন করবে।'
+                            : 'Switches the homepage countdown to the completed state with memories & souvenir links.'}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setSimulateEventCompletedInput(!simulateEventCompletedInput)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${simulateEventCompletedInput
+                          ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
+                          : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                          }`}
+                      >
+                        {simulateEventCompletedInput ? 'Active (ইভেন্ট সমাপ্ত)' : 'Inactive (কাউন্টডাউন চালু)'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                          Home page sections
+                        </h3>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Hide sections or change their display order, then save the settings.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setHomePageSectionsInput([...DEFAULT_HOME_PAGE_SECTIONS])}
+                        className="px-2.5 py-1 text-[11px] font-semibold text-[#0284C7] hover:text-[#0EA5E9] border border-slate-200 hover:border-sky-300 rounded-lg bg-white transition cursor-pointer self-start sm:self-auto shadow-2xs"
+                      >
+                        {language === 'bn' ? 'ডিফল্ট সাজান' : 'Reset to Default Order'}
+                      </button>
+                    </div>
+                    <ol className="space-y-2">
+                      {homePageSectionsInput.map((section, index) => (
+                        <li
+                          className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3"
+                          key={section.id}
+                        >
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                              <input
+                                checked={section.visible}
+                                onChange={() => toggleHomePageSection(section.id)}
+                                type="checkbox"
+                              />
+                              <span>{homePageSectionLabels[section.id]}</span>
+                            </label>
+                            {section.id === 'committee' && (
+                              <button
+                                type="button"
+                                onClick={() => handleTabChange('committeeManagement')}
+                                className="px-2 py-0.5 rounded-md bg-sky-50 text-[#0284C7] hover:bg-sky-100 border border-sky-200 text-[11px] font-bold cursor-pointer transition-colors"
+                              >
+                                {language === 'bn' ? '👥 ১৬ সদস্য ও ক্যারোসেল পরিচালনা' : '👥 Edit 16 Members & Carousel'}
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              aria-label={`Move ${homePageSectionLabels[section.id]} up`}
+                              className="rounded p-1 text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+                              disabled={index === 0}
+                              onClick={() => moveHomePageSection(section.id, -1)}
+                              type="button"
+                            >
+                              <ChevronUp className="h-4 w-4" />
+                            </button>
+                            <button
+                              aria-label={`Move ${homePageSectionLabels[section.id]} down`}
+                              className="rounded p-1 text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+                              disabled={index === homePageSectionsInput.length - 1}
+                              onClick={() => moveHomePageSection(section.id, 1)}
+                              type="button"
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  </section>
+
+                  {/* 7. DONORS HALL OF FAME PRIVACY CONTROL */}
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                          <Award className="w-4 h-4 text-amber-600" />
+                          <span>{language === 'bn' ? 'অনুদাতা তালিকার গোপনীয়তা নিয়ন্ত্রণ' : 'Donors Hall of Fame Privacy Control'}</span>
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {language === 'bn'
+                            ? 'অনলাইন অনুদান পেজে শীর্ষ ১০ অনুদাতার টাকার পরিমাণ প্রদর্শন বা গোপন রাখুন।'
+                            : 'Control whether donation amounts are publicly visible or hidden in the Donors Hall of Fame.'}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setHideDonationAmountsInput(!hideDonationAmountsInput)}
+                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 shadow-xs shrink-0 ${hideDonationAmountsInput
+                          ? 'bg-amber-600 text-white hover:bg-amber-700'
+                          : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                          }`}
+                      >
+                        {hideDonationAmountsInput ? (
+                          <>
+                            <EyeOff className="w-3.5 h-3.5" />
+                            <span>{language === 'bn' ? 'টাকার পরিমাণ লুকানো (HIDDEN)' : 'AMOUNTS HIDDEN'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>{language === 'bn' ? 'টাকার পরিমাণ দৃশ্যমান (VISIBLE)' : 'AMOUNTS VISIBLE'}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={isSavingSettings}
+                      className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-black text-xs shadow-md transition-colors cursor-pointer flex items-center gap-2"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>
+                        {isSavingSettings
+                          ? language === 'bn'
+                            ? 'সংরক্ষণ হচ্ছে...'
+                            : 'Saving...'
+                          : language === 'bn'
+                            ? 'ইভেন্ট ও ফি সেটিংস সংরক্ষণ করুন'
+                            : 'Save Event & Fee Settings'}
+                      </span>
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
+          )}
 
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={isSavingSettings}
-                className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-black text-xs shadow-md transition-colors cursor-pointer flex items-center gap-2"
-              >
-                <Check className="w-4 h-4" />
-                <span>
-                  {isSavingSettings
-                    ? language === 'bn'
-                      ? 'সংরক্ষণ হচ্ছে...'
-                      : 'Saving...'
-                    : language === 'bn'
-                      ? 'ইভেন্ট ও ফি সেটিংস সংরক্ষণ করুন'
-                      : 'Save Event & Fee Settings'}
-                </span>
-              </button>
+          {/* TAB: MEAL TIME & SCANNER CONTROL SYSTEM (SUPER ADMIN & DESK) */}
+          {activeTab === 'mealControl' && (
+            <div className="space-y-6 max-w-4xl">
+              <MealTimeScannerControlPanel
+                language={language}
+                adminName={effectiveAdmin.fullName || 'Super Admin'}
+              />
             </div>
-          </form>
-        </div>
-        </div>
-      )}
+          )}
 
-      {/* TAB: MEAL TIME & SCANNER CONTROL SYSTEM (SUPER ADMIN & DESK) */}
-      {activeTab === 'mealControl' && (
-        <div className="space-y-6 max-w-4xl">
-          <MealTimeScannerControlPanel
-            language={language}
-            adminName={effectiveAdmin.fullName || 'Super Admin'}
-          />
-        </div>
-      )}
+          {/* TAB 5: PAYMENTS */}
+          {activeTab === 'payments' && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-bold text-slate-900">{t.tabPayments}</h2>
+                <button
+                  onClick={() => exportToCSV(registrations, 'PLSCF_Reunion_Payments')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{t.btnExportCsv}</span>
+                </button>
+              </div>
 
-      {/* TAB 5: PAYMENTS */}
-      {activeTab === 'payments' && (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-bold text-slate-900">{t.tabPayments}</h2>
-            <button
-              onClick={() => exportToCSV(registrations, 'PLSCF_Reunion_Payments')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>{t.btnExportCsv}</span>
-            </button>
-          </div>
+              {/* Payments Table: Desktop View (>= 640px) */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                      <th className="py-2.5 px-3">Transaction ID</th>
+                      <th className="py-2.5 px-3">Student Name</th>
+                      <th className="py-2.5 px-3">Method</th>
+                      <th className="py-2.5 px-3">Amount</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {paginate(registrations, payPage, payPageSize).map((r) => (
+                      <tr key={r.id} className="hover:bg-slate-50">
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-800">
+                          {r.transactionId}
+                        </td>
+                        <td className="py-2.5 px-3 font-medium text-slate-900">{r.fullName}</td>
+                        <td className="py-2.5 px-3 uppercase font-semibold text-slate-600">
+                          {r.paymentMethod}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-emerald-700 whitespace-nowrap tabular-nums">৳{r.totalPaid}</td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${r.paymentStatus === 'paid'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : r.paymentStatus === 'pending'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-rose-100 text-rose-800'
+                              }`}
+                          >
+                            {r.paymentStatus}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-400">
+                          {new Date(r.registeredAt).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-          {/* Payments Table: Desktop View (>= 640px) */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
-                  <th className="py-2.5 px-3">Transaction ID</th>
-                  <th className="py-2.5 px-3">Student Name</th>
-                  <th className="py-2.5 px-3">Method</th>
-                  <th className="py-2.5 px-3">Amount</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 px-3">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+              {/* Payments Table: Mobile Responsive Cards (< 640px) */}
+              <div className="sm:hidden space-y-3">
                 {paginate(registrations, payPage, payPageSize).map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50">
-                    <td className="py-2.5 px-3 font-mono font-bold text-slate-800">
-                      {r.transactionId}
-                    </td>
-                    <td className="py-2.5 px-3 font-medium text-slate-900">{r.fullName}</td>
-                    <td className="py-2.5 px-3 uppercase font-semibold text-slate-600">
-                      {r.paymentMethod}
-                    </td>
-                    <td className="py-2.5 px-3 font-bold text-emerald-700 whitespace-nowrap tabular-nums">৳{r.totalPaid}</td>
-                    <td className="py-2.5 px-3">
+                  <div key={`mobile-pay-${r.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-900 block text-sm truncate">{r.fullName}</span>
+                        <span className="font-mono text-xs text-slate-500 font-bold block truncate">{r.transactionId || 'No TxID'}</span>
+                      </div>
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase shrink-0 ${
                           r.paymentStatus === 'paid'
                             ? 'bg-emerald-100 text-emerald-800'
                             : r.paymentStatus === 'pending'
@@ -3775,889 +3944,884 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       >
                         {r.paymentStatus}
                       </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-slate-400">
-                      {new Date(r.registeredAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Payments Table: Mobile Responsive Cards (< 640px) */}
-          <div className="sm:hidden space-y-3">
-            {paginate(registrations, payPage, payPageSize).map((r) => (
-              <div key={`mobile-pay-${r.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <span className="font-bold text-slate-900 block text-sm truncate">{r.fullName}</span>
-                    <span className="font-mono text-xs text-slate-500 font-bold block truncate">{r.transactionId || 'No TxID'}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+                      <span className="font-semibold text-slate-600 uppercase text-[10px] bg-slate-100 px-2 py-0.5 rounded">
+                        {r.paymentMethod}
+                      </span>
+                      <span className="font-black text-emerald-700 whitespace-nowrap inline-block tabular-nums text-sm">
+                        ৳{r.totalPaid}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        {new Date(r.registeredAt).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 shrink-0">
-                    {r.paymentStatus}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
-                  <span className="font-semibold text-slate-600 uppercase text-[10px] bg-slate-100 px-2 py-0.5 rounded">
-                    {r.paymentMethod}
-                  </span>
-                  <span className="font-black text-emerald-700 whitespace-nowrap inline-block tabular-nums text-sm">
-                    ৳{r.totalPaid}
-                  </span>
-                  <span className="text-[11px] text-slate-400">
-                    {new Date(r.registeredAt).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Payments Global Pagination */}
-          <GlobalPagination
-            currentPage={payPage}
-            totalRecords={registrations.length}
-            pageSize={payPageSize}
-            onPageChange={setPayPage}
-            onPageSizeChange={setPayPageSize}
-            language={language}
-          />
-        </div>
-      )}
-
-      {/* TAB 6: DONATIONS & PATRONS MANAGEMENT */}
-      {activeTab === 'donations' && (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
-          {/* Header Bar */}
-          <div className="flex flex-wrap justify-between items-center gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center">
-                  <Heart className="w-4 h-4 fill-rose-600 text-rose-600" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-black text-slate-900">
-                    {language === 'bn' ? 'অনুদান ও পৃষ্ঠপোষক তালিকা' : 'Donations & Patrons Ledger'}
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    {language === 'bn'
-                      ? `পুনর্মিলনী উন্নয়ন ও কল্যাণ তহবিলের সম্পূর্ণ হিসাব (সুপাবেস ডাটাবেজ: ${getDonationsTableName(selectedYear)})`
-                      : `Live institutional patronage & welfare contributions (Supabase table: ${getDonationsTableName(selectedYear)})`}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={refreshDonationsFromCloud}
-                disabled={isRefreshingDonations}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer border border-slate-300 transition-colors shadow-2xs"
-                title="Refresh donations directly from Supabase cloud database"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingDonations ? 'animate-spin' : ''}`} />
-                <span>{language === 'bn' ? 'ডাটাবেজ রিফ্রেশ' : 'Sync Supabase'}</span>
-              </button>
-
-              {isSuperAdminAccount && (
-                <button
-                  type="button"
-                  onClick={handleToggleHideDonationAmounts}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border transition-colors shadow-2xs ${
-                    feeSettings.hideDonationAmounts
-                      ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
-                      : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
-                  }`}
-                  title="Super Admin Privacy Toggle: Show or Hide donation amounts on public Donors Hall of Fame"
-                >
-                  {feeSettings.hideDonationAmounts ? (
-                    <>
-                      <EyeOff className="w-3.5 h-3.5 text-amber-700" />
-                      <span>{language === 'bn' ? 'অনুদানের পরিমাণ গোপন (Hidden)' : 'Amounts: Hidden in Hall of Fame'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="w-3.5 h-3.5 text-slate-600" />
-                      <span>{language === 'bn' ? 'অনুদানের পরিমাণ দৃশ্যমান (Visible)' : 'Amounts: Visible in Hall of Fame'}</span>
-                    </>
-                  )}
-                </button>
-              )}
-
-              <button
-                onClick={() => exportToCSV(donations, `PLSCF_Donations_${selectedYear}`)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>{t.btnExportCsv}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Top Metric Cards */}
-          {(() => {
-            const totalAmount = donations.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
-            const count = donations.length;
-            const avgAmount = count > 0 ? Math.round(totalAmount / count) : 0;
-            const topDonor = donations.reduce<DonationRecord | null>(
-              (max, d) => (!max || Number(d.amount) > Number(max.amount) ? d : max),
-              null
-            );
-
-            return (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-xs">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#38BDF8] block">
-                    {language === 'bn' ? 'সর্বমোট অনুদান' : 'Total Patronage'}
-                  </span>
-                  <p className="text-xl font-black text-white mt-1 tabular-nums">
-                    ৳{totalAmount.toLocaleString()}
-                  </p>
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    {language === 'bn' ? `${count}টি নিশ্চিত অনুদান` : `${count} verified contributions`}
-                  </span>
-                </div>
-
-                <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-xs">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block">
-                    {language === 'bn' ? 'মোট অনুদাতা' : 'Total Donors'}
-                  </span>
-                  <p className="text-xl font-black text-white mt-1 tabular-nums font-mono">
-                    {count}
-                  </p>
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    {language === 'bn' ? 'সুপাবেস লাইভ রেকর্ড' : 'Supabase Live Records'}
-                  </span>
-                </div>
-
-                <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-xs">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">
-                    {language === 'bn' ? 'গড় অনুদান' : 'Average Donation'}
-                  </span>
-                  <p className="text-xl font-black text-white mt-1 tabular-nums">
-                    ৳{avgAmount.toLocaleString()}
-                  </p>
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    {language === 'bn' ? 'প্রতি অনুদানে গড়' : 'Per donation average'}
-                  </span>
-                </div>
-
-                <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-xs">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 block">
-                    {language === 'bn' ? 'সর্বোচ্চ একক অনুদান' : 'Top Contribution'}
-                  </span>
-                  <p className="text-xl font-black text-white mt-1 tabular-nums">
-                    ৳{topDonor ? Number(topDonor.amount).toLocaleString() : 0}
-                  </p>
-                  <span className="text-[10px] text-slate-400 mt-0.5 block truncate" title={topDonor?.donorName}>
-                    {topDonor ? topDonor.donorName : '—'}
-                  </span>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Search & Filter Toolbar */}
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-            <div className="relative flex-1 w-full">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={donationsSearchQuery}
-                onChange={(e) => setDonationsSearchQuery(e.target.value)}
-                placeholder={
-                  language === 'bn'
-                    ? 'অনুদাতার নাম, মোবাইল নম্বর, ট্রানজ্যাকশন আইডি বা টোকেন দিয়ে খুঁজুন...'
-                    : 'Search by donor name, phone, transaction ID, or token...'
-                }
-                className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0284C7] transition-all"
-              />
-              {donationsSearchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setDonationsSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            <div className="w-full sm:w-auto flex items-center gap-2">
-              <select
-                value={donationsPurposeFilter}
-                onChange={(e) => setDonationsPurposeFilter(e.target.value)}
-                className="w-full sm:w-auto px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0284C7]"
-              >
-                <option value="ALL">{language === 'bn' ? 'সকল খাত (All Causes)' : 'All Causes'}</option>
-                {Array.from(new Set(donations.map((d) => d.purpose).filter(Boolean))).map((purpose) => (
-                  <option key={purpose} value={purpose}>
-                    {purpose}
-                  </option>
                 ))}
-              </select>
+              </div>
+
+              {/* Payments Global Pagination */}
+              <GlobalPagination
+                currentPage={payPage}
+                totalRecords={registrations.length}
+                pageSize={payPageSize}
+                onPageChange={setPayPage}
+                onPageSizeChange={setPayPageSize}
+                language={language}
+              />
             </div>
-          </div>
+          )}
 
-          {/* Donations Table: Desktop View (>= 640px) */}
-          {(() => {
-            const filtered = donations.filter((d) => {
-              const q = donationsSearchQuery.trim().toLowerCase();
-              const matchesSearch =
-                !q ||
-                d.donorName.toLowerCase().includes(q) ||
-                d.mobileNumber.toLowerCase().includes(q) ||
-                (d.email && d.email.toLowerCase().includes(q)) ||
-                d.id.toLowerCase().includes(q) ||
-                (d.token && d.token.toLowerCase().includes(q)) ||
-                (d.qrToken && d.qrToken.toLowerCase().includes(q)) ||
-                (d.transactionId && d.transactionId.toLowerCase().includes(q));
+          {/* TAB 6: DONATIONS & PATRONS MANAGEMENT */}
+          {activeTab === 'donations' && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
+              {/* Header Bar */}
+              <div className="flex flex-wrap justify-between items-center gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center">
+                      <Heart className="w-4 h-4 fill-rose-600 text-rose-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-black text-slate-900">
+                        {language === 'bn' ? 'অনুদান ও পৃষ্ঠপোষক তালিকা' : 'Donations & Patrons Ledger'}
+                      </h2>
+                      <p className="text-xs text-slate-500">
+                        {language === 'bn'
+                          ? `পুনর্মিলনী উন্নয়ন ও কল্যাণ তহবিলের সম্পূর্ণ হিসাব (সুপাবেস ডাটাবেজ: ${getDonationsTableName(selectedYear)})`
+                          : `Live institutional patronage & welfare contributions (Supabase table: ${getDonationsTableName(selectedYear)})`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-              const matchesPurpose =
-                donationsPurposeFilter === 'ALL' || d.purpose === donationsPurposeFilter;
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={refreshDonationsFromCloud}
+                    disabled={isRefreshingDonations}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer border border-slate-300 transition-colors shadow-2xs"
+                    title="Refresh donations directly from Supabase cloud database"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingDonations ? 'animate-spin' : ''}`} />
+                    <span>{language === 'bn' ? 'ডাটাবেজ রিফ্রেশ' : 'Sync Supabase'}</span>
+                  </button>
 
-              return matchesSearch && matchesPurpose;
-            });
+                  {isSuperAdminAccount && (
+                    <button
+                      type="button"
+                      onClick={handleToggleHideDonationAmounts}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border transition-colors shadow-2xs ${feeSettings.hideDonationAmounts
+                        ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
+                        : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                        }`}
+                      title="Super Admin Privacy Toggle: Show or Hide donation amounts on public Donors Hall of Fame"
+                    >
+                      {feeSettings.hideDonationAmounts ? (
+                        <>
+                          <EyeOff className="w-3.5 h-3.5 text-amber-700" />
+                          <span>{language === 'bn' ? 'অনুদানের পরিমাণ গোপন (Hidden)' : 'Amounts: Hidden in Hall of Fame'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="w-3.5 h-3.5 text-slate-600" />
+                          <span>{language === 'bn' ? 'অনুদানের পরিমাণ দৃশ্যমান (Visible)' : 'Amounts: Visible in Hall of Fame'}</span>
+                        </>
+                      )}
+                    </button>
+                  )}
 
-            const paginated = paginate(filtered, donationsPage, donationsPageSize);
+                  <button
+                    onClick={() => exportToCSV(donations, `PLSCF_Donations_${selectedYear}`)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>{t.btnExportCsv}</span>
+                  </button>
+                </div>
+              </div>
 
-            return (
-              <>
-                <div className="hidden sm:block overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold">
-                        <th className="py-3 px-3.5">Donor / Patron</th>
-                        <th className="py-3 px-3.5">Voucher & Token</th>
-                        <th className="py-3 px-3.5">Designated Cause</th>
-                        <th className="py-3 px-3.5">Amount</th>
-                        <th className="py-3 px-3.5">Gateway & Trx</th>
-                        <th className="py-3 px-3.5">Date</th>
-                        <th className="py-3 px-3.5 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
+              {/* Top Metric Cards */}
+              {(() => {
+                const totalAmount = donations.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+                const count = donations.length;
+                const avgAmount = count > 0 ? Math.round(totalAmount / count) : 0;
+                const topDonor = donations.reduce<DonationRecord | null>(
+                  (max, d) => (!max || Number(d.amount) > Number(max.amount) ? d : max),
+                  null
+                );
+
+                return (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-xs">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#38BDF8] block">
+                        {language === 'bn' ? 'সর্বমোট অনুদান' : 'Total Patronage'}
+                      </span>
+                      <p className="text-xl font-black text-white mt-1 tabular-nums">
+                        ৳{totalAmount.toLocaleString()}
+                      </p>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">
+                        {language === 'bn' ? `${count}টি নিশ্চিত অনুদান` : `${count} verified contributions`}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-xs">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block">
+                        {language === 'bn' ? 'মোট অনুদাতা' : 'Total Donors'}
+                      </span>
+                      <p className="text-xl font-black text-white mt-1 tabular-nums font-mono">
+                        {count}
+                      </p>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">
+                        {language === 'bn' ? 'সুপাবেস লাইভ রেকর্ড' : 'Supabase Live Records'}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-xs">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">
+                        {language === 'bn' ? 'গড় অনুদান' : 'Average Donation'}
+                      </span>
+                      <p className="text-xl font-black text-white mt-1 tabular-nums">
+                        ৳{avgAmount.toLocaleString()}
+                      </p>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">
+                        {language === 'bn' ? 'প্রতি অনুদানে গড়' : 'Per donation average'}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-xs">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 block">
+                        {language === 'bn' ? 'সর্বোচ্চ একক অনুদান' : 'Top Contribution'}
+                      </span>
+                      <p className="text-xl font-black text-white mt-1 tabular-nums">
+                        ৳{topDonor ? Number(topDonor.amount).toLocaleString() : 0}
+                      </p>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block truncate" title={topDonor?.donorName}>
+                        {topDonor ? topDonor.donorName : '—'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Search & Filter Toolbar */}
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <div className="relative flex-1 w-full">
+                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={donationsSearchQuery}
+                    onChange={(e) => setDonationsSearchQuery(e.target.value)}
+                    placeholder={
+                      language === 'bn'
+                        ? 'অনুদাতার নাম, মোবাইল নম্বর, ট্রানজ্যাকশন আইডি বা টোকেন দিয়ে খুঁজুন...'
+                        : 'Search by donor name, phone, transaction ID, or token...'
+                    }
+                    className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0284C7] transition-all"
+                  />
+                  {donationsSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setDonationsSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                <div className="w-full sm:w-auto flex items-center gap-2">
+                  <select
+                    value={donationsPurposeFilter}
+                    onChange={(e) => setDonationsPurposeFilter(e.target.value)}
+                    className="w-full sm:w-auto px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0284C7]"
+                  >
+                    <option value="ALL">{language === 'bn' ? 'সকল খাত (All Causes)' : 'All Causes'}</option>
+                    {Array.from(new Set(donations.map((d) => d.purpose).filter(Boolean))).map((purpose) => (
+                      <option key={purpose} value={purpose}>
+                        {purpose}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Donations Table: Desktop View (>= 640px) */}
+              {(() => {
+                const filtered = donations.filter((d) => {
+                  const q = donationsSearchQuery.trim().toLowerCase();
+                  const matchesSearch =
+                    !q ||
+                    d.donorName.toLowerCase().includes(q) ||
+                    d.mobileNumber.toLowerCase().includes(q) ||
+                    (d.email && d.email.toLowerCase().includes(q)) ||
+                    d.id.toLowerCase().includes(q) ||
+                    (d.token && d.token.toLowerCase().includes(q)) ||
+                    (d.qrToken && d.qrToken.toLowerCase().includes(q)) ||
+                    (d.transactionId && d.transactionId.toLowerCase().includes(q));
+
+                  const matchesPurpose =
+                    donationsPurposeFilter === 'ALL' || d.purpose === donationsPurposeFilter;
+
+                  return matchesSearch && matchesPurpose;
+                });
+
+                const paginated = paginate(filtered, donationsPage, donationsPageSize);
+
+                return (
+                  <>
+                    <div className="hidden sm:block overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold">
+                            <th className="py-3 px-3.5">Donor / Patron</th>
+                            <th className="py-3 px-3.5">Voucher & Token</th>
+                            <th className="py-3 px-3.5">Designated Cause</th>
+                            <th className="py-3 px-3.5">Amount</th>
+                            <th className="py-3 px-3.5">Gateway & Trx</th>
+                            <th className="py-3 px-3.5">Date</th>
+                            <th className="py-3 px-3.5 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {paginated.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">
+                                {language === 'bn' ? 'কোনো অনুদানের তথ্য পাওয়া যায়নি।' : 'No donation records found matching criteria.'}
+                              </td>
+                            </tr>
+                          ) : (
+                            paginated.map((d) => (
+                              <tr key={d.id} className="hover:bg-slate-50/80 transition-colors">
+                                <td className="py-3 px-3.5">
+                                  <span className="font-bold text-slate-900 block text-xs">{d.donorName}</span>
+                                  <a href={`tel:${d.mobileNumber}`} className="text-[11px] text-slate-500 font-mono hover:underline" aria-label={`Call donor ${d.donorName} at ${d.mobileNumber}`}>
+                                    {d.mobileNumber}
+                                  </a>
+                                  {d.email && <span className="text-[10px] text-slate-400 block truncate max-w-[150px]">{d.email}</span>}
+                                </td>
+                                <td className="py-3 px-3.5">
+                                  <div className="space-y-1">
+                                    <span className="font-mono text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 block w-fit">
+                                      {d.id}
+                                    </span>
+                                    {(d.token || d.qrToken) && (
+                                      <span className="font-mono text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 block w-fit">
+                                        Token: {d.token || d.qrToken}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-3.5 text-slate-700 font-medium max-w-[180px]">
+                                  {d.purpose}
+                                </td>
+                                <td className="py-3 px-3.5 font-black text-emerald-700 whitespace-nowrap tabular-nums text-sm">
+                                  ৳{Number(d.amount).toLocaleString('en-US')}
+                                </td>
+                                <td className="py-3 px-3.5">
+                                  <span className="inline-block text-[10px] uppercase font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 mb-1">
+                                    {d.paymentMethod}
+                                  </span>
+                                  <span className="font-mono text-[10px] text-slate-500 block truncate max-w-[120px]" title={d.transactionId}>
+                                    {d.transactionId}
+                                  </span>
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                                    <span>{d.paymentStatus || 'paid'}</span>
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3.5 text-slate-500 whitespace-nowrap text-xs">
+                                  {d.date}
+                                </td>
+                                <td className="py-3 px-3.5 text-right whitespace-nowrap space-x-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedCardDonation(d)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                                    title="View & Download Official Thank You Card"
+                                  >
+                                    <Award className="w-3.5 h-3.5 text-amber-600" />
+                                    <span>Card</span>
+                                  </button>
+                                  {isSuperAdminAccount && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteDonation(d)}
+                                      className="inline-flex items-center p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs transition-all cursor-pointer"
+                                      title="Delete Donation Record"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile Responsive Cards (< 640px) */}
+                    <div className="sm:hidden space-y-3">
                       {paginated.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">
-                            {language === 'bn' ? 'কোনো অনুদানের তথ্য পাওয়া যায়নি।' : 'No donation records found matching criteria.'}
-                          </td>
-                        </tr>
+                        <div className="p-6 text-center text-slate-400 text-xs">
+                          {language === 'bn' ? 'কোনো অনুদানের তথ্য পাওয়া যায়নি।' : 'No donation records found.'}
+                        </div>
                       ) : (
                         paginated.map((d) => (
-                          <tr key={d.id} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="py-3 px-3.5">
-                              <span className="font-bold text-slate-900 block text-xs">{d.donorName}</span>
-                              <a href={`tel:${d.mobileNumber}`} className="text-[11px] text-slate-500 font-mono hover:underline" aria-label={`Call donor ${d.donorName} at ${d.mobileNumber}`}>
-                                {d.mobileNumber}
-                              </a>
-                              {d.email && <span className="text-[10px] text-slate-400 block truncate max-w-[150px]">{d.email}</span>}
-                            </td>
-                            <td className="py-3 px-3.5">
-                              <div className="space-y-1">
-                                <span className="font-mono text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 block w-fit">
-                                  {d.id}
-                                </span>
-                                {(d.token || d.qrToken) && (
-                                  <span className="font-mono text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 block w-fit">
-                                    Token: {d.token || d.qrToken}
-                                  </span>
-                                )}
+                          <div key={`mobile-don-${d.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <span className="font-bold text-slate-900 block text-sm truncate">{d.donorName}</span>
+                                <a href={`tel:${d.mobileNumber}`} className="text-xs text-slate-500 font-mono hover:underline" aria-label={`Call donor ${d.donorName} at ${d.mobileNumber}`}>{d.mobileNumber}</a>
+                                {d.email && <span className="text-[10px] text-slate-400 block truncate">{d.email}</span>}
                               </div>
-                            </td>
-                            <td className="py-3 px-3.5 text-slate-700 font-medium max-w-[180px]">
-                              {d.purpose}
-                            </td>
-                            <td className="py-3 px-3.5 font-black text-emerald-700 whitespace-nowrap tabular-nums text-sm">
-                              ৳{Number(d.amount).toLocaleString('en-US')}
-                            </td>
-                            <td className="py-3 px-3.5">
-                              <span className="inline-block text-[10px] uppercase font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 mb-1">
+                              <span className="font-black text-emerald-700 whitespace-nowrap inline-block tabular-nums text-sm">
+                                ৳{Number(d.amount).toLocaleString('en-US')}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                              <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                                {d.id}
+                              </span>
+                              {(d.token || d.qrToken) && (
+                                <span className="font-mono text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                  Token: {d.token || d.qrToken}
+                                </span>
+                              )}
+                              <span className="text-[10px] uppercase font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
                                 {d.paymentMethod}
                               </span>
-                              <span className="font-mono text-[10px] text-slate-500 block truncate max-w-[120px]" title={d.transactionId}>
-                                {d.transactionId}
-                              </span>
-                              <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
-                                <span>{d.paymentStatus || 'paid'}</span>
-                              </span>
-                            </td>
-                            <td className="py-3 px-3.5 text-slate-500 whitespace-nowrap text-xs">
-                              {d.date}
-                            </td>
-                            <td className="py-3 px-3.5 text-right whitespace-nowrap space-x-1.5">
+                            </div>
+
+                            <div className="text-xs text-slate-600 pt-2 border-t border-slate-100">
+                              <span className="font-medium">{d.purpose}</span> • <span className="text-slate-400">{d.date}</span>
+                            </div>
+
+                            {d.transactionId && (
+                              <div className="text-[10px] text-slate-400 font-mono truncate">
+                                Tx: <strong className="text-slate-700">{d.transactionId}</strong>
+                              </div>
+                            )}
+
+                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                               <button
                                 type="button"
                                 onClick={() => setSelectedCardDonation(d)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-all cursor-pointer shadow-xs"
-                                title="View & Download Official Thank You Card"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-colors cursor-pointer"
                               >
                                 <Award className="w-3.5 h-3.5 text-amber-600" />
-                                <span>Card</span>
+                                <span>Thank You Card</span>
                               </button>
                               {isSuperAdminAccount && (
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteDonation(d)}
-                                  className="inline-flex items-center p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs transition-all cursor-pointer"
-                                  title="Delete Donation Record"
+                                  className="p-1.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               )}
-                            </td>
-                          </tr>
+                            </div>
+                          </div>
                         ))
                       )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Mobile Responsive Cards (< 640px) */}
-                <div className="sm:hidden space-y-3">
-                  {paginated.length === 0 ? (
-                    <div className="p-6 text-center text-slate-400 text-xs">
-                      {language === 'bn' ? 'কোনো অনুদানের তথ্য পাওয়া যায়নি।' : 'No donation records found.'}
                     </div>
-                  ) : (
-                    paginated.map((d) => (
-                      <div key={`mobile-don-${d.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <span className="font-bold text-slate-900 block text-sm truncate">{d.donorName}</span>
-                            <a href={`tel:${d.mobileNumber}`} className="text-xs text-slate-500 font-mono hover:underline" aria-label={`Call donor ${d.donorName} at ${d.mobileNumber}`}>{d.mobileNumber}</a>
-                            {d.email && <span className="text-[10px] text-slate-400 block truncate">{d.email}</span>}
-                          </div>
-                          <span className="font-black text-emerald-700 whitespace-nowrap inline-block tabular-nums text-sm">
-                            ৳{Number(d.amount).toLocaleString('en-US')}
-                          </span>
-                        </div>
 
-                        <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                          <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-                            {d.id}
-                          </span>
-                          {(d.token || d.qrToken) && (
-                            <span className="font-mono text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                              Token: {d.token || d.qrToken}
-                            </span>
-                          )}
-                          <span className="text-[10px] uppercase font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                            {d.paymentMethod}
-                          </span>
-                        </div>
+                    {/* Donations Global Pagination */}
+                    <GlobalPagination
+                      currentPage={donationsPage}
+                      totalRecords={filtered.length}
+                      pageSize={donationsPageSize}
+                      onPageChange={setDonationsPage}
+                      onPageSizeChange={setDonationsPageSize}
+                      language={language}
+                    />
+                  </>
+                );
+              })()}
+            </div>
+          )}
 
-                        <div className="text-xs text-slate-600 pt-2 border-t border-slate-100">
-                          <span className="font-medium">{d.purpose}</span> • <span className="text-slate-400">{d.date}</span>
-                        </div>
+          {/* TAB 7: T-SHIRTS */}
+          {activeTab === 'tshirts' && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">{t.tabTShirts}</h2>
+                <p className="text-xs text-slate-500">
+                  Live inventory distribution tracking. Click on status to toggle delivered.
+                </p>
+              </div>
 
-                        {d.transactionId && (
-                          <div className="text-[10px] text-slate-400 font-mono truncate">
-                            Tx: <strong className="text-slate-700">{d.transactionId}</strong>
-                          </div>
-                        )}
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
+                {tshirtSizes.map((size) => (
+                  <div key={size} className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                    <span className="text-xs font-bold text-slate-500 block uppercase">Size {size}</span>
+                    <span className="text-2xl font-black text-slate-900 block mt-1">{tshirtCounts[size] || 0}</span>
+                    <span className="text-[10px] text-emerald-600 font-semibold">Ordered</span>
+                  </div>
+                ))}
+              </div>
 
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+              {/* T-Shirt Table: Desktop View (>= 640px) */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                      <th className="py-2.5 px-3">Student Name</th>
+                      <th className="py-2.5 px-3">Reg ID</th>
+                      <th className="py-2.5 px-3">Size</th>
+                      <th className="py-2.5 px-3">Delivery Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {paginate(registrations, tshirtPage, tshirtPageSize).map((reg) => (
+                      <tr key={reg.id} className="hover:bg-slate-50">
+                        <td className="py-2.5 px-3 font-medium text-slate-900">{reg.fullName}</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-500">{reg.id}</td>
+                        <td className="py-2.5 px-3 font-bold">{reg.tShirtSize}</td>
+                        <td className="py-2.5 px-3">
                           <button
-                            type="button"
-                            onClick={() => setSelectedCardDonation(d)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-colors cursor-pointer"
+                            onClick={() => handleToggleTShirtCollected(reg.id, isTShirtGiven(reg))}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 shadow-xs ${isTShirtGiven(reg)
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                              : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                              }`}
+                            title={isTShirtGiven(reg) ? 'Status: Given (Click to reset to Pending)' : 'Status: Pending (Click to mark Given)'}
                           >
-                            <Award className="w-3.5 h-3.5 text-amber-600" />
-                            <span>Thank You Card</span>
+                            {isTShirtGiven(reg) ? '✓ Given / Handed Over' : '⏳ Pending Collection'}
                           </button>
-                          {isSuperAdminAccount && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteDonation(d)}
-                              className="p-1.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Donations Global Pagination */}
-                <GlobalPagination
-                  currentPage={donationsPage}
-                  totalRecords={filtered.length}
-                  pageSize={donationsPageSize}
-                  onPageChange={setDonationsPage}
-                  onPageSizeChange={setDonationsPageSize}
-                  language={language}
-                />
-              </>
-            );
-          })()}
-        </div>
-      )}
-
-      {/* TAB 7: T-SHIRTS */}
-      {activeTab === 'tshirts' && (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">{t.tabTShirts}</h2>
-            <p className="text-xs text-slate-500">
-              Live inventory distribution tracking. Click on status to toggle delivered.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
-            {tshirtSizes.map((size) => (
-              <div key={size} className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
-                <span className="text-xs font-bold text-slate-500 block uppercase">Size {size}</span>
-                <span className="text-2xl font-black text-slate-900 block mt-1">{tshirtCounts[size] || 0}</span>
-                <span className="text-[10px] text-emerald-600 font-semibold">Ordered</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))}
-          </div>
 
-          {/* T-Shirt Table: Desktop View (>= 640px) */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
-                  <th className="py-2.5 px-3">Student Name</th>
-                  <th className="py-2.5 px-3">Reg ID</th>
-                  <th className="py-2.5 px-3">Size</th>
-                  <th className="py-2.5 px-3">Delivery Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+              {/* T-Shirt Table: Mobile Responsive Cards (< 640px) */}
+              <div className="sm:hidden space-y-3">
                 {paginate(registrations, tshirtPage, tshirtPageSize).map((reg) => (
-                  <tr key={reg.id} className="hover:bg-slate-50">
-                    <td className="py-2.5 px-3 font-medium text-slate-900">{reg.fullName}</td>
-                    <td className="py-2.5 px-3 font-mono text-slate-500">{reg.id}</td>
-                    <td className="py-2.5 px-3 font-bold">{reg.tShirtSize}</td>
-                    <td className="py-2.5 px-3">
-                      <button
-                        onClick={() => handleToggleTShirtCollected(reg.id, isTShirtGiven(reg))}
-                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 shadow-xs ${
-                          isTShirtGiven(reg)
-                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                            : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                  <div key={`mobile-tshirt-${reg.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-900 block text-sm truncate">{reg.fullName}</span>
+                        <span className="font-mono text-xs text-slate-500 block">{reg.id}</span>
+                      </div>
+                      <span className="px-3 py-1 rounded-lg bg-slate-100 text-slate-900 font-black text-xs shrink-0">
+                        Size {reg.tShirtSize}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleTShirtCollected(reg.id, isTShirtGiven(reg))}
+                      className={`w-full min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs ${isTShirtGiven(reg)
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
                         }`}
-                        title={isTShirtGiven(reg) ? 'Status: Given (Click to reset to Pending)' : 'Status: Pending (Click to mark Given)'}
-                      >
-                        {isTShirtGiven(reg) ? '✓ Given / Handed Over' : '⏳ Pending Collection'}
-                      </button>
-                    </td>
-                  </tr>
+                    >
+                      {isTShirtGiven(reg) ? '✓ Given / Handed Over (Tap to reset)' : '⏳ Pending Collection (Tap to Give)'}
+                    </button>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* T-Shirt Table: Mobile Responsive Cards (< 640px) */}
-          <div className="sm:hidden space-y-3">
-            {paginate(registrations, tshirtPage, tshirtPageSize).map((reg) => (
-              <div key={`mobile-tshirt-${reg.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <span className="font-bold text-slate-900 block text-sm truncate">{reg.fullName}</span>
-                    <span className="font-mono text-xs text-slate-500 block">{reg.id}</span>
-                  </div>
-                  <span className="px-3 py-1 rounded-lg bg-slate-100 text-slate-900 font-black text-xs shrink-0">
-                    Size {reg.tShirtSize}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleToggleTShirtCollected(reg.id, isTShirtGiven(reg))}
-                  className={`w-full min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs ${
-                    isTShirtGiven(reg)
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                      : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
-                  }`}
-                >
-                  {isTShirtGiven(reg) ? '✓ Given / Handed Over (Tap to reset)' : '⏳ Pending Collection (Tap to Give)'}
-                </button>
               </div>
-            ))}
-          </div>
 
-          {/* T-Shirt Global Pagination */}
-          <GlobalPagination
-            currentPage={tshirtPage}
-            totalRecords={registrations.length}
-            pageSize={tshirtPageSize}
-            onPageChange={setTshirtPage}
-            onPageSizeChange={setTshirtPageSize}
-            language={language}
-          />
-        </div>
-      )}
+              {/* T-Shirt Global Pagination */}
+              <GlobalPagination
+                currentPage={tshirtPage}
+                totalRecords={registrations.length}
+                pageSize={tshirtPageSize}
+                onPageChange={setTshirtPage}
+                onPageSizeChange={setTshirtPageSize}
+                language={language}
+              />
+            </div>
+          )}
 
-      {/* TAB 8: QR TICKETS */}
-      {activeTab === 'tickets' && (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">{t.tabTickets}</h2>
-            <p className="text-xs text-slate-500">
-              Verified digital tickets issued to registered students.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {paginate(registrations, ticketsPage, ticketsPageSize).map((reg) => (
-              <div key={reg.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs font-bold text-slate-800">{reg.id}</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 uppercase">
-                    {reg.paymentStatus}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <img
-                    src={reg.photoUrl}
-                    alt={reg.fullName}
-                    className="w-12 h-12 rounded-lg object-cover border border-slate-200"
-                  />
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-xs">{reg.fullName}</h4>
-                    <span className="text-[11px] text-slate-500 block">{reg.batchName}</span>
-                    <span className="text-[10px] text-slate-400">T-Shirt: {reg.tShirtSize}</span>
-                  </div>
-                </div>
-                <button
-                  onClick={() => onSelectTicket && onSelectTicket(reg)}
-                  className="w-full py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer"
-                >
-                  View Digital Pass
-                </button>
+          {/* TAB 8: QR TICKETS */}
+          {activeTab === 'tickets' && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">{t.tabTickets}</h2>
+                <p className="text-xs text-slate-500">
+                  Verified digital tickets issued to registered students.
+                </p>
               </div>
-            ))}
-          </div>
 
-          {/* Tickets Global Pagination */}
-          <GlobalPagination
-            currentPage={ticketsPage}
-            totalRecords={registrations.length}
-            pageSize={ticketsPageSize}
-            onPageChange={setTicketsPage}
-            onPageSizeChange={setTicketsPageSize}
-            language={language}
-          />
-        </div>
-      )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {paginate(registrations, ticketsPage, ticketsPageSize).map((reg) => (
+                  <div key={reg.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs font-bold text-slate-800">{reg.id}</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 uppercase">
+                        {reg.paymentStatus}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {reg.photoUrl ? (
+                        <img
+                          src={reg.photoUrl}
+                          alt={reg.fullName}
+                          className="w-12 h-12 rounded-lg object-cover border border-slate-200"
+                        />
+                      ) : (
+                        <div
+                          aria-label={reg.fullName}
+                          className="w-12 h-12 rounded-lg border border-slate-200 bg-sky-50 text-sky-700 font-black text-base flex items-center justify-center uppercase shrink-0"
+                        >
+                          {(reg.fullName || 'S').trim().charAt(0)}
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-xs">{reg.fullName}</h4>
+                        <span className="text-[11px] text-slate-500 block">{reg.batchName}</span>
+                        <span className="text-[10px] text-slate-400">T-Shirt: {reg.tShirtSize}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => onSelectTicket && onSelectTicket(reg)}
+                      className="w-full py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer"
+                    >
+                      View Digital Pass
+                    </button>
+                  </div>
+                ))}
+              </div>
 
-      {/* TAB 9: STAFF ROLES */}
-      {activeTab === 'staff' && (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">{t.tabStaff}</h2>
-            <p className="text-xs text-slate-500">
-              Gate operators, supervisors, and administrative officers.
-            </p>
-          </div>
+              {/* Tickets Global Pagination */}
+              <GlobalPagination
+                currentPage={ticketsPage}
+                totalRecords={registrations.length}
+                pageSize={ticketsPageSize}
+                onPageChange={setTicketsPage}
+                onPageSizeChange={setTicketsPageSize}
+                language={language}
+              />
+            </div>
+          )}
 
-          {/* Staff Table: Desktop View (>= 640px) */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
-                  <th className="py-2.5 px-3">Username</th>
-                  <th className="py-2.5 px-3">Officer Name</th>
-                  <th className="py-2.5 px-3">Assigned Gate</th>
-                  <th className="py-2.5 px-3">Role</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+          {/* TAB 9: STAFF ROLES */}
+          {activeTab === 'staff' && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">{t.tabStaff}</h2>
+                <p className="text-xs text-slate-500">
+                  Gate operators, supervisors, and administrative officers.
+                </p>
+              </div>
+
+              {/* Staff Table: Desktop View (>= 640px) */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                      <th className="py-2.5 px-3">Username</th>
+                      <th className="py-2.5 px-3">Officer Name</th>
+                      <th className="py-2.5 px-3">Assigned Gate</th>
+                      <th className="py-2.5 px-3">Role</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {paginate(INITIAL_STAFF_USERS, staffPage, staffPageSize).map((st) => (
+                      <tr key={st.id} className="hover:bg-slate-50">
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-800">{st.username}</td>
+                        <td className="py-2.5 px-3 font-medium text-slate-900">{st.fullName}</td>
+                        <td className="py-2.5 px-3 text-slate-600">{st.gateAssigned}</td>
+                        <td className="py-2.5 px-3 font-bold uppercase text-[10px] text-emerald-700">{st.role}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Staff Table: Mobile Responsive Cards (< 640px) */}
+              <div className="sm:hidden space-y-3">
                 {paginate(INITIAL_STAFF_USERS, staffPage, staffPageSize).map((st) => (
-                  <tr key={st.id} className="hover:bg-slate-50">
-                    <td className="py-2.5 px-3 font-mono font-bold text-slate-800">{st.username}</td>
-                    <td className="py-2.5 px-3 font-medium text-slate-900">{st.fullName}</td>
-                    <td className="py-2.5 px-3 text-slate-600">{st.gateAssigned}</td>
-                    <td className="py-2.5 px-3 font-bold uppercase text-[10px] text-emerald-700">{st.role}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Staff Table: Mobile Responsive Cards (< 640px) */}
-          <div className="sm:hidden space-y-3">
-            {paginate(INITIAL_STAFF_USERS, staffPage, staffPageSize).map((st) => (
-              <div key={`mobile-stf-${st.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="font-bold text-slate-900 block text-sm">{st.fullName}</span>
-                    <span className="font-mono text-xs text-slate-500 font-semibold">{st.username}</span>
+                  <div key={`mobile-stf-${st.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-bold text-slate-900 block text-sm">{st.fullName}</span>
+                        <span className="font-mono text-xs text-slate-500 font-semibold">{st.username}</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 shrink-0">
+                        {st.role}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-600 pt-2 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-bold text-slate-400">Assigned Station</span>
+                      <span className="font-medium text-slate-800">{st.gateAssigned}</span>
+                    </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 shrink-0">
-                    {st.role}
-                  </span>
+                ))}
+              </div>
+
+              {/* Staff Global Pagination */}
+              <GlobalPagination
+                currentPage={staffPage}
+                totalRecords={INITIAL_STAFF_USERS.length}
+                pageSize={staffPageSize}
+                onPageChange={setStaffPage}
+                onPageSizeChange={setStaffPageSize}
+                language={language}
+              />
+            </div>
+          )}
+
+          {/* TAB 10: FINANCES */}
+          {activeTab === 'finances' && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">{t.tabFinances}</h2>
+                  <p className="text-xs text-slate-500">
+                    Audit trail of event procurement, venue construction, acoustic and souvenir costs.
+                  </p>
                 </div>
-                <div className="text-xs text-slate-600 pt-2 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Assigned Station</span>
-                  <span className="font-medium text-slate-800">{st.gateAssigned}</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const summary = await FinancialService.getFinancialTransparencySummary();
+                      const csv = FinancialService.generateFinancialReportCsv(summary);
+                      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `PLSCF_Financial_Report_${new Date().toISOString().split('T')[0]}.csv`;
+                      a.click();
+                      setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold cursor-pointer transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export CSV Report</span>
+                  </button>
+                  <button
+                    onClick={() => setShowAddExpenseModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Record Expense Voucher</span>
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
 
-          {/* Staff Global Pagination */}
-          <GlobalPagination
-            currentPage={staffPage}
-            totalRecords={INITIAL_STAFF_USERS.length}
-            pageSize={staffPageSize}
-            onPageChange={setStaffPage}
-            onPageSizeChange={setStaffPageSize}
-            language={language}
-          />
-        </div>
-      )}
+              {/* Finances Table: Desktop View (>= 640px) */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                      <th className="py-2.5 px-3">Voucher Ref</th>
+                      <th className="py-2.5 px-3">Category</th>
+                      <th className="py-2.5 px-3">Reason / Description</th>
+                      <th className="py-2.5 px-3">Officer</th>
+                      <th className="py-2.5 px-3">Amount</th>
+                      <th className="py-2.5 px-3">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {paginate(expenses, expensesPage, expensesPageSize).map((exp) => (
+                      <tr key={exp.id} className="hover:bg-slate-50">
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-800">{exp.receiptRef}</td>
+                        <td className="py-2.5 px-3 font-semibold text-slate-700">{exp.category}</td>
+                        <td className="py-2.5 px-3 text-slate-600">{exp.reason}</td>
+                        <td className="py-2.5 px-3 text-slate-500">{exp.responsiblePerson}</td>
+                        <td className="py-2.5 px-3 font-bold text-rose-600 whitespace-nowrap tabular-nums">৳{exp.amount.toLocaleString()}</td>
+                        <td className="py-2.5 px-3 text-slate-400">{exp.date}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-      {/* TAB 10: FINANCES */}
-      {activeTab === 'finances' && (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">{t.tabFinances}</h2>
-              <p className="text-xs text-slate-500">
-                Audit trail of event procurement, venue construction, acoustic and souvenir costs.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  const summary = await FinancialService.getFinancialTransparencySummary();
-                  const csv = FinancialService.generateFinancialReportCsv(summary);
-                  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `PLSCF_Financial_Report_${new Date().toISOString().split('T')[0]}.csv`;
-                  a.click();
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold cursor-pointer transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Export CSV Report</span>
-              </button>
-              <button
-                onClick={() => setShowAddExpenseModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Record Expense Voucher</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Finances Table: Desktop View (>= 640px) */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
-                  <th className="py-2.5 px-3">Voucher Ref</th>
-                  <th className="py-2.5 px-3">Category</th>
-                  <th className="py-2.5 px-3">Reason / Description</th>
-                  <th className="py-2.5 px-3">Officer</th>
-                  <th className="py-2.5 px-3">Amount</th>
-                  <th className="py-2.5 px-3">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+              {/* Finances Table: Mobile Responsive Cards (< 640px) */}
+              <div className="sm:hidden space-y-3">
                 {paginate(expenses, expensesPage, expensesPageSize).map((exp) => (
-                  <tr key={exp.id} className="hover:bg-slate-50">
-                    <td className="py-2.5 px-3 font-mono font-bold text-slate-800">{exp.receiptRef}</td>
-                    <td className="py-2.5 px-3 font-semibold text-slate-700">{exp.category}</td>
-                    <td className="py-2.5 px-3 text-slate-600">{exp.reason}</td>
-                    <td className="py-2.5 px-3 text-slate-500">{exp.responsiblePerson}</td>
-                    <td className="py-2.5 px-3 font-bold text-rose-600 whitespace-nowrap tabular-nums">৳{exp.amount.toLocaleString()}</td>
-                    <td className="py-2.5 px-3 text-slate-400">{exp.date}</td>
-                  </tr>
+                  <div key={`mobile-exp-${exp.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="font-mono text-xs font-bold text-slate-800 block truncate">{exp.receiptRef}</span>
+                        <span className="font-semibold text-slate-700 text-xs block">{exp.category}</span>
+                      </div>
+                      <span className="font-black text-rose-600 whitespace-nowrap inline-block tabular-nums text-sm shrink-0">
+                        ৳{exp.amount.toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      {exp.reason}
+                    </p>
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 text-slate-500">
+                      <span>Officer: <strong className="text-slate-700">{exp.responsiblePerson}</strong></span>
+                      <span className="text-[11px] text-slate-400">{exp.date}</span>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Finances Table: Mobile Responsive Cards (< 640px) */}
-          <div className="sm:hidden space-y-3">
-            {paginate(expenses, expensesPage, expensesPageSize).map((exp) => (
-              <div key={`mobile-exp-${exp.id}`} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <span className="font-mono text-xs font-bold text-slate-800 block truncate">{exp.receiptRef}</span>
-                    <span className="font-semibold text-slate-700 text-xs block">{exp.category}</span>
-                  </div>
-                  <span className="font-black text-rose-600 whitespace-nowrap inline-block tabular-nums text-sm shrink-0">
-                    ৳{exp.amount.toLocaleString()}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  {exp.reason}
-                </p>
-                <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 text-slate-500">
-                  <span>Officer: <strong className="text-slate-700">{exp.responsiblePerson}</strong></span>
-                  <span className="text-[11px] text-slate-400">{exp.date}</span>
-                </div>
               </div>
-            ))}
-          </div>
 
-          {/* Finances Global Pagination */}
-          <GlobalPagination
-            currentPage={expensesPage}
-            totalRecords={expenses.length}
-            pageSize={expensesPageSize}
-            onPageChange={setExpensesPage}
-            onPageSizeChange={setExpensesPageSize}
-            language={language}
-          />
-        </div>
-      )}
-
-      {/* TAB 11: NOTICES & MEDIA */}
-      {activeTab === 'notices' && (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">{t.tabNoticesAdmin}</h2>
-              <p className="text-xs text-slate-500">
-                Publish bulletins, schedule updates, and emergency security advisories.
-              </p>
+              {/* Finances Global Pagination */}
+              <GlobalPagination
+                currentPage={expensesPage}
+                totalRecords={expenses.length}
+                pageSize={expensesPageSize}
+                onPageChange={setExpensesPage}
+                onPageSizeChange={setExpensesPageSize}
+                language={language}
+              />
             </div>
-            <button
-              onClick={() => {
-                setEditingNoticeId(null);
-                setNoticeTitleEn('');
-                setNoticeTitleBn('');
-                setNoticeCategory('general');
-                setNoticeContentEn('');
-                setNoticeContentBn('');
-                setShowAddNoticeModal(true);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Publish Notice</span>
-            </button>
-          </div>
+          )}
 
-          <div className="space-y-3">
-            {paginate(notices, noticesPage, noticesPageSize).map((n) => (
-              <div key={n.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                    {n.category}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-slate-400">{n.date}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleEditNotice(n)}
-                      className="rounded-md p-1 text-slate-500 hover:bg-slate-200"
-                      aria-label={`Edit notice: ${n.titleEn}`}
-                    >
-                      <Edit2 className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteNotice(n.id)}
-                      className="rounded-md p-1 text-rose-600 hover:bg-rose-100"
-                      aria-label={`Delete notice: ${n.titleEn}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+          {/* TAB 11: NOTICES & MEDIA */}
+          {activeTab === 'notices' && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">{t.tabNoticesAdmin}</h2>
+                  <p className="text-xs text-slate-500">
+                    Publish bulletins, schedule updates, and emergency security advisories.
+                  </p>
                 </div>
-                <h4 className="font-bold text-slate-900 text-sm">
-                  {language === 'bn' ? n.titleBn : n.titleEn}
-                </h4>
-                <p className="text-xs text-slate-600">
-                  {language === 'bn' ? n.contentBn : n.contentEn}
+                <button
+                  onClick={() => {
+                    setEditingNoticeId(null);
+                    setNoticeTitleEn('');
+                    setNoticeTitleBn('');
+                    setNoticeCategory('general');
+                    setNoticeContentEn('');
+                    setNoticeContentBn('');
+                    setShowAddNoticeModal(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Publish Notice</span>
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {paginate(notices, noticesPage, noticesPageSize).map((n) => (
+                  <div key={n.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                        {n.category}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-400">{n.date}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleEditNotice(n)}
+                          className="rounded-md p-1 text-slate-500 hover:bg-slate-200"
+                          aria-label={`Edit notice: ${n.titleEn}`}
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteNotice(n.id)}
+                          className="rounded-md p-1 text-rose-600 hover:bg-rose-100"
+                          aria-label={`Delete notice: ${n.titleEn}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <h4 className="font-bold text-slate-900 text-sm">
+                      {language === 'bn' ? n.titleBn : n.titleEn}
+                    </h4>
+                    <p className="text-xs text-slate-600">
+                      {language === 'bn' ? n.contentBn : n.contentEn}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Notices Global Pagination */}
+              <GlobalPagination
+                currentPage={noticesPage}
+                totalRecords={notices.length}
+                pageSize={noticesPageSize}
+                onPageChange={setNoticesPage}
+                onPageSizeChange={setNoticesPageSize}
+                language={language}
+              />
+            </div>
+          )}
+
+          {/* TAB 12: EXPORT & AUDIT REPORTS */}
+          {activeTab === 'reports' && (
+            <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6 max-w-3xl">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">{t.tabReports}</h2>
+                <p className="text-xs text-slate-500">
+                  Download comprehensive administrative datasets for event audit and government reporting.
                 </p>
               </div>
-            ))}
-          </div>
 
-          {/* Notices Global Pagination */}
-          <GlobalPagination
-            currentPage={noticesPage}
-            totalRecords={notices.length}
-            pageSize={noticesPageSize}
-            onPageChange={setNoticesPage}
-            onPageSizeChange={setNoticesPageSize}
-            language={language}
-          />
-        </div>
-      )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button
+                  onClick={() => exportToCSV(registrations, `PLSCF_All_Registrations_${selectedYear}`)}
+                  className="p-5 rounded-2xl border-2 border-slate-200 hover:border-emerald-600 text-left transition-all cursor-pointer space-y-2 group"
+                >
+                  <Download className="w-6 h-6 text-emerald-600 group-hover:scale-110 transition-transform" />
+                  <h4 className="font-bold text-slate-900 text-sm">Export Registrations CSV</h4>
+                  <p className="text-xs text-slate-500">
+                    All attendee personal details, batches, T-shirt sizes, and payment records.
+                  </p>
+                </button>
 
-      {/* TAB 12: EXPORT & AUDIT REPORTS */}
-      {activeTab === 'reports' && (
-        <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6 max-w-3xl">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">{t.tabReports}</h2>
-            <p className="text-xs text-slate-500">
-              Download comprehensive administrative datasets for event audit and government reporting.
-            </p>
-          </div>
+                <button
+                  onClick={() => exportToCSV(donations, `PLSCF_Donations_${selectedYear}`)}
+                  className="p-5 rounded-2xl border-2 border-slate-200 hover:border-emerald-600 text-left transition-all cursor-pointer space-y-2 group"
+                >
+                  <Download className="w-6 h-6 text-emerald-600 group-hover:scale-110 transition-transform" />
+                  <h4 className="font-bold text-slate-900 text-sm">Export Donations CSV</h4>
+                  <p className="text-xs text-slate-500">
+                    Complete patron contribution ledger with transaction references.
+                  </p>
+                </button>
+              </div>
+            </div>
+          )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button
-              onClick={() => exportToCSV(registrations, `PLSCF_All_Registrations_${selectedYear}`)}
-              className="p-5 rounded-2xl border-2 border-slate-200 hover:border-emerald-600 text-left transition-all cursor-pointer space-y-2 group"
-            >
-              <Download className="w-6 h-6 text-emerald-600 group-hover:scale-110 transition-transform" />
-              <h4 className="font-bold text-slate-900 text-sm">Export Registrations CSV</h4>
-              <p className="text-xs text-slate-500">
-                All attendee personal details, batches, T-shirt sizes, and payment records.
-              </p>
-            </button>
+          {/* TAB 13: PHOTO GALLERY & VIDEO MEMORIES MANAGEMENT */}
+          {activeTab === 'galleryManagement' && (
+            <Suspense fallback={<AdminTabFallback />}>
+              <GalleryManagementTab language={language} />
+            </Suspense>
+          )}
 
-            <button
-              onClick={() => exportToCSV(donations, `PLSCF_Donations_${selectedYear}`)}
-              className="p-5 rounded-2xl border-2 border-slate-200 hover:border-emerald-600 text-left transition-all cursor-pointer space-y-2 group"
-            >
-              <Download className="w-6 h-6 text-emerald-600 group-hover:scale-110 transition-transform" />
-              <h4 className="font-bold text-slate-900 text-sm">Export Donations CSV</h4>
-              <p className="text-xs text-slate-500">
-                Complete patron contribution ledger with transaction references.
-              </p>
-            </button>
-          </div>
-        </div>
-      )}
+          {/* TAB 13.5: ORGANIZING COMMITTEE MANAGEMENT */}
+          {activeTab === 'committeeManagement' && (
+            <Suspense fallback={<AdminTabFallback />}>
+              <CommitteeManagementTab language={language} onNavigateHome={onNavigateHome} />
+            </Suspense>
+          )}
 
-      {/* TAB 13: PHOTO GALLERY & VIDEO MEMORIES MANAGEMENT */}
-      {activeTab === 'galleryManagement' && (
-        <Suspense fallback={<AdminTabFallback />}>
-          <GalleryManagementTab language={language} />
-        </Suspense>
-      )}
+          {/* TAB 14: ABOUT & CONTACT PAGE LIVE CMS EDITOR (SUPER ADMIN ONLY) */}
+          {activeTab === 'aboutContactManagement' && isSuperAdminAccount && (
+            <Suspense fallback={<AdminTabFallback />}>
+              <AboutContactManagementTab language={language} adminName={effectiveAdmin.fullName} />
+            </Suspense>
+          )}
 
-      {/* TAB 13.5: ORGANIZING COMMITTEE MANAGEMENT */}
-      {activeTab === 'committeeManagement' && (
-        <Suspense fallback={<AdminTabFallback />}>
-          <CommitteeManagementTab language={language} onNavigateHome={onNavigateHome} />
-        </Suspense>
-      )}
+          {/* TAB 15: INTERNATIONAL PAYMENT PAGE EDITOR (SUPER ADMIN ONLY) */}
+          {activeTab === 'internationalPaymentManagement' && isSuperAdminAccount && (
+            <Suspense fallback={<AdminTabFallback />}>
+              <InternationalPaymentManagementTab
+                language={language}
+                adminName={effectiveAdmin.fullName}
+              />
+            </Suspense>
+          )}
 
-      {/* TAB 14: ABOUT & CONTACT PAGE LIVE CMS EDITOR (SUPER ADMIN ONLY) */}
-      {activeTab === 'aboutContactManagement' && isSuperAdminAccount && (
-        <Suspense fallback={<AdminTabFallback />}>
-          <AboutContactManagementTab language={language} adminName={effectiveAdmin.fullName} />
-        </Suspense>
-      )}
-
-      {/* TAB 15: INTERNATIONAL PAYMENT PAGE EDITOR (SUPER ADMIN ONLY) */}
-      {activeTab === 'internationalPaymentManagement' && isSuperAdminAccount && (
-        <Suspense fallback={<AdminTabFallback />}>
-          <InternationalPaymentManagementTab
-            language={language}
-            adminName={effectiveAdmin.fullName}
-          />
-        </Suspense>
-      )}
+          {/* TAB 16: SUPABASE BACKEND USAGE & PLAN LIMITS MONITOR (SUPER ADMIN ONLY) */}
+          {activeTab === 'supabaseLimits' && isSuperAdminAccount && (
+            <Suspense fallback={<AdminTabFallback />}>
+              <SupabaseLimitsTab
+                language={language}
+                adminName={effectiveAdmin.fullName}
+              />
+            </Suspense>
+          )}
 
         </main>
       </div>
@@ -5040,8 +5204,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       ? 'মুছে ফেলা হচ্ছে...'
                       : 'Deleting...'
                     : language === 'bn'
-                    ? 'বুকিং স্থায়ীভাবে মুছে ফেলুন'
-                    : 'Confirm & Delete Booking'}
+                      ? 'বুকিং স্থায়ীভাবে মুছে ফেলুন'
+                      : 'Confirm & Delete Booking'}
                 </span>
               </button>
             </div>
@@ -5088,11 +5252,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="flex justify-between items-center">
                 <span className="text-slate-600 font-medium">Current Gate Status:</span>
                 <span
-                  className={`font-black px-2.5 py-0.5 rounded-full text-[11px] ${
-                    gateBlockedAlert.gateStatus === 'BACK'
-                      ? 'bg-rose-600 text-white'
-                      : 'bg-slate-200 text-slate-700'
-                  }`}
+                  className={`font-black px-2.5 py-0.5 rounded-full text-[11px] ${gateBlockedAlert.gateStatus === 'BACK'
+                    ? 'bg-rose-600 text-white'
+                    : 'bg-slate-200 text-slate-700'
+                    }`}
                 >
                   {gateBlockedAlert.gateStatus === 'BACK' ? 'BACK (Exited Venue)' : 'NOT ENTERED'}
                 </span>

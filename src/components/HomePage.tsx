@@ -418,59 +418,37 @@ export const HomePage: React.FC<HomePageProps> = ({
               </button>
             </div>
             <div className="p-4 space-y-3 flex-1 flex flex-col justify-around">
-              <div
-                onClick={() => onNavigate('notices')}
-                className="flex items-start gap-3 p-2 rounded-xl hover:bg-[#E2EEF8]/60 transition-colors cursor-pointer group"
-              >
-                <div className="bg-[#E2EEF8] text-[#0284C7] font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg text-center shrink-0 leading-tight">
-                  <div>Nov</div>
-                  <div className="text-sm">15</div>
-                </div>
-                <div className="min-w-0">
-                  <div className="font-bold text-xs sm:text-sm text-[#0F172A] group-hover:text-[#0284C7] transition-colors truncate">
-                    {language === 'bn' ? 'রিইউনিয়ন নিবন্ধন উন্মুক্ত!' : 'Reunion Registration Open!'}
+              {notices.slice(0, 3).map((notice) => {
+                const parsedDate = notice.date ? new Date(notice.date) : null;
+                const monthLabel =
+                  parsedDate && !Number.isNaN(parsedDate.getTime())
+                    ? parsedDate.toLocaleDateString('en-US', { month: 'short' })
+                    : 'Info';
+                const dayLabel =
+                  parsedDate && !Number.isNaN(parsedDate.getTime())
+                    ? String(parsedDate.getDate()).padStart(2, '0')
+                    : '★';
+                return (
+                  <div
+                    key={notice.id}
+                    onClick={() => onNavigate('notices')}
+                    className="flex items-start gap-3 p-2 rounded-xl hover:bg-[#E2EEF8]/60 transition-colors cursor-pointer group"
+                  >
+                    <div className="bg-[#E2EEF8] text-[#0284C7] font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg text-center shrink-0 leading-tight min-w-[42px]">
+                      <div>{monthLabel}</div>
+                      <div className="text-sm">{dayLabel}</div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-xs sm:text-sm text-[#0F172A] group-hover:text-[#0284C7] transition-colors truncate">
+                        {language === 'bn' ? notice.titleBn : notice.titleEn}
+                      </div>
+                      <div className="text-[11px] sm:text-xs text-slate-500 truncate">
+                        {language === 'bn' ? notice.contentBn : notice.contentEn}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[11px] sm:text-xs text-slate-500 truncate">
-                    {language === 'bn' ? 'ঐতিহাসিক এই আয়োজনের অংশ হোন...' : 'Be a part of this historic event...'}
-                  </div>
-                </div>
-              </div>
-
-              <div
-                onClick={() => onNavigate('notices')}
-                className="flex items-start gap-3 p-2 rounded-xl hover:bg-[#E2EEF8]/60 transition-colors cursor-pointer group"
-              >
-                <div className="bg-[#E2EEF8] text-[#0284C7] font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg text-center shrink-0 leading-tight">
-                  <div>Nov</div>
-                  <div className="text-sm">15</div>
-                </div>
-                <div className="min-w-0">
-                  <div className="font-bold text-xs sm:text-sm text-[#0F172A] group-hover:text-[#0284C7] transition-colors truncate">
-                    {language === 'bn' ? 'পেমেন্ট গেটওয়ে সক্রিয় হয়েছে' : 'Payment Gateway is Live'}
-                  </div>
-                  <div className="text-[11px] sm:text-xs text-slate-500 truncate">
-                    {language === 'bn' ? 'নিরাপদে ও সহজে অনলাইনে ফি পরিশোধ করুন...' : 'Now you can pay securely online...'}
-                  </div>
-                </div>
-              </div>
-
-              <div
-                onClick={() => onNavigate('notices')}
-                className="flex items-start gap-3 p-2 rounded-xl hover:bg-[#E2EEF8]/60 transition-colors cursor-pointer group"
-              >
-                <div className="bg-[#E2EEF8] text-[#0284C7] font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg text-center shrink-0 leading-tight">
-                  <div>Nov</div>
-                  <div className="text-sm">15</div>
-                </div>
-                <div className="min-w-0">
-                  <div className="font-bold text-xs sm:text-sm text-[#0F172A] group-hover:text-[#0284C7] transition-colors truncate">
-                    {language === 'bn' ? 'ইভেন্ট সূচি প্রকাশিত' : 'Event Schedule Released'}
-                  </div>
-                  <div className="text-[11px] sm:text-xs text-slate-500 truncate">
-                    {language === 'bn' ? 'বিস্তারিত সময়সূচি ও আয়োজন দেখে নিন...' : 'Check the detailed program...'}
-                  </div>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </div>
 
@@ -862,11 +840,20 @@ export const HomePage: React.FC<HomePageProps> = ({
             <div className="p-5 rounded-2xl bg-[#E2EEF8]/60 border-2 border-[#0284C7] shadow-md animate-fade-in">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <img
-                    src={foundRegistration.photoUrl}
-                    alt={foundRegistration.fullName}
-                    className="w-16 h-16 rounded-xl object-cover border-2 border-white shadow-sm"
-                  />
+                  {foundRegistration.photoUrl ? (
+                    <img
+                      src={foundRegistration.photoUrl}
+                      alt={foundRegistration.fullName}
+                      className="w-16 h-16 rounded-xl object-cover border-2 border-white shadow-sm shrink-0"
+                    />
+                  ) : (
+                    <div
+                      aria-label={foundRegistration.fullName}
+                      className="w-16 h-16 rounded-xl border-2 border-white shadow-sm bg-[#0284C7]/15 text-[#0284C7] font-black text-xl flex items-center justify-center uppercase shrink-0"
+                    >
+                      {(foundRegistration.fullName || 'P').trim().charAt(0)}
+                    </div>
+                  )}
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-[#0284C7] text-white">

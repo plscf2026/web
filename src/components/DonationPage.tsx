@@ -22,6 +22,7 @@ import { translations } from '../i18n/translations';
 import { AppStore } from '../services/store';
 import { SupabaseService } from '../services/supabase';
 import { PayStationService } from '../services/paystation';
+import { FinancialService } from '../services/financialService';
 import { InternationalPaymentInfo, InternationalPaymentService } from '../services/internationalPaymentService';
 import { GovernanceSettingsService } from '../services/governanceSettingsService';
 import {
@@ -97,6 +98,7 @@ export const DonationPage: React.FC<DonationPageProps> = ({
 
   // Live community donations list & fee settings
   const [donationsList, setDonationsList] = useState<DonationRecord[]>([]);
+  const [authoritativeTotalRaised, setAuthoritativeTotalRaised] = useState<number | null>(null);
   const [feeSettings, setFeeSettings] = useState<FeeSettings>(
     () => initialFeeSettings || GovernanceSettingsService.getConfirmedSettings() || AppStore.getFeeSettings()
   );
@@ -116,13 +118,41 @@ export const DonationPage: React.FC<DonationPageProps> = ({
     setFeeSettings(initialFeeSettings || GovernanceSettingsService.getConfirmedSettings() || AppStore.getFeeSettings());
     InternationalPaymentService.fetchFromSupabase().catch(() => {});
 
-    // 2. Fetch live from Supabase canonical public.donations
-    SupabaseService.fetchDonations().then((res) => {
-      if (res.data && res.data.length > 0) {
-        setDonationsList(res.data);
-        AppStore.saveDonations(res.data);
+    // 2. Fetch live donations (full table for authenticated admins, safe non-PII RPC summary for public visitors)
+    const syncCommunityDonations = async () => {
+      try {
+        const res = await SupabaseService.fetchDonations();
+        if (res.data && res.data.length > 0 && !res.error) {
+          setDonationsList(res.data);
+          AppStore.saveDonations(res.data);
+        }
+        const summary = await FinancialService.getFinancialTransparencySummary();
+        if (typeof summary.total_donations === 'number') {
+          setAuthoritativeTotalRaised(summary.total_donations);
+        }
+        if ((!res.data || res.data.length === 0) && Array.isArray(summary.recent_donations)) {
+          const publicMapped: DonationRecord[] = summary.recent_donations.map((d) => ({
+            id: d.id,
+            donorName: d.is_anonymous ? 'Anonymous Well-Wisher' : d.donor_name,
+            mobileNumber: '',
+            email: '',
+            amount: Number(d.amount) || 0,
+            purpose: d.purpose || 'General Reunion Fund',
+            paymentMethod: (d.payment_method as any) || 'bkash',
+            transactionId: '',
+            date: d.donation_date || new Date().toISOString().split('T')[0],
+            paymentStatus: 'paid',
+            year: 2027,
+            isAnonymous: Boolean(d.is_anonymous),
+            createdAt: d.created_at || d.donation_date,
+          }));
+          setDonationsList(publicMapped);
+        }
+      } catch (err) {
+        console.warn('Error fetching live donations from Supabase:', err);
       }
-    }).catch((err) => console.warn('Error fetching live donations from Supabase:', err));
+    };
+    void syncCommunityDonations();
 
     const handleSync = (e: any) => {
       if (e.detail) setFeeSettings(e.detail);
@@ -177,13 +207,14 @@ export const DonationPage: React.FC<DonationPageProps> = ({
               donorName: pending.donorName,
               mobileNumber: pending.mobileNumber,
               email: pending.email,
-              amount: verifyRes.result.amount || pending.amount,
+              amount: pending.amount,
               purpose: pending.purpose,
             },
             verifyRes.result
           );
           setCompletedDonation(donation);
           setDonationsList(AppStore.getDonations());
+          setAuthoritativeTotalRaised((prev) => (typeof prev === 'number' ? prev + (Number(donation.amount) || pending.amount) : prev));
           sessionStorage.removeItem('plscf_pending_donation');
           localStorage.removeItem('plscf_pending_donation');
           PayStationService.clearPendingSession();
@@ -220,18 +251,20 @@ export const DonationPage: React.FC<DonationPageProps> = ({
           clearInterval(interval);
           const pendingRaw = sessionStorage.getItem('plscf_pending_donation');
           const pending = pendingRaw ? JSON.parse(pendingRaw) : null;
+          const principalAmt = pending?.amount || pendingPayment.amount;
           const donation = await PayStationService.completeDonationAfterPayment(
             {
               donorName: pending?.donorName || pendingPayment.donorName || 'Honored Patron',
               mobileNumber: pending?.mobileNumber || pendingPayment.mobileNumber || '01700000000',
               email: pending?.email || pendingPayment.email || '',
-              amount: verifyRes.result.amount || pendingPayment.amount,
+              amount: principalAmt,
               purpose: pending?.purpose || pendingPayment.purpose || 'General Reunion Fund',
             },
             verifyRes.result
           );
           setCompletedDonation(donation);
           setDonationsList(AppStore.getDonations());
+          setAuthoritativeTotalRaised((prev) => (typeof prev === 'number' ? prev + (Number(donation.amount) || principalAmt) : prev));
           sessionStorage.removeItem('plscf_pending_donation');
           localStorage.removeItem('plscf_pending_donation');
           PayStationService.clearPendingSession();
@@ -248,7 +281,10 @@ export const DonationPage: React.FC<DonationPageProps> = ({
   const effectiveAmount = customAmount ? Math.max(0, Number(customAmount) || 0) : selectedAmount;
   const donationGatewayCharge = calculateGatewayCharge(effectiveAmount);
   const donationTotalPayable = Math.round((effectiveAmount + donationGatewayCharge) * 100) / 100;
-  const totalRaised = donationsList.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+  const totalRaised =
+    authoritativeTotalRaised !== null
+      ? authoritativeTotalRaised
+      : donationsList.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
 
   // Top 10 Donors sorted by donation amount descending (Donors Hall of Fame)
   const top10Donors = useMemo(() => {
@@ -279,18 +315,20 @@ export const DonationPage: React.FC<DonationPageProps> = ({
       if (verifyRes.verified && verifyRes.result) {
         const pendingRaw = sessionStorage.getItem('plscf_pending_donation');
         const pending = pendingRaw ? JSON.parse(pendingRaw) : null;
+        const principalAmt = pending?.amount || pendingPayment.amount;
         const donation = await PayStationService.completeDonationAfterPayment(
           {
             donorName: pending?.donorName || pendingPayment.donorName || donorName || 'Honored Patron',
             mobileNumber: pending?.mobileNumber || pendingPayment.mobileNumber || mobileNumber || '01700000000',
             email: pending?.email || pendingPayment.email || email,
-            amount: verifyRes.result.amount || pendingPayment.amount,
+            amount: principalAmt,
             purpose: pending?.purpose || pendingPayment.purpose || defaultCauseTitle,
           },
           verifyRes.result
         );
         setCompletedDonation(donation);
         setDonationsList(AppStore.getDonations());
+        setAuthoritativeTotalRaised((prev) => (typeof prev === 'number' ? prev + (Number(donation.amount) || principalAmt) : prev));
         sessionStorage.removeItem('plscf_pending_donation');
         localStorage.removeItem('plscf_pending_donation');
         PayStationService.clearPendingSession();
