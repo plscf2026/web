@@ -216,6 +216,13 @@ export function validateRegistrationData(data: RegistrationFormData): Validation
     }
   }
 
+  if (data.category !== 'former' && data.category !== 'current') {
+    errors.category = {
+      en: 'Please select a student category (Former or Current).',
+      bn: 'অনুগ্রহ করে শিক্ষার্থীর ধরন (প্রাক্তন অথবা বর্তমান) নির্বাচন করুন।',
+    };
+  }
+
   if (data.category === 'former') {
     if (!data.passingYear || data.passingYear.trim().length === 0) {
       errors.passingYear = {

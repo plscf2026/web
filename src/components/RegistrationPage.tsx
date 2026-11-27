@@ -115,8 +115,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   const [mobileNumber, setMobileNumber] = useState(() => draft?.mobileNumber || '');
   const [email, setEmail] = useState(() => draft?.email || ''); // OPTIONAL
   const [address, setAddress] = useState(() => draft?.address || '');
-  const [category, setCategory] = useState<StudentCategory>(
-    () => initialCategory || draft?.category || 'former'
+  const [category, setCategory] = useState<StudentCategory | ''>(
+    () => initialCategory || draft?.category || ''
   );
   const [gender, setGender] = useState<'male' | 'female'>(() => draft?.gender || 'male');
   const [bloodGroup, setBloodGroup] = useState(() => draft?.bloodGroup || '');
@@ -191,7 +191,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     setMobileNumber('');
     setEmail('');
     setAddress('');
-    setCategory(initialCategory || 'former');
+    setCategory(initialCategory || '');
     setGender('male');
     setBloodGroup('');
     setHasParent(false);
@@ -254,7 +254,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
           mobileNumber,
           email,
           address,
-          category,
+          category: category || undefined,
           gender,
           bloodGroup,
           hasParent,
@@ -323,7 +323,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     if (initialData.mobileNumber !== undefined) setMobileNumber(initialData.mobileNumber || '');
     if (initialData.email !== undefined) setEmail(initialData.email || '');
     if (initialData.address !== undefined) setAddress(initialData.address || '');
-    if (initialData.category !== undefined) setCategory(initialData.category || 'former');
+    if (initialData.category !== undefined) setCategory(initialData.category || '');
     if (initialData.gender !== undefined) setGender(initialData.gender || 'male');
     if (initialData.bloodGroup !== undefined) setBloodGroup(initialData.bloodGroup || '');
     if (initialData.hasParent !== undefined) setHasParent(Boolean(initialData.hasParent));
@@ -377,7 +377,9 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
   const isOptionalDonationOpen = isDonationOpen(feeSettings);
   const donationAmount = isOptionalDonationOpen && typeof donationInput === 'number' ? donationInput : 0;
-  const fees = calculateTotalFee(category, feeSettings, donationAmount, effectiveHasParent);
+  const fees = category
+    ? calculateTotalFee(category, feeSettings, donationAmount, effectiveHasParent)
+    : { registrationFee: 0, parentFee: 0, donationAmount: 0, totalPayable: 0 };
   const gatewayCharge = calculateGatewayCharge(fees.totalPayable);
   const totalPayableWithCharge = Math.round((fees.totalPayable + gatewayCharge) * 100) / 100;
 
@@ -406,7 +408,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
         fileOrDataUrl: confirmedDataUrl,
         registrationId: studentId.trim() || registrationDraftId,
         batchYear: passingYear || undefined,
-        category,
+        category: category || undefined,
         currentClass: currentClass || undefined,
         isParent: false,
       });
@@ -489,7 +491,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
         : category === 'former'
         ? 'Alumni Full Name'
         : 'Student Full Name'),
-    category,
+    category: category || undefined,
     batchName:
       category === 'current'
         ? currentClass
@@ -546,7 +548,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
         fileOrDataUrl: confirmedDataUrl,
         registrationId: studentId.trim() || registrationDraftId,
         batchYear: passingYear || undefined,
-        category,
+        category: category || undefined,
         currentClass: currentClass || undefined,
         isParent: true,
       });
@@ -660,6 +662,19 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
         ...current,
         termsAccepted: { en: msg, bn: msg },
       }));
+      return;
+    }
+    if (category !== 'former' && category !== 'current') {
+      setValidationErrors((current) => ({
+        ...current,
+        category: {
+          en: 'Please select a Student Category before continuing.',
+          bn: 'অনুগ্রহ করে এগিয়ে যাওয়ার আগে শিক্ষার্থীর ধরন নির্বাচন করুন।',
+        },
+      }));
+      window.requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>('[data-validation-field="category"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
       return;
     }
     if (!isCategoryRegistrationOpen(category, feeSettings)) {
@@ -805,7 +820,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
 
   const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
-  const selectedCategoryOpen = isCategoryRegistrationOpen(category, feeSettings);
+  const hasSelectedCategory = category === 'former' || category === 'current';
+  const selectedCategoryOpen = hasSelectedCategory && isCategoryRegistrationOpen(category, feeSettings);
   const otherCategory: StudentCategory = category === 'former' ? 'current' : 'former';
   const otherCategoryOpen = isCategoryRegistrationOpen(otherCategory, feeSettings);
 
@@ -917,9 +933,13 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
       ) : (
       <form onSubmit={handleSubmit} className="space-y-8" noValidate>
         {/* Category Selector Card - always visible & clickable when Global Registration is ON */}
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#E2EEF8]">
+        <div
+          data-validation-field="category"
+          aria-invalid={Boolean(validationErrors.category)}
+          className="bg-white rounded-3xl p-6 shadow-sm border border-[#E2EEF8]"
+        >
           <label className="block text-sm font-bold text-[#0F172A] mb-3">
-            {t.categoryLabel} *
+            {t.categoryLabel} <span className="text-rose-600">*</span>
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Alumni Button */}
@@ -928,11 +948,22 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               onClick={() => {
                 setCategory('former');
                 setIdVerificationResult(null);
-                if (validationErrors.passingYear || validationErrors.lastClassAttended || validationErrors.studentId) {
+                setHasParent(false);
+                if (
+                  validationErrors.category ||
+                  validationErrors.passingYear ||
+                  validationErrors.lastClassAttended ||
+                  validationErrors.studentId ||
+                  validationErrors.currentClass ||
+                  validationErrors.hasParent
+                ) {
                   const next = { ...validationErrors };
+                  delete next.category;
                   delete next.passingYear;
                   delete next.lastClassAttended;
                   delete next.studentId;
+                  delete next.currentClass;
+                  delete next.hasParent;
                   setValidationErrors(next);
                 }
               }}
@@ -973,11 +1004,19 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               type="button"
               onClick={() => {
                 setCategory('current');
-                if (validationErrors.passingYear || validationErrors.lastClassAttended || validationErrors.currentClass) {
+                if (
+                  validationErrors.category ||
+                  validationErrors.passingYear ||
+                  validationErrors.lastClassAttended ||
+                  validationErrors.currentClass ||
+                  validationErrors.hasParent
+                ) {
                   const next = { ...validationErrors };
+                  delete next.category;
                   delete next.passingYear;
                   delete next.lastClassAttended;
                   delete next.currentClass;
+                  delete next.hasParent;
                   setValidationErrors(next);
                 }
               }}
@@ -1013,10 +1052,16 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               </p>
             </button>
           </div>
+          {validationErrors.category && (
+            <p className="mt-2 text-xs text-rose-600 flex items-center gap-1 font-medium">
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>{validationErrors.category[language]}</span>
+            </p>
+          )}
         </div>
 
         {/* Category-specific closure notice replaces application form when selected category is OFF */}
-        {!selectedCategoryOpen && (
+        {hasSelectedCategory && !selectedCategoryOpen && (
           <GovernanceClosureNoticeCard
             notice={getStructuredClosureNotice(
               feeSettings,

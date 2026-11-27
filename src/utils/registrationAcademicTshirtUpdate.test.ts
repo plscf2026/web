@@ -113,4 +113,73 @@ test('Registration Form: Academic & T-shirt initial state and validation invaria
     assert.equal(lastClassAttended, '', 'Fresh last class attended must be empty string');
     assert.equal(tShirtSize, '', 'Fresh t-shirt size must be empty string');
   });
+
+  await t.test('7. Fresh registration has no preselected category and blocks submission without category', () => {
+    const draft = null as Partial<RegistrationFormData> | null;
+    const initialCategory = undefined as ('former' | 'current') | undefined;
+    const category = initialCategory || draft?.category || '';
+    assert.equal(category, '', 'Fresh registration must not preselect former or current');
+
+    const missingCategoryData: RegistrationFormData = {
+      fullName: 'Sagar Saha',
+      photoUrl: 'data:image/jpeg;base64,sample',
+      mobileNumber: '01712345678',
+      address: 'Faridpur',
+      gender: 'male',
+      bloodGroup: 'B+',
+      category: '' as any,
+      batchName: 'SSC 2020',
+      tShirtSize: 'M',
+      donationAmount: 0,
+      termsAccepted: true,
+    };
+    const res = validateRegistrationData(missingCategoryData);
+    assert.equal(res.isValid, false);
+    assert.ok(res.errors.category, 'Submission must be blocked when category is unselected');
+  });
+
+  await t.test('8. Switching categories excludes previous category fields and validates/saves both cleanly', () => {
+    // Switching to former excludes current student fields & guardian pass
+    const formerForm: RegistrationFormData = {
+      fullName: 'Alumnus Member',
+      photoUrl: 'https://example.com/a.jpg',
+      mobileNumber: '01712345678',
+      address: 'Faridpur',
+      gender: 'female',
+      bloodGroup: 'A+',
+      category: 'former',
+      passingYear: '2015',
+      lastClassAttended: 'SSC',
+      studentId: undefined,
+      currentClass: undefined,
+      groupOrSection: undefined,
+      rollNumber: undefined,
+      hasParent: false,
+      batchName: 'SSC 2015',
+      tShirtSize: 'L',
+      donationAmount: 0,
+      termsAccepted: true,
+    };
+    assert.equal(validateRegistrationData(formerForm).isValid, true);
+
+    // Switching to current excludes former student fields
+    const currentForm: RegistrationFormData = {
+      fullName: 'Current Student',
+      photoUrl: 'https://example.com/c.jpg',
+      mobileNumber: '01712345679',
+      address: 'Faridpur',
+      gender: 'female',
+      bloodGroup: 'O+',
+      category: 'current',
+      studentId: 'PLSC-2026-105',
+      currentClass: 'Class 9',
+      passingYear: undefined,
+      lastClassAttended: undefined,
+      batchName: 'Class 9 (Section A)',
+      tShirtSize: 'M',
+      donationAmount: 0,
+      termsAccepted: true,
+    };
+    assert.equal(validateRegistrationData(currentForm).isValid, true);
+  });
 });
