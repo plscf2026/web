@@ -693,7 +693,7 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
   };
 
   const passingYears: number[] = [];
-  for (let y = 2025; y >= 1962; y--) passingYears.push(y);
+  for (let y = 2026; y >= 1962; y--) passingYears.push(y);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -1048,8 +1048,8 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
                     {isBangla
-                      ? '১৯৬২ থেকে ২০২৫ সাল পর্যন্ত সকল পাসের ব্যাচ'
-                      : 'All alumni batches from 1962 to 2025'}
+                      ? '১৯৬২ থেকে ২০২৬ সাল পর্যন্ত সকল পাসের ব্যাচ'
+                      : 'All alumni batches from 1962 to 2026'}
                   </p>
                 </button>
 

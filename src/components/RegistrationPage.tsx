@@ -137,8 +137,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   const [registrationDraftId] = useState(() => `DRAFT-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`);
 
   // Academic Information
-  const [passingYear, setPassingYear] = useState(() => draft?.passingYear || '2015'); // Mandatory for former
-  const [lastClassAttended, setLastClassAttended] = useState(() => draft?.lastClassAttended || 'SSC'); // Optional for former
+  const [passingYear, setPassingYear] = useState(() => draft?.passingYear || ''); // Mandatory for former
+  const [lastClassAttended, setLastClassAttended] = useState(() => draft?.lastClassAttended || ''); // Mandatory for former
   const [currentClass, setCurrentClass] = useState(() => draft?.currentClass || 'Class 10'); // For current students
   const [studentId, setStudentId] = useState(() => draft?.studentId || ''); // Mandatory for current students
   const [idVerificationResult, setIdVerificationResult] = useState<StudentIdVerificationResult | null>(null);
@@ -148,7 +148,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   const [rollNumber, setRollNumber] = useState(() => draft?.rollNumber || '');
 
   // T-shirt & Donation
-  const [tShirtSize, setTShirtSize] = useState<TShirtSize>(() => draft?.tShirtSize || 'L');
+  const [tShirtSize, setTShirtSize] = useState<TShirtSize | ''>(() => (draft?.tShirtSize as TShirtSize) || '');
   const [donationInput, setDonationInput] = useState<number | ''>(() => (typeof draft?.donationInput === 'number' ? draft.donationInput : ''));
   const [termsAccepted, setTermsAccepted] = useState(true);
 
@@ -206,8 +206,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     if (parentFileInputRef.current) {
       parentFileInputRef.current.value = '';
     }
-    setPassingYear('2015');
-    setLastClassAttended('SSC');
+    setPassingYear('');
+    setLastClassAttended('');
     setCurrentClass('Class 10');
     setStudentId('');
     setIdVerificationResult(null);
@@ -215,7 +215,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     setBatchName('');
     setGroupOrSection('Section A');
     setRollNumber('');
-    setTShirtSize('L');
+    setTShirtSize('');
     setDonationInput('');
     setTermsAccepted(true);
     setPhotoSizeKb(null);
@@ -332,14 +332,14 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     if (initialData.parentPhone !== undefined) setParentPhone(initialData.parentPhone || '');
     if (initialData.parentRelation !== undefined) setParentRelation(initialData.parentRelation || 'Guardian');
     if (initialData.parentPhotoUrl !== undefined) setParentPhotoUrl(initialData.parentPhotoUrl || '');
-    if (initialData.passingYear !== undefined) setPassingYear(initialData.passingYear || '2015');
-    if (initialData.lastClassAttended !== undefined) setLastClassAttended(initialData.lastClassAttended || 'SSC');
+    if (initialData.passingYear !== undefined) setPassingYear(initialData.passingYear || '');
+    if (initialData.lastClassAttended !== undefined) setLastClassAttended(initialData.lastClassAttended || '');
     if (initialData.currentClass !== undefined) setCurrentClass(initialData.currentClass || 'Class 10');
     if (initialData.studentId !== undefined) setStudentId(initialData.studentId || '');
     if (initialData.batchName !== undefined) setBatchName(initialData.batchName || '');
     if (initialData.groupOrSection !== undefined) setGroupOrSection(initialData.groupOrSection || 'Section A');
     if (initialData.rollNumber !== undefined) setRollNumber(initialData.rollNumber || '');
-    if (initialData.tShirtSize !== undefined) setTShirtSize((initialData.tShirtSize as TShirtSize) || 'L');
+    if (initialData.tShirtSize !== undefined) setTShirtSize((initialData.tShirtSize as TShirtSize) || '');
     if (typeof initialData.donationAmount === 'number') {
       setDonationInput(initialData.donationAmount > 0 ? initialData.donationAmount : '');
     }
@@ -708,13 +708,36 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
       batchName: getComputedBatch(),
       groupOrSection: category === 'current' ? groupOrSection : undefined,
       rollNumber: category === 'current' ? rollNumber : undefined,
-      tShirtSize,
+      tShirtSize: tShirtSize as TShirtSize,
       donationAmount,
       termsAccepted: true,
     };
 
     const result = validateRegistrationData(formData);
     const customErrors: Record<string, { en: string; bn: string }> = { ...result.errors };
+
+    // Strict validation for former students academic information
+    if (category === 'former') {
+      if (!passingYear || !passingYear.trim()) {
+        customErrors.passingYear = {
+          en: 'Please select your passing / graduation year.',
+          bn: 'অনুগ্রহ করে পাস বা অধ্যয়নের শেষ বছর নির্বাচন করুন।',
+        };
+      }
+      if (!lastClassAttended || !lastClassAttended.trim()) {
+        customErrors.lastClassAttended = {
+          en: 'Please select the last class you attended.',
+          bn: 'অনুগ্রহ করে আপনার সর্বশেষ অধ্যয়নের শ্রেণি নির্বাচন করুন।',
+        };
+      }
+    }
+
+    if (!tShirtSize || !String(tShirtSize).trim()) {
+      customErrors.tShirtSize = {
+        en: 'Please select your T-shirt size.',
+        bn: 'অনুগ্রহ করে আপনার টি-শার্টের সাইজ নির্বাচন করুন।',
+      };
+    }
 
     // Strict validation for current student ID status
     if (category === 'current') {
@@ -774,9 +797,9 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     onInitiatePayment(formData, fees);
   };
 
-  // Generate passing years 1962 to 2025
+  // Generate passing years 1962 to 2026
   const passingYears: number[] = [];
-  for (let y = 2025; y >= 1962; y--) {
+  for (let y = 2026; y >= 1962; y--) {
     passingYears.push(y);
   }
 
@@ -905,9 +928,10 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               onClick={() => {
                 setCategory('former');
                 setIdVerificationResult(null);
-                if (validationErrors.passingYear || validationErrors.studentId) {
+                if (validationErrors.passingYear || validationErrors.lastClassAttended || validationErrors.studentId) {
                   const next = { ...validationErrors };
                   delete next.passingYear;
+                  delete next.lastClassAttended;
                   delete next.studentId;
                   setValidationErrors(next);
                 }
@@ -939,8 +963,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               </div>
               <p className="text-xs text-slate-500 mt-1">
                 {language === 'bn'
-                  ? '১৯৬২ থেকে ২০২৫ সাল পর্যন্ত সকল পাসের ব্যাচ'
-                  : 'All alumni batches from 1962 to 2025'}
+                  ? '১৯৬২ থেকে ২০২৬ সাল পর্যন্ত সকল পাসের ব্যাচ'
+                  : 'All alumni batches from 1962 to 2026'}
               </p>
             </button>
 
@@ -949,8 +973,10 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               type="button"
               onClick={() => {
                 setCategory('current');
-                if (validationErrors.currentClass) {
+                if (validationErrors.passingYear || validationErrors.lastClassAttended || validationErrors.currentClass) {
                   const next = { ...validationErrors };
+                  delete next.passingYear;
+                  delete next.lastClassAttended;
                   delete next.currentClass;
                   setValidationErrors(next);
                 }
@@ -2016,7 +2042,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               {/* Former Student: Graduation / Last Attended Year is MANDATORY */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  {language === 'bn' ? 'পাস বা অধ্যয়নের শেষ বছর *' : 'Graduation / Last Attended Year *'}{' '}
+                  {language === 'bn' ? 'পাস বা অধ্যয়নের শেষ বছর' : 'Graduation / Last Attended Year'}{' '}
                   <span className="text-rose-600">*</span>
                 </label>
                 <select
@@ -2048,29 +2074,54 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                 )}
               </div>
 
-              {/* Optional Last Class Attended for Former Students */}
+              {/* Last Class Attended for Former Students - MANDATORY */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  {language === 'bn' ? 'সর্বশেষ অধ্যয়নের শ্রেণি (ঐচ্ছিক)' : 'Last Class Attended (Optional)'}
+                  {language === 'bn' ? 'সর্বশেষ অধ্যয়নের শ্রেণি' : 'Last Class Attended'}{' '}
+                  <span className="text-rose-600">*</span>
                 </label>
                 <select
+                  name="lastClassAttended"
+                  aria-invalid={Boolean(validationErrors.lastClassAttended)}
                   value={lastClassAttended}
-                  onChange={(e) => setLastClassAttended(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 focus:outline-hidden"
+                  onChange={(e) => {
+                    setLastClassAttended(e.target.value);
+                    clearValidationError('lastClassAttended');
+                  }}
+                  className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
+                    validationErrors.lastClassAttended
+                      ? 'border-rose-500 bg-rose-50/30'
+                      : 'border-slate-300 focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20'
+                  }`}
                 >
-                  <option value="SSC">SSC (মাধ্যমিক)</option>
+                  <option value="">
+                    {language === 'bn' ? 'সর্বশেষ শ্রেণি নির্বাচন করুন' : 'Select Last Class'}
+                  </option>
                   <option value="HSC">HSC (উচ্চ মাধ্যমিক)</option>
+                  <option value="SSC">SSC (মাধ্যমিক)</option>
                   <option value="Class 10">Class 10 (দশম শ্রেণি)</option>
+                  <option value="Class 9">Class 9 (নবম শ্রেণি)</option>
                   <option value="Class 8">Class 8 (অষ্টম শ্রেণি)</option>
+                  <option value="Class 7">Class 7 (সপ্তম শ্রেণি)</option>
+                  <option value="Class 6">Class 6 (ষষ্ঠ শ্রেণি)</option>
                   <option value="Class 5">Class 5 (পঞ্চম শ্রেণি)</option>
+                  <option value="Class 4">Class 4 (চতুর্থ শ্রেণি)</option>
                   <option value="Class 3">Class 3 (তৃতীয় শ্রেণি)</option>
-                  <option value="Other">Other / অন্যান্য</option>
+                  <option value="Class 2">Class 2 (দ্বিতীয় শ্রেণি)</option>
+                  <option value="Class 1">Class 1 (প্রথম শ্রেণি)</option>
+                  <option value="Other">{language === 'bn' ? 'Other / অন্যান্য' : 'Other'}</option>
                 </select>
                 <span className="text-[10px] text-slate-500 mt-1 block">
                   {language === 'bn'
-                    ? 'এসএসসি বা এইচএসসির আগেই বিদ্যালয় ত্যাগ করে থাকলে প্রযোজ্য শ্রেণি নির্বাচন করুন।'
-                    : 'Applicable if student left school prior to SSC or HSC completion.'}
+                    ? 'আপনার সর্বশেষ অধ্যয়নের শ্রেণি নির্বাচন করুন।'
+                    : 'Select the last class you attended.'}
                 </span>
+                {validationErrors.lastClassAttended && (
+                  <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    <span>{validationErrors.lastClassAttended[language]}</span>
+                  </p>
+                )}
               </div>
             </div>
           </div>
