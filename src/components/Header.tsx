@@ -103,9 +103,11 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-18 sm:h-20">
           {/* Logo & School Crest */}
-          <div
+          <button
+            type="button"
             onClick={() => handleNav('home')}
-            className="flex items-center gap-2.5 sm:gap-3.5 cursor-pointer select-none group min-w-0"
+            aria-label={language === 'bn' ? 'হোম পেজে ফিরুন' : 'Go to home page'}
+            className="flex items-center gap-2.5 sm:gap-3.5 cursor-pointer select-none group min-w-0 text-left bg-transparent border-0 p-0"
           >
             <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-full overflow-hidden bg-white p-0.5 shadow-md group-hover:scale-105 transition-transform duration-200 border-2 border-[#0284C7] shrink-0 flex items-center justify-center">
               <img
@@ -123,7 +125,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>{language === 'bn' ? 'স্থাপিত ১৯৬২ • ফরিদপুর' : 'Est. 1962 • Faridpur'}</span>
               </p>
             </div>
-          </div>
+          </button>
 
           {/* Desktop Navigation Links */}
           <nav className="hidden lg:flex items-center gap-1.5 xl:gap-2">
@@ -167,9 +169,11 @@ export const Header: React.FC<HeaderProps> = ({
               {t.switchLanguage}
             </button>
             <button
+              type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 rounded-lg text-[#0F172A] hover:bg-[#E2EEF8] cursor-pointer"
               aria-label="Toggle mobile menu"
+              aria-expanded={mobileMenuOpen}
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>

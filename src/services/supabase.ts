@@ -1781,6 +1781,7 @@ export const SupabaseService = {
   }): Promise<{ success: boolean; account?: AdminAccount; error?: string }> {
     // Testing credentials support restricted strictly to dev environment
     if (
+      !(import.meta as any).env?.PROD &&
       isDevTestBypassAllowed() &&
       (input.email.trim().toLowerCase() === 'admin@gmail.com' || input.username.trim().toLowerCase() === 'admin') &&
       input.password === 'admin@123'
@@ -1820,6 +1821,7 @@ export const SupabaseService = {
 
     // Testing credentials support restricted strictly to dev environment
     if (
+      !(import.meta as any).env?.PROD &&
       isDevTestBypassAllowed() &&
       password === 'admin@123' &&
       (
@@ -1962,7 +1964,7 @@ export const SupabaseService = {
       createdAt: data.created_at || new Date().toISOString(),
     };
 
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && isDevTestBypassAllowed()) {
       localStorage.setItem(
         'plscf_test_admin_session',
         JSON.stringify({ ...account, expiresAt: Date.now() + ADMIN_SESSION_TTL_MS })
@@ -1998,13 +2000,15 @@ export const SupabaseService = {
       try {
         const saved = localStorage.getItem('plscf_test_admin_session');
         if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
-            localStorage.removeItem('plscf_test_admin_session');
-          } else if (!isDevTestBypassAllowed() && parsed.id === 'admin-master-001') {
+          if (!isDevTestBypassAllowed()) {
             localStorage.removeItem('plscf_test_admin_session');
           } else {
-            return parsed;
+            const parsed = JSON.parse(saved);
+            if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
+              localStorage.removeItem('plscf_test_admin_session');
+            } else {
+              return parsed;
+            }
           }
         }
       } catch (_) { }

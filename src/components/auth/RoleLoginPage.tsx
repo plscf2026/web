@@ -265,7 +265,7 @@ export const RoleLoginPage: React.FC<RoleLoginPageProps> = ({
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder={config.demoCredentials.email}
+                  placeholder={isDevBypass ? config.demoCredentials.email : 'username@domain.com'}
                   className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-hidden focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all font-mono"
                 />
               </div>

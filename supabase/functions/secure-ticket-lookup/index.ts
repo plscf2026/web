@@ -90,11 +90,13 @@ serve(async (req) => {
       );
     }
 
-    const clientIp =
-      req.headers.get('cf-connecting-ip')?.trim() ||
-      req.headers.get('x-real-ip')?.trim() ||
-      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-      'unavailable';
+    const rawCfIp = req.headers.get('cf-connecting-ip')?.trim();
+    const rawRealIp = req.headers.get('x-real-ip')?.trim();
+    const rawFwd = req.headers.get('x-forwarded-for')?.split(',').pop()?.trim();
+    const clientIpCandidate = rawCfIp || rawRealIp || rawFwd || 'unavailable';
+    const clientIp = /^[0-9a-fA-F:.]{3,64}$/.test(clientIpCandidate)
+      ? clientIpCandidate
+      : 'unavailable';
     const [ipHash, subjectHash] = await Promise.all([
       hmacHex(rateLimitSecret, `ip|${clientIp}`),
       hmacHex(rateLimitSecret, `ticket|${clientIp}|${registrationId}`),

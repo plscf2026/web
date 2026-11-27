@@ -233,6 +233,8 @@ export const DonationPage: React.FC<DonationPageProps> = ({
           setCompletedDonation(donation);
           setDonationsList(AppStore.getDonations());
           sessionStorage.removeItem('plscf_pending_donation');
+          localStorage.removeItem('plscf_pending_donation');
+          PayStationService.clearPendingSession();
           setPendingPayment(null);
         }
       } catch { }
@@ -241,7 +243,9 @@ export const DonationPage: React.FC<DonationPageProps> = ({
     return () => clearInterval(interval);
   }, [pendingPayment, completedDonation]);
 
-  const effectiveAmount = customAmount ? Math.max(10, Number(customAmount) || 0) : selectedAmount;
+  const minDonation = typeof feeSettings.minDonation === 'number' && feeSettings.minDonation > 0 ? feeSettings.minDonation : 100;
+  const maxDonation = typeof feeSettings.maxDonation === 'number' && feeSettings.maxDonation >= minDonation ? feeSettings.maxDonation : 50000;
+  const effectiveAmount = customAmount ? Math.max(0, Number(customAmount) || 0) : selectedAmount;
   const donationGatewayCharge = calculateGatewayCharge(effectiveAmount);
   const donationTotalPayable = Math.round((effectiveAmount + donationGatewayCharge) * 100) / 100;
   const totalRaised = donationsList.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
@@ -288,6 +292,8 @@ export const DonationPage: React.FC<DonationPageProps> = ({
         setCompletedDonation(donation);
         setDonationsList(AppStore.getDonations());
         sessionStorage.removeItem('plscf_pending_donation');
+        localStorage.removeItem('plscf_pending_donation');
+        PayStationService.clearPendingSession();
         setPendingPayment(null);
       } else {
         setErrorMessage(verifyRes.error || (isBangla ? 'পেমেন্ট এখনও নিশ্চিত হয়নি।' : 'Payment has not been confirmed yet. Please complete it on the gateway.'));
@@ -331,8 +337,21 @@ export const DonationPage: React.FC<DonationPageProps> = ({
       return;
     }
 
-    if (effectiveAmount < 10) {
-      setErrorMessage(isBangla ? 'অনুদানের সর্বনিম্ন পরিমাণ ১০ টাকা।' : 'Minimum donation amount is 10 BDT.');
+    if (effectiveAmount < minDonation) {
+      setErrorMessage(
+        isBangla
+          ? `অনুদানের সর্বনিম্ন পরিমাণ ৳${minDonation} টাকা।`
+          : `Minimum donation amount is ${minDonation} BDT.`
+      );
+      return;
+    }
+
+    if (effectiveAmount > maxDonation) {
+      setErrorMessage(
+        isBangla
+          ? `অনুদানের সর্বোচ্চ পরিমাণ ৳${maxDonation.toLocaleString()} টাকা।`
+          : `Maximum online donation amount is ${maxDonation.toLocaleString()} BDT.`
+      );
       return;
     }
 
@@ -881,6 +900,8 @@ export const DonationPage: React.FC<DonationPageProps> = ({
                       type="button"
                       onClick={() => {
                         sessionStorage.removeItem('plscf_pending_donation');
+                        localStorage.removeItem('plscf_pending_donation');
+                        PayStationService.clearPendingSession();
                         setPendingPayment(null);
                       }}
                       className="text-xs text-slate-500 hover:text-slate-800 underline ml-auto cursor-pointer"

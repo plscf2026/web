@@ -76,7 +76,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [pollCount, setPollCount] = useState(0);
 
   // Uniform 1.8% gateway charge added on top of every payment subtotal
-  const parentFee = registrationData?.hasParent ? 1500 : 0;
+  const configuredParentFee = AppStore.getFeeSettings().parentFee ?? 500;
+  const parentFee = registrationData?.hasParent ? (registrationData.parentFee ?? configuredParentFee) : 0;
   const subtotal = registrationFee + parentFee + donationAmount;
   const gatewayCharge = calculateGatewayCharge(subtotal);
   const finalTotalPayable = Math.round((subtotal + gatewayCharge) * 100) / 100;

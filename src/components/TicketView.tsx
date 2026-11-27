@@ -1,15 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
 import {
   Printer,
-  Mail,
   CheckCircle2,
   Calendar,
   MapPin,
   Shirt,
   ShieldCheck,
   Sparkles,
-  X,
   UserPlus,
   AlertTriangle,
   Clock,
@@ -42,7 +40,6 @@ export const TicketView: React.FC<TicketViewProps> = ({
 }) => {
   const t = translations[language];
   const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [emailModalOpen, setEmailModalOpen] = useState(false);
 
   useEffect(() => {
     if (qrCanvasRef.current) {
@@ -62,10 +59,6 @@ export const TicketView: React.FC<TicketViewProps> = ({
 
   const handlePrint = () => {
     window.print();
-  };
-
-  const handleResendEmail = () => {
-    setEmailModalOpen(true);
   };
 
   const isPaid = registration.paymentStatus === 'paid';
@@ -175,16 +168,6 @@ export const TicketView: React.FC<TicketViewProps> = ({
                   : 'Print Card (Pending Approval)'
                 : t.btnPrintTicket}
             </span>
-          </button>
-        )}
-
-        {isPaid && (
-          <button
-            onClick={handleResendEmail}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs sm:text-sm font-semibold shadow-xs transition-all cursor-pointer"
-          >
-            <Mail className="w-4 h-4 text-[#0284C7]" />
-            <span>{t.btnResendEmail}</span>
           </button>
         )}
 
@@ -546,76 +529,10 @@ export const TicketView: React.FC<TicketViewProps> = ({
             </span>
           </div>
           <div className="font-mono text-slate-400 text-[10px]">
-            PLSCF-SECURE-EVENT-PASS • 1962-2026
+            PLSCF-SECURE-EVENT-PASS • 1962-2027
           </div>
         </div>
       </div>
-
-      {/* Simulated Email Sent Modal */}
-      {emailModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-150">
-            <div className="bg-slate-900 text-white p-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-[#38BDF8]" />
-                <span className="text-xs font-semibold">
-                  {t.emailModalTitle}
-                </span>
-              </div>
-              <button
-                onClick={() => setEmailModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div className="p-3 bg-[#E2EEF8] border border-[#0284C7]/30 rounded-xl text-xs text-[#0F172A] flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#0284C7] shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-bold block">
-                    {language === 'bn' ? 'ইমেইল সফলভাবে পাঠানো হয়েছে!' : 'Email Dispatched Successfully!'}
-                  </span>
-                  <span>
-                    {t.emailModalSubtitle}{' '}
-                    <strong className="text-slate-900">{registration.email}</strong>
-                  </span>
-                </div>
-              </div>
-
-              {/* Simulated Email Envelope Preview */}
-              <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 text-xs space-y-2">
-                <div className="text-slate-500 font-mono text-[11px]">
-                  <strong>Subject:</strong> [Confirmed] Your Police Lines School & College Reunion 2026 Digital Ticket ({registration.id})
-                </div>
-                <div className="border-t border-slate-200 pt-2 text-slate-700 leading-relaxed">
-                  <p>Dear {registration.fullName},</p>
-                  <p className="mt-1">
-                    Thank you for registering for the Grand Reunion 2026. Your payment of ৳{registration.totalPaid} has been verified.
-                  </p>
-                  <ul className="list-disc list-inside mt-2 space-y-0.5 font-medium text-slate-900">
-                    <li>Registration ID: {registration.id}</li>
-                    <li>T-Shirt Size: {registration.tShirtSize}</li>
-                    <li>Venue: Police Lines Campus & Ground, Faridpur</li>
-                    <li>Event Date: December 25-26, 2026</li>
-                  </ul>
-                  <p className="mt-2 text-slate-500 text-[11px]">
-                    Attached: Digital_Ticket_{registration.id}.pdf with scannable QR Code.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setEmailModalOpen(false)}
-                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors cursor-pointer"
-              >
-                {language === 'bn' ? 'ঠিক আছে' : 'Got it'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

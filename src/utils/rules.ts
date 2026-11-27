@@ -312,7 +312,11 @@ export function calculateTotalFee(
 ): { registrationFee: number; parentFee: number; donationAmount: number; totalPayable: number } {
   const baseFee = category === 'former' ? feeSettings.formerStudentFee : feeSettings.currentStudentFee;
   const validDonation = Math.max(0, Number(donationAmount) || 0);
-  const parentFee = hasParent ? 1500 : 0;
+  const configuredParentFee =
+    typeof feeSettings.parentFee === 'number' && Number.isFinite(feeSettings.parentFee) && feeSettings.parentFee >= 0
+      ? feeSettings.parentFee
+      : 500;
+  const parentFee = hasParent ? configuredParentFee : 0;
   return {
     registrationFee: baseFee,
     parentFee,

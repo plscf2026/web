@@ -23,6 +23,7 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
   const isBn = language === 'bn';
   const [content, setContent] = useState<AboutContactContent>(() => AboutContactService.getContent());
   const [feedbackSent, setFeedbackSent] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -65,6 +66,7 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
     if (!isFormValid || submitting) return;
 
     setSubmitting(true);
+    setSubmitError(null);
     const inquiry: ContactInquiry = {
       id: `INQ-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       name: name.trim(),
@@ -74,7 +76,28 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
       status: 'NEW',
     };
 
-    // 1. Save locally to localStorage
+    // 1. Save to Supabase inquiries table
+    const { error: dbError } = await supabase.from('inquiries').insert({
+      id: inquiry.id,
+      name: inquiry.name,
+      mobile_number: inquiry.mobileNumber,
+      message: inquiry.message,
+      created_at: inquiry.createdAt,
+      status: inquiry.status,
+    });
+
+    if (dbError) {
+      console.warn('Supabase inquiry insert error:', dbError);
+      setSubmitting(false);
+      setSubmitError(
+        language === 'bn'
+          ? 'দুঃখিত, এই মুহূর্তে আপনার বার্তাটি সার্ভারে সংরক্ষণ করা যায়নি। অনুগ্রহ করে পরে আবার চেষ্টা করুন।'
+          : 'Unable to submit your inquiry right now. Please try again shortly.'
+      );
+      return;
+    }
+
+    // 2. Mirror locally after server persistence succeeds
     try {
       const stored = localStorage.getItem('plscf_contact_inquiries');
       const list: ContactInquiry[] = stored ? JSON.parse(stored) : [];
@@ -82,20 +105,6 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
       localStorage.setItem('plscf_contact_inquiries', JSON.stringify(list.slice(0, 100)));
     } catch (err) {
       console.warn('Local storage inquiry error:', err);
-    }
-
-    // 2. Save to Supabase inquiries table
-    try {
-      await supabase.from('inquiries').insert({
-        id: inquiry.id,
-        name: inquiry.name,
-        mobile_number: inquiry.mobileNumber,
-        message: inquiry.message,
-        created_at: inquiry.createdAt,
-        status: inquiry.status,
-      });
-    } catch (err) {
-      console.warn('Supabase inquiry insert note:', err);
     }
 
     setSubmitting(false);
@@ -365,6 +374,12 @@ export const AboutContactPage: React.FC<AboutContactPageProps> = ({ language }) 
                   </p>
                 )}
               </div>
+
+              {submitError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+                  {submitError}
+                </div>
+              )}
 
               <button
                 type="submit"

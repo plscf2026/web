@@ -17,6 +17,7 @@ import {
   generateThankYouCardPdf,
   printThankYouCard,
 } from '../utils/thankYouCardGenerator';
+import { sanitizeSvg } from '../utils/security';
 
 export interface ThankYouCardBadgeProps {
   cardData: ThankYouCardData;
@@ -122,7 +123,7 @@ export const ThankYouCardBadge: React.FC<ThankYouCardBadgeProps> = ({
       <div className="relative w-full aspect-[10/14] rounded-2xl overflow-hidden shadow-2xl border-4 border-amber-600/50 bg-[#3b0a14] flex items-center justify-center">
         <div
           className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full"
-          dangerouslySetInnerHTML={{ __html: svgContent }}
+          dangerouslySetInnerHTML={{ __html: sanitizeSvg(svgContent) }}
         />
       </div>
 

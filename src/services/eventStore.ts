@@ -612,13 +612,15 @@ export class EventStore {
       try {
         const saved = localStorage.getItem('plscf_test_staff_session');
         if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
-            localStorage.removeItem('plscf_test_staff_session');
-          } else if (!isDevTestBypassAllowed() && parsed.id?.startsWith('staff-001')) {
+          if (!isDevTestBypassAllowed()) {
             localStorage.removeItem('plscf_test_staff_session');
           } else {
-            return parsed;
+            const parsed = JSON.parse(saved);
+            if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
+              localStorage.removeItem('plscf_test_staff_session');
+            } else {
+              return parsed;
+            }
           }
         }
       } catch (_) { }
@@ -691,7 +693,7 @@ export class EventStore {
     const normalized = identifier.trim().toLowerCase();
 
     // Testing credentials support restricted strictly to dev environment
-    if (isDevTestBypassAllowed() && passwordAttempt === 'admin@123') {
+    if (!(import.meta as any).env?.PROD && isDevTestBypassAllowed() && passwordAttempt === 'admin@123') {
       const allStaff = this.getStaffAccounts();
       const match = allStaff.find(
         (a) =>
@@ -810,7 +812,7 @@ export class EventStore {
       createdBy: data.created_by || undefined,
     };
 
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && isDevTestBypassAllowed()) {
       localStorage.setItem(
         'plscf_test_staff_session',
         JSON.stringify({ ...staff, expiresAt: Date.now() + STAFF_SESSION_TTL_MS })

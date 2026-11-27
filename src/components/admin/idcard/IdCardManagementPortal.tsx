@@ -1975,17 +1975,10 @@ export const IdCardManagementPortal: React.FC<IdCardManagementPortalProps> = ({
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-slate-300 font-semibold text-xs">New Secure Password</label>
-                <button
-                  type="button"
-                  onClick={() => setNewStaffPassword('admin@123')}
-                  className="text-[10px] text-amber-400 hover:text-amber-300 font-mono font-semibold"
-                >
-                  🧪 Fill: admin@123
-                </button>
               </div>
               <input
                 type="password"
-                placeholder="Enter new password (e.g. staff@123)"
+                placeholder="Enter new strong password"
                 value={newStaffPassword}
                 onChange={(e) => setNewStaffPassword(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"

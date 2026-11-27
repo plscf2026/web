@@ -287,6 +287,7 @@ test('Accompanying Parent / Guardian validation & fee calculation rules', () => 
   const feeSettings: FeeSettings = {
     formerStudentFee: 1500,
     currentStudentFee: 1000,
+    parentFee: 500,
     registrationOpen: true,
     startDate: '2026-01-01',
     endDate: '2026-12-01',
@@ -301,12 +302,17 @@ test('Accompanying Parent / Guardian validation & fee calculation rules', () => 
   assert.equal(feesWithoutParent.donationAmount, 500);
   assert.equal(feesWithoutParent.totalPayable, 2000);
 
-  // 2. Fee calculation WITH accompanying parent (+৳1,500)
+  // 2. Fee calculation WITH accompanying parent (+৳500 from feeSettings.parentFee)
   const feesWithParent = calculateTotalFee('former', feeSettings, 500, true);
   assert.equal(feesWithParent.registrationFee, 1500);
-  assert.equal(feesWithParent.parentFee, 1500);
+  assert.equal(feesWithParent.parentFee, 500);
   assert.equal(feesWithParent.donationAmount, 500);
-  assert.equal(feesWithParent.totalPayable, 3500); // 1500 + 1500 + 500
+  assert.equal(feesWithParent.totalPayable, 2500); // 1500 + 500 + 500
+
+  // 2b. Fee calculation respects custom configured parentFee
+  const customParentFees = calculateTotalFee('former', { ...feeSettings, parentFee: 1200 }, 0, true);
+  assert.equal(customParentFees.parentFee, 1200);
+  assert.equal(customParentFees.totalPayable, 2700);
 
   // 3. Parent field validation when hasParent is true
   const baseStudent: RegistrationFormData = {

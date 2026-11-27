@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Home, UserPlus, HeartHandshake, Ticket, QrCode, Shield } from 'lucide-react';
 import { Language, FeeSettings, GovernanceLoadStatus } from '../../types';
 import { AppStore } from '../../services/store';
+import { SupabaseService } from '../../services/supabase';
 import { isGlobalRegistrationOpen } from '../../utils/rules';
 
 interface MobileBottomNavProps {
@@ -99,7 +100,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             <button
               key={item.id}
               type="button"
-              onClick={() => onNavigate(item.id)}
+              onClick={() => {
+                const isLeavingPriv =
+                  activeView === 'admin' || activeView === 'dashboard' || activeView === 'scanner';
+                if (isLeavingPriv && item.id === 'home') {
+                  SupabaseService.terminateAdministrativeSession({ forceLocal: true }).catch(() => {});
+                }
+                onNavigate(item.id);
+              }}
               className={`flex-1 min-w-0 flex flex-col items-center justify-center min-h-[44px] py-1 px-1 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
                 isActive
                   ? 'text-[#38BDF8] bg-sky-950/60 font-bold shadow-inner'

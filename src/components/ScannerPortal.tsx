@@ -27,6 +27,7 @@ import { ForcePasswordChangeGate } from './auth/ForcePasswordChangeGate';
 
 interface ScannerPortalProps {
   language: Language;
+  initialModule?: string;
 }
 
 const STAFF_TYPE_OPTIONS: Array<{
@@ -44,7 +45,7 @@ const STAFF_TYPE_OPTIONS: Array<{
     value: 'GATE_STAFF',
     labelEn: 'Gate Entry & Exit Staff (GATE_STAFF)',
     labelBn: 'গেট এন্ট্রি ও প্রস্থান স্টাফ',
-    moduleId: 'gate_entry',
+    moduleId: 'gate_scanner',
   },
   {
     value: 'BREAKFAST_STAFF',
@@ -84,25 +85,40 @@ const STAFF_TYPE_OPTIONS: Array<{
   },
 ];
 
-export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
+export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language, initialModule }) => {
   const [currentStaff, setCurrentStaff] = useState<StaffAccount | null>(null);
 
   // Login form state - dev bypass enabled only in local development
-  const isDevMode = isDevTestBypassAllowed();
+  const isDevMode = !(import.meta as any).env?.PROD && isDevTestBypassAllowed();
+  const DEV_TEST_PWD = (import.meta as any).env?.DEV ? 'admin@123' : '';
   const [staffTypeInput, setStaffTypeInput] = useState<EventStaffRole | 'ALL'>('ALL');
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // Active module tab if Super Admin - default to Multi-Station Desk
+  // Active module tab if Super Admin - honor URL :module param when valid, else sessionStorage
+  const normalizeModuleSlug = (raw?: string): string => {
+    if (!raw) return '';
+    if (raw === 'gate_entry') return 'gate_scanner';
+    return raw;
+  };
   const [activeAdminModule, setActiveAdminModule] = useState<string>(() => {
+    const fromRoute = normalizeModuleSlug(initialModule);
+    if (fromRoute) return fromRoute;
     try {
-      return sessionStorage.getItem('plscf_scanner_module') || 'multi_station';
+      return normalizeModuleSlug(sessionStorage.getItem('plscf_scanner_module') || undefined) || 'multi_station';
     } catch {
       return 'multi_station';
     }
   });
+
+  useEffect(() => {
+    const normalized = normalizeModuleSlug(initialModule);
+    if (normalized) {
+      setActiveAdminModule(normalized);
+    }
+  }, [initialModule]);
 
   const handleAdminModuleChange = (mod: string) => {
     setActiveAdminModule(mod);
@@ -158,12 +174,14 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
     const autoLogin = sessionStorage.getItem('plscf_scanner_auto_login');
     if (prefillUser) {
       setUsernameInput(prefillUser);
-      setPasswordInput('admin@123');
+      if (isDevMode) {
+        setPasswordInput(DEV_TEST_PWD);
+      }
       sessionStorage.removeItem('plscf_scanner_prefill_user');
 
       if (isDevMode && autoLogin === 'true') {
         sessionStorage.removeItem('plscf_scanner_auto_login');
-        EventStore.authenticateStaff(prefillUser, 'admin@123')
+        EventStore.authenticateStaff(prefillUser, DEV_TEST_PWD)
           .then((res) => {
             if (res.success && res.staff && active) {
               setCurrentStaff(res.staff);
@@ -401,20 +419,20 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
           )}
 
           {/* Testing Mode Credentials Banner (Development only) */}
-          {isDevMode && (
+          {!(import.meta as any).env?.PROD && isDevMode && (
             <div className="p-3 bg-sky-50 border border-sky-300 text-sky-900 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xs">
               <div className="flex items-center gap-1.5 font-medium flex-wrap">
                 <span className="font-bold text-sky-950">🧪 Testing Credentials:</span>
                 <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">admin@gmail.com</span>
                 <span className="text-slate-400">/</span>
-                <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">admin@123</span>
+                <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">{DEV_TEST_PWD}</span>
               </div>
               <button
                 type="button"
                 onClick={() => {
                   setStaffTypeInput('SUPER_ADMIN');
                   setUsernameInput('admin@gmail.com');
-                  setPasswordInput('admin@123');
+                  setPasswordInput(DEV_TEST_PWD);
                 }}
                 className="text-[10px] text-sky-800 bg-sky-100 hover:bg-sky-200 px-2.5 py-1 rounded-full font-bold cursor-pointer transition-colors shadow-2xs"
               >
@@ -549,7 +567,7 @@ export const ScannerPortal: React.FC<ScannerPortalProps> = ({ language }) => {
                     onClick={() => {
                       setStaffTypeInput(staff.staffType);
                       setUsernameInput(staff.id);
-                      setPasswordInput('admin@123');
+                      setPasswordInput(DEV_TEST_PWD);
                     }}
                     className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${staff.color}`}
                   >

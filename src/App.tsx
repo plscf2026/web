@@ -92,6 +92,11 @@ export default function App() {
     return resolveRouteFromLocation().category;
   });
 
+  const [scannerModule, setScannerModule] = useState<string | undefined>(() => {
+    const resolved = resolveRouteFromLocation();
+    return resolved.view === 'scanner' ? resolved.tab : undefined;
+  });
+
   // Unified router navigation handler: updates state, syncs HTML5 history and persists session
   const handleNavigate = (view: string, replace = false, extraParams?: Record<string, string>) => {
     if (view === 'register' && activeView === 'ticket') {
@@ -113,6 +118,9 @@ export default function App() {
 
     if (view === 'register') {
       setInitialRegistrationCategory(parseRegistrationCategory(extraParams?.category));
+    }
+    if (view === 'scanner') {
+      setScannerModule(extraParams?.tab);
     }
     setActiveView(view);
     syncRouteHistory(view, replace, extraParams);
@@ -269,7 +277,7 @@ export default function App() {
             const rawMsg = (params.get('message') || params.get('error') || params.get('reason') || '').toLowerCase();
             const isInsufficientBalance = rawMsg.includes('balance') || statusParam.includes('balance');
 
-            if (isInsufficientBalance) {
+            if (isInsufficientBalance && PayStationService.getConfig().isSandbox) {
               setPaymentModalError(
                 language === 'bn'
                   ? 'পেমেন্ট ব্যর্থ: বিকাশ স্যান্ডবক্স টেস্ট নম্বরে ব্যালেন্স অপ্রতুল ("Insufficient balance")। অনুগ্রহ করে পর্যাপ্ত ব্যালেন্সযুক্ত সক্রিয় টেস্ট ওয়ালেট 01929918378 বা 01770618576 ব্যবহার করুন (OTP: 123456, PIN: 12121)। আপনার পূরণকৃত সব তথ্য সংরক্ষিত রয়েছে।'
@@ -293,6 +301,9 @@ export default function App() {
             sessionStorage.setItem('plscf_returned_donation_invoice', invoiceFromUrl);
           }
           handleNavigate('donate', true);
+        } else if (invoiceFromUrl) {
+          // Cross-browser return with invoice but without local pendingSession -> route to ticket recovery lookup
+          handleNavigate('find-ticket', true);
         } else {
           handleNavigate('register', true);
         }
@@ -329,6 +340,12 @@ export default function App() {
         const nextParams: Record<string, string> = {};
         if (resolved.tab) nextParams.tab = resolved.tab;
         if (resolved.category) nextParams.category = resolved.category;
+        if (resolved.portalRole) {
+          nextParams.role = PORTAL_ROLE_CONFIGS[resolved.portalRole]?.slug || resolved.portalRole;
+        }
+        if (resolved.view === 'scanner') {
+          setScannerModule(resolved.tab);
+        }
         syncRouteHistory(
           resolved.view,
           true,
@@ -518,9 +535,11 @@ export default function App() {
 
             {activeView === 'about' && <AboutContactPage language={language} />}
 
-            {activeView === 'scanner' && <ScannerPortal language={language} />}
+            {activeView === 'scanner' && (
+              <ScannerPortal language={language} initialModule={scannerModule} />
+            )}
 
-            {(activeView === 'admin' || activeView === 'dashboard') && (
+            {(activeView === 'admin' || activeView === 'dashboard' || activeView === 'portal') && (
               <AdminDashboard
                 language={language}
                 portalRole={currentPortalRole}

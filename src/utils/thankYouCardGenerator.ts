@@ -245,6 +245,14 @@ export async function printThankYouCard(data: ThankYouCardData): Promise<void> {
     throw new Error('Unable to access printing iframe document');
   }
 
+  const triggerPrint = () => {
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    }, 250);
+  };
+  iframe.onload = triggerPrint;
+
   doc.open();
   doc.write(`
     <!DOCTYPE html>
@@ -274,18 +282,12 @@ export async function printThankYouCard(data: ThankYouCardData): Promise<void> {
         </style>
       </head>
       <body>
-        <img src="${imgDataUrl}" />
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-            }, 300);
-          };
-        </script>
+        <img src="${imgDataUrl}" alt="Thank You Card" />
       </body>
     </html>
   `);
   doc.close();
+  triggerPrint();
 
   setTimeout(() => {
     try {

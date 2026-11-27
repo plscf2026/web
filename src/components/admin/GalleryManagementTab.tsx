@@ -23,6 +23,7 @@ import { Language } from '../../types';
 import { GalleryService, GalleryMediaItem } from '../../services/galleryService';
 import { GlobalPagination } from '../common/GlobalPagination';
 import { paginate } from '../../utils/pagination';
+import { readValidatedImage } from '../../utils/fileValidation';
 
 interface GalleryManagementTabProps {
   language: Language;
@@ -213,23 +214,20 @@ export const GalleryManagementTab: React.FC<GalleryManagementTabProps> = ({ lang
     }
   };
 
-  const handleDeviceFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDeviceFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      alert(isBangla ? 'অনুগ্রহ করে শুধুমাত্র ছবি ফাইল নির্বাচন করুন' : 'Please select an image file');
-      return;
+    try {
+      const validatedDataUrl = await readValidatedImage(file);
+      setFormThumbnail(validatedDataUrl);
+    } catch (err: any) {
+      setStatusMessage({
+        text: err?.message || (isBangla ? 'শুধুমাত্র বৈধ JPEG, PNG, বা WebP ছবি আপলোড করা যাবে।' : 'Only valid JPEG, PNG, or WebP images are permitted.'),
+        type: 'error',
+      });
+      e.target.value = '';
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
-        setFormThumbnail(result);
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleImportJsonFile = (e: React.ChangeEvent<HTMLInputElement>) => {

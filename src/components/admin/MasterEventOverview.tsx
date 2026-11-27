@@ -273,7 +273,7 @@ export const MasterEventOverview: React.FC<MasterEventOverviewProps> = ({
               </div>
             </div>
             <button
-              onClick={() => onNavigateTab('foodManagement')}
+              onClick={() => onNavigateTab('mealControl')}
               className="text-xs text-amber-700 hover:text-amber-900 font-bold flex items-center gap-1 cursor-pointer"
             >
               <span>Manage</span>
@@ -360,7 +360,7 @@ export const MasterEventOverview: React.FC<MasterEventOverviewProps> = ({
               </div>
             </div>
             <button
-              onClick={() => onNavigateTab('dressManagement')}
+              onClick={() => onNavigateTab('tshirts')}
               className="text-xs text-indigo-700 hover:text-indigo-900 font-bold flex items-center gap-1 cursor-pointer"
             >
               <span>Details</span>

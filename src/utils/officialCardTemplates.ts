@@ -22,6 +22,7 @@ import { studentCardSvgRaw } from '../assets/cards/studentCardSvgRaw';
 import { parentCardSvgRaw } from '../assets/cards/parentCardSvgRaw';
 import { alumniCardSvgRaw } from '../assets/cards/alumniCardSvgRaw';
 import { StudentIdCardRecord } from '../types/idcard';
+import { sanitizeImageUrl } from './security';
 
 export type CardType = 'student' | 'alumni' | 'parent';
 
@@ -273,9 +274,10 @@ export function buildOfficialCardSvg(data: OfficialCardData): string {
     `<text id="registration-id_${uid}" x="345" y="1037" font-size="21.27">${safeRegId}</text>`
   );
 
-  // 9. Photo integration
-  if (data.photoUrl && data.photoUrl.trim()) {
-    const safePhoto = escapeXml(data.photoUrl.trim());
+  // 9. Photo integration (strict URL scheme validation)
+  const sanitizedPhoto = data.photoUrl ? sanitizeImageUrl(data.photoUrl.trim()) : '';
+  if (sanitizedPhoto && !sanitizedPhoto.startsWith('data:image/svg+xml')) {
+    const safePhoto = escapeXml(sanitizedPhoto);
     const photoTag = `<image id="student-photo_${uid}" x="330" y="434" width="240" height="248" preserveAspectRatio="xMidYMid slice" clip-path="url(#portrait-edge_${uid})" xlink:href="${safePhoto}" href="${safePhoto}" />`;
     // Inject right after the silhouette group
     svg = svg.replace(
@@ -420,6 +422,14 @@ export async function printOfficialCard(
     return;
   }
 
+  const triggerPrint = () => {
+    setTimeout(() => {
+      iframe?.contentWindow?.focus();
+      iframe?.contentWindow?.print();
+    }, 250);
+  };
+  iframe.onload = triggerPrint;
+
   doc.open();
   doc.write(`
     <!DOCTYPE html>
@@ -462,18 +472,11 @@ export async function printOfficialCard(
       </head>
       <body>
         <div class="card-container">
-          <img src="${dataUrl}" alt="ID Card" />
+          <img src="${escapeXml(sanitizeImageUrl(dataUrl))}" alt="ID Card" />
         </div>
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.focus();
-              window.print();
-            }, 300);
-          };
-        </script>
       </body>
     </html>
   `);
   doc.close();
+  triggerPrint();
 }

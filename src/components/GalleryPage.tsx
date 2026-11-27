@@ -13,6 +13,8 @@ import { translations } from '../i18n/translations';
 import { GlobalPagination } from './common/GlobalPagination';
 import { paginate, DEFAULT_PAGE_SIZE } from '../utils/pagination';
 import { GalleryService, GalleryMediaItem } from '../services/galleryService';
+import { isDevTestBypassAllowed } from '../services/supabase';
+import { sanitizeImageUrl, sanitizeUrl } from '../utils/security';
 
 interface GalleryPageProps {
   language: Language;
@@ -90,8 +92,8 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language, onNavigate }
           {t.gallerySubtitle}
         </p>
 
-        {/* Quick Admin Edit Button */}
-        {onNavigate && (
+        {/* Quick Admin Edit Button (visible only in dev/sandbox mode or to active admin) */}
+        {onNavigate && isDevTestBypassAllowed() && (
           <div className="pt-1 flex justify-center">
             <button
               type="button"
@@ -226,7 +228,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language, onNavigate }
             <div className="relative aspect-16/9 bg-black flex items-center justify-center">
               {selectedItem.type === 'photo' ? (
                 <img
-                  src={selectedItem.thumbnail}
+                  src={sanitizeImageUrl(selectedItem.thumbnail)}
                   alt={selectedItem.titleEn}
                   className="w-full h-full object-contain"
                 />
@@ -238,9 +240,9 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language, onNavigate }
                   allowFullScreen
                   className="w-full h-full border-0"
                 />
-              ) : isDirectVideo ? (
+              ) : isDirectVideo && sanitizeUrl(selectedItem.videoUrl) ? (
                 <video
-                  src={selectedItem.videoUrl}
+                  src={sanitizeUrl(selectedItem.videoUrl)}
                   controls
                   autoPlay
                   className="w-full h-full"
@@ -251,9 +253,9 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ language, onNavigate }
                   <p className="text-sm font-semibold">
                     {language === 'bn' ? 'ভিডিও স্ট্রিম প্লেয়ার' : 'Video Memory Stream'}
                   </p>
-                  {selectedItem.videoUrl && (
+                  {sanitizeUrl(selectedItem.videoUrl) && (
                     <a
-                      href={selectedItem.videoUrl}
+                      href={sanitizeUrl(selectedItem.videoUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#0284C7] text-white text-xs font-bold hover:bg-[#0EA5E9]"

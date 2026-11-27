@@ -21,6 +21,7 @@ import {
   OfficialCardData,
   convertImageUrlToDataUrl,
 } from '../../utils/officialCardTemplates';
+import { sanitizeSvg } from '../../utils/security';
 
 export interface OfficialCardBadgeProps {
   student: StudentIdCardRecord;
@@ -284,7 +285,7 @@ export const OfficialCardBadge: React.FC<OfficialCardBadgeProps> = ({
         {/* Render Vector SVG Card */}
         <div
           className="w-full h-full [&>svg]:w-full [&>svg]:h-full [&>svg]:block"
-          dangerouslySetInnerHTML={{ __html: svgContent }}
+          dangerouslySetInnerHTML={{ __html: sanitizeSvg(svgContent) }}
         />
 
         {/* Live Synchronized Photo Overlay if custom slot provided (e.g. active camera stream) */}

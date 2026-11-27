@@ -1,4 +1,4 @@
-# robots.txt for Police Lines School & College Faridpur — Reunion 2026
+# robots.txt for Police Lines School & College Faridpur — Grand Reunion 2027
 # https://plscf65.vercel.app/
 
 User-agent: *

@@ -37,7 +37,7 @@ export const NoticeBoardPage: React.FC<NoticeBoardPageProps> = ({ language }) =>
     // Generate simulated PDF text download
     const blob = new Blob(
       [
-        `POLICE LINES SCHOOL AND COLLEGE, FARIDPUR\nGRAND REUNION 2026 OFFICIAL NOTICE\n\nTitle: ${title}\nDate: ${new Date().toLocaleDateString()}\n\nOfficial notice copy from the Reunion Organizing Committee.`,
+        `POLICE LINES SCHOOL AND COLLEGE, FARIDPUR\nGRAND REUNION 2027 OFFICIAL NOTICE\n\nTitle: ${title}\nDate: ${new Date().toLocaleDateString()}\n\nOfficial notice copy from the Reunion Organizing Committee.`,
       ],
       { type: 'text/plain' }
     );

@@ -151,12 +151,12 @@ export async function validateStudentImage(
   }
 
   const mime = fileOrBlob.type.toLowerCase();
-  if (mime && !ALLOWED_MIME_TYPES.includes(mime as any)) {
+  if (!mime || !ALLOWED_MIME_TYPES.includes(mime as any)) {
     return {
       valid: false,
       mimeType: mime,
       sizeBytes: fileOrBlob.size,
-      error: `Unsupported image format: "${mime}". Allowed formats: JPEG, PNG, WebP.`,
+      error: `Unsupported image format: "${mime || 'unknown'}". Allowed formats: JPEG, PNG, WebP.`,
     };
   }
 
@@ -184,8 +184,7 @@ export async function validateStudentImage(
       bytes[10] === 0x42 &&
       bytes[11] === 0x50; // WEBP
 
-    if (!isJpeg && !isPng && !isWebp && !isRiff) {
-      // If MIME header claims JPEG/PNG but magic bytes do not match
+    if (!isJpeg && !isPng && !isWebp) {
       return {
         valid: false,
         sizeBytes: fileOrBlob.size,
@@ -193,7 +192,11 @@ export async function validateStudentImage(
       };
     }
   } catch {
-    // If arrayBuffer fails (e.g. mocked test environment), pass if MIME type is valid
+    return {
+      valid: false,
+      sizeBytes: fileOrBlob.size,
+      error: 'Unable to verify image file contents.',
+    };
   }
 
   return {

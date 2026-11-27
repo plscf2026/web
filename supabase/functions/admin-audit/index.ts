@@ -66,7 +66,7 @@ serve(async (req) => {
 
     const { data: admin, error: adminError } = await supabase
       .from('admin_accounts')
-      .select('id, username, role')
+      .select('id, username, role, status, is_locked')
       .eq('auth_user_id', authData.user.id)
       .maybeSingle();
 
@@ -74,7 +74,12 @@ serve(async (req) => {
       console.error('Admin profile lookup failed:', adminError.message);
       return jsonResponse({ error: 'Unable to verify administrator permissions.' }, 500, headers);
     }
-    if (!admin || admin.role !== 'super_admin') {
+    if (
+      !admin ||
+      admin.role !== 'super_admin' ||
+      admin.is_locked ||
+      (admin.status && admin.status.toUpperCase() !== 'ACTIVE')
+    ) {
       return jsonResponse({ error: 'Administrator permission is required.' }, 403, headers);
     }
 

@@ -86,18 +86,53 @@ serve(async (req) => {
   }
 
   try {
+    const authorization = req.headers.get('authorization') ?? '';
+    const tokenMatch = authorization.match(/^Bearer\s+(\S+)$/i);
+    if (!tokenMatch) {
+      return jsonResponse({ error: 'Staff or administrator authentication is required.' }, 401, headers);
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(tokenMatch[1]);
+    if (authError || !authData.user) {
+      return jsonResponse({ error: 'Authentication token is invalid or expired.' }, 401, headers);
+    }
+
+    const [{ data: adminProfile }, { data: staffProfile }] = await Promise.all([
+      supabase
+        .from('admin_accounts')
+        .select('id, role, status, is_locked')
+        .eq('auth_user_id', authData.user.id)
+        .maybeSingle(),
+      supabase
+        .from('staff_accounts')
+        .select('id, role, status')
+        .eq('auth_user_id', authData.user.id)
+        .maybeSingle(),
+    ]);
+
+    const hasActiveAdmin = Boolean(
+      adminProfile &&
+      !adminProfile.is_locked &&
+      (!adminProfile.status || adminProfile.status.toUpperCase() === 'ACTIVE')
+    );
+    const hasActiveStaff = Boolean(staffProfile && staffProfile.status === 'ACTIVE');
+
+    if (!hasActiveAdmin && !hasActiveStaff) {
+      return jsonResponse({ error: 'Active staff or administrator authorization is required.' }, 403, headers);
+    }
+
     let studentId = '';
     let qrToken = '';
     let year = 2027;
-    let staffId = '';
-    let staffRole = '';
 
     if (req.method === 'GET') {
       const url = new URL(req.url);
       studentId = url.searchParams.get('id')?.trim() || '';
       qrToken = url.searchParams.get('token')?.trim() || '';
-      staffId = url.searchParams.get('staff_id')?.trim() || '';
-      staffRole = url.searchParams.get('staff_role')?.trim() || '';
       const parsedYear = Number(url.searchParams.get('year') || '2027');
       if (Number.isInteger(parsedYear) && parsedYear >= 2020 && parsedYear <= 2100) {
         year = parsedYear;
@@ -106,8 +141,6 @@ serve(async (req) => {
       const body = await req.json();
       studentId = typeof body.id === 'string' ? body.id.trim() : '';
       qrToken = typeof body.token === 'string' ? body.token.trim() : '';
-      staffId = typeof body.staff_id === 'string' ? body.staff_id.trim() : '';
-      staffRole = typeof body.staff_role === 'string' ? body.staff_role.trim() : '';
       const parsedYear = Number(body.year || '2027');
       if (Number.isInteger(parsedYear) && parsedYear >= 2020 && parsedYear <= 2100) {
         year = parsedYear;
@@ -119,42 +152,58 @@ serve(async (req) => {
     if (parsedFromUrl.id) studentId = parsedFromUrl.id;
     if (!qrToken && parsedFromUrl.token) qrToken = parsedFromUrl.token;
 
-    // Normalization
+    // Strict input sanitization (prevent filter injection)
     studentId = studentId.toUpperCase().trim();
     qrToken = qrToken.toUpperCase().trim();
 
-    if (!studentId && !qrToken) {
+    if ((!studentId && !qrToken) || (studentId && !/^[A-Z0-9_-]{3,64}$/.test(studentId)) || (qrToken && !/^[A-Z0-9_-]{4,64}$/.test(qrToken))) {
       return jsonResponse(
         {
           success: false,
           verified: false,
           status: 'INVALID_INPUT',
-          error: 'Registration ID or QR token is required for verification.',
+          error: 'Valid registration ID or QR token is required for verification.',
         },
         400,
         headers
       );
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    // 1. Parameterized authoritative lookup in registrations_2027 (zero photo_url / zero PII)
+    const selectCols = 'id, full_name, full_name_bn, category, passing_year, current_class, batch_name, payment_status, registration_approval_status, qr_token, year';
+    let registration: any = null;
+    let error: any = null;
 
-    // 1. Authoritative lookup in registrations_2027 (zero photo_url / zero PII)
-    const targetTable = 'registrations_2027';
-    let query = supabase
-      .from(targetTable)
-      .select('id, full_name, full_name_bn, category, passing_year, current_class, batch_name, payment_status, registration_approval_status, qr_token, year');
+    if (studentId) {
+      const byIdRes = await supabase
+        .from('registrations_2027')
+        .select(selectCols)
+        .eq('id', studentId)
+        .limit(1)
+        .maybeSingle();
+      registration = byIdRes.data;
+      error = byIdRes.error;
 
-    if (studentId && qrToken) {
-      query = query.eq('id', studentId);
-    } else if (studentId) {
-      query = query.or(`id.ilike.${studentId},qr_token.ilike.${studentId}`);
+      if (!registration && !error) {
+        const byTokenRes = await supabase
+          .from('registrations_2027')
+          .select(selectCols)
+          .eq('qr_token', studentId)
+          .limit(1)
+          .maybeSingle();
+        registration = byTokenRes.data;
+        error = byTokenRes.error;
+      }
     } else {
-      query = query.eq('qr_token', qrToken);
+      const byQrRes = await supabase
+        .from('registrations_2027')
+        .select(selectCols)
+        .eq('qr_token', qrToken)
+        .limit(1)
+        .maybeSingle();
+      registration = byQrRes.data;
+      error = byQrRes.error;
     }
-
-    const { data: registration, error } = await query.limit(1).maybeSingle();
 
     if (error || !registration) {
       return jsonResponse(
@@ -209,16 +258,28 @@ serve(async (req) => {
       );
     }
 
-    // 3. Cryptographic token matching (case-insensitive)
-    if (qrToken && registration.qr_token) {
+    // 3. Mandatory cryptographic token matching (case-insensitive)
+    if (registration.qr_token) {
       const regToken = String(registration.qr_token).trim().toUpperCase();
-      if (regToken !== qrToken && registration.id.toUpperCase() !== studentId) {
+      if (qrToken && regToken !== qrToken) {
         return jsonResponse(
           {
             success: false,
             verified: false,
             status: 'TOKEN_MISMATCH',
             error: `Cryptographic QR token mismatch for registration "${registration.id}".`,
+          },
+          403,
+          headers
+        );
+      }
+      if (!qrToken && regToken !== studentId) {
+        return jsonResponse(
+          {
+            success: false,
+            verified: false,
+            status: 'TOKEN_REQUIRED',
+            error: 'Cryptographic QR token is required for ID verification.',
           },
           403,
           headers
@@ -238,7 +299,7 @@ serve(async (req) => {
       cardStatus = idCardRecord.card_status;
     }
 
-    // Return safe, sanitized verification payload with zero PII (photo_url omitted)
+    // Return safe, sanitized verification payload (zero PII, omit raw qrToken)
     return jsonResponse(
       {
         success: true,
@@ -255,7 +316,6 @@ serve(async (req) => {
           passingYear: registration.passing_year || null,
           currentClass: registration.current_class || null,
           paymentStatus: registration.payment_status,
-          qrToken: registration.qr_token,
           cardStatus: cardStatus,
           verifiedAt: new Date().toISOString(),
         },

@@ -225,9 +225,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         if (prefillUser) {
           sessionStorage.removeItem('plscf_admin_prefill_user');
 
-          if (isDevBypass && autoLogin === 'true') {
+          if (!(import.meta as any).env?.PROD && isDevBypass && autoLogin === 'true') {
             sessionStorage.removeItem('plscf_admin_auto_login');
-            const res = await SupabaseService.loginAdmin(prefillUser, 'admin@123');
+            const res = await SupabaseService.loginAdmin(prefillUser, !(import.meta as any).env?.PROD ? 'admin@123' : '');
             if (res.success && res.account && isMounted) {
               setAdminSession(res.account);
               setIsLoadingSession(false);
@@ -943,7 +943,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const tshirtSizes = ['S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Oversize 50'] as const;
   const tshirtCounts = tshirtSizes.reduce((acc, size) => {
     acc[size] = registrations.filter(
-      (r) => (r.year ?? 2026) === selectedYear && r.tShirtSize === size && r.paymentStatus === 'paid'
+      (r) => (r.year ?? 2027) === selectedYear && r.tShirtSize === size && r.paymentStatus === 'paid'
     ).length;
     return acc;
   }, {} as Record<string, number>);
@@ -2199,8 +2199,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </ErrorBoundary>
       )}
 
-      {/* TAB: SUPER ADMIN MANUAL REGISTRATION & FINANCIAL APPROVAL PORTAL */}
-      {activeTab === 'manualApproval' && isSuperAdmin && (
+      {/* TAB: MANUAL REGISTRATION & FINANCIAL APPROVAL PORTAL */}
+      {activeTab === 'manualApproval' && (isSuperAdmin || effectiveAdmin.role === 'finance_manager' || currentPortalConfig.allowedTabs.includes('manualApproval')) && (
         <ErrorBoundary>
           <ManualApprovalTab
             language={language}
@@ -3764,7 +3764,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </td>
                     <td className="py-2.5 px-3 font-bold text-emerald-700 whitespace-nowrap tabular-nums">৳{r.totalPaid}</td>
                     <td className="py-2.5 px-3">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                          r.paymentStatus === 'paid'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : r.paymentStatus === 'pending'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-rose-100 text-rose-800'
+                        }`}
+                      >
                         {r.paymentStatus}
                       </span>
                     </td>
@@ -4200,7 +4208,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
             {tshirtSizes.map((size) => (
               <div key={size} className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
                 <span className="text-xs font-bold text-slate-500 block uppercase">Size {size}</span>

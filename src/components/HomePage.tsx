@@ -41,10 +41,11 @@ import {
 } from '../types';
 import { translations } from '../i18n/translations';
 import { AppStore } from '../services/store';
-import { SupabaseService } from '../services/supabase';
+import { SupabaseService, isDevTestBypassAllowed } from '../services/supabase';
 import { ReunionStatsService, ReunionStatsSnapshot } from '../services/reunionStatsService';
 import { FinancialTransparencyDashboard } from './financials/FinancialTransparencyDashboard';
 import { ThankYouCardModal } from './ThankYouCardModal';
+import { CommitteeSection } from './committee/CommitteeSection';
 import { GovernanceClosureNoticeCard } from './common/GovernanceClosureNoticeCard';
 import {
   isGlobalRegistrationOpen,
@@ -791,25 +792,27 @@ export const HomePage: React.FC<HomePageProps> = ({
             </p>
           </div>
 
-          {/* Testing Credentials Banner (For quick attendee lookup testing) */}
-          <div className="max-w-2xl mx-auto p-3 bg-[#E2EEF8]/70 border border-[#0284C7]/30 text-[#0F172A] rounded-2xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xs">
-            <div className="flex items-center gap-1.5 font-medium flex-wrap">
-              <span className="font-bold text-[#0F172A]">🧪 Testing Credentials:</span>
-              <span className="font-mono bg-white px-2 py-0.5 rounded-lg border border-[#0284C7]/20 text-[#0284C7] font-bold">PLSCF-2026-F1001</span>
-              <span className="text-slate-400">/</span>
-              <span className="font-mono bg-white px-2 py-0.5 rounded-lg border border-[#0284C7]/20 text-[#0284C7] font-bold">01712345678</span>
+          {/* Testing Credentials Banner (Development only) */}
+          {isDevTestBypassAllowed() && (
+            <div className="max-w-2xl mx-auto p-3 bg-[#E2EEF8]/70 border border-[#0284C7]/30 text-[#0F172A] rounded-2xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+              <div className="flex items-center gap-1.5 font-medium flex-wrap">
+                <span className="font-bold text-[#0F172A]">🧪 Testing Credentials:</span>
+                <span className="font-mono bg-white px-2 py-0.5 rounded-lg border border-[#0284C7]/20 text-[#0284C7] font-bold">PLSCF-2026-F1001</span>
+                <span className="text-slate-400">/</span>
+                <span className="font-mono bg-white px-2 py-0.5 rounded-lg border border-[#0284C7]/20 text-[#0284C7] font-bold">01712345678</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchRegId('PLSCF-2026-F1001');
+                  setSearchMobile('01712345678');
+                }}
+                className="text-[10px] text-[#0284C7] bg-white hover:bg-[#E2EEF8] border border-[#0284C7]/30 px-3 py-1 rounded-full font-bold cursor-pointer transition-colors shadow-2xs"
+              >
+                Auto-fill
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setSearchRegId('PLSCF-2026-F1001');
-                setSearchMobile('01712345678');
-              }}
-              className="text-[10px] text-[#0284C7] bg-white hover:bg-[#E2EEF8] border border-[#0284C7]/30 px-3 py-1 rounded-full font-bold cursor-pointer transition-colors shadow-2xs"
-            >
-              Auto-fill
-            </button>
-          </div>
+          )}
 
           {/* Verification Form */}
           <form onSubmit={handleCheckStatus} className="grid grid-cols-1 sm:grid-cols-5 gap-3 max-w-2xl mx-auto">
@@ -1350,66 +1353,10 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </section>
 
-      {/* ORGANIZING COMMITTEE */}
-      <section
-        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
-        style={getHomePageSectionStyle('committee')}
-      >
-        <div className="text-center max-w-2xl mx-auto mb-10 space-y-2">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            {t.committeeHeading}
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-600">
-            {language === 'bn'
-              ? 'জেলা পুলিশ প্রশাসন ও অ্যালামনাই নেতৃবৃন্দের সমন্বয়ে গঠিত পরিচালনা পর্ষদ।'
-              : 'Joint organizing leadership by District Police Administration and Senior Alumni.'}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            {
-              name: 'Dr. M. A. Kashem',
-              role: 'Convenor (আহ্বায়ক)',
-              desc: '1974 SSC Batch • Senior Civil Servant',
-              img: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&auto=format&fit=crop&q=80',
-            },
-            {
-              name: 'Superintendent of Police',
-              role: 'Chief Patron (প্রধান পৃষ্ঠপোষক)',
-              desc: 'Faridpur District Police Administration',
-              img: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80',
-            },
-            {
-              name: 'Prof. Anwara Begum',
-              role: 'Faculty Advisor (উপদেষ্টা)',
-              desc: 'Former Principal, Police Lines College',
-              img: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=300&auto=format&fit=crop&q=80',
-            },
-            {
-              name: 'Md. Shafiqul Alam',
-              role: 'Member Secretary (সদস্য সচিব)',
-              desc: '1988 SSC Batch • Alumni Association',
-              img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
-            },
-          ].map((member, idx) => (
-            <div key={idx} className="bg-white rounded-2xl p-6 border border-slate-200 text-center shadow-xs space-y-3">
-              <img
-                src={member.img}
-                alt={member.name}
-                className="w-20 h-20 rounded-full object-cover mx-auto border-2 border-[#0284C7] shadow-sm"
-              />
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm">{member.name}</h4>
-                <span className="text-xs font-semibold text-[#0284C7] block mt-0.5">
-                  {member.role}
-                </span>
-                <p className="text-[11px] text-slate-500 mt-1">{member.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* ORGANIZING COMMITTEE (CMS-driven from CommitteeService) */}
+      <div style={getHomePageSectionStyle('committee')}>
+        <CommitteeSection language={language} />
+      </div>
 
       {/* Thank You Card Modal for Verified Patron */}
       {selectedCardDonation && (

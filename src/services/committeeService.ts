@@ -34,8 +34,8 @@ const DATA_FILE_URL = '/data/committee_members.json';
 export const DEFAULT_COMMITTEE_SETTINGS: CommitteeSettings = {
   displayMode: 'carousel',
   autoScrollSpeedMs: 3500,
-  sectionTitleEn: 'Reunion 2026 Organizing Committee',
-  sectionTitleBn: 'পুনর্মিলনী ২০২৬ পরিচালনা পরিষদ',
+  sectionTitleEn: 'Reunion 2027 Organizing Committee',
+  sectionTitleBn: 'পুনর্মিলনী ২০২৭ পরিচালনা পরিষদ',
   sectionSubtitleEn: 'Joint organizing leadership by District Police Administration and Senior Alumni.',
   sectionSubtitleBn: 'জেলা পুলিশ প্রশাসন ও অ্যালামনাই নেতৃবৃন্দের সমন্বয়ে গঠিত পরিচালনা পর্ষদ।',
 };

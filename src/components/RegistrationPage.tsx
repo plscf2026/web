@@ -50,6 +50,7 @@ import { StudentIdService } from '../services/studentIdStore';
 import { readValidatedImage } from '../utils/fileValidation';
 import { compressImageTo200KB } from '../utils/imageCompressor';
 import { AppStore } from '../services/store';
+import { isDevTestBypassAllowed } from '../services/supabase';
 import { PayStationService } from '../services/paystation';
 import { StudentPhotoStorageService, extractStoragePathFromPublicUrl } from '../services/studentPhotoStorageService';
 import { StudentIdCardRecord } from '../types/idcard';
@@ -1040,24 +1041,26 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                     : 'Enter your institutional Student ID. Your official full name, enrolled class, and academic year will be loaded and displayed directly from the school database.'}
                 </div>
 
-                {/* Quick Testing Badges */}
-                <div className="p-2.5 bg-sky-50 border border-sky-300 text-sky-900 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xs">
-                  <div className="flex items-center gap-1.5 font-medium flex-wrap">
-                    <span className="font-bold text-sky-950">🧪 {language === 'bn' ? 'নমুনা ভেরিফাইড আইডি:' : 'Quick Test ID:'}</span>
-                    <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">PLSC-2026-101</span>
+                {/* Quick Testing Badges (Development only) */}
+                {isDevTestBypassAllowed() && (
+                  <div className="p-2.5 bg-sky-50 border border-sky-300 text-sky-900 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                    <div className="flex items-center gap-1.5 font-medium flex-wrap">
+                      <span className="font-bold text-sky-950">🧪 {language === 'bn' ? 'নমুনা ভেরিফাইড আইডি:' : 'Quick Test ID:'}</span>
+                      <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-800 font-bold">PLSC-2026-101</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStudentId('PLSC-2026-101');
+                        clearValidationError('studentId');
+                        handleVerifyStudentId('PLSC-2026-101');
+                      }}
+                      className="text-[10px] text-sky-800 bg-sky-100 hover:bg-sky-200 px-2.5 py-1 rounded-full font-bold cursor-pointer transition-colors shadow-2xs"
+                    >
+                      {language === 'bn' ? 'অটো-ফিল ও যাচাই' : 'Auto-fill & Verify'}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStudentId('PLSC-2026-101');
-                      clearValidationError('studentId');
-                      handleVerifyStudentId('PLSC-2026-101');
-                    }}
-                    className="text-[10px] text-sky-800 bg-sky-100 hover:bg-sky-200 px-2.5 py-1 rounded-full font-bold cursor-pointer transition-colors shadow-2xs"
-                  >
-                    {language === 'bn' ? 'অটো-ফিল ও যাচাই' : 'Auto-fill & Verify'}
-                  </button>
-                </div>
+                )}
 
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-slate-900">

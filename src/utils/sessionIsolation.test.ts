@@ -415,12 +415,43 @@ test('Scenario 13: Browser refresh preserves legitimate active session without r
   assert.equal(route.view, 'dashboard');
   assert.equal(route.portalRole, 'moderator');
 
-  const restoredSession = await SupabaseService.getActiveAdminSession();
-  assert.ok(restoredSession);
-  assert.equal(restoredSession?.role, 'moderator');
-  // Must NOT escalate to super_admin or admin
-  assert.notEqual(restoredSession?.role, 'super_admin');
-  assert.notEqual(restoredSession?.role, 'admin');
+  const restoredModerator = {
+    id: 'mod_99',
+    role: 'moderator',
+    email: 'moderator@school.edu',
+    username: 'moderator',
+    full_name: 'Event Moderator',
+    status: 'ACTIVE',
+    is_locked: false,
+    created_at: new Date().toISOString(),
+  };
+
+  // Authoritative Supabase Auth + DB session lookup on browser refresh (F-04 hardened)
+  const origGetSession = (supabase.auth as any).getSession;
+  const origFrom = (supabase as any).from;
+  (supabase.auth as any).getSession = async () => ({
+    data: { session: { user: { id: 'auth-mod-99' } } },
+    error: null,
+  });
+  (supabase as any).from = () => ({
+    select: () => ({
+      eq: () => ({
+        maybeSingle: async () => ({ data: restoredModerator, error: null }),
+      }),
+    }),
+  });
+
+  try {
+    const restoredSession = await SupabaseService.getActiveAdminSession();
+    assert.ok(restoredSession);
+    assert.equal(restoredSession?.role, 'moderator');
+    // Must NOT escalate to super_admin or admin
+    assert.notEqual(restoredSession?.role, 'super_admin');
+    assert.notEqual(restoredSession?.role, 'admin');
+  } finally {
+    (supabase.auth as any).getSession = origGetSession;
+    (supabase as any).from = origFrom;
+  }
 });
 
 test('Scenario 14: Back/Forward navigation to Home terminates administrative session', async () => {

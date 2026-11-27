@@ -244,3 +244,58 @@ export function computeAuthoritativeOrderAmount(
     expectedTotal,
   };
 }
+
+/**
+ * F-09 fix: Given a verified gateway settlement total (`gatewayPaidAmount`),
+ * determine and validate the authoritative principal donation amount (without
+ * double-charging the gateway percentage onto an already-charged gateway total).
+ */
+export function resolveAuthoritativeDonationPrincipal(
+  rawSettings: unknown,
+  gatewayPaidAmount: number,
+  paymentMethod: unknown,
+  pendingOrderFees?: { donationAmount?: unknown; gatewayCharge?: unknown } | null
+): ComputedOrderBreakdown {
+  if (!Number.isFinite(gatewayPaidAmount) || gatewayPaidAmount <= 0) {
+    return {
+      valid: false,
+      error: 'INVALID_DONATION_AMOUNT',
+      message: 'Verified gateway payment amount must be positive.',
+    };
+  }
+
+  const s = (rawSettings && typeof rawSettings === 'object' && !Array.isArray(rawSettings))
+    ? (rawSettings as Record<string, unknown>)
+    : null;
+  const ratesObj = (s?.gatewayChargeRates && typeof s.gatewayChargeRates === 'object' && !Array.isArray(s.gatewayChargeRates))
+    ? (s.gatewayChargeRates as Record<string, unknown>)
+    : null;
+
+  const rawMethod = typeof paymentMethod === 'string' ? paymentMethod.trim().toLowerCase() : '';
+  const method = rawMethod || 'paystation';
+  let rate = 0;
+  if (ratesObj && method in ratesObj) {
+    rate = Number(ratesObj[method]);
+  } else if (method === 'paystation' && s?.gatewayChargePercent !== undefined && s?.gatewayChargePercent !== null) {
+    rate = Number(s.gatewayChargePercent) / 100;
+  }
+
+  let candidatePrincipal: number | undefined;
+  if (pendingOrderFees && pendingOrderFees.donationAmount !== undefined && pendingOrderFees.donationAmount !== null) {
+    const orderDon = Number(pendingOrderFees.donationAmount);
+    if (Number.isFinite(orderDon) && orderDon > 0) {
+      candidatePrincipal = orderDon;
+    }
+  }
+  if (candidatePrincipal === undefined) {
+    candidatePrincipal = Number.isFinite(rate) && rate >= 0 ? round2(gatewayPaidAmount / (1 + rate)) : gatewayPaidAmount;
+  }
+
+  return computeAuthoritativeOrderAmount(rawSettings, {
+    orderType: 'donation',
+    donationAmount: candidatePrincipal,
+    paymentMethod: method,
+    payWithCharge: 0,
+    clientPaymentAmount: gatewayPaidAmount,
+  });
+}

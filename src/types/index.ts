@@ -374,6 +374,8 @@ export interface PortalRoleConfig {
   };
 }
 
+const DEV_DEMO_PASSWORD = (import.meta as any).env?.DEV ? 'admin@123' : '';
+
 export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
   super_admin: {
     role: 'super_admin',
@@ -405,11 +407,9 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
       'staffManagement',
       'budgetManagement',
       'dailyAnalytics',
-      'securityAudit',
       'auditHistory',
       'studentIds',
       'idCardManagement',
-      'reunionManagement',
       'feeSettings',
       'mealControl',
       'payments',
@@ -426,8 +426,8 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
       'reports',
     ],
     demoCredentials: {
-      email: 'admin@gmail.com',
-      password: 'admin@123',
+      email: (import.meta as any).env?.DEV ? 'admin@gmail.com' : '',
+      password: DEV_DEMO_PASSWORD,
       fullName: 'Principal / Head Convener',
     },
   },
@@ -466,8 +466,8 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
       'reports',
     ],
     demoCredentials: {
-      email: 'venue.admin@gmail.com',
-      password: 'admin@123',
+      email: (import.meta as any).env?.DEV ? 'venue.admin@gmail.com' : '',
+      password: DEV_DEMO_PASSWORD,
       fullName: 'Venue Operations Administrator',
     },
   },
@@ -492,8 +492,8 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
     defaultTab: 'allBookings',
     allowedTabs: ['allBookings', 'tickets', 'idCardManagement', 'notices', 'masterOverview'],
     demoCredentials: {
-      email: 'moderator@gmail.com',
-      password: 'admin@123',
+      email: (import.meta as any).env?.DEV ? 'moderator@gmail.com' : '',
+      password: DEV_DEMO_PASSWORD,
       fullName: 'Campus Security & Floor Moderator',
     },
   },
@@ -526,8 +526,8 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
       'reports',
     ],
     demoCredentials: {
-      email: 'finance@gmail.com',
-      password: 'admin@123',
+      email: (import.meta as any).env?.DEV ? 'finance@gmail.com' : '',
+      password: DEV_DEMO_PASSWORD,
       fullName: 'Treasurer / Finance Secretary',
     },
   },
@@ -559,8 +559,8 @@ export const PORTAL_ROLE_CONFIGS: Record<PortalRole, PortalRoleConfig> = {
       'tickets',
     ],
     demoCredentials: {
-      email: 'registration@gmail.com',
-      password: 'admin@123',
+      email: (import.meta as any).env?.DEV ? 'registration@gmail.com' : '',
+      password: DEV_DEMO_PASSWORD,
       fullName: 'Registration Desk Officer',
     },
   },

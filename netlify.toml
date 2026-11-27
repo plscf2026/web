@@ -5,7 +5,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://api.fontshare.com; font-src 'self' https://api.fontshare.com https://cdn.fontshare.com data:; img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co https://hnthoszbkhvygoowtvau.supabase.co; connect-src 'self' https://*.supabase.co https://hnthoszbkhvygoowtvau.supabase.co wss://*.supabase.co wss://hnthoszbkhvygoowtvau.supabase.co; frame-src 'self' https://api.paystation.com.bd https://sandbox.paystation.com.bd; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self' https://api.paystation.com.bd https://sandbox.paystation.com.bd;"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://api.fontshare.com; font-src 'self' https://api.fontshare.com https://cdn.fontshare.com data:; img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co https://hnthoszbkhvygoowtvau.supabase.co; media-src 'self' blob: data: mediastream:; connect-src 'self' https://*.supabase.co https://hnthoszbkhvygoowtvau.supabase.co wss://*.supabase.co wss://hnthoszbkhvygoowtvau.supabase.co; frame-src 'self' https://api.paystation.com.bd https://sandbox.paystation.com.bd; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self' https://api.paystation.com.bd https://sandbox.paystation.com.bd;"
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"

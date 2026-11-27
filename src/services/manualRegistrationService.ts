@@ -358,7 +358,8 @@ export class ManualRegistrationService {
       // 5. Financial statuses: NEVER auto-verified!
       const finStatus = finAmt > 0 ? 'pending' : 'none';
       const defaultFee = Number(input.registrationFee) || (input.category === 'current' ? 500 : 1500);
-      const parentFee = input.hasParent ? Number(input.parentFee ?? 1500) : 0;
+      const configuredParentFee = AppStore.getFeeSettings().parentFee ?? 500;
+      const parentFee = input.hasParent ? Number(input.parentFee ?? configuredParentFee) : 0;
 
       // 6. Upload photos to Supabase Storage if data URLs
       let photoStoragePath: string | null =

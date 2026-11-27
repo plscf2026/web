@@ -76,6 +76,22 @@ export interface SafeHtmlOptions {
   allowLinks?: boolean;
 }
 
+export function sanitizeSvg(svg: string | null | undefined): string {
+  if (!svg) return '';
+  const purifier = getPurifier();
+  if (purifier && typeof purifier.sanitize === 'function') {
+    return purifier.sanitize(String(svg), {
+      USE_PROFILES: { svg: true, svgFilters: true },
+      ADD_TAGS: ['use'],
+      FORBID_TAGS: ['script', 'foreignObject', 'iframe', 'object', 'embed'],
+      FORBID_ATTR: ['onload', 'onerror', 'onclick', 'onmouseover', 'onfocus'],
+    });
+  }
+  return String(svg)
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/\son\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+}
+
 export function sanitizeHtml(
   html: string | null | undefined,
   options: SafeHtmlOptions = {}

@@ -19,7 +19,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { computeAuthoritativeOrderAmount } from './feeValidation.ts';
+import { computeAuthoritativeOrderAmount, resolveAuthoritativeDonationPrincipal } from './feeValidation.ts';
 import { parseAllowlistedOrigins } from './callbackUrl.ts';
 import { executeInitiatePayment } from './initiationHandler.ts';
 import { verifyPayStationTransaction } from './statusClient.ts';
@@ -92,6 +92,29 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
   return headers;
 }
 
+function sanitizeGatewayStatusResponse(raw: any): Record<string, unknown> {
+  if (!raw || typeof raw !== 'object') {
+    return { status_code: '500', status: 'error', message: 'Invalid gateway status payload.' };
+  }
+  const srcData = raw.data && typeof raw.data === 'object' ? raw.data : null;
+  return {
+    status_code: raw.status_code ?? (srcData ? '200' : '500'),
+    status: raw.status ?? 'unknown',
+    message: typeof raw.message === 'string' ? raw.message : undefined,
+    data: srcData
+      ? {
+          invoice_number: srcData.invoice_number ?? null,
+          trx_id: srcData.trx_id ?? null,
+          trx_status: srcData.trx_status ?? null,
+          payment_amount: srcData.payment_amount ?? srcData.trx_amount ?? null,
+          payment_method: srcData.payment_method ?? null,
+          currency: srcData.currency ?? null,
+          order_date_time: srcData.order_date_time ?? null,
+        }
+      : null,
+  };
+}
+
 async function generateHmacSha256Signature(
   regId: string,
   trxId: string,
@@ -128,13 +151,13 @@ interface GatewayStatusVerification {
 async function loadPendingOrderBinding(
   sbAdmin: any,
   invoiceNumber?: string
-): Promise<PendingOrderCurrencyBinding | null> {
+): Promise<(PendingOrderCurrencyBinding & { fees?: { donationAmount?: number; gatewayCharge?: number } | null }) | null> {
   const cleanInvoice = typeof invoiceNumber === 'string' ? invoiceNumber.trim() : '';
   if (!cleanInvoice || !sbAdmin) return null;
   try {
     const { data } = await sbAdmin
       .from('pending_orders')
-      .select('invoice_number, currency, amount')
+      .select('invoice_number, currency, amount, fees')
       .eq('invoice_number', cleanInvoice)
       .maybeSingle();
     return data ?? null;
@@ -191,6 +214,12 @@ async function verifyGatewayTransactionStatus(
 serve(async (req) => {
   const origin      = req.headers.get('origin');
   const corsHeaders = getCorsHeaders(origin);
+
+  // Reject browser requests from disallowed origins while preserving origin-less
+  // server-to-server PayStation IPN POSTs (F-16).
+  if (origin && !allowedOrigins.includes(origin)) {
+    return jsonResponse({ error: 'Origin not allowed' }, 403, corsHeaders);
+  }
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -328,13 +357,13 @@ serve(async (req) => {
       if (!settingsRow?.value) {
         return jsonResponse({ success: false, error: 'FEE_SETTINGS_MISSING' }, 503, corsHeaders);
       }
-      const resolvedMethod = gwCheck.method || payment_method || 'bkash';
-      const donEval = computeAuthoritativeOrderAmount(settingsRow.value, {
-        orderType: 'donation',
-        donationAmount: gwCheck.amount!,
-        paymentMethod: resolvedMethod,
-        payWithCharge: 0,
-      });
+      const resolvedMethod = normalizeGatewayMethodForPersistence(gwCheck.method || payment_method || 'bkash');
+      const donEval = resolveAuthoritativeDonationPrincipal(
+        settingsRow.value,
+        gwCheck.amount!,
+        resolvedMethod,
+        pendingOrder?.fees ?? null
+      );
       if (!donEval.valid) {
         return jsonResponse({ success: false, error: donEval.error, message: donEval.message }, 402, corsHeaders);
       }
@@ -344,7 +373,7 @@ serve(async (req) => {
         p_donor_name: String(donor_name || 'Donor'),
         p_mobile_number: String(mobile_number || ''),
         p_email: String(email || ''),
-        p_amount: donEval.expectedTotal!,
+        p_amount: donEval.donationAmount!,
         p_purpose: String(purpose || 'General Reunion Fund'),
         p_payment_method: String(resolvedMethod),
         p_transaction_id: gwCheck.trxId!,
@@ -353,7 +382,19 @@ serve(async (req) => {
         p_year: Number(year || 2027),
       });
       if (rpcErr || !rpcData?.success) {
-        return jsonResponse({ success: false, error: rpcErr?.code || 'RECORD_DONATION_FAILED', message: rpcErr?.message || rpcData?.error }, 402, corsHeaders);
+        return jsonResponse({ success: false, error: rpcErr?.code || 'RECORD_DONATION_FAILED', message: 'Could not record verified donation.' }, 402, corsHeaders);
+      }
+      if (invoice_number && rpcData?.donation?.id) {
+        await sbAdmin
+          .from('pending_orders')
+          .update({
+            status: 'paid',
+            promoted_registration_id: String(rpcData.donation.id),
+            transaction_id: gwCheck.trxId!,
+            reconciled_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('invoice_number', String(invoice_number));
       }
       return jsonResponse({ success: true, donation: rpcData.donation }, 200, corsHeaders);
     }
@@ -373,9 +414,10 @@ serve(async (req) => {
           method: 'POST', headers: { 'Accept': 'application/json', 'merchantId': PAYSTATION_MERCHANT_ID! },
           body: formBody,
         });
-        return jsonResponse(await statusRes.json(), 200, corsHeaders);
+        return jsonResponse(sanitizeGatewayStatusResponse(await statusRes.json()), 200, corsHeaders);
       } catch (err: any) {
-        return jsonResponse({ success: false, error: err.message }, 502, corsHeaders);
+        console.error('[verify-payment transaction-status-v1 Error]', err);
+        return jsonResponse({ success: false, error: 'GATEWAY_STATUS_UNAVAILABLE' }, 502, corsHeaders);
       }
     }
 
@@ -392,9 +434,10 @@ serve(async (req) => {
           headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'merchantId': PAYSTATION_MERCHANT_ID! },
           body: JSON.stringify({ trxId }),
         });
-        return jsonResponse(await statusRes.json(), 200, corsHeaders);
+        return jsonResponse(sanitizeGatewayStatusResponse(await statusRes.json()), 200, corsHeaders);
       } catch (err: any) {
-        return jsonResponse({ success: false, error: err.message }, 502, corsHeaders);
+        console.error('[verify-payment transaction-status-v2 Error]', err);
+        return jsonResponse({ success: false, error: 'GATEWAY_STATUS_UNAVAILABLE' }, 502, corsHeaders);
       }
     }
 
@@ -572,6 +615,6 @@ serve(async (req) => {
 
   } catch (err: any) {
     console.error('[verify-payment Unhandled Error]', err);
-    return jsonResponse({ success: false, error: err.message || 'Internal payment error' }, 500, corsHeaders);
+    return jsonResponse({ success: false, error: 'INTERNAL_PAYMENT_ERROR', message: 'Internal payment processing error.' }, 500, corsHeaders);
   }
 });
