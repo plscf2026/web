@@ -541,3 +541,59 @@ test('Scenario 15: Strict preservation of unrelated application data during logo
   assert.equal(localStore['plscf_verified_student_ids'], '["STD-100"]');
   assert.equal(localStore['plscf_idcard_records_2027'], '[]');
 });
+
+test('Scenario 16: Super Admin login remains active when login audit telemetry fails', async () => {
+  setupMockBrowser();
+
+  let signOutCalled = false;
+  const origSignIn = supabase.auth.signInWithPassword;
+  const origSignOut = supabase.auth.signOut;
+  const origFrom = supabase.from;
+  const origRecordAuditLog = SupabaseService.recordAuditLog;
+
+  (supabase.auth as any).signInWithPassword = async () => ({
+    data: {
+      user: { id: 'uid-super-1', email: 'super@plscf.edu.bd' },
+      session: { access_token: 'tok-123' },
+    },
+    error: null,
+  });
+  (supabase.auth as any).signOut = async () => {
+    signOutCalled = true;
+    return { error: null };
+  };
+  (supabase as any).from = () => ({
+    select: () => ({
+      eq: () => ({
+        maybeSingle: async () => ({
+          data: {
+            id: 'ADM-SUPER-ROOT-001',
+            username: 'super@plscf.edu.bd',
+            full_name: 'Principal Super Admin',
+            email: 'super@plscf.edu.bd',
+            role: 'super_admin',
+            status: 'ACTIVE',
+            is_locked: false,
+            must_change_password: false,
+          },
+          error: null,
+        }),
+      }),
+    }),
+  });
+  (SupabaseService as any).recordAuditLog = async () => {
+    throw new Error('Edge Function returned non-2xx status code');
+  };
+
+  try {
+    const res = await SupabaseService.loginAdmin('super@plscf.edu.bd', 'StrongPass#123', 'super_admin');
+    assert.equal(res.success, true);
+    assert.equal(res.account?.role, 'super_admin');
+    assert.equal(signOutCalled, false, 'Authenticated admin session must not be signed out on audit telemetry failure');
+  } finally {
+    (supabase.auth as any).signInWithPassword = origSignIn;
+    (supabase.auth as any).signOut = origSignOut;
+    (supabase as any).from = origFrom;
+    (SupabaseService as any).recordAuditLog = origRecordAuditLog;
+  }
+});

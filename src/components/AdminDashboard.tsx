@@ -220,6 +220,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Check session on mount and handle RBAC prefill / auto-login
   useEffect(() => {
     let isMounted = true;
+    let authEventOccurred = false;
     async function checkSession() {
       try {
         setIsLoadingSession(true);
@@ -247,7 +248,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         }
 
         const session = await SupabaseService.getActiveAdminSession();
-        if (isMounted) {
+        if (isMounted && !authEventOccurred) {
           setAdminSession(session);
         }
       } catch (err) {
@@ -265,6 +266,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, authSession) => {
       if (!isMounted) return;
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        authEventOccurred = true;
         if (authSession?.user) {
           const session = await SupabaseService.getActiveAdminSession();
           if (isMounted && session) {
@@ -273,6 +275,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }
         }
       } else if (event === 'SIGNED_OUT') {
+        authEventOccurred = true;
         if (isMounted) {
           setAdminSession(null);
           setIsLoadingSession(false);

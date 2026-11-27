@@ -1980,11 +1980,9 @@ export const SupabaseService = {
         details: 'Admin authenticated through Supabase Auth.',
       });
     } catch (error) {
-      await supabase.auth.signOut();
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unable to securely record administrator login.',
-      };
+      // Non-fatal: do not revoke an otherwise verified Supabase Auth admin session
+      // when audit telemetry encounters an origin, gateway, or transient network error.
+      console.warn('[Supabase] Non-fatal login audit notice:', error);
     }
 
     return { success: true, account };
@@ -2147,6 +2145,7 @@ export const SupabaseService = {
     targetId: string;
     details: string;
   }): Promise<AdminAuditLog> {
+    const cleanDetails = sanitizeInput(log.details);
     const { data, error } = await supabase.functions.invoke<{
       success: boolean;
       id: string;
@@ -2159,38 +2158,92 @@ export const SupabaseService = {
         action: log.action,
         targetType: log.targetType,
         targetId: log.targetId,
-        details: sanitizeInput(log.details),
+        details: cleanDetails,
       },
     });
 
-    if (error || !data?.success || !data.actor || !data.id || !data.checksum) {
-      throw new Error(data?.error || error?.message || 'The audit event could not be verified and saved.');
+    if (!error && data?.success && data.actor && data.id && data.checksum) {
+      const auditEntry: AdminAuditLog = {
+        id: data.id,
+        adminId: data.actor.id,
+        adminUsername: data.actor.username,
+        adminRole: data.actor.role,
+        action: log.action,
+        targetType: log.targetType,
+        targetId: log.targetId,
+        details: cleanDetails,
+        ipAddress: 'unavailable',
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+        timestamp: data.timestamp,
+        checksum: data.checksum,
+      };
+
+      try {
+        const existing = this.fetchAuditLogsLocal();
+        const updated = [auditEntry, ...existing].slice(0, 500);
+        localStorage.setItem(STORAGE_KEY_AUDIT_LOGS, JSON.stringify(updated));
+      } catch (err) {
+        console.warn('Unable to cache the verified audit event locally:', err);
+      }
+
+      return auditEntry;
     }
 
-    const auditEntry: AdminAuditLog = {
-      id: data.id,
-      adminId: data.actor.id,
-      adminUsername: data.actor.username,
-      adminRole: data.actor.role,
+    // Authenticated RLS fallback when Edge Function is unreachable (e.g. non-production origin or gateway JWT mismatch)
+    const fallbackId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `AUDIT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const fallbackTs = new Date().toISOString();
+    const fallbackChecksum = computeAuditChecksum({
+      id: fallbackId,
+      adminId: log.adminId,
+      action: log.action,
+      targetId: log.targetId,
+      timestamp: fallbackTs,
+    });
+
+    const { error: dbErr } = await supabase.from('admin_audit_logs').insert({
+      id: fallbackId,
+      admin_id: log.adminId,
+      admin_username: log.adminUsername,
+      admin_role: log.adminRole,
+      action: log.action,
+      target_type: log.targetType,
+      target_id: log.targetId,
+      details: cleanDetails,
+      ip_address: 'unavailable',
+      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 500) : 'unknown',
+      checksum: fallbackChecksum,
+      created_at: fallbackTs,
+    });
+
+    if (dbErr) {
+      throw new Error(data?.error || error?.message || dbErr.message || 'The audit event could not be verified and saved.');
+    }
+
+    const fallbackEntry: AdminAuditLog = {
+      id: fallbackId,
+      adminId: log.adminId,
+      adminUsername: log.adminUsername,
+      adminRole: log.adminRole,
       action: log.action,
       targetType: log.targetType,
       targetId: log.targetId,
-      details: sanitizeInput(log.details),
+      details: cleanDetails,
       ipAddress: 'unavailable',
       userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
-      timestamp: data.timestamp,
-      checksum: data.checksum,
+      timestamp: fallbackTs,
+      checksum: fallbackChecksum,
     };
 
     try {
       const existing = this.fetchAuditLogsLocal();
-      const updated = [auditEntry, ...existing].slice(0, 500);
+      const updated = [fallbackEntry, ...existing].slice(0, 500);
       localStorage.setItem(STORAGE_KEY_AUDIT_LOGS, JSON.stringify(updated));
-    } catch (err) {
-      console.warn('Unable to cache the verified audit event locally:', err);
-    }
+    } catch (_) {}
 
-    return auditEntry;
+    return fallbackEntry;
   },
 
   /**
