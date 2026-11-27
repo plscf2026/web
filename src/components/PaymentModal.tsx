@@ -130,7 +130,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         registrationData.category === 'current'
           ? feeSettings.currentStudentFee
           : feeSettings.formerStudentFee;
-      const currentParentFee = registrationData.hasParent ? (registrationData.parentFee ?? (feeSettings.parentFee ?? 500)) : 0;
+      const currentParentFee = registrationData.hasParent ? (registrationData.parentFee ?? (feeSettings.parentFee ?? 1500)) : 0;
       const currentSubtotal = effectiveBaseFee + currentParentFee;
       const impliedSubtotal = Math.round((payment.amount / 1.018) * 100) / 100;
       const effectiveCharge = Math.max(0, Math.round((payment.amount - impliedSubtotal) * 100) / 100);

@@ -178,7 +178,7 @@ export function normalizeClosureNoticeContent(
 export const INITIAL_FEE_SETTINGS: FeeSettings = {
   formerStudentFee: 1500,
   currentStudentFee: 500,
-  parentFee: 500,
+  parentFee: 1500,
   minDonation: 100,
   maxDonation: 50000,
   gatewayChargePercent: 1.8,

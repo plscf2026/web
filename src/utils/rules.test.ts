@@ -341,20 +341,8 @@ test('Accompanying Parent / Guardian validation & fee calculation rules', () => 
   assert.ok(resMissingParent.errors.parentPhone);
   assert.ok(resMissingParent.errors.parentRelation);
 
-  // Invalid parent relation (only Guardian, Father, Mother, Sister, Brother allowed)
+  // Invalid parent relation (only Father, Mother, Sister, Husband allowed)
   const resInvalidRelation = validateRegistrationData({
-    ...baseStudent,
-    parentName: 'Abdul Malek',
-    parentPhotoUrl: 'https://example.com/parent.jpg',
-    parentAge: 52,
-    parentPhone: '01700000000',
-    parentRelation: 'Cousin',
-  });
-  assert.equal(resInvalidRelation.isValid, false);
-  assert.ok(resInvalidRelation.errors.parentRelation);
-
-  // Valid parent fields provided with Guardian default
-  const resValidGuardian = validateRegistrationData({
     ...baseStudent,
     parentName: 'Abdul Malek',
     parentPhotoUrl: 'https://example.com/parent.jpg',
@@ -362,11 +350,34 @@ test('Accompanying Parent / Guardian validation & fee calculation rules', () => 
     parentPhone: '01700000000',
     parentRelation: 'Guardian',
   });
+  assert.equal(resInvalidRelation.isValid, false);
+  assert.ok(resInvalidRelation.errors.parentRelation);
+
+  // Valid parent fields provided with Father / Husband
+  const resValidGuardian = validateRegistrationData({
+    ...baseStudent,
+    parentName: 'Abdul Malek',
+    parentPhotoUrl: 'https://example.com/parent.jpg',
+    parentAge: 52,
+    parentPhone: '01700000000',
+    parentRelation: 'Father',
+  });
   assert.equal(resValidGuardian.isValid, true);
   assert.equal(resValidGuardian.errors.parentName, undefined);
   assert.equal(resValidGuardian.errors.parentPhotoUrl, undefined);
   assert.equal(resValidGuardian.errors.parentPhone, undefined);
   assert.equal(resValidGuardian.errors.parentRelation, undefined);
+
+  // Valid with Husband
+  const resValidHusband = validateRegistrationData({
+    ...baseStudent,
+    parentName: 'Kamal Hossain',
+    parentPhotoUrl: 'https://example.com/husband.jpg',
+    parentAge: 30,
+    parentPhone: '01700000000',
+    parentRelation: 'Husband',
+  });
+  assert.equal(resValidHusband.isValid, true);
 
   // Valid with Sister
   const resValidSister = validateRegistrationData({

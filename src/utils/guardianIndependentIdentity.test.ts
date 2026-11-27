@@ -88,8 +88,8 @@ test('1. Guardian Eligibility: female current students & male current students s
   assert.equal(isGuardianEligible('current', 'male', 'Class 7'), false);
   assert.equal(isGuardianEligible('current', 'male', 'Class 10'), false);
 
-  // Former students (female or male): NOT eligible
-  assert.equal(isGuardianEligible('former', 'female', ''), false);
+  // Former female student: ALSO eligible ("open in both side"); Former male student: NOT eligible
+  assert.equal(isGuardianEligible('former', 'female', ''), true);
   assert.equal(isGuardianEligible('former', 'male', ''), false);
 });
 

@@ -180,7 +180,7 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
   const [hasParent, setHasParent] = useState(false);
   const [parentName, setParentName] = useState('');
   const [parentAge, setParentAge] = useState<number | ''>('');
-  const [parentRelation, setParentRelation] = useState('Guardian');
+  const [parentRelation, setParentRelation] = useState('');
   const [parentPhone, setParentPhone] = useState('');
   const [parentPhotoUrl, setParentPhotoUrl] = useState('');
   const [parentPhotoStoragePath, setParentPhotoStoragePath] = useState<string | null>(null);
@@ -1574,11 +1574,11 @@ export const ManualRegistrationTab: React.FC<ManualRegistrationTabProps> = ({
                             onChange={(e) => setParentRelation(e.target.value)}
                             className="w-full px-3 py-2 rounded-xl text-xs border border-amber-300 bg-white font-bold"
                           >
-                            <option value="Guardian">Guardian</option>
+                            <option value="">{isBangla ? 'সম্পর্ক নির্বাচন করুন' : 'Select Relation'}</option>
                             <option value="Father">Father</option>
                             <option value="Mother">Mother</option>
                             <option value="Sister">Sister</option>
-                            <option value="Brother">Brother</option>
+                            <option value="Husband">Husband</option>
                           </select>
                         </div>
                         <div>

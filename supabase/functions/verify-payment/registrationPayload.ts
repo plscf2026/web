@@ -153,11 +153,12 @@ export function validateAndBuildPendingRegistrationData(
   const parentPhotoUrl = cleanStr(rawForm.parentPhotoUrl ?? rawForm.parent_photo_url, 300000) || null;
 
   if (hasParent) {
-    if (!parentName || !parentRelation || !parentPhone || !/^01[3-9][0-9]{8}$/.test(parentPhone)) {
+    const ALLOWED_RELATIONS = new Set(['father', 'mother', 'sister', 'husband']);
+    if (!parentName || !parentRelation || !ALLOWED_RELATIONS.has(parentRelation.trim().toLowerCase()) || !parentPhone || !/^01[3-9][0-9]{8}$/.test(parentPhone)) {
       return {
         valid: false,
         error: 'INVALID_REGISTRATION_DATA',
-        message: 'parentName, parentRelation, and valid parentPhone are required when hasParent is true.',
+        message: 'parentName, valid parentRelation (Father, Mother, Sister, or Husband), and valid parentPhone are required when hasParent is true.',
       };
     }
     if (!parentPhotoUrl || !isValidImageReference(parentPhotoUrl)) {

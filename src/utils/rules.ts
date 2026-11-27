@@ -76,11 +76,13 @@ export function isGuardianEligible(
   gender?: string | null,
   currentClass?: string | null
 ): boolean {
-  if (String(category || '').trim().toLowerCase() !== 'current') {
-    return false;
-  }
-  if (String(gender || '').trim().toLowerCase() === 'female') {
+  const cleanCat = String(category || '').trim().toLowerCase();
+  const cleanGen = String(gender || '').trim().toLowerCase();
+  if (cleanGen === 'female' && (cleanCat === 'current' || cleanCat === 'former')) {
     return true;
+  }
+  if (cleanCat !== 'current') {
+    return false;
   }
   return isStudentBelowClass6(currentClass);
 }
@@ -176,8 +178,8 @@ export function validateRegistrationData(data: RegistrationFormData): Validation
   if (data.hasParent) {
     if (!isGuardianEligible(data.category, data.gender, data.currentClass)) {
       errors.hasParent = {
-        en: 'Accompanying parent/guardian pass is only available for current female students or current male students below Class 6.',
-        bn: 'অভিভাবক পাস শুধুমাত্র বর্তমান নারী শিক্ষার্থী অথবা ৬ষ্ঠ শ্রেণির নিচের বর্তমান পুরুষ শিক্ষার্থীদের জন্য প্রযোজ্য।',
+        en: 'Accompanying parent/guardian pass is only available for female students (Former & Current) or current male students below Class 6.',
+        bn: 'অভিভাবক পাস শুধুমাত্র নারী শিক্ষার্থী (প্রাক্তন ও বর্তমান) অথবা ৬ষ্ঠ শ্রেণির নিচের বর্তমান পুরুষ শিক্ষার্থীদের জন্য প্রযোজ্য।',
       };
     }
     if (!data.parentName || data.parentName.trim().length < 2) {
@@ -204,14 +206,14 @@ export function validateRegistrationData(data: RegistrationFormData): Validation
         bn: 'অভিভাবকের জন্য সঠিক ১১ ডিজিটের মোবাইল নম্বর প্রদান করুন',
       };
     }
-    const ALLOWED_PARENT_RELATIONS = ['guardian', 'father', 'mother', 'sister', 'brother'];
+    const ALLOWED_PARENT_RELATIONS = ['father', 'mother', 'sister', 'husband'];
     if (
       !data.parentRelation ||
       !ALLOWED_PARENT_RELATIONS.includes(data.parentRelation.trim().toLowerCase())
     ) {
       errors.parentRelation = {
-        en: 'Please select relation with student (Guardian, Father, Mother, Sister, or Brother)',
-        bn: 'শিক্ষার্থীর সাথে সম্পর্ক নির্বাচন করুন (অভিভাবক, পিতা, মাতা, বোন, বা ভাই)',
+        en: 'Please select relation with student (Father, Mother, Sister, or Husband)',
+        bn: 'শিক্ষার্থীর সাথে সম্পর্ক নির্বাচন করুন (পিতা, মাতা, বোন, বা স্বামী)',
       };
     }
   }

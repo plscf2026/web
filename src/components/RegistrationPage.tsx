@@ -126,7 +126,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
   const [parentName, setParentName] = useState(() => draft?.parentName || '');
   const [parentAge, setParentAge] = useState<number | ''>(() => (typeof draft?.parentAge === 'number' ? draft.parentAge : ''));
   const [parentPhone, setParentPhone] = useState(() => draft?.parentPhone || '');
-  const [parentRelation, setParentRelation] = useState(() => draft?.parentRelation || 'Guardian');
+  const [parentRelation, setParentRelation] = useState(() => draft?.parentRelation || '');
   const [parentPhotoUrl, setParentPhotoUrl] = useState(() => draft?.parentPhotoUrl || '');
   const [parentPhotoStoragePath, setParentPhotoStoragePath] = useState<string | null>(() => draft?.parentPhotoStoragePath || extractStoragePathFromPublicUrl(draft?.parentPhotoUrl) || null);
   const [isUploadingParentPhoto, setIsUploadingParentPhoto] = useState(false);
@@ -198,7 +198,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     setParentName('');
     setParentAge('');
     setParentPhone('');
-    setParentRelation('Guardian');
+    setParentRelation('');
     setParentPhotoUrl('');
     setParentPhotoSizeKb(null);
     setIsCompressingParentPhoto(false);
@@ -330,7 +330,7 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
     if (initialData.parentName !== undefined) setParentName(initialData.parentName || '');
     if (initialData.parentAge !== undefined) setParentAge(initialData.parentAge !== undefined && initialData.parentAge !== null ? Number(initialData.parentAge) : '');
     if (initialData.parentPhone !== undefined) setParentPhone(initialData.parentPhone || '');
-    if (initialData.parentRelation !== undefined) setParentRelation(initialData.parentRelation || 'Guardian');
+    if (initialData.parentRelation !== undefined) setParentRelation(initialData.parentRelation || '');
     if (initialData.parentPhotoUrl !== undefined) setParentPhotoUrl(initialData.parentPhotoUrl || '');
     if (initialData.passingYear !== undefined) setPassingYear(initialData.passingYear || '');
     if (initialData.lastClassAttended !== undefined) setLastClassAttended(initialData.lastClassAttended || '');
@@ -948,7 +948,9 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               onClick={() => {
                 setCategory('former');
                 setIdVerificationResult(null);
-                setHasParent(false);
+                if (gender !== 'female') {
+                  setHasParent(false);
+                }
                 if (
                   validationErrors.category ||
                   validationErrors.passingYear ||
@@ -1758,13 +1760,13 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                   </h2>
                   <p className="text-xs text-slate-600 mt-0.5">
                     {language === 'bn'
-                      ? 'বর্তমান নারী শিক্ষার্থী অথবা ৬ষ্ঠ শ্রেণির নিচের বর্তমান শিক্ষার্থীরা কেবল ১ জন অভিভাবক সঙ্গে আনতে পারবেন।'
-                      : 'Eligible for current female students or current male students below Class 6 (Strictly 1 Parent/Guardian).'}
+                      ? 'নারী শিক্ষার্থী (প্রাক্তন ও বর্তমান) অথবা ৬ষ্ঠ শ্রেণির নিচের বর্তমান পুরুষ শিক্ষার্থীরা কেবল ১ জন অভিভাবক সঙ্গে আনতে পারবেন।'
+                      : 'Eligible for female students (Former & Current) or current male students below Class 6 (Strictly 1 Parent/Guardian).'}
                   </p>
                 </div>
               </div>
               <span className="px-3 py-1 rounded-full bg-amber-600 text-white font-black text-xs shrink-0 self-start sm:self-auto shadow-2xs">
-                + ৳ {(feeSettings.parentFee ?? 500).toLocaleString()} BDT
+                + ৳ {(feeSettings.parentFee ?? 1500).toLocaleString()} BDT
               </span>
             </div>
 
@@ -1788,8 +1790,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
               <div className="text-xs">
                 <span className="font-bold text-slate-900 block">
                   {language === 'bn'
-                    ? 'হ্যাঁ, আমি ১ জন অভিভাবক সহ অংশগ্রহণ করব (+৳১,৫০০ ফি প্রযোজ্য)'
-                    : 'Yes, I will attend with 1 parent/guardian (+৳1,500 fee applies)'}
+                    ? `হ্যাঁ, আমি ১ জন অভিভাবক সহ অংশগ্রহণ করব (+৳${(feeSettings.parentFee ?? 1500).toLocaleString()} ফি প্রযোজ্য)`
+                    : `Yes, I will attend with 1 parent/guardian (+৳${(feeSettings.parentFee ?? 1500).toLocaleString()} fee applies)`}
                 </span>
                 <span className="text-slate-500 mt-0.5 block">
                   {language === 'bn'
@@ -1846,26 +1848,37 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
                     )}
                   </div>
 
-                  {/* Relation with student: default is Guardian; options: Guardian, Father, Mother, Sister, Brother */}
+                  {/* Relation with student: Father, Mother, Sister, Husband only */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       {language === 'bn' ? 'শিক্ষার্থীর সাথে সম্পর্ক' : 'Relation with Student'} <span className="text-rose-600">*</span>
                     </label>
                     <select
                       name="parentRelation"
+                      aria-invalid={Boolean(validationErrors.parentRelation)}
                       value={parentRelation}
                       onChange={(e) => {
                         setParentRelation(e.target.value);
                         clearValidationError('parentRelation');
                       }}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 focus:outline-hidden"
+                      className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden ${
+                        validationErrors.parentRelation
+                          ? 'border-rose-500 bg-rose-50/30'
+                          : 'border-slate-300 bg-white focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20'
+                      }`}
                     >
-                      <option value="Guardian">{language === 'bn' ? 'বৈধ অভিভাবক (Guardian)' : 'Guardian'}</option>
+                      <option value="">{language === 'bn' ? 'সম্পর্ক নির্বাচন করুন' : 'Select Relation'}</option>
                       <option value="Father">{language === 'bn' ? 'পিতা (Father)' : 'Father'}</option>
                       <option value="Mother">{language === 'bn' ? 'মাতা (Mother)' : 'Mother'}</option>
                       <option value="Sister">{language === 'bn' ? 'বোন (Sister)' : 'Sister'}</option>
-                      <option value="Brother">{language === 'bn' ? 'ভাই (Brother)' : 'Brother'}</option>
+                      <option value="Husband">{language === 'bn' ? 'স্বামী (Husband)' : 'Husband'}</option>
                     </select>
+                    {validationErrors.parentRelation && (
+                      <p className="mt-1 text-xs text-rose-600 flex items-center gap-1 font-medium">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        <span>{validationErrors.parentRelation[language]}</span>
+                      </p>
+                    )}
                   </div>
 
                   {/* Parent Photo Upload & Camera Capture */}
@@ -2066,8 +2079,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({
             <HeartHandshake className="w-4 h-4 text-slate-400 shrink-0" />
             <span>
               {language === 'bn'
-                ? `অভিভাবক নিবন্ধন কেবল বর্তমান নারী শিক্ষার্থী অথবা ৬ষ্ঠ শ্রেণির নিচের বর্তমান শিক্ষার্থীদের জন্য প্রযোজ্য (সর্বোচ্চ ১ জন, ফি ৳${(feeSettings.parentFee ?? 500).toLocaleString()})।`
-                : `Accompanying parent pass is reserved for current female students and current male students below Class 6 (Max 1 Person, ৳${(feeSettings.parentFee ?? 500).toLocaleString()}).`}
+                ? `অভিভাবক নিবন্ধন কেবল নারী শিক্ষার্থী (প্রাক্তন ও বর্তমান) অথবা ৬ষ্ঠ শ্রেণির নিচের বর্তমান পুরুষ শিক্ষার্থীদের জন্য প্রযোজ্য (সর্বোচ্চ ১ জন, ফি ৳${(feeSettings.parentFee ?? 1500).toLocaleString()})।`
+                : `Accompanying parent pass is reserved for female students (Former & Current) and current male students below Class 6 (Max 1 Person, ৳${(feeSettings.parentFee ?? 1500).toLocaleString()}).`}
             </span>
           </div>
         )}

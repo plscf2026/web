@@ -85,11 +85,11 @@ DECLARE
   v_cat TEXT := lower(trim(COALESCE(p_category, '')));
   v_gen TEXT := lower(trim(COALESCE(p_gender, '')));
 BEGIN
+  IF v_gen = 'female' AND v_cat IN ('current', 'former') THEN
+    RETURN true;
+  END IF;
   IF v_cat <> 'current' THEN
     RETURN false;
-  END IF;
-  IF v_gen = 'female' THEN
-    RETURN true;
   END IF;
   RETURN public.is_student_below_class_6(p_current_class);
 END;

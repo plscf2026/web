@@ -906,7 +906,7 @@ export class PayStationService {
 
     const hasParent = Boolean(formData.hasParent);
     const feeSettings = AppStore.getFeeSettings();
-    const parentFee = hasParent ? (formData.parentFee ?? pendingSession?.fees?.parentFee ?? 500) : 0;
+    const parentFee = hasParent ? (formData.parentFee ?? pendingSession?.fees?.parentFee ?? 1500) : 0;
     const baseFee =
       formData.category === 'current'
         ? feeSettings.currentStudentFee

@@ -51,9 +51,9 @@ export function isGuardianEligibleServer(
   currentClass: unknown
 ): boolean {
   const cat = typeof category === 'string' ? category.trim().toLowerCase() : '';
-  if (cat !== 'current') return false;
   const gen = typeof gender === 'string' ? gender.trim().toLowerCase() : '';
-  if (gen === 'female') return true;
+  if (gen === 'female' && (cat === 'current' || cat === 'former')) return true;
+  if (cat !== 'current') return false;
   return isStudentBelowClass6Server(currentClass);
 }
 
@@ -189,7 +189,7 @@ export function computeAuthoritativeOrderAmount(
       return {
         valid: false,
         error: 'GUARDIAN_NOT_ELIGIBLE',
-        message: 'Accompanying parent/guardian pass is only available for current female students or current male students below Class 6.',
+        message: 'Accompanying parent/guardian pass is only available for female students (Former & Current) or current male students below Class 6.',
       };
     }
     registrationFee = rawCat === 'current' ? currentStudentFee : formerStudentFee;
