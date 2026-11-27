@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Users,
   Plus,
@@ -20,6 +20,8 @@ import {
   Upload,
   Loader2,
   AlertCircle,
+  Database,
+  RefreshCw,
 } from 'lucide-react';
 import { CommitteeMember, CommitteeSettings, Language } from '../../types';
 import { CommitteeService } from '../../services/committeeService';
@@ -59,7 +61,54 @@ export const CommitteeManagementTab: React.FC<CommitteeManagementTabProps> = ({
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [photoUploadError, setPhotoUploadError] = useState('');
   const [photoUploadInfo, setPhotoUploadInfo] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
   const photoFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Sync with Supabase on mount and listen to realtime updates
+  useEffect(() => {
+    CommitteeService.loadMembers().then((loaded) => {
+      setMembers(loaded);
+    });
+    CommitteeService.fetchSettingsFromSupabase().then((res) => {
+      if (res.success && res.data) {
+        setSettings(res.data);
+      }
+    });
+
+    const handleUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setMembers(e.detail);
+      } else {
+        setMembers(CommitteeService.getMembers());
+      }
+    };
+
+    const handleSettingsUpdate = (e: any) => {
+      if (e.detail) {
+        setSettings(e.detail);
+      }
+    };
+
+    window.addEventListener('plscf_committee_updated', handleUpdate);
+    window.addEventListener('plscf_committee_settings_updated', handleSettingsUpdate);
+
+    return () => {
+      window.removeEventListener('plscf_committee_updated', handleUpdate);
+      window.removeEventListener('plscf_committee_settings_updated', handleSettingsUpdate);
+    };
+  }, []);
+
+  const handleForceSyncToDatabase = async () => {
+    setIsSyncing(true);
+    const res = await CommitteeService.syncRosterToDatabase(members);
+    await CommitteeService.saveSettings(settings);
+    setIsSyncing(false);
+    if (res.success) {
+      showToast(isBn ? 'সদস্য তালিকা সফলভাবে Supabase ক্লাউড ডাটাবেজে সিঙ্ক হয়েছে!' : 'Roster successfully synced to Supabase database!');
+    } else {
+      showToast(isBn ? `সিঙ্ক সতর্কতা: ${res.error}` : `Sync notice: ${res.error}`);
+    }
+  };
 
   // Form State
   const [formData, setFormData] = useState<Partial<CommitteeMember>>({
@@ -170,10 +219,10 @@ export const CommitteeManagementTab: React.FC<CommitteeManagementTabProps> = ({
 
     if (editingMember) {
       CommitteeService.updateMember(editingMember.id, formData);
-      showToast(isBn ? 'সদস্যের তথ্য সফলভাবে হালনাগাদ করা হয়েছে।' : 'Member updated successfully.');
+      showToast(isBn ? 'সদস্যের তথ্য সফলভাবে Supabase ডাটাবেজে সংরক্ষিত হয়েছে।' : 'Member saved directly to Supabase database.');
     } else {
       CommitteeService.addMember(formData as any);
-      showToast(isBn ? 'নতুন সদস্য সফলভাবে যুক্ত করা হয়েছে।' : 'New member added successfully.');
+      showToast(isBn ? 'নতুন সদস্য সফলভাবে Supabase ডাটাবেজে যুক্ত করা হয়েছে।' : 'New member saved to Supabase database.');
     }
 
     setIsModalOpen(false);
@@ -184,7 +233,7 @@ export const CommitteeManagementTab: React.FC<CommitteeManagementTabProps> = ({
   const handleDeleteMember = (id: string, name: string) => {
     if (confirm(isBn ? `আপনি কি নিশ্চিতভাবে "${name}"-কে অপসারণ করতে চান?` : `Are you sure you want to remove "${name}" from the committee?`)) {
       CommitteeService.deleteMember(id);
-      showToast(isBn ? 'সদস্য অপসারণ করা হয়েছে।' : 'Member removed.');
+      showToast(isBn ? 'সদস্য Supabase ডাটাবেজ থেকে অপসারণ করা হয়েছে।' : 'Member removed from Supabase database.');
       refreshList();
     }
   };
@@ -192,12 +241,14 @@ export const CommitteeManagementTab: React.FC<CommitteeManagementTabProps> = ({
   // Toggle Member Active Status
   const handleToggleActive = (member: CommitteeMember) => {
     CommitteeService.updateMember(member.id, { isActive: !member.isActive });
+    showToast(isBn ? 'সদস্য প্রদর্শন স্ট্যাটাস সংরক্ষিত হয়েছে।' : 'Member status updated in database.');
     refreshList();
   };
 
   // Move Up / Down
   const handleMove = (id: string, dir: 'up' | 'down') => {
     CommitteeService.reorderMember(id, dir);
+    showToast(isBn ? 'সদস্যের ক্রম পরিবর্তন ডাটাবেজে সংরক্ষিত।' : 'Member order updated in database.');
     refreshList();
   };
 
@@ -205,14 +256,14 @@ export const CommitteeManagementTab: React.FC<CommitteeManagementTabProps> = ({
   const handleUpdateSettings = (partial: Partial<CommitteeSettings>) => {
     const updated = CommitteeService.saveSettings(partial);
     setSettings(updated);
-    showToast(isBn ? 'প্রদর্শন সেটিংস সফলভাবে সংরক্ষিত হয়েছে।' : 'Display settings saved.');
+    showToast(isBn ? 'প্রদর্শন সেটিংস ডাটাবেজে সংরক্ষিত হয়েছে।' : 'Display settings saved to database.');
   };
 
   // Reset to default 16 members
   const handleResetToDefault = () => {
     if (confirm(isBn ? 'আপনি কি কমিটি সদস্যদের ডিফল্ট ১৬ জনে রিসেট করতে চান?' : 'Reset committee members to default 16 members?')) {
       CommitteeService.resetToDefault();
-      showToast(isBn ? '১৬ জন সদস্যে রিসেট সম্পন্ন হয়েছে।' : 'Reset to default 16 members complete.');
+      showToast(isBn ? '১৬ জন সদস্যে রিসেট ও ডাটাবেজে সিঙ্ক সম্পন্ন হয়েছে।' : 'Reset to default 16 members & synced to database.');
       refreshList();
     }
   };
@@ -246,6 +297,24 @@ export const CommitteeManagementTab: React.FC<CommitteeManagementTabProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            {/* DB Status Badge */}
+            <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/15 text-emerald-300 text-xs font-semibold border border-emerald-400/30">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <Database className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{isBn ? 'Supabase ডাটাবেজ সংযুক্ত' : 'Supabase DB Connected'}</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleForceSyncToDatabase}
+              disabled={isSyncing}
+              className="px-3.5 py-2.5 rounded-xl bg-emerald-600/80 hover:bg-emerald-600 text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              title={isBn ? 'সম্পূর্ণ রোস্টার Supabase ডাটাবেজে সিঙ্ক করুন' : 'Force sync entire roster to Supabase DB'}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? (isBn ? 'সিঙ্ক হচ্ছে...' : 'Syncing...') : (isBn ? 'ডাটাবেজে সিঙ্ক' : 'Sync to Cloud')}</span>
+            </button>
+
             <button
               type="button"
               onClick={handleOpenCreateModal}

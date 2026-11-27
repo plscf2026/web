@@ -33,6 +33,11 @@ export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
     CommitteeService.loadMembers().then((loaded) => {
       setMembers(loaded);
     });
+    CommitteeService.fetchSettingsFromSupabase().then((res) => {
+      if (res.success && res.data) {
+        setSettings(res.data);
+      }
+    });
 
     const handleUpdate = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) {
