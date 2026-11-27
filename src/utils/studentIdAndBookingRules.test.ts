@@ -9,7 +9,7 @@ import {
   isStudentBelowClass6,
 } from './rules';
 import { CurrentStudentIdRecord } from '../types';
-import { StudentIdService } from '../services/studentIdStore';
+import { StudentIdService, getDeletedStudentIds, clearDeletedStudentIds } from '../services/studentIdStore';
 import { parseScannedInput } from './tokenGenerator';
 
 test('Strict 11-digit Bangladeshi mobile validation in Contact & Registration forms', () => {
@@ -247,4 +247,67 @@ test('isStudentBelowClass6 accurately identifies students below Class 6 across n
   assert.equal(isStudentBelowClass6('Class 12 (HSC)'), false);
   assert.equal(isStudentBelowClass6(''), false);
   assert.equal(isStudentBelowClass6(undefined), false);
+});
+
+test('Student ID Deletion Engine: Existing and dynamic IDs delete permanently without resurrection', async () => {
+  // Clear any previous test deleted tracking
+  clearDeletedStudentIds();
+
+  // 1. Initial list has the seed IDs (e.g. PLSC-2026-102)
+  const initialList = StudentIdService.getAllStudentIds();
+  const targetId = 'PLSC-2026-102';
+  const existsBefore = initialList.some((s) => s.studentId === targetId);
+  assert.equal(existsBefore, true, 'PLSC-2026-102 should initially exist');
+
+  // 2. Delete the existing seed Student ID
+  const deleteRes = await StudentIdService.deleteRecordAsync(targetId, 'Audit Test: Admin removal of test seed ID');
+  assert.equal(deleteRes.success, true, 'Deletion should report success');
+
+  // 3. Verify it is removed immediately from getAllStudentIds()
+  const listAfterDelete = StudentIdService.getAllStudentIds();
+  const existsAfter = listAfterDelete.some((s) => s.studentId === targetId);
+  assert.equal(existsAfter, false, 'PLSC-2026-102 must NOT exist in student list after deletion');
+
+  // 4. Verify deleted tracking contains targetId
+  const deletedSet = getDeletedStudentIds();
+  assert.equal(deletedSet.has(targetId), true, 'PLSC-2026-102 must be registered in deleted tracking set');
+
+  // 5. Subsequent call (simulating page reload or component re-render) must NEVER resurrect it
+  const listSubsequent = StudentIdService.getAllStudentIds();
+  assert.equal(listSubsequent.some((s) => s.studentId === targetId), false, 'PLSC-2026-102 must remain absent on re-fetch');
+
+  // 6. Test USED student ID protection
+  const usedTarget = initialList.find((s) => s.verificationStatus === 'USED');
+  if (usedTarget) {
+    const cannotDeleteUsed = await StudentIdService.deleteRecordAsync(usedTarget.studentId, 'Attempt delete used');
+    assert.equal(cannotDeleteUsed.success, false, 'USED student ID must be protected from deletion');
+    assert.ok(cannotDeleteUsed.error?.includes('Cannot delete'), 'Error message should explain protection');
+  }
+
+  // 7. Test Add, Update, and Delete on dynamic Student ID
+  const dynamicId = 'PLSC-DYN-999';
+  const addRes = await StudentIdService.addStudentIdAsync({
+    studentId: dynamicId,
+    studentName: 'Dynamic Student',
+    className: 'Class 10',
+    academicYear: '2026',
+  });
+  assert.equal(addRes.success, true);
+
+  const listWithDynamic = StudentIdService.getAllStudentIds();
+  assert.equal(listWithDynamic.some((s) => s.studentId === dynamicId), true);
+
+  // Update dynamic
+  const updateRes = await StudentIdService.updateRecordAsync(dynamicId, {
+    studentName: 'Dynamic Student Updated',
+  }, 'Name correction');
+  assert.equal(updateRes, true);
+
+  const updatedRec = StudentIdService.getAllStudentIds().find((s) => s.studentId === dynamicId);
+  assert.equal(updatedRec?.studentName, 'Dynamic Student Updated');
+
+  // Delete dynamic
+  const deleteDynRes = await StudentIdService.deleteRecordAsync(dynamicId, 'Cleaning up dynamic test ID');
+  assert.equal(deleteDynRes.success, true);
+  assert.equal(StudentIdService.getAllStudentIds().some((s) => s.studentId === dynamicId), false);
 });

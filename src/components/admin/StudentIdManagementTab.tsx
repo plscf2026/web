@@ -200,12 +200,12 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
   };
 
   // Handle Confirmed Audit Action (Toggle or Delete)
-  const handleConfirmAuditAction = () => {
+  const handleConfirmAuditAction = async () => {
     if (!auditModalAction || !auditReason.trim()) return;
 
     if (auditModalAction.type === 'TOGGLE_STATUS') {
       const nextStatus: StudentIdStatus = auditModalAction.record.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-      const updated = StudentIdService.toggleStatus(
+      const updated = await StudentIdService.toggleStatusAsync(
         auditModalAction.record.studentId,
         auditReason.trim(),
         'SUPER_ADMIN'
@@ -222,7 +222,7 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
         setActionMessage({ text: 'Student ID record was not found.', type: 'error' });
       }
     } else if (auditModalAction.type === 'DELETE') {
-      const res = StudentIdService.deleteRecord(
+      const res = await StudentIdService.deleteRecordAsync(
         auditModalAction.record.studentId,
         auditReason.trim(),
         'SUPER_ADMIN'
@@ -249,11 +249,11 @@ export const StudentIdManagementTab: React.FC<StudentIdManagementTabProps> = ({
   };
 
   // Handle Edit Update
-  const handleUpdateRecord = (e: React.SyntheticEvent) => {
+  const handleUpdateRecord = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!editingRecord) return;
 
-    const res = StudentIdService.updateRecord(editingRecord.studentId, {
+    const res = await StudentIdService.updateRecordAsync(editingRecord.studentId, {
       studentName: editingRecord.studentName,
       className: editingRecord.className,
       academicYear: editingRecord.academicYear,

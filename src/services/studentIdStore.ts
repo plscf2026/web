@@ -9,8 +9,54 @@ import { EventStore } from './eventStore';
 import { supabase } from './supabase';
 
 const STORAGE_KEY_STUDENT_IDS = 'plscf_current_student_ids_v2';
+export const STORAGE_KEY_DELETED_STUDENT_IDS = 'plscf_deleted_student_ids_v2';
 
 let studentMemoryStore: CurrentStudentIdRecord[] | null = null;
+let deletedMemoryStore: Set<string> | null = null;
+
+export function getDeletedStudentIds(): Set<string> {
+  if (typeof window === 'undefined') {
+    if (!deletedMemoryStore) {
+      deletedMemoryStore = new Set<string>();
+    }
+    return deletedMemoryStore;
+  }
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY_DELETED_STUDENT_IDS);
+    if (!raw) return new Set<string>();
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return new Set<string>(parsed.map((id: string) => String(id).trim().toUpperCase()));
+    }
+  } catch (_) {}
+  return new Set<string>();
+}
+
+export function addDeletedStudentId(studentId: string): void {
+  const cleanId = (studentId || '').trim().toUpperCase();
+  if (!cleanId) return;
+  const set = getDeletedStudentIds();
+  set.add(cleanId);
+  if (typeof window === 'undefined') {
+    deletedMemoryStore = set;
+    return;
+  }
+  try {
+    window.localStorage.setItem(STORAGE_KEY_DELETED_STUDENT_IDS, JSON.stringify(Array.from(set)));
+  } catch (err) {
+    console.warn('LocalStorage error saving deleted student ID:', err);
+  }
+}
+
+export function clearDeletedStudentIds(): void {
+  if (typeof window === 'undefined') {
+    deletedMemoryStore = new Set<string>();
+    return;
+  }
+  try {
+    window.localStorage.removeItem(STORAGE_KEY_DELETED_STUDENT_IDS);
+  } catch (_) {}
+}
 
 export const INITIAL_STUDENT_IDS: CurrentStudentIdRecord[] = [
   {
@@ -459,41 +505,54 @@ export const INITIAL_STUDENT_IDS: CurrentStudentIdRecord[] = [
 ];
 
 function loadStoredList(): CurrentStudentIdRecord[] {
+  const deletedSet = getDeletedStudentIds();
   if (typeof window === 'undefined') {
     if (!studentMemoryStore) {
-      studentMemoryStore = [...INITIAL_STUDENT_IDS];
+      studentMemoryStore = INITIAL_STUDENT_IDS.filter(
+        (item) => !deletedSet.has(item.studentId.trim().toUpperCase())
+      );
     }
-    return studentMemoryStore;
+    return studentMemoryStore.filter(
+      (item) => !deletedSet.has(item.studentId.trim().toUpperCase())
+    );
   }
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY_STUDENT_IDS);
-    const parsed = raw ? JSON.parse(raw) : [];
-    const map = new Map<string, CurrentStudentIdRecord>();
-    for (const item of INITIAL_STUDENT_IDS) {
-      map.set(item.studentId, item);
+    if (!raw) {
+      const initial = INITIAL_STUDENT_IDS.filter(
+        (item) => !deletedSet.has(item.studentId.trim().toUpperCase())
+      );
+      window.localStorage.setItem(STORAGE_KEY_STUDENT_IDS, JSON.stringify(initial));
+      return initial;
     }
+    const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      for (const item of parsed) {
-        map.set(item.studentId, item);
-      }
+      // Return saved records, strictly ensuring deleted IDs are excluded
+      return parsed.filter(
+        (item) => item && item.studentId && !deletedSet.has(item.studentId.trim().toUpperCase())
+      );
     }
-    const merged = Array.from(map.values());
-    if (!raw || parsed.length !== merged.length) {
-      window.localStorage.setItem(STORAGE_KEY_STUDENT_IDS, JSON.stringify(merged));
-    }
-    return merged;
+    return INITIAL_STUDENT_IDS.filter(
+      (item) => !deletedSet.has(item.studentId.trim().toUpperCase())
+    );
   } catch {
-    return INITIAL_STUDENT_IDS;
+    return INITIAL_STUDENT_IDS.filter(
+      (item) => !deletedSet.has(item.studentId.trim().toUpperCase())
+    );
   }
 }
 
 function persistList(list: CurrentStudentIdRecord[]) {
+  const deletedSet = getDeletedStudentIds();
+  const cleanList = list.filter(
+    (item) => item && item.studentId && !deletedSet.has(item.studentId.trim().toUpperCase())
+  );
   if (typeof window === 'undefined') {
-    studentMemoryStore = list;
+    studentMemoryStore = cleanList;
     return;
   }
   try {
-    window.localStorage.setItem(STORAGE_KEY_STUDENT_IDS, JSON.stringify(list));
+    window.localStorage.setItem(STORAGE_KEY_STUDENT_IDS, JSON.stringify(cleanList));
   } catch (err) {
     console.warn('LocalStorage error persisting student IDs:', err);
   }
@@ -554,27 +613,33 @@ export class StudentIdService {
         .select('*')
         .order('student_id', { ascending: true });
 
-      if (!error && Array.isArray(data) && data.length > 0) {
-        const localList = loadStoredList();
-        const map = new Map<string, CurrentStudentIdRecord>();
+      if (!error && Array.isArray(data)) {
+        const deletedSet = getDeletedStudentIds();
+        if (data.length > 0) {
+          const map = new Map<string, CurrentStudentIdRecord>();
 
-        // Add initial records
-        for (const item of INITIAL_STUDENT_IDS) {
-          map.set(item.studentId, item);
-        }
-        // Merge local storage modifications
-        for (const item of localList) {
-          map.set(item.studentId, item);
-        }
-        // Authoritative cloud data
-        for (const row of data) {
-          const rec = fromStudentIdDbRow(row);
-          map.set(rec.studentId, rec);
-        }
+          // 1. Authoritative cloud data
+          for (const row of data) {
+            const rec = fromStudentIdDbRow(row);
+            const cleanId = rec.studentId.trim().toUpperCase();
+            if (!deletedSet.has(cleanId)) {
+              map.set(cleanId, rec);
+            }
+          }
 
-        const merged = Array.from(map.values());
-        persistList(merged);
-        return merged;
+          // 2. Merge local additions/updates that haven't been deleted or synced yet
+          const localList = loadStoredList();
+          for (const item of localList) {
+            const cleanId = item.studentId.trim().toUpperCase();
+            if (!deletedSet.has(cleanId) && !map.has(cleanId)) {
+              map.set(cleanId, item);
+            }
+          }
+
+          const merged = Array.from(map.values()).sort((a, b) => a.studentId.localeCompare(b.studentId));
+          persistList(merged);
+          return merged;
+        }
       }
     } catch (err) {
       console.warn('[StudentIdService] Supabase sync notice:', err);
@@ -1073,14 +1138,14 @@ export class StudentIdService {
    */
   static toggleStatus(id: string, reason: string, adminEmail = 'superadmin'): boolean {
     const list = this.getAllStudentIds();
-    const index = list.findIndex((r) => r.id === id || r.studentId === id);
-    if (index === -1) return false;
+    const match = list.find((r) => r.id === id || r.studentId === id);
+    if (!match) return false;
 
-    const item = list[index];
-    const nextStatus = item.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    const nextStatus = match.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    const index = list.findIndex((r) => r.id === match.id);
 
     list[index] = {
-      ...item,
+      ...match,
       status: nextStatus,
       updatedAt: new Date().toISOString(),
     };
@@ -1089,7 +1154,7 @@ export class StudentIdService {
     supabase.from('current_student_ids').update({
       status: nextStatus,
       updated_at: new Date().toISOString(),
-    }).eq('id', item.id).then((res) => {
+    }).or(`student_id.eq.${match.studentId},id.eq.${match.id}`).then((res) => {
       if (res.error) console.warn('[StudentIdService] toggleStatus error:', res.error.message);
     }, (err) => {
       console.warn('[StudentIdService] toggleStatus network error:', err);
@@ -1099,9 +1164,53 @@ export class StudentIdService {
       adminId: adminEmail,
       adminName: 'Super Administrator',
       entityType: 'STUDENT_ID',
-      entityId: item.studentId,
+      entityId: match.studentId,
       action: 'TOGGLE_STATUS',
-      previousValue: item.status,
+      previousValue: match.status,
+      newValue: nextStatus,
+      reason: reason.trim(),
+    });
+
+    return true;
+  }
+
+  /**
+   * Authoritative async status toggle with database confirmation
+   */
+  static async toggleStatusAsync(id: string, reason: string, adminEmail = 'superadmin'): Promise<boolean> {
+    const list = this.getAllStudentIds();
+    const match = list.find((r) => r.id === id || r.studentId === id);
+    if (!match) return false;
+
+    const nextStatus = match.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    const index = list.findIndex((r) => r.id === match.id);
+
+    list[index] = {
+      ...match,
+      status: nextStatus,
+      updatedAt: new Date().toISOString(),
+    };
+
+    persistList(list);
+
+    try {
+      const { error } = await supabase.from('current_student_ids').update({
+        status: nextStatus,
+        updated_at: new Date().toISOString(),
+      }).or(`student_id.eq.${match.studentId},id.eq.${match.id}`);
+
+      if (error) console.warn('[StudentIdService] toggleStatusAsync notice:', error.message);
+    } catch (err) {
+      console.warn('[StudentIdService] toggleStatusAsync network error:', err);
+    }
+
+    EventStore.recordAuditHistory({
+      adminId: adminEmail,
+      adminName: 'Super Administrator',
+      entityType: 'STUDENT_ID',
+      entityId: match.studentId,
+      action: 'TOGGLE_STATUS',
+      previousValue: match.status,
       newValue: nextStatus,
       reason: reason.trim(),
     });
@@ -1119,9 +1228,10 @@ export class StudentIdService {
     adminEmail = 'superadmin'
   ): boolean {
     const list = this.getAllStudentIds();
-    const index = list.findIndex((r) => r.id === id || r.studentId === id);
-    if (index === -1) return false;
+    const match = list.find((r) => r.id === id || r.studentId === id);
+    if (!match) return false;
 
+    const index = list.findIndex((r) => r.id === match.id);
     const prev = { ...list[index] };
     list[index] = {
       ...list[index],
@@ -1138,7 +1248,7 @@ export class StudentIdService {
     if (updates.className !== undefined) dbUpdates.class_name = updates.className;
     if (updates.academicYear !== undefined) dbUpdates.academic_year = updates.academicYear;
 
-    supabase.from('current_student_ids').update(dbUpdates).eq('id', list[index].id).then((res) => {
+    supabase.from('current_student_ids').update(dbUpdates).or(`student_id.eq.${match.studentId},id.eq.${match.id}`).then((res) => {
       if (res.error) console.warn('[StudentIdService] updateRecord error:', res.error.message);
     }, (err) => {
       console.warn('[StudentIdService] updateRecord network error:', err);
@@ -1148,7 +1258,7 @@ export class StudentIdService {
       adminId: adminEmail,
       adminName: 'Super Administrator',
       entityType: 'STUDENT_ID',
-      entityId: list[index].studentId,
+      entityId: match.studentId,
       action: 'UPDATE_STUDENT_ID',
       previousValue: JSON.stringify(prev),
       newValue: JSON.stringify(list[index]),
@@ -1159,7 +1269,113 @@ export class StudentIdService {
   }
 
   /**
-   * Delete an un-used Student ID (Super Admin only with audit reason)
+   * Authoritative async update with database confirmation
+   */
+  static async updateRecordAsync(
+    id: string,
+    updates: { studentName?: string; className?: string; academicYear?: string },
+    reason: string,
+    adminEmail = 'superadmin'
+  ): Promise<boolean> {
+    const list = this.getAllStudentIds();
+    const match = list.find((r) => r.id === id || r.studentId === id);
+    if (!match) return false;
+
+    const index = list.findIndex((r) => r.id === match.id);
+    const prev = { ...list[index] };
+    list[index] = {
+      ...list[index],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+
+    persistList(list);
+
+    const dbUpdates: any = {
+      updated_at: new Date().toISOString(),
+    };
+    if (updates.studentName !== undefined) dbUpdates.student_name = updates.studentName || null;
+    if (updates.className !== undefined) dbUpdates.class_name = updates.className;
+    if (updates.academicYear !== undefined) dbUpdates.academic_year = updates.academicYear;
+
+    try {
+      const { error } = await supabase
+        .from('current_student_ids')
+        .update(dbUpdates)
+        .or(`student_id.eq.${match.studentId},id.eq.${match.id}`);
+
+      if (error) console.warn('[StudentIdService] updateRecordAsync notice:', error.message);
+    } catch (err) {
+      console.warn('[StudentIdService] updateRecordAsync network error:', err);
+    }
+
+    EventStore.recordAuditHistory({
+      adminId: adminEmail,
+      adminName: 'Super Administrator',
+      entityType: 'STUDENT_ID',
+      entityId: match.studentId,
+      action: 'UPDATE_STUDENT_ID',
+      previousValue: JSON.stringify(prev),
+      newValue: JSON.stringify(list[index]),
+      reason: reason.trim(),
+    });
+
+    return true;
+  }
+
+  /**
+   * Delete an un-used Student ID (Super Admin only with audit reason) - Async with database confirmation
+   */
+  static async deleteRecordAsync(
+    id: string,
+    reason: string,
+    adminEmail = 'superadmin'
+  ): Promise<{ success: boolean; error?: string }> {
+    const list = this.getAllStudentIds();
+    const match = list.find((r) => r.id === id || r.studentId === id);
+    if (!match) return { success: false, error: 'Student ID record not found.' };
+
+    if (match.verificationStatus === 'USED') {
+      return {
+        success: false,
+        error: 'Cannot delete: This Student ID has already been successfully linked to an active registration.',
+      };
+    }
+
+    const cleanId = match.studentId.trim().toUpperCase();
+    addDeletedStudentId(cleanId);
+
+    const filtered = list.filter((r) => r.id !== match.id && r.studentId.trim().toUpperCase() !== cleanId);
+    persistList(filtered);
+
+    try {
+      const { error } = await supabase
+        .from('current_student_ids')
+        .delete()
+        .or(`student_id.eq.${cleanId},id.eq.${match.id}`);
+
+      if (error) {
+        console.warn('[StudentIdService] Cloud delete notice:', error.message);
+      }
+    } catch (err: any) {
+      console.warn('[StudentIdService] Cloud delete error:', err);
+    }
+
+    EventStore.recordAuditHistory({
+      adminId: adminEmail,
+      adminName: 'Super Administrator',
+      entityType: 'STUDENT_ID',
+      entityId: match.studentId,
+      action: 'DELETE_STUDENT_ID',
+      previousValue: `${match.studentId} (${match.className})`,
+      reason: reason.trim(),
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Delete an un-used Student ID (Synchronous wrapper for backward compatibility)
    */
   static deleteRecord(id: string, reason: string, adminEmail = 'superadmin'): { success: boolean; error?: string } {
     const list = this.getAllStudentIds();
@@ -1173,13 +1389,24 @@ export class StudentIdService {
       };
     }
 
-    const filtered = list.filter((r) => r.id !== id && r.studentId !== id);
+    const cleanId = match.studentId.trim().toUpperCase();
+    addDeletedStudentId(cleanId);
+
+    const filtered = list.filter((r) => r.id !== match.id && r.studentId.trim().toUpperCase() !== cleanId);
     persistList(filtered);
-    supabase.from('current_student_ids').delete().eq('id', match.id).then((res) => {
-      if (res.error) console.warn('[StudentIdService] deleteRecord error:', res.error.message);
-    }, (err) => {
-      console.warn('[StudentIdService] deleteRecord network error:', err);
-    });
+
+    supabase
+      .from('current_student_ids')
+      .delete()
+      .or(`student_id.eq.${cleanId},id.eq.${match.id}`)
+      .then(
+        (res) => {
+          if (res.error) console.warn('[StudentIdService] deleteRecord notice:', res.error.message);
+        },
+        (err) => {
+          console.warn('[StudentIdService] deleteRecord network error:', err);
+        }
+      );
 
     EventStore.recordAuditHistory({
       adminId: adminEmail,
