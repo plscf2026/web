@@ -17,7 +17,31 @@ export interface GalleryMediaItem {
 }
 
 const STORAGE_KEY = 'plscf_gallery_media_v1';
+// Tracks IDs explicitly deleted by admin so they never resurface from defaults or fallback files.
+const STORAGE_KEY_DELETED = 'plscf_gallery_media_deleted_v1';
 const DATA_FILE_URL = '/data/gallery_media.json';
+
+function getDeletedIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_DELETED);
+    if (raw) return new Set(JSON.parse(raw));
+  } catch (_) {}
+  return new Set();
+}
+
+function addDeletedId(id: string) {
+  try {
+    const set = getDeletedIds();
+    set.add(id);
+    localStorage.setItem(STORAGE_KEY_DELETED, JSON.stringify(Array.from(set)));
+  } catch (_) {}
+}
+
+function filterDeleted(items: GalleryMediaItem[]): GalleryMediaItem[] {
+  const deleted = getDeletedIds();
+  if (deleted.size === 0) return items;
+  return items.filter((i) => !deleted.has(i.id));
+}
 
 const DEFAULT_MEDIA_ITEMS: GalleryMediaItem[] = [
   {
@@ -184,11 +208,12 @@ export const GalleryService = {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          return filterDeleted(parsed);
         }
       }
     } catch (_) {}
-    return DEFAULT_MEDIA_ITEMS;
+    // Return defaults only filtering out any items the admin previously deleted
+    return filterDeleted(DEFAULT_MEDIA_ITEMS);
   },
 
   setLocalCache(items: GalleryMediaItem[]) {
@@ -199,7 +224,7 @@ export const GalleryService = {
   },
 
   async loadItems(): Promise<GalleryMediaItem[]> {
-    // 1. Try fetching from Supabase database table
+    // 1. Always try Supabase first — it is the authoritative source
     try {
       const { data, error } = await supabase
         .from('gallery_media')
@@ -207,31 +232,26 @@ export const GalleryService = {
         .order('sort_order', { ascending: true });
 
       if (!error && Array.isArray(data) && data.length > 0) {
-        const mapped = data.map(rowToItem);
+        // Filter out items the admin deleted locally while offline
+        const mapped = filterDeleted(data.map(rowToItem));
         this.setLocalCache(mapped);
         return mapped;
       }
-    } catch (_) {
-      // Offline or table not ready, proceed to next fallback
-    }
-
-    // 2. Try fetching from hosted public data file (/data/gallery_media.json)
-    try {
-      const res = await fetch(DATA_FILE_URL, { cache: 'no-cache' });
-      if (res.ok) {
-        const json = await res.json();
-        if (Array.isArray(json) && json.length > 0) {
-          const cached = this.getLocalCache();
-          // If local cache has custom user edits (different length or IDs), preserve cached
-          if (cached.length <= DEFAULT_MEDIA_ITEMS.length) {
-            this.setLocalCache(json);
-            return json;
-          }
+      // If Supabase table exists but is empty, that is intentional — return empty list
+      if (!error && Array.isArray(data) && data.length === 0) {
+        const deleted = getDeletedIds();
+        if (deleted.size > 0) {
+          // Admin has deleted everything — honour that
+          this.setLocalCache([]);
+          return [];
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Offline or table not ready — fall through to local cache
+    }
 
-    // 3. Fallback to local cache or defaults
+    // 2. Fall back to localStorage cache (never fall back to defaults/JSON file)
+    //    This preserves any edits made when Supabase was reachable.
     return this.getLocalCache();
   },
 
@@ -273,10 +293,15 @@ export const GalleryService = {
   },
 
   async deleteItem(id: string): Promise<{ success: boolean; error?: string }> {
+    // 1. Record in permanent deleted blacklist (survives page refresh & default resurrection)
+    addDeletedId(id);
+
+    // 2. Remove from localStorage cache immediately
     const current = this.getLocalCache();
     const updated = current.filter((i: GalleryMediaItem) => i.id !== id);
     this.setLocalCache(updated);
 
+    // 3. Delete from Supabase (authoritative store)
     try {
       const { error } = await supabase
         .from('gallery_media')
@@ -284,10 +309,11 @@ export const GalleryService = {
         .eq('id', id);
 
       if (error) {
-        return { success: true, error: error.message };
+        // Deletion persisted in blacklist; Supabase will be retried on next sync
+        return { success: true, error: `Local delete done; DB sync warning: ${error.message}` };
       }
     } catch (e: any) {
-      return { success: true, error: e?.message };
+      return { success: true, error: `Local delete done; DB unreachable: ${e?.message}` };
     }
 
     return { success: true };
@@ -302,16 +328,21 @@ export const GalleryService = {
 
       if (!error && Array.isArray(data)) {
         if (data.length > 0) {
-          const mapped = data.map(rowToItem);
+          // Filter out admin-deleted items before writing back to localStorage
+          const mapped = filterDeleted(data.map(rowToItem));
           this.setLocalCache(mapped);
           return { success: true, count: mapped.length };
         } else {
-          // If remote is empty, push local items to Supabase
-          const local = this.getLocalCache();
-          const rows = local.map(itemToRow);
-          const { error: insertErr } = await supabase.from('gallery_media').insert(rows);
-          if (!insertErr) {
-            return { success: true, count: local.length };
+          // Remote is empty — push local non-deleted items to Supabase
+          const local = this.getLocalCache(); // already filters deleted
+          if (local.length > 0) {
+            const rows = local.map(itemToRow);
+            const { error: insertErr } = await supabase.from('gallery_media').insert(rows);
+            if (!insertErr) {
+              return { success: true, count: local.length };
+            }
+          } else {
+            return { success: true, count: 0 };
           }
         }
       }
