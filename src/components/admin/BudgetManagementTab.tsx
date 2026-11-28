@@ -13,6 +13,7 @@ import {
   Phone,
   ShieldAlert,
   UserCheck,
+  AlertCircle,
   X,
 } from 'lucide-react';
 import {
@@ -206,6 +207,11 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
     e.preventDefault();
     const amt = Number(allocationAmount);
     if (!selectedStaffId || isNaN(amt) || amt <= 0) return;
+
+    if (overview.remainingUnallocatedBudget < 100) {
+      alert(`Error: Insufficient unallocated budget (Available: BDT ${overview.remainingUnallocatedBudget.toLocaleString()}). Please click "Modify Central Budget" to increase the fund first.`);
+      return;
+    }
 
     if (amt > overview.remainingUnallocatedBudget) {
       alert(`Error: Allocation amount BDT ${amt} exceeds the remaining unallocated budget of BDT ${overview.remainingUnallocatedBudget}.`);
@@ -1219,6 +1225,17 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
             <p className="text-xs text-slate-500">
               Unallocated Budget Available: <strong className="text-emerald-700 font-mono">BDT {overview.remainingUnallocatedBudget.toLocaleString()}</strong>
             </p>
+            {overview.remainingUnallocatedBudget < 100 && (
+              <div className="p-3 bg-amber-50 border border-amber-300 text-amber-900 rounded-2xl text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="block font-bold">Insufficient Unallocated Budget (Available: BDT {overview.remainingUnallocatedBudget.toLocaleString()})</strong>
+                  <span>
+                    Minimum allocation is BDT 100. Please click <strong>"Modify Central Budget"</strong> to increase the total event fund before allocating to staff.
+                  </span>
+                </div>
+              </div>
+            )}
             <form onSubmit={handleAllocateMoney} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Select Staff Member *</label>
@@ -1260,11 +1277,13 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
                 <input
                   type="number"
                   min="100"
-                  max={overview.remainingUnallocatedBudget}
+                  max={overview.remainingUnallocatedBudget >= 100 ? overview.remainingUnallocatedBudget : undefined}
+                  disabled={overview.remainingUnallocatedBudget < 100}
                   value={allocationAmount}
                   onChange={(e) => setAllocationAmount(e.target.value)}
+                  placeholder={overview.remainingUnallocatedBudget >= 100 ? 'e.g. 5000' : 'Increase central budget first'}
                   required
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono font-bold"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono font-bold disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
@@ -1282,7 +1301,11 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
                 <button type="button" onClick={() => setShowAllocateModal(false)} className="px-4 py-2 border rounded-xl text-xs font-bold">
                   Cancel
                 </button>
-                <button type="submit" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold">
+                <button
+                  type="submit"
+                  disabled={overview.remainingUnallocatedBudget < 100}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold"
+                >
                   Confirm Allocation
                 </button>
               </div>

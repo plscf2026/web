@@ -136,6 +136,11 @@ export const StaffFinanceModule: React.FC<StaffFinanceModuleProps> = ({
       return;
     }
 
+    if (summary.remainingSpendableBalance <= 0) {
+      setFormError('Cannot submit expense: You currently have BDT 0 spendable balance. Please request a budget allocation from your Finance Manager first.');
+      return;
+    }
+
     if (!expenseDescription.trim()) {
       setFormError('Please enter a detailed description of the expense.');
       return;
@@ -331,6 +336,15 @@ export const StaffFinanceModule: React.FC<StaffFinanceModuleProps> = ({
             </span>
           </div>
 
+          {summary.remainingSpendableBalance <= 0 && (
+            <div className="p-3 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                You currently have <strong>BDT 0</strong> spendable balance. Please request an operational fund allocation from your Finance Manager before submitting new expenses.
+              </span>
+            </div>
+          )}
+
           {formError && (
             <div className="p-3 bg-rose-50 border border-rose-300 text-rose-800 rounded-xl text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
@@ -348,12 +362,13 @@ export const StaffFinanceModule: React.FC<StaffFinanceModuleProps> = ({
                   <input
                     type="number"
                     min="1"
-                    max={summary.remainingSpendableBalance}
+                    max={summary.remainingSpendableBalance > 0 ? summary.remainingSpendableBalance : undefined}
+                    disabled={summary.remainingSpendableBalance <= 0}
                     value={expenseAmount}
                     onChange={(e) => setExpenseAmount(e.target.value)}
                     placeholder="e.g. 5000"
                     required
-                    className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm font-mono font-bold focus:border-emerald-600 focus:outline-hidden"
+                    className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm font-mono font-bold focus:border-emerald-600 focus:outline-hidden disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                   />
                   <span className="absolute left-3.5 top-2.5 text-xs font-bold text-slate-400">BDT</span>
                 </div>
@@ -549,7 +564,8 @@ export const StaffFinanceModule: React.FC<StaffFinanceModuleProps> = ({
               </button>
               <button
                 type="submit"
-                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider cursor-pointer shadow-xs"
+                disabled={summary.remainingSpendableBalance <= 0}
+                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-black uppercase tracking-wider cursor-pointer shadow-xs"
               >
                 [ SUBMIT EXPENSE ]
               </button>
