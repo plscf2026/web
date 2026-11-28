@@ -119,261 +119,63 @@ const KEY_AUDIT_HISTORY = 'plscf_event_admin_audit_history_v2';
 // Universal test credentials: all staff can log in with password 'admin@123'
 export const INITIAL_STAFF_ACCOUNTS: StaffAccount[] = [
   {
-    "id": "STF-TEST-ADMIN",
-    "authUserId": "admin-master-auth",
-    "fullName": "System Administrator (Testing)",
-    "username": "admin@gmail.com",
-    "email": "admin@gmail.com",
-    "role": "SUPER_ADMIN",
-    "department": "ALL_SERVICES",
-    "permissions": [
-      "VIEW",
-      "SCAN",
-      "VERIFY",
-      "APPROVE",
-      "REJECT",
-      "EXPORT",
-      "MANAGE"
+    id: 'staff-master-001',
+    authUserId: 'admin-master-auth',
+    fullName: 'System Administrator (Testing)',
+    username: 'sagarsaha3371@gmail.com',
+    email: 'sagarsaha3371@gmail.com',
+    role: 'SUPER_ADMIN',
+    department: 'ALL_SERVICES',
+    permissions: [
+      'VIEW',
+      'SCAN',
+      'VERIFY',
+      'APPROVE',
+      'REJECT',
+      'EXPORT',
+      'MANAGE',
     ],
-    "status": "ACTIVE",
-    "assignedGate": "All Gates / All Modules",
-    "createdAt": "2026-01-01T00:00:00Z",
-    "createdBy": "SYSTEM_INIT"
+    status: 'ACTIVE',
+    assignedGate: 'All Gates / All Modules',
+    createdAt: '2026-01-01T00:00:00Z',
+    createdBy: 'SYSTEM_INIT',
   },
   {
-    "id": "STF-001",
-    "authUserId": "gate-staff-auth",
-    "fullName": "Tariqul Islam (Gate Lead)",
-    "username": "gate@gmail.com",
-    "email": "gate@gmail.com",
-    "role": "GATE_STAFF",
-    "department": "GATE",
-    "permissions": [
-      "VIEW",
-      "SCAN",
-      "VERIFY",
-      "APPROVE"
+    id: 'STF-TEST-ADMIN',
+    authUserId: 'admin-auth',
+    fullName: 'Administrator',
+    username: 'admin@gmail.com',
+    email: 'admin@gmail.com',
+    role: 'SUPER_ADMIN',
+    department: 'ALL_SERVICES',
+    permissions: [
+      'VIEW',
+      'SCAN',
+      'VERIFY',
+      'APPROVE',
+      'REJECT',
+      'EXPORT',
+      'MANAGE',
     ],
-    "status": "ACTIVE",
-    "assignedGate": "Gate 01 - Main Entrance",
-    "createdAt": "2026-01-05T09:00:00Z",
-    "createdBy": "SUPER_ADMIN"
+    status: 'ACTIVE',
+    assignedGate: 'All Gates / All Modules',
+    createdAt: '2026-01-01T00:00:00Z',
+    createdBy: 'SYSTEM_INIT',
   },
   {
-    "id": "STF-002",
-    "authUserId": "food-staff-auth",
-    "fullName": "Mohammad Faruk Hossain (Lunch Incharge)",
-    "username": "food@gmail.com",
-    "email": "food@gmail.com",
-    "role": "LUNCH_STAFF",
-    "department": "LUNCH",
-    "permissions": [
-      "VIEW",
-      "SCAN",
-      "VERIFY",
-      "APPROVE"
-    ],
-    "status": "ACTIVE",
-    "assignedGate": "Food Pavilion A (Lunch)",
-    "createdAt": "2026-01-05T09:00:00Z",
-    "createdBy": "SUPER_ADMIN"
+    id: 'STF-001',
+    authUserId: 'gate-staff-auth',
+    fullName: 'Tariqul Islam (Gate Lead)',
+    username: 'gate@gmail.com',
+    email: 'gate@gmail.com',
+    role: 'GATE_STAFF',
+    department: 'GATE',
+    permissions: ['VIEW', 'SCAN', 'VERIFY', 'APPROVE'],
+    status: 'ACTIVE',
+    assignedGate: 'Gate 01 - Main Entrance',
+    createdAt: '2026-01-05T09:00:00Z',
+    createdBy: 'SUPER_ADMIN',
   },
-  {
-    "id": "STF-003",
-    "authUserId": "breakfast-staff-auth",
-    "fullName": "Nasir Uddin (Breakfast Lead)",
-    "username": "breakfast@gmail.com",
-    "email": "breakfast@gmail.com",
-    "role": "BREAKFAST_STAFF",
-    "department": "BREAKFAST",
-    "permissions": [
-      "VIEW",
-      "SCAN",
-      "VERIFY",
-      "APPROVE"
-    ],
-    "status": "ACTIVE",
-    "assignedGate": "Food Pavilion B (Breakfast)",
-    "createdAt": "2026-01-05T09:00:00Z",
-    "createdBy": "SUPER_ADMIN"
-  },
-  {
-    "id": "STF-004",
-    "authUserId": "dress-staff-auth",
-    "fullName": "Jamal Uddin Chowdhury (Kit & T-Shirt)",
-    "username": "dress@gmail.com",
-    "email": "dress@gmail.com",
-    "role": "DRESS_STAFF",
-    "department": "DRESS",
-    "permissions": [
-      "VIEW",
-      "SCAN",
-      "VERIFY",
-      "APPROVE"
-    ],
-    "status": "ACTIVE",
-    "assignedGate": "Distribution Booth 01",
-    "createdAt": "2026-01-05T09:00:00Z",
-    "createdBy": "SUPER_ADMIN"
-  },
-  {
-    "id": "STF-005",
-    "authUserId": "finance-staff-auth",
-    "fullName": "Md. Shafiqul Alam (Finance Secretary)",
-    "username": "finance@gmail.com",
-    "email": "finance@gmail.com",
-    "role": "FINANCE_STAFF",
-    "department": "FINANCE",
-    "permissions": [
-      "VIEW",
-      "VERIFY",
-      "APPROVE",
-      "EXPORT"
-    ],
-    "status": "ACTIVE",
-    "assignedGate": "Central Accounts Office",
-    "createdAt": "2026-01-05T09:00:00Z",
-    "createdBy": "SUPER_ADMIN"
-  },
-  {
-    "id": "STF-006",
-    "authUserId": "dinner-staff-auth",
-    "fullName": "Abdur Rahim (Dinner Incharge)",
-    "username": "dinner@gmail.com",
-    "email": "dinner@gmail.com",
-    "role": "DINNER_STAFF",
-    "department": "DINNER",
-    "permissions": [
-      "VIEW",
-      "SCAN",
-      "VERIFY",
-      "APPROVE"
-    ],
-    "status": "ACTIVE",
-    "assignedGate": "Food Pavilion C (Dinner)",
-    "createdAt": "2026-01-06T10:00:00Z",
-    "createdBy": "SUPER_ADMIN"
-  },
-  {
-    "id": "STF-007",
-    "authUserId": "gate2-staff-auth",
-    "fullName": "Tanvir Hasan (Gate 02 Officer)",
-    "username": "gate2@gmail.com",
-    "email": "gate2@gmail.com",
-    "role": "GATE_STAFF",
-    "department": "GATE",
-    "permissions": [
-      "VIEW",
-      "SCAN",
-      "VERIFY",
-      "APPROVE"
-    ],
-    "status": "ACTIVE",
-    "assignedGate": "Gate 02 - East Campus",
-    "createdAt": "2026-01-06T10:00:00Z",
-    "createdBy": "SUPER_ADMIN"
-  },
-  {
-    "id": "STF-008",
-    "authUserId": "dress2-staff-auth",
-    "fullName": "Kazi Rayhan (Distribution Booth 02)",
-    "username": "dress2@gmail.com",
-    "email": "dress2@gmail.com",
-    "role": "DRESS_STAFF",
-    "department": "DRESS",
-    "permissions": [
-      "VIEW",
-      "SCAN",
-      "VERIFY",
-      "APPROVE"
-    ],
-    "status": "ACTIVE",
-    "assignedGate": "Distribution Booth 02",
-    "createdAt": "2026-01-07T11:00:00Z",
-    "createdBy": "SUPER_ADMIN"
-  },
-  {
-    "id": "STF-009",
-    "authUserId": "supervisor-staff-auth",
-    "fullName": "Engr. Moniruzzaman (Floor Supervisor)",
-    "username": "supervisor@gmail.com",
-    "email": "supervisor@gmail.com",
-    "role": "SUPER_ADMIN",
-    "department": "ALL_SERVICES",
-    "permissions": [
-      "VIEW",
-      "SCAN",
-      "VERIFY",
-      "APPROVE",
-      "REJECT",
-      "EXPORT",
-      "MANAGE"
-    ],
-    "status": "ACTIVE",
-    "assignedGate": "All Gate & Floor Stations",
-    "createdAt": "2026-01-07T11:00:00Z",
-    "createdBy": "SUPER_ADMIN"
-  },
-  {
-    "id": "STF-010",
-    "authUserId": "registration-staff-auth",
-    "fullName": "Dr. Nusrat Jahan (Registration Lead)",
-    "username": "registration@gmail.com",
-    "email": "registration@gmail.com",
-    "role": "SUPER_ADMIN",
-    "department": "ALL_SERVICES",
-    "permissions": [
-      "VIEW",
-      "SCAN",
-      "VERIFY",
-      "APPROVE",
-      "EXPORT",
-      "MANAGE"
-    ],
-    "status": "ACTIVE",
-    "assignedGate": "Secretariat Registration Desk",
-    "createdAt": "2026-01-08T09:00:00Z",
-    "createdBy": "SUPER_ADMIN"
-  },
-  {
-    "id": "STF-011",
-    "authUserId": "content-staff-auth",
-    "fullName": "Farhana Yasmin (Souvenir & Media Lead)",
-    "username": "content@gmail.com",
-    "email": "content@gmail.com",
-    "role": "SUPER_ADMIN",
-    "department": "ALL_SERVICES",
-    "permissions": [
-      "VIEW",
-      "VERIFY",
-      "EXPORT",
-      "MANAGE"
-    ],
-    "status": "ACTIVE",
-    "assignedGate": "Media & Public Relations Room",
-    "createdAt": "2026-01-08T09:00:00Z",
-    "createdBy": "SUPER_ADMIN"
-  },
-  {
-    "id": "STF-012",
-    "authUserId": "idcard-staff-auth",
-    "fullName": "Kamrul Hasan (ID Card Coordinator)",
-    "username": "idcard.staff@gmail.com",
-    "email": "idcard.staff@gmail.com",
-    "role": "SUPER_ADMIN",
-    "department": "ALL_SERVICES",
-    "permissions": [
-      "VIEW",
-      "VERIFY",
-      "APPROVE",
-      "EXPORT",
-      "MANAGE"
-    ],
-    "status": "ACTIVE",
-    "assignedGate": "ID Card Production Center",
-    "createdAt": "2026-01-09T10:00:00Z",
-    "createdBy": "SUPER_ADMIN"
-  }
 ];
 
 // Initial Gate Entry & Exit Events
@@ -399,74 +201,7 @@ export const INITIAL_CENTRAL_BUDGET: CentralBudget = {
 };
 
 // Initial Seed Allocations
-export const INITIAL_STAFF_ALLOCATIONS: StaffAllocation[] = [
-  {
-    "id": "ALC-001",
-    "staffId": "STF-005",
-    "staffName": "Md. Shafiqul Alam (Finance Secretary)",
-    "allocatedAmount": 150000,
-    "academicYear": 2026,
-    "status": "ACTIVE",
-    "allocatedAt": "2026-01-10T10:00:00Z",
-    "allocatedBy": "SUPER_ADMIN",
-    "notes": "Treasury operations, vendor settlements, and emergency liquidity"
-  },
-  {
-    "id": "ALC-002",
-    "staffId": "STF-004",
-    "staffName": "Jamal Uddin Chowdhury (Kit & T-Shirt)",
-    "allocatedAmount": 100000,
-    "academicYear": 2026,
-    "status": "ACTIVE",
-    "allocatedAt": "2026-01-12T11:00:00Z",
-    "allocatedBy": "SUPER_ADMIN",
-    "notes": "T-shirt logistics, packaging, and kit distribution booth setup"
-  },
-  {
-    "id": "ALC-003",
-    "staffId": "STF-003",
-    "staffName": "Nasir Uddin (Breakfast Lead)",
-    "allocatedAmount": 40000,
-    "academicYear": 2026,
-    "status": "ACTIVE",
-    "allocatedAt": "2026-01-15T09:00:00Z",
-    "allocatedBy": "SUPER_ADMIN",
-    "notes": "Breakfast mineral water, morning refreshments procurement"
-  },
-  {
-    "id": "ALC-004",
-    "staffId": "STF-002",
-    "staffName": "Mohammad Faruk Hossain (Lunch Incharge)",
-    "allocatedAmount": 120000,
-    "academicYear": 2026,
-    "status": "ACTIVE",
-    "allocatedAt": "2026-01-18T10:00:00Z",
-    "allocatedBy": "SUPER_ADMIN",
-    "notes": "Grand Buffet catering booking, serving personnel & disposable ware"
-  },
-  {
-    "id": "ALC-005",
-    "staffId": "STF-006",
-    "staffName": "Abdur Rahim (Dinner Incharge)",
-    "allocatedAmount": 60000,
-    "academicYear": 2026,
-    "status": "ACTIVE",
-    "allocatedAt": "2026-01-20T11:00:00Z",
-    "allocatedBy": "SUPER_ADMIN",
-    "notes": "Evening cultural show buffet and tea session logistics"
-  },
-  {
-    "id": "ALC-006",
-    "staffId": "STF-001",
-    "staffName": "Tariqul Islam (Gate Lead)",
-    "allocatedAmount": 30000,
-    "academicYear": 2026,
-    "status": "ACTIVE",
-    "allocatedAt": "2026-01-22T09:30:00Z",
-    "allocatedBy": "SUPER_ADMIN",
-    "notes": "Gate metal detectors, barricades, and wireless QR scanners"
-  }
-];
+export const INITIAL_STAFF_ALLOCATIONS: StaffAllocation[] = [];
 
 // Initial Seed Expenses
 export const INITIAL_STAFF_EXPENSES: StaffExpense[] = [];
@@ -512,7 +247,8 @@ function saveData<T>(key: string, data: T): void {
   }
 }
 
-let staffAccountsCache: StaffAccount[] = [...INITIAL_STAFF_ACCOUNTS];
+const KEY_STAFF_ACCOUNTS = 'plscf_staff_accounts_v3';
+let staffAccountsCache: StaffAccount[] | null = null;
 
 export class EventStore {
   // ==========================================
@@ -520,15 +256,15 @@ export class EventStore {
   // ==========================================
 
   static getStaffAccounts(): StaffAccount[] {
-    const rawList = staffAccountsCache || [];
-    const map = new Map<string, StaffAccount>();
-    for (const s of INITIAL_STAFF_ACCOUNTS) {
-      map.set(s.id, s);
+    if (staffAccountsCache !== null) {
+      return staffAccountsCache;
     }
-    for (const s of rawList) {
-      map.set(s.id, s);
+    const saved = loadData<StaffAccount[] | null>(KEY_STAFF_ACCOUNTS, null);
+    if (saved !== null) {
+      staffAccountsCache = saved;
+      return staffAccountsCache;
     }
-    staffAccountsCache = Array.from(map.values());
+    staffAccountsCache = [...INITIAL_STAFF_ACCOUNTS];
     return staffAccountsCache;
   }
 
@@ -559,15 +295,9 @@ export class EventStore {
       createdAt: row.created_at,
       createdBy: row.created_by || undefined,
     }));
-    const map = new Map<string, StaffAccount>();
-    for (const s of INITIAL_STAFF_ACCOUNTS) {
-      map.set(s.id, s);
-    }
-    for (const a of accounts) {
-      map.set(a.id, a);
-    }
-    staffAccountsCache = Array.from(map.values());
-    return staffAccountsCache;
+    staffAccountsCache = accounts;
+    saveData(KEY_STAFF_ACCOUNTS, accounts);
+    return accounts;
   }
 
   /**
@@ -612,6 +342,10 @@ export class EventStore {
 
   static saveStaffAccounts(accounts: StaffAccount[]): void {
     staffAccountsCache = accounts;
+    saveData(KEY_STAFF_ACCOUNTS, accounts);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('plscf_staff_sync'));
+    }
   }
 
   static async getActiveStaffSession(): Promise<StaffAccount | null> {
