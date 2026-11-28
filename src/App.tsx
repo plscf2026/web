@@ -280,8 +280,8 @@ export default function App() {
           // If gateway reported failure/cancel or user pressed "GO BACK" after an error
           if (statusParam.includes('fail') || statusParam.includes('cancel')) {
             setPaymentModalStep('failed');
-            const gatewayDetail = (params.get('message') || params.get('error') || params.get('reason') || '').trim();
-            const rawMsg = gatewayDetail.toLowerCase();
+            const rawReasonOriginal = (params.get('message') || params.get('error') || params.get('reason') || '').trim();
+            const rawMsg = rawReasonOriginal.toLowerCase();
             const isInsufficientBalance = rawMsg.includes('balance') || statusParam.includes('balance');
 
             if (isInsufficientBalance && PayStationService.getConfig().isSandbox) {
@@ -290,12 +290,17 @@ export default function App() {
                   ? 'পেমেন্ট ব্যর্থ: বিকাশ স্যান্ডবক্স টেস্ট নম্বরে ব্যালেন্স অপ্রতুল ("Insufficient balance")। অনুগ্রহ করে পর্যাপ্ত ব্যালেন্সযুক্ত সক্রিয় টেস্ট ওয়ালেট 01929918378 বা 01770618576 ব্যবহার করুন (OTP: 123456, PIN: 12121)। আপনার পূরণকৃত সব তথ্য সংরক্ষিত রয়েছে।'
                   : 'Payment Failed: The test bKash wallet has insufficient sandbox mock balance. Please use active test wallet 01929918378 or 01770618576 (OTP: 123456, PIN: 12121). All your entered data is preserved.'
               );
-            } else {
-              const detailSuffix = gatewayDetail ? ` (${gatewayDetail})` : '';
+            } else if (rawReasonOriginal) {
               setPaymentModalError(
                 language === 'bn'
-                  ? `PayStation গেটওয়েতে পেমেন্ট সম্পন্ন হয়নি বা বাতিল হয়েছে${detailSuffix}। আপনার পূরণকৃত সব তথ্য সংরক্ষিত রয়েছে — অনুগ্রহ করে আবার চেষ্টা করুন।`
-                  : `Payment was not completed or was cancelled on PayStation gateway${detailSuffix}. All your entered details are preserved — please try again.`
+                  ? `PayStation গেটওয়েতে পেমেন্ট সম্পন্ন হয়নি (${rawReasonOriginal})। আপনার পূরণকৃত সব তথ্য সংরক্ষিত রয়েছে — অনুগ্রহ করে আবার চেষ্টা করুন।`
+                  : `Payment was not completed on PayStation gateway (${rawReasonOriginal}). All your entered details are preserved — please try again.`
+              );
+            } else {
+              setPaymentModalError(
+                language === 'bn'
+                  ? 'PayStation গেটওয়েতে পেমেন্ট সম্পন্ন হয়নি বা বাতিল হয়েছে। আপনার পূরণকৃত সব তথ্য সংরক্ষিত রয়েছে — অনুগ্রহ করে আবার চেষ্টা করুন।'
+                  : 'Payment was not completed or was cancelled on PayStation gateway. All your entered details are preserved — please try again.'
               );
             }
           } else {
