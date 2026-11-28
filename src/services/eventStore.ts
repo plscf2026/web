@@ -1986,13 +1986,14 @@ export class EventStore {
   /**
    * Super Admin only: Close a staff member's financial account after event
    */
-  static closeStaffFinancialAccount(
+  static async closeStaffFinancialAccount(
     staffId: string,
     staffName: string,
     adminId: string,
     adminName: string,
     reason: string
-  ): boolean {
+  ): Promise<{ success: boolean; error?: string }> {
+    // 1. Mark any allocations as CLOSED locally & in Supabase
     const allocations = this.getStaffAllocations();
     const staffAllocs = allocations.filter((a) => a.staffId === staffId);
     staffAllocs.forEach((a) => {
@@ -2000,11 +2001,28 @@ export class EventStore {
     });
     this.saveStaffAllocations(allocations);
 
-    supabase
+    const { error: allocErr } = await supabase
       .from('staff_allocations')
       .update({ status: 'CLOSED' })
-      .eq('staff_id', staffId)
-      .then(undefined, () => {});
+      .eq('staff_id', staffId);
+
+    // 2. Persist DISABLED (closed/reconciled) status on staff_accounts in Supabase & local state
+    const { error: staffErr } = await supabase
+      .from('staff_accounts')
+      .update({ status: 'DISABLED' })
+      .eq('id', staffId);
+
+    if (staffErr) {
+      return { success: false, error: staffErr.message };
+    }
+    if (allocErr) {
+      console.warn('[EventStore] closeStaffFinancialAccount alloc update notice:', allocErr.message);
+    }
+
+    const accounts = this.getStaffAccounts().map((s) =>
+      s.id === staffId ? { ...s, status: 'DISABLED' as const } : s
+    );
+    this.saveStaffAccounts(accounts);
 
     this.recordAuditHistory({
       adminId,
@@ -2012,11 +2030,16 @@ export class EventStore {
       entityType: 'STAFF',
       entityId: staffId,
       action: 'CLOSE_FINANCIAL_ACCOUNT',
-      newValue: 'CLOSED',
+      newValue: 'DISABLED (CLOSED)',
       reason: `Staff ${staffName} financial account closed. Reason: ${reason}`,
     });
 
-    return true;
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('plscf_finance_sync'));
+      window.dispatchEvent(new CustomEvent('plscf_staff_sync'));
+    }
+
+    return { success: true };
   }
 
   /**
@@ -2045,7 +2068,7 @@ export class EventStore {
         } satisfies CentralBudget);
       }
 
-      if (!allocRes.error && Array.isArray(allocRes.data) && allocRes.data.length > 0) {
+      if (!allocRes.error && Array.isArray(allocRes.data)) {
         const mappedAllocs: StaffAllocation[] = allocRes.data.map((a: any) => ({
           id: a.id,
           staffId: a.staff_id,
@@ -2079,12 +2102,10 @@ export class EventStore {
           voidReason: e.void_reason || undefined,
           createdAt: e.created_at || new Date().toISOString(),
         }));
-        if (mappedExps.length > 0) {
-          this.saveStaffExpenses(mappedExps);
-        }
+        this.saveStaffExpenses(mappedExps);
       }
 
-      if (!ledgerRes.error && Array.isArray(ledgerRes.data) && ledgerRes.data.length > 0) {
+      if (!ledgerRes.error && Array.isArray(ledgerRes.data)) {
         const mappedLedger: FinancialLedgerEntry[] = ledgerRes.data.map((l: any) => ({
           id: l.id,
           staffId: l.staff_id,

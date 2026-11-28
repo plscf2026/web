@@ -334,7 +334,7 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
   };
 
   // Close Staff Account Handler (Requirement 8J)
-  const handleCloseStaffAccount = (staffId: string, staffName: string) => {
+  const handleCloseStaffAccount = async (staffId: string, staffName: string) => {
     if (!isSuperAdmin && !allowedStaffIds.has(staffId)) {
       alert('Unauthorized: You may only reconcile and close accounts for Finance Staff assigned to you.');
       return;
@@ -342,14 +342,22 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
     const reason = prompt(`Enter reason for closing financial account for ${staffName}:`);
     if (!reason) return;
 
-    EventStore.closeStaffFinancialAccount(
+    const res = await EventStore.closeStaffFinancialAccount(
       staffId,
       staffName,
       adminSession.id,
       adminSession.fullName,
       reason
     );
-    refreshAll();
+    if (!res.success) {
+      setFeedbackNotice({
+        type: 'error',
+        message: `Failed to close account for ${staffName} in database: ${res.error || 'Permission denied'}`,
+      });
+      setTimeout(() => setFeedbackNotice(null), 5000);
+      return;
+    }
+    await syncScopedStaffAndFinance(true);
     setFeedbackNotice({
       type: 'success',
       message: `Financial account for ${staffName} closed and reconciled.`,
@@ -645,7 +653,7 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
                       ledger
                     );
                     const sAllocs = allocations.filter((a) => a.staffId === stf.id);
-                    const isClosed = sAllocs.length > 0 && sAllocs.every((a) => a.status === 'CLOSED');
+                    const isClosed = stf.status !== 'ACTIVE' || (sAllocs.length > 0 && sAllocs.every((a) => a.status === 'CLOSED'));
                     return (
                       <tr key={stf.id} className="hover:bg-slate-50 transition-colors">
                         <td className="py-2.5 px-3 font-mono font-bold text-slate-900">

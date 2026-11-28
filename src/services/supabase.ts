@@ -16,6 +16,7 @@ import {
   hasSqlInjectionPattern,
 } from '../utils/security';
 import { parseScannedInput } from '../utils/tokenGenerator';
+import { GuardianBookingRecord } from '../utils/guardianBookingsView';
 import { broadcastLogout } from './authSync';
 
 // Supabase configuration provided by the user
@@ -469,6 +470,14 @@ const REGISTRATION_CACHE_TTL_MS = 10_000; // 10s memory cache to prevent redunda
 const registrationCache = new Map<number, CachedRegistrations>();
 const inFlightRegistrationFetches = new Map<number, Promise<{ data: RegistrationRecord[]; source: 'supabase' | 'local'; tableUsed: string; error?: string }>>();
 
+interface CachedGuardians {
+  data: GuardianBookingRecord[];
+  source: 'supabase' | 'local';
+  timestamp: number;
+}
+const guardianCache = new Map<number, CachedGuardians>();
+const inFlightGuardianFetches = new Map<number, Promise<{ data: GuardianBookingRecord[]; source: 'supabase' | 'local'; error?: string }>>();
+
 // Selective projection: strictly includes application fields, omits heavy gateway_response JSON blobs
 export const REGISTRATION_SELECT_COLUMNS = [
   'id',
@@ -550,8 +559,10 @@ export const SupabaseService = {
   clearRegistrationCache(year?: number): void {
     if (year) {
       registrationCache.delete(year);
+      guardianCache.delete(year);
     } else {
       registrationCache.clear();
+      guardianCache.clear();
     }
   },
   /**
@@ -821,6 +832,68 @@ export const SupabaseService = {
       return await fetchPromise;
     } finally {
       inFlightRegistrationFetches.delete(year);
+    }
+  },
+
+  /**
+   * Fetch all guardian bookings for the selected event year from `guardian_registrations_2027`
+   * independently of table pagination and search.
+   */
+  async fetchGuardians(
+    year: number = 2027,
+    options?: { forceRefresh?: boolean }
+  ): Promise<{ data: GuardianBookingRecord[]; source: 'supabase' | 'local'; error?: string }> {
+    if (!options?.forceRefresh) {
+      const cached = guardianCache.get(year);
+      if (cached && Date.now() - cached.timestamp < REGISTRATION_CACHE_TTL_MS) {
+        return { data: cached.data, source: cached.source };
+      }
+    }
+
+    if (inFlightGuardianFetches.has(year)) {
+      return inFlightGuardianFetches.get(year)!;
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('guardian_registrations_2027')
+          .select(
+            'id, registration_id, student_registration_id, event_id, year, guardian_name, guardian_name_bn, mobile_number, guardian_phone, relation, guardian_relation, guardian_age, photo_url, qr_token, registration_fee, guardian_fee, total_paid, payment_status, registration_approval_status, transaction_id, payment_method, gateway_invoice_number, is_checked_in, gate_status, registered_at'
+          )
+          .eq('year', year)
+          .order('registered_at', { ascending: false });
+
+        if (!error && Array.isArray(data)) {
+          const rows = data as GuardianBookingRecord[];
+          guardianCache.set(year, {
+            data: rows,
+            source: 'supabase',
+            timestamp: Date.now(),
+          });
+          return { data: rows, source: 'supabase' as const };
+        }
+
+        return {
+          data: [],
+          source: 'supabase' as const,
+          error: error?.message,
+        };
+      } catch (err: any) {
+        console.warn('Supabase fetchGuardians error:', err);
+        return {
+          data: [],
+          source: 'local' as const,
+          error: err?.message || 'Failed to fetch guardians',
+        };
+      }
+    })();
+
+    inFlightGuardianFetches.set(year, fetchPromise);
+    try {
+      return await fetchPromise;
+    } finally {
+      inFlightGuardianFetches.delete(year);
     }
   },
 

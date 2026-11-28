@@ -1,4 +1,15 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { Fragment, useState, useEffect, lazy, Suspense } from 'react';
+import {
+  GuardianBookingRecord,
+  countConfirmedGuardianBookings,
+  getGuardianGateStatus,
+  getGuardianMealStatus,
+  groupGuardiansByStudent,
+  matchesStudentOrGuardianSearch,
+  resolveGuardianContact,
+  resolveGuardianDisplayId,
+  resolveGuardianRelation,
+} from '../utils/guardianBookingsView';
 import {
   Shield,
   ShieldCheck,
@@ -409,6 +420,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [bookingToDelete, setBookingToDelete] = useState<RegistrationRecord | null>(null);
   const [deleteReason, setDeleteReason] = useState<string>('');
   const [isDeletingBooking, setIsDeletingBooking] = useState<boolean>(false);
+  const [guardians, setGuardians] = useState<GuardianBookingRecord[]>([]);
+  const [isFoodTrackingSynced, setIsFoodTrackingSynced] = useState<boolean>(false);
 
   // Gate Access Control Alert Modal for Admin / Super Admin attempting to distribute to NOT_ENTERED or BACK attendees
   const [gateBlockedAlert, setGateBlockedAlert] = useState<{
@@ -603,11 +616,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // Fetch registrations from Supabase for selected year
+  // Fetch registrations & linked guardians from Supabase for selected year
   const fetchSupabaseRegistrationsForYear = async (year: number, forceRefresh = false) => {
     setIsFetchingFromSupabase(true);
     try {
-      const res = await SupabaseService.fetchRegistrations(year, { forceRefresh });
+      const [res, guardiansRes] = await Promise.all([
+        SupabaseService.fetchRegistrations(year, { forceRefresh }),
+        SupabaseService.fetchGuardians(year, { forceRefresh }),
+      ]);
       setSupabaseTableUsed(res.tableUsed);
       const deletedIds = AppStore.getDeletedRegistrationIds();
 
@@ -621,6 +637,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           window.dispatchEvent(new CustomEvent('plscf_idcard_store_updated'));
         }
         // Circular event dispatch removed here: network fetch completion must NEVER re-trigger event listeners
+      }
+
+      if (!guardiansRes.error && Array.isArray(guardiansRes.data)) {
+        setGuardians(guardiansRes.data);
       }
     } catch (err) {
       console.warn('Error fetching registrations from Supabase:', err);
@@ -646,6 +666,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       EventStore.syncDistributionsWithSupabase(),
       EventStore.syncFinanceWithSupabase(),
     ]).then(() => {
+      setIsFoodTrackingSynced(true);
       syncLocalState();
     });
   }, [selectedYear, adminSession?.id]);
@@ -765,6 +786,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       fetchSupabaseRegistrationsForYear(selectedYear, true),
       EventStore.syncDistributionsWithSupabase(),
     ]);
+    setIsFoodTrackingSynced(true);
     SupabaseService.fetchDonations(selectedYear).then((res) => {
       if (res.data && res.data.length > 0) {
         setDonations(res.data);
@@ -919,14 +941,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setRegPage(1);
   };
 
+  const guardiansByStudent = groupGuardiansByStudent(guardians, selectedYear);
+  const confirmedGuardianCount = countConfirmedGuardianBookings(guardians, selectedYear);
+
   // Filtered registrations for selected year with comprehensive column filters
   const filteredRegistrations = registrationsForYear.filter((r) => {
-    const matchSearch =
-      r.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.mobileNumber.includes(searchTerm) ||
-      r.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.batchName.toLowerCase().includes(searchTerm.toLowerCase());
+    const linkedGuardians = guardiansByStudent.get(r.id.trim().toUpperCase()) || [];
+    const matchSearch = matchesStudentOrGuardianSearch(r, linkedGuardians, searchTerm);
 
     const matchCategory = categoryFilter === 'all' || r.category === categoryFilter;
     const matchStatus = statusFilter === 'all' || r.paymentStatus === statusFilter;
@@ -2609,7 +2630,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </span>
 
                   <button
-                    onClick={() => fetchSupabaseRegistrationsForYear(2027)}
+                    onClick={() => fetchSupabaseRegistrationsForYear(selectedYear, true)}
                     disabled={isFetchingFromSupabase}
                     className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold cursor-pointer transition-colors"
                     title="Fetch latest bookings directly from Supabase (registrations_2027)"
@@ -2629,7 +2650,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               {/* Bookings Statistics Bar */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                   <span className="text-[11px] text-slate-500 font-bold uppercase block">Genuine Paid Bookings</span>
                   <span className="text-2xl font-black text-slate-900 mt-1 block">
@@ -2656,6 +2677,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     {genuineRegistrations.filter((r) => r.category === 'current').length}
                   </span>
                   <span className="text-[10px] text-slate-400">Enrolled School & College</span>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <span className="text-[11px] text-slate-500 font-bold uppercase block">
+                    Guardian Bookings / অভিভাবক বুকিং
+                  </span>
+                  <span className="text-2xl font-black text-indigo-700 mt-1 block">
+                    {confirmedGuardianCount}
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    Confirmed Guardians ({selectedYear})
+                  </span>
                 </div>
 
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -2882,8 +2915,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </td>
                       </tr>
                     ) : (
-                      paginate(filteredRegistrations, regPage, regPageSize).map((reg) => (
-                        <tr key={reg.id} className="hover:bg-slate-50/80 transition-colors">
+                      paginate(filteredRegistrations, regPage, regPageSize).map((reg) => {
+                        const linkedGuardians = guardiansByStudent.get(reg.id.trim().toUpperCase()) || [];
+                        return (
+                        <Fragment key={reg.id}>
+                        <tr className="hover:bg-slate-50/80 transition-colors">
                           <td className="py-3 px-3">
                             <div className="flex items-center gap-3">
                               <div
@@ -3131,7 +3167,141 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </button>
                           </td>
                         </tr>
-                      ))
+                        {linkedGuardians.map((g) => {
+                          const gDisplayId = resolveGuardianDisplayId(g);
+                          const gContact = resolveGuardianContact(g);
+                          const gRelation = resolveGuardianRelation(g);
+                          const gGate = getGuardianGateStatus(g, gateEvents);
+                          const gBreakfast = getGuardianMealStatus(g, 'breakfast', foodDistributions, isFoodTrackingSynced || foodDistributions.length > 0);
+                          const gLunch = getGuardianMealStatus(g, 'lunch', foodDistributions, isFoodTrackingSynced || foodDistributions.length > 0);
+                          const gDinner = getGuardianMealStatus(g, 'dinner', foodDistributions, isFoodTrackingSynced || foodDistributions.length > 0);
+                          const gFee = Number(g.guardian_fee ?? g.total_paid ?? 0);
+                          const gPayStatus = String(g.payment_status || 'pending').toLowerCase();
+                          return (
+                            <tr
+                              key={`guardian-${reg.id}-${g.id}`}
+                              className="bg-indigo-50/35 hover:bg-indigo-50/60 transition-colors border-l-4 border-l-indigo-400"
+                            >
+                              <td className="py-2.5 pl-8 pr-3">
+                                <div className="flex items-center gap-2.5">
+                                  <span className="text-indigo-400 font-bold select-none">↳</span>
+                                  <div>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase">
+                                        Guardian / অভিভাবক
+                                      </span>
+                                      <span className="font-bold text-slate-900">{g.guardian_name}</span>
+                                    </div>
+                                    <span className="font-mono text-[10px] text-indigo-700 font-bold block mt-0.5">
+                                      {gDisplayId}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                  {gRelation}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-600">
+                                {gContact ? (
+                                  <div className="font-mono">{gContact}</div>
+                                ) : (
+                                  <span className="text-slate-400 italic">Unavailable</span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-semibold">
+                                  Unavailable
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <span
+                                  className={`inline-block px-2.5 py-1 rounded-lg text-[11px] font-black whitespace-nowrap ${
+                                    gGate === 'ENTRY'
+                                      ? 'bg-emerald-600 text-white'
+                                      : gGate === 'BACK'
+                                        ? 'bg-rose-600 text-white'
+                                        : gGate === 'NOT_ENTERED'
+                                          ? 'bg-slate-100 text-slate-600 border border-slate-300'
+                                          : 'bg-slate-100 text-slate-400 border border-slate-200'
+                                  }`}
+                                >
+                                  {gGate === 'ENTRY'
+                                    ? 'ENTRY'
+                                    : gGate === 'BACK'
+                                      ? 'BACK'
+                                      : gGate === 'NOT_ENTERED'
+                                        ? 'NOT ENTERED'
+                                        : 'Unavailable'}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <div className="flex items-center justify-center gap-1 flex-wrap">
+                                  {(
+                                    [
+                                      { code: 'B', label: 'Breakfast', status: gBreakfast },
+                                      { code: 'L', label: 'Lunch', status: gLunch },
+                                      { code: 'D', label: 'Dinner', status: gDinner },
+                                    ] as const
+                                  ).map((meal) => (
+                                    <span
+                                      key={meal.code}
+                                      title={`${meal.label}: ${meal.status === 'TAKEN' ? 'Taken' : meal.status === 'PENDING' ? 'Pending' : 'Unavailable'}`}
+                                      className={`px-1.5 py-0.5 rounded text-[10px] font-black whitespace-nowrap ${
+                                        meal.status === 'TAKEN'
+                                          ? 'bg-emerald-600 text-white'
+                                          : meal.status === 'PENDING'
+                                            ? 'bg-rose-500 text-white'
+                                            : 'bg-slate-100 text-slate-500 border border-slate-200'
+                                      }`}
+                                    >
+                                      {meal.code}:{' '}
+                                      {meal.status === 'TAKEN'
+                                        ? 'Taken'
+                                        : meal.status === 'PENDING'
+                                          ? 'Pending'
+                                          : 'Unavailable'}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className="font-bold text-slate-800 tabular-nums">৳{gFee}</span>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                    gPayStatus === 'paid'
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}
+                                >
+                                  {gPayStatus}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-[11px] text-slate-500">
+                                <span className="font-mono block">{g.transaction_id || 'Unavailable'}</span>
+                              </td>
+                              <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                                {onSelectTicket ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => onSelectTicket(reg)}
+                                    className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
+                                  >
+                                    View Ticket
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] text-slate-400">Unavailable</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        </Fragment>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -3387,6 +3557,87 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
+
+                      {/* Linked Guardian Sub-Cards (Mobile) */}
+                      {(guardiansByStudent.get(reg.id.trim().toUpperCase()) || []).map((g) => {
+                        const gDisplayId = resolveGuardianDisplayId(g);
+                        const gContact = resolveGuardianContact(g);
+                        const gRelation = resolveGuardianRelation(g);
+                        const gGate = getGuardianGateStatus(g, gateEvents);
+                        const gBreakfast = getGuardianMealStatus(g, 'breakfast', foodDistributions, isFoodTrackingSynced || foodDistributions.length > 0);
+                        const gLunch = getGuardianMealStatus(g, 'lunch', foodDistributions, isFoodTrackingSynced || foodDistributions.length > 0);
+                        const gDinner = getGuardianMealStatus(g, 'dinner', foodDistributions, isFoodTrackingSynced || foodDistributions.length > 0);
+                        return (
+                          <div
+                            key={`mobile-guardian-${reg.id}-${g.id}`}
+                            className="ml-3 pl-3 border-l-2 border-indigo-300 bg-indigo-50/45 rounded-r-xl p-3 space-y-2 text-xs"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase">
+                                    Guardian / অভিভাবক
+                                  </span>
+                                  <span className="font-bold text-slate-900 truncate">{g.guardian_name}</span>
+                                </div>
+                                <span className="font-mono text-[10px] text-indigo-700 font-bold block mt-0.5">
+                                  {gDisplayId} • {gRelation}
+                                </span>
+                              </div>
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-black shrink-0 ${
+                                  gGate === 'ENTRY'
+                                    ? 'bg-emerald-600 text-white'
+                                    : gGate === 'BACK'
+                                      ? 'bg-rose-600 text-white'
+                                      : gGate === 'NOT_ENTERED'
+                                        ? 'bg-slate-100 text-slate-600 border border-slate-300'
+                                        : 'bg-slate-100 text-slate-400 border border-slate-200'
+                                }`}
+                              >
+                                {gGate === 'ENTRY'
+                                  ? 'ENTRY'
+                                  : gGate === 'BACK'
+                                    ? 'BACK'
+                                    : gGate === 'NOT_ENTERED'
+                                      ? 'NOT ENTERED'
+                                      : 'Unavailable'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2 text-[11px] text-slate-600">
+                              <span className="font-mono">{gContact || 'Unavailable'}</span>
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {(
+                                  [
+                                    { code: 'B', status: gBreakfast },
+                                    { code: 'L', status: gLunch },
+                                    { code: 'D', status: gDinner },
+                                  ] as const
+                                ).map((meal) => (
+                                  <span
+                                    key={meal.code}
+                                    className={`px-1.5 py-0.5 rounded text-[10px] font-black ${
+                                      meal.status === 'TAKEN'
+                                        ? 'bg-emerald-600 text-white'
+                                        : meal.status === 'PENDING'
+                                          ? 'bg-rose-500 text-white'
+                                          : 'bg-slate-100 text-slate-500 border border-slate-200'
+                                    }`}
+                                  >
+                                    {meal.code}:{' '}
+                                    {meal.status === 'TAKEN'
+                                      ? 'Taken'
+                                      : meal.status === 'PENDING'
+                                        ? 'Pending'
+                                        : 'Unavailable'}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   ))
                 )}

@@ -399,3 +399,28 @@ test('4. Homepage Counters: 2 former + 1 current + 1 guardian => Total Registere
   assert.equal(derived?.guardians, 1);
   assert.equal(derived?.batchesRepresented, 2);
 });
+
+test('5. Guardian DB Persistence Migration: maps registration_id, mobile_number, relation, and guardian_fee in both RPCs', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const migrationPath = path.resolve(
+    process.cwd(),
+    'supabase/migrations/20270402000000_fix_guardian_registration_id_and_mobile_persistence.sql'
+  );
+  const sql = fs.readFileSync(migrationPath, 'utf8');
+
+  // Ensure both rpc_promote_pending_order_to_registration and rpc_verify_payment populate all 4 previously omitted columns
+  const insertMatches = sql.match(/INSERT INTO public\.guardian_registrations_2027\s*\([\s\S]*?\)\s*VALUES\s*\(/g) || [];
+  assert.equal(insertMatches.length, 2, 'Expected 2 guardian_registrations_2027 INSERT blocks (promote + verify fallback)');
+
+  for (const block of insertMatches) {
+    assert.ok(block.includes('registration_id'), 'INSERT must explicitly set registration_id');
+    assert.ok(block.includes('mobile_number'), 'INSERT must explicitly set mobile_number');
+    assert.ok(block.includes('relation,'), 'INSERT must explicitly set relation');
+    assert.ok(block.includes('guardian_fee'), 'INSERT must explicitly set guardian_fee');
+  }
+
+  // Ensure rpc_lookup_ticket checks registration_id and mobile_number fallback
+  assert.ok(sql.includes('COALESCE(g.registration_id'), 'rpc_lookup_ticket should check registration_id');
+  assert.ok(sql.includes('COALESCE(g.guardian_phone, g.mobile_number'), 'rpc_lookup_ticket should check mobile_number fallback');
+});
