@@ -559,8 +559,15 @@ export class EventStore {
       createdAt: row.created_at,
       createdBy: row.created_by || undefined,
     }));
-    staffAccountsCache = accounts;
-    return accounts;
+    const map = new Map<string, StaffAccount>();
+    for (const s of INITIAL_STAFF_ACCOUNTS) {
+      map.set(s.id, s);
+    }
+    for (const a of accounts) {
+      map.set(a.id, a);
+    }
+    staffAccountsCache = Array.from(map.values());
+    return staffAccountsCache;
   }
 
   /**
@@ -570,7 +577,7 @@ export class EventStore {
   static async fetchAssignedFinanceStaff(managerId?: string, isSuperAdmin = false): Promise<StaffAccount[]> {
     try {
       const { data, error } = await supabase.rpc('rpc_get_manager_finance_staff');
-      if (!error && Array.isArray(data)) {
+      if (!error && Array.isArray(data) && data.length > 0) {
         return data.map((row: any) => ({
           id: row.id,
           authUserId: row.authUserId || '',

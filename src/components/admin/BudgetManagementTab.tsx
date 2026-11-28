@@ -52,16 +52,17 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
     username: 'superadmin',
   };
   const isSuperAdmin = String(adminRole || '').toLowerCase() === 'super_admin';
+  const isFinanceManager = String(adminRole || '').toLowerCase() === 'finance_manager';
 
   const [centralBudget, setCentralBudget] = useState(() => EventStore.getCentralBudget());
   const [rawAllocations, setRawAllocations] = useState(() => EventStore.getStaffAllocations());
   const [rawExpenses, setRawExpenses] = useState(() => EventStore.getStaffExpenses());
   const [rawLedger, setRawLedger] = useState(() => EventStore.getFinancialLedger());
   const [staffList, setStaffList] = useState<StaffAccount[]>(() =>
-    isSuperAdmin
+    isSuperAdmin || isFinanceManager
       ? EventStore.getStaffAccounts()
       : EventStore.getStaffAccounts().filter(
-          (s) => s.role === 'FINANCE_STAFF' && s.assignedManagerId === adminSession.id
+          (s) => s.role === 'FINANCE_STAFF' && (!s.assignedManagerId || s.assignedManagerId === adminSession.id)
         )
   );
   const [viewingStaffProfile, setViewingStaffProfile] = useState<StaffAccount | null>(null);
@@ -106,10 +107,12 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
   }, [expenseSearch, statusFilter]);
 
   // Synchronize assigned Staff & Finance records from Supabase (RLS-enforced)
-  const syncScopedStaffAndFinance = async () => {
+  const syncScopedStaffAndFinance = async (skipSupabaseSync = false) => {
     try {
-      await EventStore.syncFinanceWithSupabase();
-      if (isSuperAdmin) {
+      if (!skipSupabaseSync) {
+        await EventStore.syncFinanceWithSupabase();
+      }
+      if (isSuperAdmin || isFinanceManager) {
         const fetched = await EventStore.fetchStaffAccounts().catch(() => EventStore.getStaffAccounts());
         setStaffList(fetched);
       } else {
@@ -124,9 +127,9 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
   };
 
   useEffect(() => {
-    void syncScopedStaffAndFinance();
+    void syncScopedStaffAndFinance(false);
     const onSync = () => {
-      void syncScopedStaffAndFinance();
+      void syncScopedStaffAndFinance(true);
     };
     window.addEventListener('plscf_finance_sync', onSync);
     window.addEventListener('plscf_staff_sync', onSync);
@@ -134,29 +137,29 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
       window.removeEventListener('plscf_finance_sync', onSync);
       window.removeEventListener('plscf_staff_sync', onSync);
     };
-  }, [adminSession.id, isSuperAdmin]);
+  }, [adminSession.id, isSuperAdmin, isFinanceManager]);
 
   // Strict Finance Manager Isolation: only see records belonging to assigned Finance Staff
   const allowedStaffIds = useMemo(() => new Set(staffList.map((s) => s.id)), [staffList]);
 
   const allocations = useMemo(
-    () => (isSuperAdmin ? rawAllocations : rawAllocations.filter((a) => allowedStaffIds.has(a.staffId))),
-    [isSuperAdmin, rawAllocations, allowedStaffIds]
+    () => (isSuperAdmin || isFinanceManager ? rawAllocations : rawAllocations.filter((a) => allowedStaffIds.has(a.staffId))),
+    [isSuperAdmin, isFinanceManager, rawAllocations, allowedStaffIds]
   );
 
   const expenses = useMemo(
-    () => (isSuperAdmin ? rawExpenses : rawExpenses.filter((e) => allowedStaffIds.has(e.staffId))),
-    [isSuperAdmin, rawExpenses, allowedStaffIds]
+    () => (isSuperAdmin || isFinanceManager ? rawExpenses : rawExpenses.filter((e) => allowedStaffIds.has(e.staffId))),
+    [isSuperAdmin, isFinanceManager, rawExpenses, allowedStaffIds]
   );
 
   const ledger = useMemo(
     () =>
-      isSuperAdmin
+      isSuperAdmin || isFinanceManager
         ? rawLedger
         : rawLedger.filter(
             (l) => allowedStaffIds.has(l.staffId) || l.transactionType === 'REGISTRATION_INFLOW'
           ),
-    [isSuperAdmin, rawLedger, allowedStaffIds]
+    [isSuperAdmin, isFinanceManager, rawLedger, allowedStaffIds]
   );
 
   const refreshAll = () => {
@@ -164,7 +167,7 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
     setRawAllocations(EventStore.getStaffAllocations());
     setRawExpenses(EventStore.getStaffExpenses());
     setRawLedger(EventStore.getFinancialLedger());
-    if (isSuperAdmin) {
+    if (isSuperAdmin || isFinanceManager) {
       setStaffList(EventStore.getStaffAccounts());
     }
   };
@@ -210,8 +213,8 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
     }
 
     const staff = staffList.find((s) => s.id === selectedStaffId);
-    if (!staff || (!isSuperAdmin && !allowedStaffIds.has(staff.id))) {
-      alert('Unauthorized: You may only allocate budget to Finance Staff assigned to you.');
+    if (!staff || (!isSuperAdmin && !isFinanceManager && !allowedStaffIds.has(staff.id))) {
+      alert('Unauthorized: You may only allocate budget to authorized staff.');
       return;
     }
 
@@ -242,8 +245,8 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
     if (!returnStaffId || isNaN(amt) || amt <= 0) return;
 
     const staff = staffList.find((s) => s.id === returnStaffId);
-    if (!staff || (!isSuperAdmin && !allowedStaffIds.has(staff.id))) {
-      alert('Unauthorized: You may only record cash returns for Finance Staff assigned to you.');
+    if (!staff || (!isSuperAdmin && !isFinanceManager && !allowedStaffIds.has(staff.id))) {
+      alert('Unauthorized: You may only record cash returns for authorized staff.');
       return;
     }
 
@@ -1223,14 +1226,35 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
                   value={selectedStaffId}
                   onChange={(e) => setSelectedStaffId(e.target.value)}
                   required
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold bg-white text-slate-900"
                 >
                   <option value="">-- Choose Staff Account --</option>
-                  {staffList.filter((s) => s.status === 'ACTIVE').map((s) => (
-                    <option key={s.id} value={s.id}>{s.fullName} ({s.id} - {s.role})</option>
-                  ))}
+                  {staffList
+                    .filter((s) => s.role !== 'SUPER_ADMIN' && (!s.status || s.status.toUpperCase() === 'ACTIVE'))
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.fullName} ({s.id} - {s.role.replace(/_/g, ' ')})
+                      </option>
+                    ))}
                 </select>
               </div>
+              {selectedStaffId && (() => {
+                const staff = staffList.find((s) => s.id === selectedStaffId);
+                if (!staff) return null;
+                const summary = calculateStaffFinancialSummary(
+                  staff.id,
+                  staff.fullName,
+                  allocations,
+                  expenses,
+                  ledger
+                );
+                return (
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs flex justify-between items-center text-emerald-900">
+                    <span>Current Active Cash Balance:</span>
+                    <strong className="font-mono font-bold">BDT {summary.remainingSpendableBalance.toLocaleString()}</strong>
+                  </div>
+                );
+              })()}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Allocated Amount (BDT) *</label>
                 <input
@@ -1285,14 +1309,49 @@ export const BudgetManagementTab: React.FC<BudgetManagementTabProps> = ({
                   value={returnStaffId}
                   onChange={(e) => setReturnStaffId(e.target.value)}
                   required
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold bg-white text-slate-900"
                 >
                   <option value="">-- Choose Staff Account --</option>
-                  {staffList.map((s) => (
-                    <option key={s.id} value={s.id}>{s.fullName} ({s.id})</option>
-                  ))}
+                  {staffList
+                    .filter((s) => s.role !== 'SUPER_ADMIN' && (!s.status || s.status.toUpperCase() === 'ACTIVE'))
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.fullName} ({s.id} - {s.role.replace(/_/g, ' ')})
+                      </option>
+                    ))}
                 </select>
               </div>
+              {returnStaffId && (() => {
+                const staff = staffList.find((s) => s.id === returnStaffId);
+                if (!staff) return null;
+                const summary = calculateStaffFinancialSummary(
+                  staff.id,
+                  staff.fullName,
+                  allocations,
+                  expenses,
+                  ledger
+                );
+                return (
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs space-y-1.5">
+                    <div className="flex justify-between text-slate-700">
+                      <span>Total Allocated:</span>
+                      <strong className="font-mono">BDT {summary.totalAllocated.toLocaleString()}</strong>
+                    </div>
+                    <div className="flex justify-between text-slate-700">
+                      <span>Approved Expenses:</span>
+                      <strong className="font-mono">BDT {summary.totalApprovedExpenses.toLocaleString()}</strong>
+                    </div>
+                    <div className="flex justify-between text-slate-700">
+                      <span>Previously Returned:</span>
+                      <strong className="font-mono">BDT {summary.totalCashReturned.toLocaleString()}</strong>
+                    </div>
+                    <div className="flex justify-between border-t border-amber-200 pt-1.5 font-bold text-amber-900">
+                      <span>Current Cash in Hand:</span>
+                      <span className="font-mono text-sm">BDT {summary.remainingSpendableBalance.toLocaleString()}</span>
+                    </div>
+                  </div>
+                );
+              })()}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Returned Amount (BDT) *</label>
                 <input
